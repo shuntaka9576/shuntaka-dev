@@ -10,11 +10,11 @@
   "dependencies": {
     "@aws-sdk/client-dsql": "^3.700.0",
     "@aws-sdk/dsql-signer": "^3.700.0",
-    "commander": "^12.0.0",
+    "commander": "^14.0.0",
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.11.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
