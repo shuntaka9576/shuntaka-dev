@@ -1,0 +1,16 @@
+[package]
+name = "adapter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kernel.workspace = true
+shared.workspace = true
+async-trait.workspace = true
+derive-new.workspace = true
+anyhow.workspace = true
+sqlx.workspace = true
+aws-config.workspace = true
+aws-sdk-dsql.workspace = true
+chrono.workspace = true
+uuid.workspace = true

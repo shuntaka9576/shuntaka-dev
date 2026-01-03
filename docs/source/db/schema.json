@@ -1,0 +1,291 @@
+{
+  "name": "postgres",
+  "tables": [
+    {
+      "name": "app.users",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "email", "type": "text", "nullable": false },
+        {
+          "name": "github_installation_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "users_pkey",
+          "def": "CREATE UNIQUE INDEX users_pkey ON app.users USING btree (user_id)",
+          "table": "app.users",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "users_name_key",
+          "def": "CREATE UNIQUE INDEX users_name_key ON app.users USING btree (name)",
+          "table": "app.users",
+          "columns": ["name"]
+        },
+        {
+          "name": "users_email_key",
+          "def": "CREATE UNIQUE INDEX users_email_key ON app.users USING btree (email)",
+          "table": "app.users",
+          "columns": ["email"]
+        },
+        {
+          "name": "users_github_installation_id_key",
+          "def": "CREATE UNIQUE INDEX users_github_installation_id_key ON app.users USING btree (github_installation_id)",
+          "table": "app.users",
+          "columns": ["github_installation_id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "users_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (user_id)",
+          "table": "app.users",
+          "referenced_table": "",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "users_name_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (name)",
+          "table": "app.users",
+          "referenced_table": "",
+          "columns": ["name"]
+        },
+        {
+          "name": "users_email_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (email)",
+          "table": "app.users",
+          "referenced_table": "",
+          "columns": ["email"]
+        },
+        {
+          "name": "users_github_installation_id_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (github_installation_id)",
+          "table": "app.users",
+          "referenced_table": "",
+          "columns": ["github_installation_id"]
+        }
+      ]
+    },
+    {
+      "name": "app.tags",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "tag_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        { "name": "name", "type": "text", "nullable": false }
+      ],
+      "indexes": [
+        {
+          "name": "tags_pkey",
+          "def": "CREATE UNIQUE INDEX tags_pkey ON app.tags USING btree (tag_id)",
+          "table": "app.tags",
+          "columns": ["tag_id"]
+        },
+        {
+          "name": "tags_name_key",
+          "def": "CREATE UNIQUE INDEX tags_name_key ON app.tags USING btree (name)",
+          "table": "app.tags",
+          "columns": ["name"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "tags_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (tag_id)",
+          "table": "app.tags",
+          "referenced_table": "",
+          "columns": ["tag_id"]
+        },
+        {
+          "name": "tags_name_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (name)",
+          "table": "app.tags",
+          "referenced_table": "",
+          "columns": ["name"]
+        }
+      ]
+    },
+    {
+      "name": "app.articles",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "article_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "slug", "type": "text", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": false },
+        { "name": "content", "type": "text", "nullable": false },
+        { "name": "thumbnail", "type": "text", "nullable": true },
+        { "name": "description", "type": "text", "nullable": false },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'draft'::text",
+          "comment": "記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)"
+        },
+        { "name": "type", "type": "text", "nullable": true },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "articles_pkey",
+          "def": "CREATE UNIQUE INDEX articles_pkey ON app.articles USING btree (article_id)",
+          "table": "app.articles",
+          "columns": ["article_id"]
+        },
+        {
+          "name": "articles_slug_key",
+          "def": "CREATE UNIQUE INDEX articles_slug_key ON app.articles USING btree (slug)",
+          "table": "app.articles",
+          "columns": ["slug"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "articles_status_check",
+          "type": "CHECK",
+          "def": "CHECK ((status = ANY (ARRAY['draft'::text, 'review'::text, 'scheduled'::text, 'published'::text, 'archived'::text])))",
+          "table": "app.articles",
+          "referenced_table": "",
+          "columns": ["status"]
+        },
+        {
+          "name": "articles_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (article_id)",
+          "table": "app.articles",
+          "referenced_table": "",
+          "columns": ["article_id"]
+        },
+        {
+          "name": "articles_slug_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (slug)",
+          "table": "app.articles",
+          "referenced_table": "",
+          "columns": ["slug"]
+        }
+      ]
+    },
+    {
+      "name": "app.articles_tags",
+      "type": "BASE TABLE",
+      "columns": [
+        { "name": "article_id", "type": "uuid", "nullable": false },
+        { "name": "tag_id", "type": "uuid", "nullable": false }
+      ],
+      "indexes": [
+        {
+          "name": "articles_tags_pkey",
+          "def": "CREATE UNIQUE INDEX articles_tags_pkey ON app.articles_tags USING btree (article_id, tag_id)",
+          "table": "app.articles_tags",
+          "columns": ["article_id", "tag_id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "articles_tags_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (article_id, tag_id)",
+          "table": "app.articles_tags",
+          "referenced_table": "",
+          "columns": ["article_id", "tag_id"]
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "table": "app.articles",
+      "columns": ["user_id"],
+      "cardinality": "zero_or_more",
+      "parent_table": "app.users",
+      "parent_columns": ["user_id"],
+      "parent_cardinality": "exactly_one",
+      "def": "Additional Relation",
+      "virtual": true
+    },
+    {
+      "table": "app.articles_tags",
+      "columns": ["article_id"],
+      "cardinality": "zero_or_more",
+      "parent_table": "app.articles",
+      "parent_columns": ["article_id"],
+      "parent_cardinality": "exactly_one",
+      "def": "Additional Relation",
+      "virtual": true
+    },
+    {
+      "table": "app.articles_tags",
+      "columns": ["tag_id"],
+      "cardinality": "zero_or_more",
+      "parent_table": "app.tags",
+      "parent_columns": ["tag_id"],
+      "parent_cardinality": "exactly_one",
+      "def": "Additional Relation",
+      "virtual": true
+    }
+  ],
+  "driver": {
+    "name": "postgres",
+    "database_version": "PostgreSQL 15.15 (Debian 15.15-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "meta": {
+      "current_schema": "app",
+      "search_paths": ["app"],
+      "dict": { "Functions": "Stored procedures and functions" }
+    }
+  }
+}

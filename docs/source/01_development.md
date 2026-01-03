@@ -1,0 +1,252 @@
+# 環境構築
+
+```{toctree}
+:maxdepth: 1
+:caption: development
+```
+
+## 構成
+
+![image](assets/architecture.drawio.png)
+
+## 初回構築
+
+### Vercel
+
+1. [Vercel](https://vercel.com)でGitHubリポジトリをインポート
+2. Root Directory: `apps/web` を指定
+3. Framework Preset: Next.js（自動検出）
+4. Environment Variables に上記の環境変数を設定
+   - Production: 本番用の値を設定
+   - Preview: プレビュー用の値を設定（GTMは空推奨）
+5. Deploy
+
+| 設定項目 | 値 |
+|----------|-----|
+| Production Branch | `main` |
+| Preview | 全PRで自動生成 |
+| Root Directory | `apps/web` |
+| Framework | Next.js（自動検出） |
+| Build Command | `pnpm build`（デフォルト） |
+| Output Directory | `.next`（デフォルト） |
+
+| 変数名 | 用途 | Production | Preview |
+|--------|------|------------|---------|
+| `NEXT_PUBLIC_API_URL` | バックエンドAPI | `https://api.shuntaka.dev` |  |
+| `NEXT_PUBLIC_SITE_URL` | サイトURL | `https://shuntaka.dev` |  |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM | `GTM-XXXXXXX` | （空） |
+
+### GitHub App (Webhook)
+
+記事リポジトリへのpushで自動的に記事を更新するためのGitHub App設定。
+
+1. GitHub Settings → Developer settings → GitHub Apps → New GitHub App
+2. 設定値:
+   - **GitHub App name**: `shuntaka-blog-api`（任意）
+   - **Webhook URL**: `https://api-endpoint/webhooks/github`
+   - **Permissions**:
+     - Repository permissions → Contents: Read-only
+   - **Subscribe to events**: Push
+3. 作成後、App IDを控える
+4. Private keyを生成してダウンロード
+
+### AWS
+
+#### SSM Parameter Storeの登録
+
+GitHub Actions秘密鍵を登録
+
+```bash
+export STAGE_NAME=""
+aws ssm put-parameter \
+  --name "/${STAGE_NAME}/shuntaka/github-app/private-key" \
+  --type "SecureString" \
+  --value "$(cat path/to/private-key.pem)"
+```
+
+Cloudinaryの設定（OGP画像生成用）
+
+1. [Cloudinary](https://cloudinary.com/)でアカウント作成
+2. Dashboard から Cloud name, API Key, API Secret を取得
+3. SSM Parameter Storeに登録
+
+```bash
+export STAGE_NAME=""
+aws ssm put-parameter \
+  --name "/${STAGE_NAME}/shuntaka/cloudinary/api-secret" \
+  --type "SecureString" \
+  --value "your-api-secret"
+```
+#### OIDCプロバイダーの作成
+
+アカウントに1つのみ作成（初回のみ）。
+
+```bash
+export STAGE_NAME=""
+# stageNameはこのスタックでは使用しないが、getConfig()の実行に必要
+pnpm exec dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  st-oidc-provider \
+  --require-approval never
+```
+
+#### GitHub Actions用のデプロイロールの作成
+
+```bash
+export STAGE_NAME=""
+pnpm exec dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  ${STAGE_NAME:0:1}-st-deploy-role \
+  --require-approval never
+```
+
+#### ホストゾーンの作成
+
+```bash
+export STAGE_NAME=""
+export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query "Account" --output text)
+pnpm exec dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  ${STAGE_NAME:0:1}-st-global-dns \
+  --require-approval never
+```
+
+#### Route53にNSレコードを登録
+
+AWSのRoute53からホストゾーンのNSレコードを確認し、ムームードメインのコンソール画面のNSレコードを変更
+
+証明書の作成
+
+```bash
+export STAGE_NAME=""
+pnpm exec dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  ${STAGE_NAME:0:1}-st-tokyo-cert \
+  --require-approval never
+
+# デプロイ中にAWSコンソール ap-northeast-1 リージョンのACMで、*.shuntaka.techドメインのDNS検証レコードをRoute53に追加
+```
+
+#### GitHu ActionsにEnvironmentを登録
+
+`gh`コマンドで環境変数を設定（実際のシークレットはSSM Parameter Storeに格納）:
+
+> **Note**: Webフロントエンド（Next.js）の環境変数はVercelダッシュボードで設定します。[Vercelセクション](#vercel)を参照してください。
+
+```bash
+# 設定値（環境に応じて変更）
+export STAGE_NAME=""
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+export GH_APP_ID=123456
+export CLOUDINARY_CLOUD_NAME=your-cloud-name
+export CLOUDINARY_API_KEY=123456789012345
+
+# GitHub Environmentの作成（初回のみ）
+gh api --method PUT repos/shuntaka9576/shuntaka-dev/environments/${STAGE_NAME}
+
+# GitHub Actions 用（CDKデプロイで使用）
+gh secret set AWS_ACCOUNT_ID --env ${STAGE_NAME} --body "${AWS_ACCOUNT_ID}"
+
+# Lambda 環境変数用（CDK経由でLambdaに設定）
+gh secret set GH_APP_ID --env ${STAGE_NAME} --body "${GH_APP_ID}"
+gh variable set GH_APP_SECRET_PEM_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/github-app/private-key"
+gh secret set CLOUDINARY_CLOUD_NAME --env ${STAGE_NAME} --body "${CLOUDINARY_CLOUD_NAME}"
+gh secret set CLOUDINARY_API_KEY --env ${STAGE_NAME} --body "${CLOUDINARY_API_KEY}"
+gh variable set CLOUDINARY_API_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/cloudinary/api-secret"
+```
+
+usersテーブルにinstallation_idを登録。GitHub Appをリポジトリにインストール後、installation_idを確認して登録。
+
+```sql
+-- installation_idの確認方法:
+-- GitHub App設定画面 → Install App → インストール済みリポジトリをクリック
+-- URLの末尾の数字がinstallation_id (例: /installations/12345678)
+
+UPDATE app.users
+SET github_installation_id = 12345678
+WHERE name = 'shuntaka';
+```
+
+
+#### メインスタックのデプロイ
+
+```bash
+export STAGE_NAME=""
+pnpm exec dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  ${STAGE_NAME:0:1}-st-main \
+  --require-approval never
+```
+
+完了したら、VercelとRoute53にAレコードの紐付けをしてください。
+
+#### DBマイグレーション
+
+```bash
+export STAGE_NAME=""
+cd tools/dsql-cli
+
+export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
+  --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
+  --query "Parameter.Value" --output text)
+pnpm convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
+
+# 既存のデータを削除する場合
+# pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+```
+
+
+## データベース関連
+
+### dsql-cli
+
+PostgreSQLを起動
+
+```bash
+# ルートディレクトリで
+docker compose up -d postgres
+```
+
+マイグレーション実行
+
+```bash
+cd tools/dsql-cli
+# ローカル
+pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+
+# DSQL
+export STAGE_NAME=""
+export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
+  --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
+  --query "Parameter.Value" --output text)
+pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+```
+
+スキーマ削除
+
+```bash
+cd tools/dsql-cli
+# ローカル
+pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+
+# DSQL
+pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
+```
+
+DynamoDB→DSQLデータ変換
+
+```bash
+cd tools/dsql-cli
+
+# 本番データを変換（99_seed_data.sqlを生成）
+pnpm convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
+
+# ローカルDBに投入
+pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+
+# DSQLに投入
+pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
+pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+```

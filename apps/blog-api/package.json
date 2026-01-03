@@ -1,0 +1,10 @@
+{
+  "name": "blog-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cargo make run",
+    "lint": "cargo clippy --all --all-targets",
+    "test": "cargo test --all"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@shuntaka-dev/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.1.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "rss": "^1.2.2",
+    "tocbot": "^4.36.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/rss": "^0.0.32",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

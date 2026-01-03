@@ -1,0 +1,8 @@
+packages:
+  - docs
+  - apps/*
+  - iac/*
+  - tools/*
+
+ignoredBuiltDependencies:
+  - esbuild

@@ -1,0 +1,44 @@
+import Link from 'next/link';
+import type { Article } from '@/lib/api';
+
+interface ArticleCardProps {
+  article: Article;
+  userName: string;
+}
+
+function formatDate(dateString: string | null): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+export function ArticleCard({ article, userName }: ArticleCardProps) {
+  return (
+    <Link href={`/${userName}/articles/${article.slug}`}>
+      <div
+        className="mb-4 block w-full border-b"
+        style={{ borderColor: 'var(--article-record-underline)' }}
+      >
+        <div className="mb-2 flex justify-between">
+          <div>
+            <div className="pt-2 pr-2 pb-4 text-base">{article.title}</div>
+            <div className="text-xs">{formatDate(article.publishedAt)}</div>
+          </div>
+          {article.thumbnail && (
+            <div>
+              <img
+                src={article.thumbnail}
+                alt={article.title}
+                className="h-[100px] w-[150px] rounded-[10px] object-cover"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}

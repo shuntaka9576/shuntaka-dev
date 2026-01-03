@@ -1,0 +1,73 @@
+[package]
+name = "blog-api"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "server"
+path = "src/bin/app.rs"
+
+[workspace]
+members = ["api", "kernel", "adapter", "shared", "registry", "markdown", "infrastructure"]
+
+[workspace.dependencies]
+adapter = { path = "./adapter" }
+api = { path = "./api" }
+kernel = { path = "./kernel" }
+shared = { path = "./shared" }
+registry = { path = "./registry" }
+markdown = { path = "./markdown" }
+infrastructure = { path = "./infrastructure" }
+anyhow = "1.0.100"
+axum = { version = "0.8.7", features = ["macros"] }
+sqlx = { version = "0.8.6", features = [
+  "runtime-tokio",
+  "tls-rustls",
+  "uuid",
+  "chrono",
+  "macros",
+  "postgres",
+  "migrate",
+] }
+tokio = { version = "1.48.0", features = ["full"] }
+async-trait = "0.1.89"
+derive-new = "0.7.0"
+rstest = "0.26.1"
+utoipa = "5.3"
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+uuid = { version = "1.11", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+aws-config = "1.5"
+aws-sdk-dsql = "1.3"
+aws-sdk-ssm = "1.61"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+jsonwebtoken = "9"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+base64 = "0.22"
+regex = "1"
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+urlencoding = "2"
+futures = "0.3"
+thiserror = "2"
+tracing = "0.1"
+
+[dependencies]
+adapter.workspace = true
+api.workspace = true
+registry.workspace = true
+shared.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+axum.workspace = true
+sqlx.workspace = true
+async-trait.workspace = true
+derive-new.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

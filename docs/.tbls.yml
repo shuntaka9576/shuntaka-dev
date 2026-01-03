@@ -1,0 +1,32 @@
+dsn: postgres://postgres:postgres@127.0.0.1:5433/postgres?sslmode=disable&search_path=app
+
+comments:
+  - table: app.articles
+    columnComments:
+      status: "記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)"
+
+docPath: source/db
+er:
+  format: mermaid
+  showColumnTypes:
+    related: true
+    primary: true
+relations:
+  - table: app.articles
+    columns:
+      - user_id
+    parentTable: app.users
+    parentColumns:
+      - user_id
+  - table: app.articles_tags
+    columns:
+      - article_id
+    parentTable: app.articles
+    parentColumns:
+      - article_id
+  - table: app.articles_tags
+    columns:
+      - tag_id
+    parentTable: app.tags
+    parentColumns:
+      - tag_id

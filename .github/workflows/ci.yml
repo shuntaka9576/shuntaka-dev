@@ -1,0 +1,33 @@
+name: CI
+
+on: [push]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup node
+        uses: ./.github/actions/setup-node
+
+      - name: Lint
+        shell: bash
+        run: pnpm lint
+
+      - name: Spell check
+        shell: bash
+        run: pnpm spell-check
+
+      - name: Type check
+        shell: bash
+        run: pnpm type-check
+
+      - name: Test
+        shell: bash
+        run: pnpm run test

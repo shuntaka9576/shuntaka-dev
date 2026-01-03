@@ -1,0 +1,21 @@
+# common
+dist
+.env.development.local
+
+# turbo
+.turbo
+
+# nodejs
+node_modules
+
+# drawio
+*.bkp
+
+# cspell
+.cspellcache
+
+# cdk
+cdk.context.json
+tsconfig.tsbuildinfo
+
+.legacy

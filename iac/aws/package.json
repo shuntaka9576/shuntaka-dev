@@ -1,0 +1,20 @@
+{
+  "name": "@shuntaka-dev/aws",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "deploy": "dotenv -- cdk deploy"
+  },
+  "devDependencies": {
+    "@types/node": "22.7.9",
+    "aws-cdk": "2.1027.0",
+    "dotenv-cli": "^11.0.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.211.0",
+    "change-case": "^5.4.4",
+    "constructs": "^10.0.0",
+    "zod": "3.23.8"
+  }
+}

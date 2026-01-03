@@ -1,0 +1,9 @@
+[package]
+name = "registry"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+adapter.workspace = true
+kernel.workspace = true
+infrastructure.workspace = true

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "//#lint": {
+      "dependsOn": [],
+      "cache": true
+    },
+    "blog-api#lint": {
+      "dependsOn": [],
+      "inputs": ["**/*.rs", "Cargo.toml", "Cargo.lock"],
+      "cache": true,
+      "passThroughEnv": ["*"]
+    },
+    "blog-api#test": {
+      "dependsOn": [],
+      "inputs": ["**/*.rs", "Cargo.toml", "Cargo.lock"],
+      "cache": true,
+      "passThroughEnv": ["*"]
+    },
+    "//#spell-check": {
+      "dependsOn": [],
+      "cache": true
+    },
+    "type-check": {
+      "dependsOn": [],
+      "cache": true
+    },
+    "check": {
+      "dependsOn": ["//#lint", "//#spell-check", "type-check", "blog-api#lint"],
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**"],
+      "outputs": ["**/dist/**", "**/.next/**"],
+      "cache": true
+    },
+    "docs#build-docs": {
+      "dependsOn": [],
+      "inputs": ["docs/source/**", "docs/.tbls.yml", "docs/pyproject.toml"],
+      "outputs": ["docs/build/**"],
+      "cache": true
+    },
+    "dev": {
+      "dependsOn": [],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "deploy": {
+      "dependsOn": ["docs#build-docs"],
+      "cache": false,
+      "env": [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_DEFAULT_REGION",
+        "AWS_SESSION_TOKEN"
+      ]
+    },
+    "test": {
+      "inputs": ["src/**"],
+      "cache": true
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+registry.workspace = true
+kernel.workspace = true
+markdown.workspace = true
+infrastructure.workspace = true
+axum.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+futures.workspace = true
+regex.workspace = true
