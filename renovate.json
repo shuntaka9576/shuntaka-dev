@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "dependencyDashboard": false,
+  "ignoreTests": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "extends": ["schedule:daily"]
+  },
+  "automerge": false,
+  "automergeSchedule": ["every 1 hour after 00:00 and before 23:59 every day"],
+  "major": {
+    "enabled": true
+  },
+  "automergeStrategy": "squash",
+  "minimumReleaseAge": "21 days",
+  "packageRules": [
+    {
+      "description": "Group apps/web (Next.js)",
+      "matchFileNames": ["apps/web/**"],
+      "groupName": "apps/web"
+    },
+    {
+      "description": "Group apps/blog-api (Rust)",
+      "matchFileNames": ["apps/blog-api/**"],
+      "groupName": "apps/blog-api"
+    },
+    {
+      "description": "Group tools/dsql-cli",
+      "matchFileNames": ["tools/dsql-cli/**"],
+      "groupName": "tools/dsql-cli"
+    },
+    {
+      "description": "Group iac/aws (CDK)",
+      "matchFileNames": ["iac/aws/**"],
+      "groupName": "iac/aws"
+    },
+    {
+      "description": "Group root dependencies",
+      "matchFileNames": ["package.json", "pnpm-lock.yaml"],
+      "groupName": "root"
+    },
+    {
+      "description": "Immediate updates for pnpm",
+      "matchPackageNames": ["pnpm"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Immediate updates for AWS CDK",
+      "matchPackageNames": ["aws-cdk", "aws-cdk-lib"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Immediate updates for Next.js/React/Vercel",
+      "matchPackageNames": [
+        "next",
+        "@next/*",
+        "react",
+        "react-dom",
+        "@vercel/*"
+      ],
+      "minimumReleaseAge": "0 days"
+    }
+  ]
+}

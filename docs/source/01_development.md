@@ -268,3 +268,12 @@ pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
 pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
+
+## Renovate
+
+依存関係の自動アップデートPRを作成するためのRenovate設定。
+
+1. https://github.com/apps/renovate にアクセス
+2. 「Install」をクリック
+3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
+4. リポジトリルートの `renovate.json` が自動で読み込まれる
