@@ -11,7 +11,8 @@
     "yarn.lock",
     "turbo.json",
     ".legacy/**",
-    "**/target/**"
+    "**/target/**",
+    "**/__snapshots__/**"
   ],
   "language": "en",
   "words": [

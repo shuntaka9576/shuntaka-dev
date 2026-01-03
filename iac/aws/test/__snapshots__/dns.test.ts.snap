@@ -1,0 +1,141 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GlobalDnsStack > snapshot 1`] = `
+{
+  "Outputs": {
+    "HostedZoneIdOutput": {
+      "Export": {
+        "Name": "TestGlobalDnsStack-hosted-zone-id",
+      },
+      "Value": {
+        "Ref": "Route5344186EA2",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "HostedZoneIdParameter0161E959": {
+      "Properties": {
+        "Name": "/test/hosted-zone-id",
+        "Type": "String",
+        "Value": {
+          "Ref": "Route5344186EA2",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "Route5344186EA2": {
+      "Properties": {
+        "Name": "example.com.",
+      },
+      "Type": "AWS::Route53::HostedZone",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`TokyoCertificateStack > snapshot 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "TokyoCertificateArnParameterE1C08D4D": {
+      "Properties": {
+        "Name": "/test/certificate-arn",
+        "Type": "String",
+        "Value": {
+          "Ref": "TokyoCertificateF5F4B7E2",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "TokyoCertificateF5F4B7E2": {
+      "Properties": {
+        "DomainName": "example.com",
+        "DomainValidationOptions": [
+          {
+            "DomainName": "example.com",
+            "HostedZoneId": "Z1234567890ABC",
+          },
+        ],
+        "SubjectAlternativeNames": [
+          "*.example.com",
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTokyoCertificateStack/TokyoCertificate",
+          },
+        ],
+        "ValidationMethod": "DNS",
+      },
+      "Type": "AWS::CertificateManager::Certificate",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "scripts": {
     "type-check": "tsc --noEmit",
-    "deploy": "dotenv -- cdk deploy"
+    "deploy": "dotenv -- cdk deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:update": "vitest run --update"
   },
   "devDependencies": {
     "@types/node": "22.7.9",
     "aws-cdk": "2.1027.0",
-    "dotenv-cli": "^11.0.0"
+    "dotenv-cli": "^11.0.0",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "aws-cdk-lib": "2.211.0",

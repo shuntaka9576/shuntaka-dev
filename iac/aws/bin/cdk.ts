@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import { MainStack } from '../lib/api/main-stack';
 import { getConfig } from '../lib/config';
-import {
-  DeployRoleStack,
-  GlobalDnsStack,
-  MainStack,
-  OidcProviderStack,
-  TokyoCertificateStack,
-} from '../lib/main';
+import { DeployRoleStack } from '../lib/deployment/deploy-role-stack';
+import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack';
+import { GlobalDnsStack } from '../lib/dns/global-dns-stack';
+import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack';
 
 const REGIONS = {
   TOKYO: 'ap-northeast-1',
