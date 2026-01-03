@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { GoogleTagManager } from '@/components/GoogleTagManager';
 import { GoogleTagManagerNoscript } from '@/components/GoogleTagManagerNoscript';
@@ -52,6 +53,7 @@ export default function RootLayout({
           <NavigationProgressProvider>{children}</NavigationProgressProvider>
         </ThemeProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
