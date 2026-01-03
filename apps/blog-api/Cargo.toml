@@ -45,7 +45,7 @@ aws-sdk-dsql = "1.3"
 aws-sdk-ssm = "1.61"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 base64 = "0.22"
 regex = "1"
