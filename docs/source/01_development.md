@@ -18,22 +18,20 @@
 3. Framework Preset: Next.js（自動検出）
 4. Environment Variables に上記の環境変数を設定
    - Production: 本番用の値を設定
-   - Preview: プレビュー用の値を設定（GTMは空推奨）
+   - Preview: プレビュー用の値を設定
 5. Deploy
 
 | 設定項目 | 値 |
 |----------|-----|
 | Production Branch | `main` |
-| Preview | 全PRで自動生成 |
+| Preview | `preview` |
 | Root Directory | `apps/web` |
 | Framework | Next.js（自動検出） |
-| Build Command | `pnpm build`（デフォルト） |
-| Output Directory | `.next`（デフォルト） |
 
 | 変数名 | 用途 | Production | Preview |
 |--------|------|------------|---------|
-| `NEXT_PUBLIC_API_URL` | バックエンドAPI | `https://api.shuntaka.dev` |  |
-| `NEXT_PUBLIC_SITE_URL` | サイトURL | `https://shuntaka.dev` |  |
+| `NEXT_PUBLIC_API_URL` | バックエンドAPI | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
+| `NEXT_PUBLIC_SITE_URL` | サイトURL | `https://shuntaka.dev` | `https://shuntaka.tech` |
 | `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM | `GTM-XXXXXXX` | （空） |
 
 ### GitHub App (Webhook)
@@ -214,8 +212,17 @@ pnpm convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jso
 pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
+### Renovate
 
-## データベース関連
+依存関係の自動アップデートPRを作成するためのRenovate設定。
+
+1. https://github.com/apps/renovate にアクセス
+2. 「Install」をクリック
+3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
+4. リポジトリルートの `renovate.json` が自動で読み込まれる
+
+
+## ツール
 
 ### dsql-cli
 
@@ -268,12 +275,3 @@ pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
 pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
-
-## Renovate
-
-依存関係の自動アップデートPRを作成するためのRenovate設定。
-
-1. https://github.com/apps/renovate にアクセス
-2. 「Install」をクリック
-3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
-4. リポジトリルートの `renovate.json` が自動で読み込まれる
