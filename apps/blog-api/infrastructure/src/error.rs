@@ -32,3 +32,15 @@ pub enum CloudinaryError {
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 }
+
+#[derive(Error, Debug)]
+pub enum WebhookError {
+    #[error("Missing X-Hub-Signature-256 header")]
+    MissingSignature,
+
+    #[error("Invalid signature format")]
+    InvalidSignatureFormat,
+
+    #[error("Signature verification failed")]
+    SignatureVerificationFailed,
+}

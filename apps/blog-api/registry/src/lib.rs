@@ -18,6 +18,7 @@ use kernel::repository::{
 pub struct WebhookConfig {
     pub github_app_id: String,
     pub github_app_secret_pem_key_name: String,
+    pub github_webhook_secret_key_name: String,
     pub articles_dir: String,
     pub cloudinary_cloud_name: String,
     pub cloudinary_api_key: String,

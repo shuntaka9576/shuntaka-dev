@@ -39,6 +39,7 @@ export class BlogAPIConstruct extends Construct {
       blogApiEnv: {
         githubAppId: string;
         githubAppSecretPemKeyName: string;
+        githubWebhookSecretKeyName: string;
         cloudinaryCloudName: string;
         cloudinaryApiKey: string;
         cloudinaryApiSecretKeyName: string;
@@ -67,6 +68,7 @@ export class BlogAPIConstruct extends Construct {
         DSQL_CLUSTER_ENDPOINT: props.dsqlClusterEndpoint,
         GH_APP_ID: props.blogApiEnv.githubAppId,
         GH_APP_SECRET_PEM_KEY_NAME: props.blogApiEnv.githubAppSecretPemKeyName,
+        GH_WEBHOOK_SECRET_KEY_NAME: props.blogApiEnv.githubWebhookSecretKeyName,
         CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
         CLOUDINARY_API_SECRET_KEY_NAME:
@@ -90,6 +92,7 @@ export class BlogAPIConstruct extends Construct {
         actions: ['ssm:GetParameter'],
         resources: [
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubAppSecretPemKeyName}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubWebhookSecretKeyName}`,
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.cloudinaryApiSecretKeyName}`,
         ],
       })
@@ -345,6 +348,7 @@ export class MainStack extends cdk.Stack {
         blogApi: {
           githubAppId: string;
           githubAppSecretPemKeyName: string;
+          githubWebhookSecretKeyName: string;
           cloudinaryCloudName: string;
           cloudinaryApiKey: string;
           cloudinaryApiSecretKeyName: string;

@@ -1,10 +1,12 @@
 use axum::{
+    body::Bytes,
     extract::State,
     http::{HeaderMap, StatusCode},
     Json,
 };
 use futures::future::join_all;
 use infrastructure::github::{GitHubAppClient, GitHubAppClientImpl, PushEvent};
+use infrastructure::webhook::verify_signature;
 use kernel::model::article::Slug;
 use kernel::model::frontmatter::ArticleFrontmatter;
 use kernel::repository::articles::UpsertArticleInput;
@@ -45,6 +47,7 @@ fn extract_branch_name(git_ref: &str) -> Option<String> {
     responses(
         (status = 200, description = "Webhook processed successfully", body = WebhookResponse),
         (status = 400, description = "Invalid payload"),
+        (status = 401, description = "Unauthorized - Invalid or missing signature"),
         (status = 404, description = "User not found"),
         (status = 500, description = "Internal server error")
     ),
@@ -53,8 +56,78 @@ fn extract_branch_name(git_ref: &str) -> Option<String> {
 pub async fn handle_github_webhook(
     State(registry): State<AppRegistry>,
     headers: HeaderMap,
-    Json(body): Json<serde_json::Value>,
+    body: Bytes,
 ) -> Result<Json<WebhookResponse>, (StatusCode, Json<WebhookResponse>)> {
+    // Get config from registry
+    let config = registry.webhook_config();
+
+    // Verify X-Hub-Signature-256 signature
+    let signature = headers
+        .get("X-Hub-Signature-256")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| {
+            warn!("Missing X-Hub-Signature-256 header");
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(WebhookResponse {
+                    status: "error".to_string(),
+                    message: Some("Missing X-Hub-Signature-256 header".to_string()),
+                    processed: None,
+                    succeeded: None,
+                    failed: None,
+                }),
+            )
+        })?;
+
+    // Get webhook secret from SSM
+    let webhook_secret = registry
+        .ssm_client()
+        .get_parameter(&config.github_webhook_secret_key_name, true)
+        .await
+        .map_err(|e| {
+            error!("Failed to get webhook secret from SSM: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(WebhookResponse {
+                    status: "error".to_string(),
+                    message: Some("Failed to get webhook secret".to_string()),
+                    processed: None,
+                    succeeded: None,
+                    failed: None,
+                }),
+            )
+        })?;
+
+    // Verify signature
+    verify_signature(&webhook_secret, &body, signature).map_err(|e| {
+        warn!("Webhook signature verification failed: {}", e);
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(WebhookResponse {
+                status: "error".to_string(),
+                message: Some("Invalid signature".to_string()),
+                processed: None,
+                succeeded: None,
+                failed: None,
+            }),
+        )
+    })?;
+
+    // Parse JSON body
+    let parsed_body: serde_json::Value = serde_json::from_slice(&body).map_err(|e| {
+        error!("Failed to parse JSON body: {}", e);
+        (
+            StatusCode::BAD_REQUEST,
+            Json(WebhookResponse {
+                status: "error".to_string(),
+                message: Some(format!("Invalid JSON: {e}")),
+                processed: None,
+                succeeded: None,
+                failed: None,
+            }),
+        )
+    })?;
+
     // Get X-GitHub-Event header
     let event_type = headers
         .get("X-GitHub-Event")
@@ -74,7 +147,7 @@ pub async fn handle_github_webhook(
     }
 
     // Parse as PushEvent
-    let push_event: PushEvent = serde_json::from_value(body).map_err(|e| {
+    let push_event: PushEvent = serde_json::from_value(parsed_body).map_err(|e| {
         error!("Failed to parse push event: {}", e);
         (
             StatusCode::BAD_REQUEST,
@@ -118,9 +191,6 @@ pub async fn handle_github_webhook(
             failed: None,
         }));
     }
-
-    // Get config from registry
-    let config = registry.webhook_config();
 
     // Get private key from SSM
     let private_key = registry

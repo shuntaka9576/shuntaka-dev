@@ -23,6 +23,8 @@ impl AppConfig {
             github_app_id: std::env::var("GH_APP_ID").unwrap_or_default(),
             github_app_secret_pem_key_name: std::env::var("GH_APP_SECRET_PEM_KEY_NAME")
                 .unwrap_or_default(),
+            github_webhook_secret_key_name: std::env::var("GH_WEBHOOK_SECRET_KEY_NAME")
+                .unwrap_or_default(),
             articles_dir: std::env::var("ARTICLES_DIR").unwrap_or_else(|_| "articles".to_string()),
             cloudinary_cloud_name: std::env::var("CLOUDINARY_CLOUD_NAME").unwrap_or_default(),
             cloudinary_api_key: std::env::var("CLOUDINARY_API_KEY").unwrap_or_default(),
@@ -51,6 +53,7 @@ pub struct ServerConfig {
 pub struct WebhookConfig {
     pub github_app_id: String,
     pub github_app_secret_pem_key_name: String,
+    pub github_webhook_secret_key_name: String,
     pub articles_dir: String,
     pub cloudinary_cloud_name: String,
     pub cloudinary_api_key: String,

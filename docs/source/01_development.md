@@ -44,17 +44,19 @@
 2. 設定値:
    - **GitHub App name**: `shuntaka-blog-api`（任意）
    - **Webhook URL**: `https://api-endpoint/webhooks/github`
+   - **Webhook secret**: 任意の文字列を生成して設定（後でSSMに登録）
    - **Permissions**:
      - Repository permissions → Contents: Read-only
    - **Subscribe to events**: Push
 3. 作成後、App IDを控える
 4. Private keyを生成してダウンロード
+5. Webhook secretを控える（SSM登録用）
 
 ### AWS
 
 #### SSM Parameter Storeの登録
 
-GitHub Actions秘密鍵を登録
+GitHub App秘密鍵を登録
 
 ```bash
 export STAGE_NAME=""
@@ -62,6 +64,21 @@ aws ssm put-parameter \
   --name "/${STAGE_NAME}/shuntaka/github-app/private-key" \
   --type "SecureString" \
   --value "$(cat path/to/private-key.pem)"
+```
+
+GitHub Webhook Secretを登録（署名検証用）
+
+```bash
+export STAGE_NAME=""
+export WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+aws ssm put-parameter \
+  --name "/${STAGE_NAME}/shuntaka/github-webhook/secret" \
+  --type "SecureString" \
+  --value "${WEBHOOK_SECRET}"
+
+# GitHub App設定画面で同じ値を設定
+echo "GitHub Appに設定するSecret: ${WEBHOOK_SECRET}"
 ```
 
 Cloudinaryの設定（OGP画像生成用）
@@ -150,6 +167,7 @@ gh secret set AWS_ACCOUNT_ID --env ${STAGE_NAME} --body "${AWS_ACCOUNT_ID}"
 # Lambda 環境変数用（CDK経由でLambdaに設定）
 gh secret set GH_APP_ID --env ${STAGE_NAME} --body "${GH_APP_ID}"
 gh variable set GH_APP_SECRET_PEM_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/github-app/private-key"
+gh variable set GH_WEBHOOK_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/github-webhook/secret"
 gh secret set CLOUDINARY_CLOUD_NAME --env ${STAGE_NAME} --body "${CLOUDINARY_CLOUD_NAME}"
 gh secret set CLOUDINARY_API_KEY --env ${STAGE_NAME} --body "${CLOUDINARY_API_KEY}"
 gh variable set CLOUDINARY_API_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/cloudinary/api-secret"

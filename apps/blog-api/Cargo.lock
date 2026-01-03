@@ -1740,6 +1740,7 @@ dependencies = [
  "aws-sdk-ssm",
  "base64",
  "chrono",
+ "hex",
  "hmac",
  "jsonwebtoken",
  "reqwest",

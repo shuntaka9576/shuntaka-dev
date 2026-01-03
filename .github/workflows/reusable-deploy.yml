@@ -44,6 +44,7 @@ jobs:
         env:
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
           GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}
+          GH_WEBHOOK_SECRET_KEY_NAME: ${{ vars.GH_WEBHOOK_SECRET_KEY_NAME }}
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}

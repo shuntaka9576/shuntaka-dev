@@ -10,6 +10,7 @@ const cdkEnvSchema = z.object({
 const lambdaEnvSchema = z.object({
   GH_APP_ID: z.string().nonempty(),
   GH_APP_SECRET_PEM_KEY_NAME: z.string().nonempty(),
+  GH_WEBHOOK_SECRET_KEY_NAME: z.string().nonempty(),
   CLOUDINARY_CLOUD_NAME: z.string().nonempty(),
   CLOUDINARY_API_KEY: z.string().nonempty(),
   CLOUDINARY_API_SECRET_KEY_NAME: z.string().nonempty(),
@@ -70,6 +71,7 @@ interface AppParameter {
     blogApi: {
       githubAppId: string;
       githubAppSecretPemKeyName: string;
+      githubWebhookSecretKeyName: string;
       cloudinaryCloudName: string;
       cloudinaryApiKey: string;
       cloudinaryApiSecretKeyName: string;
@@ -98,6 +100,7 @@ const getLambdaEnvVars = () => {
   return lambdaEnvSchema.parse({
     GH_APP_ID: process.env.GH_APP_ID,
     GH_APP_SECRET_PEM_KEY_NAME: process.env.GH_APP_SECRET_PEM_KEY_NAME,
+    GH_WEBHOOK_SECRET_KEY_NAME: process.env.GH_WEBHOOK_SECRET_KEY_NAME,
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET_KEY_NAME: process.env.CLOUDINARY_API_SECRET_KEY_NAME,
@@ -167,6 +170,7 @@ export const getConfig = (stageName: string): AppParameter => {
       blogApi: {
         githubAppId: lambdaEnvVars.GH_APP_ID,
         githubAppSecretPemKeyName: lambdaEnvVars.GH_APP_SECRET_PEM_KEY_NAME,
+        githubWebhookSecretKeyName: lambdaEnvVars.GH_WEBHOOK_SECRET_KEY_NAME,
         cloudinaryCloudName: lambdaEnvVars.CLOUDINARY_CLOUD_NAME,
         cloudinaryApiKey: lambdaEnvVars.CLOUDINARY_API_KEY,
         cloudinaryApiSecretKeyName:
