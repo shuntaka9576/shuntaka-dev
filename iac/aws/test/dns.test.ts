@@ -25,7 +25,7 @@ describe('TokyoCertificateStack', () => {
     const app = new cdk.App();
     const stack = new TokyoCertificateStack(app, 'TestTokyoCertificateStack', {
       domainName: 'example.com',
-      hostedZoneId: 'Z1234567890ABC',
+      hostedZoneIdParameterName: '/test/hosted-zone-id',
       certificateArnParameterName: '/test/certificate-arn',
       env: {
         account: '123456789012',

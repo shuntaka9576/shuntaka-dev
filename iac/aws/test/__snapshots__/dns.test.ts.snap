@@ -75,6 +75,10 @@ exports[`TokyoCertificateStack > snapshot 1`] = `
       "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
       "Type": "AWS::SSM::Parameter::Value<String>",
     },
+    "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter": {
+      "Default": "/test/hosted-zone-id",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
   },
   "Resources": {
     "TokyoCertificateArnParameterE1C08D4D": {
@@ -93,7 +97,9 @@ exports[`TokyoCertificateStack > snapshot 1`] = `
         "DomainValidationOptions": [
           {
             "DomainName": "example.com",
-            "HostedZoneId": "Z1234567890ABC",
+            "HostedZoneId": {
+              "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+            },
           },
         ],
         "SubjectAlternativeNames": [

@@ -4,8 +4,6 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 
 export class GlobalDnsStack extends cdk.Stack {
-  public readonly hostedZoneId: string;
-
   constructor(
     scope: Construct,
     id: string,
@@ -19,8 +17,6 @@ export class GlobalDnsStack extends cdk.Stack {
     const hostedZone = new route53.PublicHostedZone(this, 'Route53', {
       zoneName: props.domainName,
     });
-
-    this.hostedZoneId = hostedZone.hostedZoneId;
 
     new ssm.StringParameter(this, 'HostedZoneIdParameter', {
       parameterName: props.hostedZoneIdParameterName,

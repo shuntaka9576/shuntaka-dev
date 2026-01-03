@@ -35,7 +35,7 @@ const tokyoCertificateStack = new TokyoCertificateStack(
   `${config.stageName.short}-${config.projectName.short}-tokyo-cert`,
   {
     domainName: config.fqdn,
-    hostedZoneId: globalDnsStack.hostedZoneId,
+    hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
     certificateArnParameterName: config.ssm.tokyo.certificateArn,
     env: {
       account: config.cdkEnv.account,
