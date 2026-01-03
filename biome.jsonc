@@ -17,7 +17,8 @@
       "!**/routeTree.gen.ts",
       "!**/.next",
       "!**/out",
-      "!**/target"
+      "!**/target",
+      "!**/next-env.d.ts"
     ]
   },
   "javascript": {
