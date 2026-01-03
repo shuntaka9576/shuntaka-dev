@@ -17,6 +17,11 @@
   "minimumReleaseAge": "21 days",
   "packageRules": [
     {
+      "description": "Group GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
       "description": "Group apps/web (Next.js)",
       "matchFileNames": ["apps/web/**"],
       "groupName": "apps/web"
