@@ -1,6 +1,10 @@
 name: Deploy
 
 on:
+  push:
+    branches:
+      - preview
+      - main
   workflow_dispatch:
     inputs:
       stageName:
@@ -16,11 +20,15 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: deploy-${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     uses: ./.github/workflows/reusable-deploy.yml
     with:
-      stageName: ${{ inputs.stageName || 'dev' }}
+      stageName: ${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       GH_APP_ID: ${{ secrets.GH_APP_ID }}
