@@ -9,11 +9,11 @@
     "build": "turbo build",
     "type-check": "pnpm --recursive type-check",
     "test": "turbo test",
-    "lint:biome": "biome check . && prettier --check **/*.{yml,yaml}",
+    "lint:biome": "biome check . && prettier --check **/*.yaml",
     "lint": "turbo lint",
     "fix": "pnpm run /fix:.*/",
     "fix:ws": "pnpm --recursive --if-present fix",
-    "fix:root": "biome check . --write && prettier --write **/*.{yml,yaml}",
+    "fix:root": "biome check . --write && prettier --write **/*.yaml",
     "deploy": "pnpm -F @shuntaka-dev/aws deploy",
     "postinstall": "lefthook install"
   },
