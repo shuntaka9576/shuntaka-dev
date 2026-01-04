@@ -87,7 +87,7 @@ AWS DSQLは以下をサポートしない：
 - `FOREIGN KEY` 制約
 - `ALTER TABLE ADD CONSTRAINT` （制限あり）
 
-仮想リレーションは `.tbls.yml` の `relations` で定義。
+仮想リレーションは `.tbls.yaml` の `relations` で定義。
 
 ### スキーマ変更の方針
 

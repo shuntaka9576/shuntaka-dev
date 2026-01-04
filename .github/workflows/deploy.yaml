@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   deploy:
-    uses: ./.github/workflows/reusable-deploy.yml
+    uses: ./.github/workflows/reusable-deploy.yaml
     with:
       stageName: ${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
     secrets:
