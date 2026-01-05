@@ -25,7 +25,7 @@ export async function getArticlesByType(
 ): Promise<Article[]> {
   const res = await fetch(
     `${API_BASE_URL}/users/${userName}/articles?type=${type}`,
-    { next: { revalidate: 60 } }
+    { next: { revalidate: 30 } }
   );
 
   if (!res.ok) {
@@ -42,7 +42,7 @@ export async function getArticleBySlug(
 ): Promise<Article | null> {
   const res = await fetch(
     `${API_BASE_URL}/users/${userName}/articles/${slug}`,
-    { next: { revalidate: 60 } }
+    { next: { revalidate: 30 } }
   );
 
   if (res.status === 404) {
