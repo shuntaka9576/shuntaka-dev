@@ -259,10 +259,10 @@ impl MarkdownConverter {
         options.extension.header_ids = Some("".to_string());
 
         // Render options
-        options.render.unsafe_ = true; // Allow raw HTML (for custom embeds)
+        options.render.r#unsafe = true; // Allow raw HTML (for custom embeds)
         options.render.github_pre_lang = true;
 
-        let mut plugins = comrak::Plugins::default();
+        let mut plugins = comrak::options::Plugins::default();
         plugins.render.codefence_syntax_highlighter = Some(&self.syntect_adapter);
 
         comrak::markdown_to_html_with_plugins(markdown, &options, &plugins)
