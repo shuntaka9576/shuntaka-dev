@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BaseLayout } from '@/components/BaseLayout';
-import { ClientTime } from '@/components/ClientTime';
 import { TableOfContents } from '@/components/TableOfContents';
 import { getArticleBySlug, getArticlesByType } from '@/lib/api';
 import { SITE_URL, USER_NAME } from '@/lib/constants';
@@ -70,7 +69,6 @@ function formatDate(dateString: string | null): string {
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const { userName, slug } = await params;
   const article = await getArticleBySlug(userName, slug);
-  const isrTime = new Date().toLocaleTimeString('ja-JP');
 
   if (!article) {
     notFound();
@@ -78,13 +76,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   return (
     <BaseLayout>
-      {/* ISR動作確認用 - 本番では削除 */}
-      <div className="fixed bottom-4 right-4 bg-black/80 text-white p-3 rounded-lg text-sm font-mono z-50">
-        <div>ISR生成: {isrTime}</div>
-        <div>
-          Client: <ClientTime />
-        </div>
-      </div>
       <div className="article-header">
         <div className="article-title">{article.title}</div>
         <div className="article-info">
