@@ -42,8 +42,13 @@
       "groupName": "iac/aws"
     },
     {
+      "description": "Group docs (Python/uv)",
+      "matchFileNames": ["docs/**"],
+      "groupName": "docs"
+    },
+    {
       "description": "Group root dependencies",
-      "matchFileNames": ["package.json", "pnpm-lock.yaml"],
+      "matchFileNames": ["./package.json"],
       "groupName": "root"
     },
     {
