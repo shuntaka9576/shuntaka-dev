@@ -15,6 +15,7 @@
   },
   "automergeStrategy": "squash",
   "minimumReleaseAge": "21 days",
+  "rangeStrategy": "bump",
   "packageRules": [
     {
       "description": "Group GitHub Actions",
