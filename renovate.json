@@ -5,7 +5,7 @@
   "dependencyDashboard": false,
   "ignoreTests": true,
   "lockFileMaintenance": {
-    "enabled": true,
+    "enabled": false,
     "extends": ["schedule:daily"]
   },
   "automerge": false,
