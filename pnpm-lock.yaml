@@ -112,10 +112,10 @@ importers:
   tools/dsql-cli:
     dependencies:
       '@aws-sdk/client-dsql':
-        specifier: ^3.952.0
+        specifier: ^3.954.0
         version: 3.958.0
       '@aws-sdk/dsql-signer':
-        specifier: ^3.952.0
+        specifier: ^3.954.0
         version: 3.958.0
       commander:
         specifier: ^14.0.2
