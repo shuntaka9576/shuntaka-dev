@@ -55,7 +55,7 @@ sha2 = "0.10.9"
 urlencoding = "2.1.3"
 futures = "0.3.31"
 thiserror = "2.0.17"
-tracing = "0.1.43"
+tracing = "0.1.44"
 hex = "0.4.3"
 
 [dependencies]
