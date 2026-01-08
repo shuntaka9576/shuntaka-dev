@@ -2,21 +2,15 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BaseLayout } from '@/components/BaseLayout';
 import { TableOfContents } from '@/components/TableOfContents';
-import { getArticleBySlug, getArticlesByType } from '@/lib/api';
-import { SITE_URL, USER_NAME } from '@/lib/constants';
+import { getArticleBySlug } from '@/lib/api';
+import { SITE_URL } from '@/lib/constants';
 
 export const dynamicParams = true;
 export const revalidate = 30;
 
 export async function generateStaticParams() {
-  const techArticles = await getArticlesByType(USER_NAME, 'tech');
-  const noteArticles = await getArticlesByType(USER_NAME, 'note');
-  const articles = [...techArticles, ...noteArticles];
-
-  return articles.map((article) => ({
-    userName: USER_NAME,
-    slug: article.slug,
-  }));
+  // ビルド時は静的生成しない（リクエスト時にオンデマンドで生成）
+  return [];
 }
 
 interface ArticlePageProps {
