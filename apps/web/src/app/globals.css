@@ -664,12 +664,26 @@ a:hover {
 
 .github-embed-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 12px;
   background: var(--github-embed-header-bg);
   border-bottom: 1px solid var(--github-embed-border);
   font-size: 0.875rem;
+}
+
+.github-embed-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.github-embed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .github-embed-header svg {
@@ -692,10 +706,6 @@ a:hover {
   text-decoration: underline;
 }
 
-.github-embed-repo {
-  font-weight: 600;
-}
-
 .github-embed-path {
   color: var(--github-embed-meta);
   overflow: hidden;
@@ -703,13 +713,16 @@ a:hover {
   white-space: nowrap;
 }
 
+.github-embed-rev {
+  color: var(--github-embed-meta);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
 .github-embed-lines {
   color: var(--github-embed-meta);
   font-size: 0.875rem;
   flex-shrink: 0;
-}
-
-.github-embed-code {
 }
 
 .github-embed-code pre {
@@ -738,7 +751,9 @@ a:hover {
   border-radius: 4px;
   cursor: pointer;
   color: var(--github-embed-meta);
-  transition: color 0.2s, background-color 0.2s;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
 }
 
 .github-embed-copy:hover {

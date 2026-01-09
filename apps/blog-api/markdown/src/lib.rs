@@ -148,17 +148,28 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
         _ => String::new(),
     };
 
-    let file_name = link.path.rsplit('/').next().unwrap_or(&link.path);
+    // Shorten revision (first 7 chars for commit hashes)
+    let short_rev = if link.branch.len() > 7 && link.branch.chars().all(|c| c.is_ascii_hexdigit()) {
+        &link.branch[..7]
+    } else {
+        &link.branch
+    };
 
     format!(
         r#"<div class="github-embed-card">
 <div class="github-embed-header">
+<div class="github-embed-info">
+<div class="github-embed-row">
 {icon}
 <a href="{url}" target="_blank" rel="noopener noreferrer">
-<span class="github-embed-repo">{owner}/{repo}</span>
-<span class="github-embed-path">/{path}</span>
+<span class="github-embed-path">{full_path}</span>
 </a>
 {lines}
+</div>
+<div class="github-embed-row">
+<span class="github-embed-rev">{rev}</span>
+</div>
+</div>
 <button class="github-embed-copy" data-code="{raw_code}" aria-label="Copy code">
 <span class="github-embed-copy-icon">{copy_icon}</span>
 <span class="github-embed-check-icon">{check_icon}</span>
@@ -170,9 +181,8 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
 </div>"#,
         icon = GITHUB_ICON,
         url = html_escape(&link.original_url),
-        owner = html_escape(&link.owner),
-        repo = html_escape(&link.repo),
-        path = html_escape(file_name),
+        full_path = html_escape(&format!("{}/{}/{}", link.owner, link.repo, link.path)),
+        rev = html_escape(short_rev),
         lines = if lines_text.is_empty() {
             String::new()
         } else {
