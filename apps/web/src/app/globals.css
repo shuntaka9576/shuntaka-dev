@@ -28,6 +28,11 @@
   --message-warn-border-color: #fcc800;
   --message-error-color: #eb6e9f36;
   --message-error-border-color: #e4007f;
+  --github-embed-border: #d0d7de;
+  --github-embed-header-bg: #f6f8fa;
+  --github-embed-code-bg: #ffffff;
+  --github-embed-link: #0969da;
+  --github-embed-meta: #656d76;
 }
 
 [data-theme="dark"] {
@@ -58,6 +63,11 @@
   --message-warn-border-color: #fcc800;
   --message-error-color: #2d333b;
   --message-error-border-color: #e4007f;
+  --github-embed-border: #30363d;
+  --github-embed-header-bg: #161b22;
+  --github-embed-code-bg: #0d1117;
+  --github-embed-link: #58a6ff;
+  --github-embed-meta: #8b949e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -89,6 +99,11 @@
     --message-warn-border-color: #fcc800;
     --message-error-color: #2d333b;
     --message-error-border-color: #e4007f;
+    --github-embed-border: #30363d;
+    --github-embed-header-bg: #161b22;
+    --github-embed-code-bg: #0d1117;
+    --github-embed-link: #58a6ff;
+    --github-embed-meta: #8b949e;
   }
 }
 
@@ -637,4 +652,77 @@ a:hover {
   to {
     opacity: 0;
   }
+}
+
+/* GitHub Embed Card */
+.github-embed-card {
+  border: 1px solid var(--github-embed-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.github-embed-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--github-embed-header-bg);
+  border-bottom: 1px solid var(--github-embed-border);
+  font-size: 0.875rem;
+}
+
+.github-embed-header svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--github-embed-meta);
+  flex-shrink: 0;
+}
+
+.github-embed-header a {
+  color: var(--github-embed-link);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.github-embed-header a:hover {
+  text-decoration: underline;
+}
+
+.github-embed-repo {
+  font-weight: 600;
+}
+
+.github-embed-path {
+  color: var(--github-embed-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-embed-lines {
+  color: var(--github-embed-meta);
+  font-size: 0.875rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.github-embed-code {
+  background: var(--github-embed-code-bg);
+}
+
+.github-embed-code pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.github-embed-code pre code {
+  background: none;
+  padding: 0;
 }
