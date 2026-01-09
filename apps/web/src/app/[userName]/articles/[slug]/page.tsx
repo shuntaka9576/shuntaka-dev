@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { ArticleContent } from '@/components/ArticleContent';
 import { BaseLayout } from '@/components/BaseLayout';
 import { TableOfContents } from '@/components/TableOfContents';
 import { getArticleBySlug } from '@/lib/api';
@@ -95,10 +96,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             />
           )}
           <div className="article-content-wrapper">
-            <div
-              className="prose prose-lg max-w-none"
-              dangerouslySetInnerHTML={{ __html: article.contentHtml ?? '' }}
-            />
+            <ArticleContent html={article.contentHtml ?? ''} />
           </div>
         </article>
         <aside className="right-sidebar">

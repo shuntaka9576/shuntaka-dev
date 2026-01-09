@@ -224,6 +224,31 @@ pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 
 ## ツール
 
+### psql接続（DSQL）
+
+SSMからエンドポイントを取得してDSQLに接続する方法。
+
+```bash
+export STAGE_NAME=""
+
+# SSMからDSQLエンドポイントを取得
+HOST=$(aws ssm get-parameter \
+  --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
+  --query "Parameter.Value" --output text)
+
+# 認証トークンを生成
+TOKEN=$(aws dsql generate-db-connect-admin-auth-token \
+  --hostname "$HOST" \
+  --region ap-northeast-1)
+
+# psqlで接続（トークンをパスワードとして使用）
+PGPASSWORD="$TOKEN" psql \
+  --dbname postgres \
+  --username admin \
+  --host "$HOST" \
+  --port 5432
+```
+
 ### dsql-cli
 
 PostgreSQLを起動
