@@ -16,7 +16,7 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
-    "aws-cdk-lib": "2.234.0",
+    "aws-cdk-lib": "2.234.1",
     "change-case": "^5.4.4",
     "constructs": "^10.4.4",
     "zod": "4.2.1"
