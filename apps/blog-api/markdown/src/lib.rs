@@ -347,13 +347,14 @@ fn parse_code_info(info: &str) -> Option<(&str, &str)> {
     Some((lang, filename))
 }
 
-/// Render code block with filename header (matches legacy HTML structure)
+/// Render code block with filename header (copy button added by frontend)
 fn render_code_block_with_filename(filename: &str, highlighted_code: &str) -> String {
     // highlighted_code already contains <pre style="..."><code>...</code></pre> from syntect
+    // Copy button is added dynamically by frontend JavaScript
     format!(
-        r#"<div class="code-block-container"><div class="code-block-filename-container"><span class="code-block-filename">{}</span></div>{}</div>"#,
-        html_escape(filename),
-        highlighted_code
+        r#"<div class="code-block-container"><div class="code-block-filename-container"><span class="code-block-filename">{filename}</span></div>{highlighted}</div>"#,
+        filename = html_escape(filename),
+        highlighted = highlighted_code
     )
 }
 
@@ -892,6 +893,7 @@ mod tests {
         assert!(html.contains("package.json"));
         assert!(html.contains("code-block-container"));
         assert!(html.contains("<pre")); // syntect generates <pre style="...">
+        // Copy button is added by frontend JavaScript
     }
 
     #[test]

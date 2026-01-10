@@ -791,9 +791,6 @@ a:hover {
 
 .code-block-filename-container {
   display: inline-block;
-  position: relative;
-  top: 1px;
-  margin-left: 0;
   padding: 6px 16px;
   background: #2b303b;
   border-radius: 6px 6px 0 0;
@@ -811,5 +808,56 @@ a:hover {
   margin: 0;
   padding: 1rem;
   border-radius: 0 6px 6px 6px;
-  background: #2b303b !important;
+}
+
+.code-block-container pre[style] {
+  background: #2b303b;
+}
+
+/* Generic copy button for all pre elements */
+.prose pre .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #9da5b4;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.prose pre .copy-btn:hover {
+  opacity: 1;
+}
+
+.prose pre .copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.prose pre .copy-btn .copy-icon {
+  display: flex;
+}
+
+.prose pre .copy-btn .check-icon {
+  display: none;
+  color: #3fb950;
+}
+
+.prose pre .copy-btn.copied .copy-icon {
+  display: none;
+}
+
+.prose pre .copy-btn.copied .check-icon {
+  display: flex;
+}
+
+.prose pre .copy-btn.copied {
+  opacity: 1;
 }
