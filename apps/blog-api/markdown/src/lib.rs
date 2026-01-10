@@ -1,7 +1,9 @@
 use comrak::Options;
 use comrak::plugins::syntect::SyntectAdapter;
 use regex::Regex;
+use scraper::{Html, Selector};
 use std::time::Duration;
+use url::Url;
 
 /// GitHub link information extracted from URL
 #[derive(Debug, Clone)]
@@ -13,6 +15,263 @@ struct GitHubLink {
     start_line: Option<usize>,
     end_line: Option<usize>,
     original_url: String,
+}
+
+/// OGP information extracted from a webpage
+#[derive(Debug, Clone)]
+struct OgpInfo {
+    url: String,
+    title: String,
+    description: Option<String>,
+    image: Option<String>,
+    favicon: Option<String>,
+}
+
+/// Fetch HTML content from URL
+fn fetch_ogp_html(url: &str) -> Result<String, String> {
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .build()
+        .new_agent();
+
+    let response = agent
+        .get(url)
+        .header("User-Agent", "Mozilla/5.0 (compatible; LinkCardBot/1.0)")
+        .call()
+        .map_err(|e| e.to_string())?;
+
+    response.into_body().read_to_string().map_err(|e| e.to_string())
+}
+
+/// Parse OGP information from HTML
+fn parse_ogp(html_content: &str, original_url: &str) -> OgpInfo {
+    let document = Html::parse_document(html_content);
+
+    // OGP meta tag selectors
+    let og_title_sel = Selector::parse("meta[property='og:title']").unwrap();
+    let og_description_sel = Selector::parse("meta[property='og:description']").unwrap();
+    let og_image_sel = Selector::parse("meta[property='og:image']").unwrap();
+
+    // Fallback selectors
+    let title_sel = Selector::parse("title").unwrap();
+    let meta_description_sel = Selector::parse("meta[name='description']").unwrap();
+
+    // Extract title (OGP first, then <title> tag, then URL)
+    let title = document
+        .select(&og_title_sel)
+        .next()
+        .and_then(|e| e.value().attr("content"))
+        .map(|s| s.to_string())
+        .or_else(|| {
+            document
+                .select(&title_sel)
+                .next()
+                .map(|e| e.text().collect::<String>())
+        })
+        .unwrap_or_else(|| original_url.to_string());
+
+    // Extract description
+    let description = document
+        .select(&og_description_sel)
+        .next()
+        .and_then(|e| e.value().attr("content"))
+        .map(|s| s.to_string())
+        .or_else(|| {
+            document
+                .select(&meta_description_sel)
+                .next()
+                .and_then(|e| e.value().attr("content"))
+                .map(|s| s.to_string())
+        });
+
+    // Extract image
+    let image = document
+        .select(&og_image_sel)
+        .next()
+        .and_then(|e| e.value().attr("content"))
+        .map(|s| resolve_url(original_url, s));
+
+    // Extract favicon
+    let favicon = extract_favicon(&document, original_url);
+
+    OgpInfo {
+        url: original_url.to_string(),
+        title,
+        description,
+        image,
+        favicon,
+    }
+}
+
+/// Extract favicon URL from HTML document
+fn extract_favicon(document: &Html, base_url: &str) -> Option<String> {
+    let icon_sel = Selector::parse("link[rel='icon'], link[rel='shortcut icon']").unwrap();
+
+    if let Some(element) = document.select(&icon_sel).next() {
+        if let Some(href) = element.value().attr("href") {
+            return Some(resolve_url(base_url, href));
+        }
+    }
+
+    // Fallback: /favicon.ico
+    if let Ok(url) = Url::parse(base_url) {
+        if let Some(host) = url.host_str() {
+            return Some(format!("{}://{}/favicon.ico", url.scheme(), host));
+        }
+    }
+
+    None
+}
+
+/// Resolve relative URL to absolute URL
+fn resolve_url(base_url: &str, href: &str) -> String {
+    if href.starts_with("http://") || href.starts_with("https://") {
+        return href.to_string();
+    }
+
+    if let Ok(base) = Url::parse(base_url) {
+        if let Ok(resolved) = base.join(href) {
+            return resolved.to_string();
+        }
+    }
+
+    href.to_string()
+}
+
+/// Extract domain from URL
+fn extract_domain(url: &str) -> String {
+    Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| url.to_string())
+}
+
+/// Render link card HTML (Zenn-style)
+fn render_link_card(ogp: &OgpInfo) -> String {
+    let domain = extract_domain(&ogp.url);
+
+    let description_html = ogp
+        .description
+        .as_ref()
+        .map(|d| {
+            format!(
+                r#"<div class="link-card-description">{}</div>"#,
+                html_escape(d)
+            )
+        })
+        .unwrap_or_default();
+
+    let image_html = ogp
+        .image
+        .as_ref()
+        .map(|i| {
+            format!(
+                r#"<div class="link-card-image"><img src="{}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>"#,
+                html_escape(i)
+            )
+        })
+        .unwrap_or_default();
+
+    let favicon_html = ogp
+        .favicon
+        .as_ref()
+        .map(|f| {
+            format!(
+                r#"<img class="link-card-favicon" src="{}" alt="" onerror="this.style.display='none'">"#,
+                html_escape(f)
+            )
+        })
+        .unwrap_or_default();
+
+    // Wrap in <div> to ensure it's treated as a block-level HTML element by comrak
+    format!(
+        r#"<div class="link-card-wrapper"><a href="{url}" class="link-card" target="_blank" rel="noopener noreferrer"><div class="link-card-content"><div class="link-card-text"><div class="link-card-title">{title}</div>{description}</div>{image}</div><div class="link-card-footer">{favicon}<span class="link-card-domain">{domain}</span></div></a></div>"#,
+        url = html_escape(&ogp.url),
+        title = html_escape(&ogp.title),
+        description = description_html,
+        image = image_html,
+        favicon = favicon_html,
+        domain = html_escape(&domain)
+    )
+}
+
+/// Check if a line contains only a standalone URL (not inside markdown link syntax)
+fn is_standalone_url(line: &str) -> bool {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
+        return false;
+    }
+    // Make sure it's not part of a markdown link
+    !line.contains('[') && !line.contains('(')
+}
+
+/// Check if URL is a GitHub URL (to be processed by GitHub embed instead)
+fn is_github_blob_url(url: &str) -> bool {
+    url.starts_with("https://github.com/") && url.contains("/blob/")
+}
+
+/// Process link cards in markdown
+/// Only processes standalone URLs at the start of a line (excluding GitHub blob URLs)
+fn process_link_cards(markdown: &str) -> String {
+    let mut result = String::new();
+    let mut in_code_block = false;
+
+    for line in markdown.lines() {
+        // Track code block state
+        if line.starts_with("```") {
+            in_code_block = !in_code_block;
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        if in_code_block {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        let trimmed = line.trim();
+
+        // Check if line is a standalone URL (not GitHub blob)
+        if is_standalone_url(trimmed) && !is_github_blob_url(trimmed) {
+            // Skip localhost and internal network URLs
+            if trimmed.contains("localhost") || trimmed.contains("127.0.0.1") {
+                result.push_str(line);
+                result.push('\n');
+                continue;
+            }
+
+            // Try to fetch OGP info
+            match fetch_ogp_html(trimmed) {
+                Ok(html_content) => {
+                    let ogp = parse_ogp(&html_content, trimmed);
+                    let card_html = render_link_card(&ogp);
+                    // Add blank lines before and after to ensure HTML block recognition
+                    result.push('\n');
+                    result.push_str(&card_html);
+                    result.push_str("\n\n");
+                    continue;
+                }
+                Err(_) => {
+                    // Fallback: keep original URL
+                    result.push_str(line);
+                    result.push('\n');
+                    continue;
+                }
+            }
+        }
+
+        result.push_str(line);
+        result.push('\n');
+    }
+
+    // Remove trailing newline if original didn't have one
+    if !markdown.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    result
 }
 
 /// Parse a GitHub blob URL into its components
@@ -573,8 +832,11 @@ impl MarkdownConverter {
         // Process GitHub embeds (fetch code and render)
         let with_github = process_github_embeds(&escaped, self);
 
+        // Process link cards (OGP cards) for standalone URLs
+        let with_link_cards = process_link_cards(&with_github);
+
         // Process code blocks with filename (e.g., ```json:package.json)
-        let with_code_blocks = process_code_blocks_with_filename(&with_github, self);
+        let with_code_blocks = process_code_blocks_with_filename(&with_link_cards, self);
 
         // Preprocess custom embed syntax
         let preprocessed = preprocess_embeds(&with_code_blocks);
@@ -898,5 +1160,168 @@ mod tests {
         assert!(html.contains("code-block-filename-container"));
         assert!(html.contains("src/main.rs"));
         assert!(html.contains("<pre")); // syntect generates <pre style="...">
+    }
+
+    // Link Card (OGP) tests
+
+    #[test]
+    fn test_is_standalone_url() {
+        assert!(is_standalone_url("https://example.com"));
+        assert!(is_standalone_url("http://example.com"));
+        assert!(is_standalone_url("  https://example.com  "));
+        assert!(!is_standalone_url("[link](https://example.com)"));
+        assert!(!is_standalone_url("Check this: https://example.com"));
+        assert!(!is_standalone_url("not a url"));
+    }
+
+    #[test]
+    fn test_is_github_blob_url() {
+        assert!(is_github_blob_url("https://github.com/owner/repo/blob/main/file.rs"));
+        assert!(!is_github_blob_url("https://github.com/owner/repo"));
+        assert!(!is_github_blob_url("https://example.com"));
+    }
+
+    #[test]
+    fn test_extract_domain() {
+        assert_eq!(extract_domain("https://example.com/path"), "example.com");
+        assert_eq!(extract_domain("https://sub.example.com"), "sub.example.com");
+        assert_eq!(extract_domain("invalid"), "invalid");
+    }
+
+    #[test]
+    fn test_resolve_url_absolute() {
+        assert_eq!(
+            resolve_url("https://example.com", "https://other.com/image.png"),
+            "https://other.com/image.png"
+        );
+    }
+
+    #[test]
+    fn test_resolve_url_relative() {
+        assert_eq!(
+            resolve_url("https://example.com/page", "/favicon.ico"),
+            "https://example.com/favicon.ico"
+        );
+        assert_eq!(
+            resolve_url("https://example.com/dir/page", "image.png"),
+            "https://example.com/dir/image.png"
+        );
+    }
+
+    #[test]
+    fn test_parse_ogp() {
+        let html = r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta property="og:title" content="Test Title">
+            <meta property="og:description" content="Test Description">
+            <meta property="og:image" content="https://example.com/image.png">
+            <link rel="icon" href="/favicon.ico">
+        </head>
+        <body></body>
+        </html>
+        "#;
+        let ogp = parse_ogp(html, "https://example.com");
+        assert_eq!(ogp.title, "Test Title");
+        assert_eq!(ogp.description, Some("Test Description".to_string()));
+        assert_eq!(ogp.image, Some("https://example.com/image.png".to_string()));
+        assert_eq!(ogp.favicon, Some("https://example.com/favicon.ico".to_string()));
+    }
+
+    #[test]
+    fn test_parse_ogp_fallback_to_title_tag() {
+        let html = r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Fallback Title</title>
+            <meta name="description" content="Fallback Description">
+        </head>
+        <body></body>
+        </html>
+        "#;
+        let ogp = parse_ogp(html, "https://example.com");
+        assert_eq!(ogp.title, "Fallback Title");
+        assert_eq!(ogp.description, Some("Fallback Description".to_string()));
+    }
+
+    #[test]
+    fn test_render_link_card() {
+        let ogp = OgpInfo {
+            url: "https://example.com".to_string(),
+            title: "Test Title".to_string(),
+            description: Some("Test Description".to_string()),
+            image: Some("https://example.com/image.png".to_string()),
+            favicon: Some("https://example.com/favicon.ico".to_string()),
+        };
+        let html = render_link_card(&ogp);
+        assert!(html.contains("link-card"));
+        assert!(html.contains("Test Title"));
+        assert!(html.contains("Test Description"));
+        assert!(html.contains("link-card-image"));
+        assert!(html.contains("link-card-favicon"));
+        assert!(html.contains("example.com"));
+        assert!(html.contains(r#"target="_blank""#));
+    }
+
+    #[test]
+    fn test_render_link_card_without_image() {
+        let ogp = OgpInfo {
+            url: "https://example.com".to_string(),
+            title: "Test Title".to_string(),
+            description: None,
+            image: None,
+            favicon: None,
+        };
+        let html = render_link_card(&ogp);
+        assert!(html.contains("link-card"));
+        assert!(html.contains("Test Title"));
+        assert!(!html.contains("link-card-image"));
+        assert!(!html.contains("link-card-description"));
+    }
+
+    #[test]
+    fn test_link_card_xss_prevention() {
+        let ogp = OgpInfo {
+            url: "https://example.com".to_string(),
+            title: "<script>alert('xss')</script>".to_string(),
+            description: Some("<img onerror='alert(1)'>".to_string()),
+            image: None,
+            favicon: None,
+        };
+        let html = render_link_card(&ogp);
+        // Angle brackets should be escaped
+        assert!(!html.contains("<script>"));
+        assert!(!html.contains("<img"));
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("&lt;img"));
+    }
+
+    #[test]
+    fn test_link_cards_not_in_code_block() {
+        let markdown = "```\nhttps://example.com\n```";
+        let result = process_link_cards(markdown);
+        // Should not be processed (inside code block)
+        assert!(result.contains("https://example.com"));
+        assert!(!result.contains("link-card"));
+    }
+
+    #[test]
+    fn test_link_cards_skip_localhost() {
+        let markdown = "https://localhost:3000/test";
+        let result = process_link_cards(markdown);
+        // Should not be processed (localhost)
+        assert!(result.contains("https://localhost:3000/test"));
+        assert!(!result.contains("link-card"));
+    }
+
+    #[test]
+    fn test_link_cards_skip_github_blob() {
+        let markdown = "https://github.com/owner/repo/blob/main/file.rs";
+        let result = process_link_cards(markdown);
+        // Should not be processed (GitHub blob - handled by GitHub embed)
+        assert!(result.contains("https://github.com/owner/repo/blob/main/file.rs"));
+        assert!(!result.contains("link-card"));
     }
 }
