@@ -166,7 +166,7 @@ fn render_link_card(ogp: &OgpInfo) -> String {
         .description
         .as_ref()
         .map(|d| {
-            let truncated = truncate_text(d, 70);
+            let truncated = truncate_text(d, 100);
             format!(
                 r#"<div class="link-card-description">{}</div>"#,
                 html_escape(&truncated)

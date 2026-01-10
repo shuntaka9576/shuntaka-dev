@@ -937,6 +937,10 @@ a:hover {
   word-break: break-word;
   overflow-wrap: break-word;
   line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .link-card-content {
@@ -1020,6 +1024,10 @@ a:hover {
 
   .link-card-description {
     font-size: 0.7rem;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .link-card-text {
