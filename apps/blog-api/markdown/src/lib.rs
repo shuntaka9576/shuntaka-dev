@@ -134,14 +134,8 @@ fn detect_language(path: &str) -> &str {
 /// GitHub SVG icon
 const GITHUB_ICON: &str = r#"<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>"#;
 
-/// Copy SVG icon
-const COPY_ICON: &str = r#"<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>"#;
-
-/// Check SVG icon (for copy success feedback)
-const CHECK_ICON: &str = r#"<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>"#;
-
 /// Render GitHub embed HTML
-fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str) -> String {
+fn render_github_embed(link: &GitHubLink, highlighted_code: &str, _raw_code: &str) -> String {
     let lines_text = match (link.start_line, link.end_line) {
         (Some(start), Some(end)) => format!("L{start}-L{end}"),
         (Some(start), None) => format!("L{start}"),
@@ -155,6 +149,7 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
         &link.branch
     };
 
+    // Copy button is added dynamically by frontend JavaScript to the code block
     format!(
         r#"<div class="github-embed-card">
 <div class="github-embed-header">
@@ -170,10 +165,6 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
 <span class="github-embed-rev">{rev}</span>
 </div>
 </div>
-<button class="github-embed-copy" data-code="{raw_code}" aria-label="Copy code">
-<span class="github-embed-copy-icon">{copy_icon}</span>
-<span class="github-embed-check-icon">{check_icon}</span>
-</button>
 </div>
 <div class="github-embed-code">
 {code}
@@ -181,16 +172,13 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
 </div>"#,
         icon = GITHUB_ICON,
         url = html_escape(&link.original_url),
-        full_path = html_escape(&format!("{}/{}/{}", link.owner, link.repo, link.path)),
+        full_path = html_escape(&link.path),
         rev = html_escape(short_rev),
         lines = if lines_text.is_empty() {
             String::new()
         } else {
             format!(r#"<span class="github-embed-lines">{lines_text}</span>"#)
         },
-        copy_icon = COPY_ICON,
-        check_icon = CHECK_ICON,
-        raw_code = html_escape_for_attr(raw_code),
         code = highlighted_code
     )
 }
@@ -347,24 +335,15 @@ fn parse_code_info(info: &str) -> Option<(&str, &str)> {
     Some((lang, filename))
 }
 
-/// Render code block with filename header (matches legacy HTML structure)
+/// Render code block with filename header (copy button added by frontend)
 fn render_code_block_with_filename(filename: &str, highlighted_code: &str) -> String {
     // highlighted_code already contains <pre style="..."><code>...</code></pre> from syntect
+    // Copy button is added dynamically by frontend JavaScript
     format!(
-        r#"<div class="code-block-container"><div class="code-block-filename-container"><span class="code-block-filename">{}</span></div>{}</div>"#,
-        html_escape(filename),
-        highlighted_code
+        r#"<div class="code-block-container"><div class="code-block-filename-container"><span class="code-block-filename">{filename}</span></div>{highlighted}</div>"#,
+        filename = html_escape(filename),
+        highlighted = highlighted_code
     )
-}
-
-/// HTML escape for data attributes (includes newlines)
-fn html_escape_for_attr(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\n', "&#10;")
-        .replace('\r', "&#13;")
 }
 
 /// Escape angle brackets that look like HTML tags but are not valid HTML
@@ -892,6 +871,7 @@ mod tests {
         assert!(html.contains("package.json"));
         assert!(html.contains("code-block-container"));
         assert!(html.contains("<pre")); // syntect generates <pre style="...">
+        // Copy button is added by frontend JavaScript
     }
 
     #[test]
