@@ -4,10 +4,6 @@
   "timezone": "Asia/Tokyo",
   "dependencyDashboard": false,
   "ignoreTests": true,
-  "lockFileMaintenance": {
-    "enabled": false,
-    "extends": ["schedule:daily"]
-  },
   "automerge": false,
   "automergeSchedule": ["every 1 hour after 00:00 and before 23:59 every day"],
   "major": {
@@ -16,7 +12,15 @@
   "automergeStrategy": "squash",
   "minimumReleaseAge": "21 days",
   "rangeStrategy": "bump",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"]
+  },
   "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "minor", "major"],
+      "schedule": ["every weekend"]
+    },
     {
       "description": "Group GitHub Actions",
       "matchManagers": ["github-actions"],
