@@ -153,7 +153,7 @@ fn truncate_text(text: &str, max_chars: usize) -> String {
         text.to_string()
     } else {
         let truncated: String = chars[..max_chars].iter().collect();
-        format!("{}...", truncated)
+        format!("{truncated}...")
     }
 }
 
