@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cargo make run",
-    "lint": "cargo clippy --all --all-targets",
+    "lint": "cargo clippy --all --all-targets -- -D warnings",
     "test": "cargo test --all"
   }
 }
