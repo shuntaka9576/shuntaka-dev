@@ -59,7 +59,7 @@ fn fetch_github_code(link: &GitHubLink) -> Result<String, String> {
 fn extract_lines(code: &str, start: usize, end: usize) -> String {
     code.lines()
         .enumerate()
-        .filter(|(i, _)| *i + 1 >= start && *i + 1 <= end)
+        .filter(|(i, _)| *i + 1 >= start && *i < end)
         .map(|(_, line)| line)
         .collect::<Vec<_>>()
         .join("\n")
@@ -143,8 +143,8 @@ const CHECK_ICON: &str = r#"<svg viewBox="0 0 16 16" fill="currentColor"><path d
 /// Render GitHub embed HTML
 fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str) -> String {
     let lines_text = match (link.start_line, link.end_line) {
-        (Some(start), Some(end)) => format!("L{}-L{}", start, end),
-        (Some(start), None) => format!("L{}", start),
+        (Some(start), Some(end)) => format!("L{start}-L{end}"),
+        (Some(start), None) => format!("L{start}"),
         _ => String::new(),
     };
 
@@ -186,7 +186,7 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, raw_code: &str
         lines = if lines_text.is_empty() {
             String::new()
         } else {
-            format!(r#"<span class="github-embed-lines">{}</span>"#, lines_text)
+            format!(r#"<span class="github-embed-lines">{lines_text}</span>"#)
         },
         copy_icon = COPY_ICON,
         check_icon = CHECK_ICON,
@@ -263,12 +263,98 @@ fn process_github_embeds(markdown: &str, converter: &MarkdownConverter) -> Strin
     result
 }
 
+/// Process code blocks with filename syntax (e.g., ```json:package.json)
+/// Converts them to custom HTML before comrak processing
+fn process_code_blocks_with_filename(markdown: &str, converter: &MarkdownConverter) -> String {
+    let mut result = String::new();
+    let mut in_code_block = false;
+    let mut code_block_info: Option<(String, String)> = None; // (lang, filename)
+    let mut code_content = String::new();
+
+    let lines: Vec<&str> = markdown.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("```") && !in_code_block {
+            let info = line.trim_start_matches('`').trim();
+            if let Some((lang, filename)) = parse_code_info(info) {
+                // Start of code block with filename
+                in_code_block = true;
+                code_block_info = Some((lang.to_string(), filename.to_string()));
+                code_content.clear();
+                continue;
+            }
+            // Normal code block without filename - pass through
+            result.push_str(line);
+            if i < lines.len() - 1 {
+                result.push('\n');
+            }
+            in_code_block = true;
+            continue;
+        }
+
+        if line.starts_with("```") && in_code_block {
+            if let Some((lang, filename)) = code_block_info.take() {
+                // End of code block with filename - render custom HTML
+                // Remove trailing newline from code content
+                let code = code_content.trim_end_matches('\n');
+                let highlighted = converter.highlight_code(code, &lang);
+                result.push_str(&render_code_block_with_filename(&filename, &highlighted));
+                if i < lines.len() - 1 {
+                    result.push('\n');
+                }
+            } else {
+                // End of normal code block - pass through
+                result.push_str(line);
+                if i < lines.len() - 1 {
+                    result.push('\n');
+                }
+            }
+            in_code_block = false;
+            continue;
+        }
+
+        if in_code_block && code_block_info.is_some() {
+            // Inside code block with filename - collect content
+            code_content.push_str(line);
+            code_content.push('\n');
+        } else {
+            // Outside code block or inside normal code block - pass through
+            result.push_str(line);
+            if i < lines.len() - 1 {
+                result.push('\n');
+            }
+        }
+    }
+
+    result
+}
+
 /// HTML escape for XSS prevention
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+/// Parse code info string to extract language and filename
+/// e.g., "json:package.json" -> Some(("json", "package.json"))
+/// e.g., "rust" -> None (no filename)
+fn parse_code_info(info: &str) -> Option<(&str, &str)> {
+    let (lang, filename) = info.split_once(':')?;
+    if lang.is_empty() || filename.is_empty() {
+        return None;
+    }
+    Some((lang, filename))
+}
+
+/// Render code block with filename header (matches legacy HTML structure)
+fn render_code_block_with_filename(filename: &str, highlighted_code: &str) -> String {
+    // highlighted_code already contains <pre style="..."><code>...</code></pre> from syntect
+    format!(
+        r#"<div class="code-block-container"><div class="code-block-filename-container"><span class="code-block-filename">{}</span></div>{}</div>"#,
+        html_escape(filename),
+        highlighted_code
+    )
 }
 
 /// HTML escape for data attributes (includes newlines)
@@ -508,8 +594,11 @@ impl MarkdownConverter {
         // Process GitHub embeds (fetch code and render)
         let with_github = process_github_embeds(&escaped, self);
 
+        // Process code blocks with filename (e.g., ```json:package.json)
+        let with_code_blocks = process_code_blocks_with_filename(&with_github, self);
+
         // Preprocess custom embed syntax
-        let preprocessed = preprocess_embeds(&with_github);
+        let preprocessed = preprocess_embeds(&with_code_blocks);
 
         // Process custom containers (:::details, :::message)
         let with_containers = process_containers(&preprocessed, |inner| self.convert_simple(inner));
@@ -781,5 +870,53 @@ mod tests {
         let result = process_github_embeds(markdown, &converter);
         // Should not be processed (inside markdown link)
         assert!(!result.contains("github-embed-card"));
+    }
+
+    #[test]
+    fn test_parse_code_info() {
+        assert_eq!(parse_code_info("json:package.json"), Some(("json", "package.json")));
+        assert_eq!(parse_code_info("rust:src/main.rs"), Some(("rust", "src/main.rs")));
+        assert_eq!(parse_code_info("typescript:index.ts"), Some(("typescript", "index.ts")));
+        assert_eq!(parse_code_info("json"), None);
+        assert_eq!(parse_code_info(":filename"), None);
+        assert_eq!(parse_code_info("lang:"), None);
+        assert_eq!(parse_code_info(""), None);
+    }
+
+    #[test]
+    fn test_code_block_with_filename() {
+        let markdown = "```json:package.json\n{\"name\": \"test\"}\n```";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains("code-block-filename-container"));
+        assert!(html.contains("code-block-filename"));
+        assert!(html.contains("package.json"));
+        assert!(html.contains("code-block-container"));
+        assert!(html.contains("<pre")); // syntect generates <pre style="...">
+    }
+
+    #[test]
+    fn test_code_block_without_filename() {
+        let markdown = "```json\n{\"name\": \"test\"}\n```";
+        let html = convert_markdown_to_html(markdown);
+        // Without filename, should not have filename container
+        assert!(!html.contains("code-block-filename-container"));
+        assert!(!html.contains("code-block-container"));
+    }
+
+    #[test]
+    fn test_code_block_filename_xss() {
+        let markdown = "```json:<script>alert('xss')</script>\n{}\n```";
+        let html = convert_markdown_to_html(markdown);
+        assert!(!html.contains("<script>alert"));
+        assert!(html.contains("&lt;script&gt;"));
+    }
+
+    #[test]
+    fn test_code_block_with_filename_multiline() {
+        let markdown = "```rust:src/main.rs\nfn main() {\n    println!(\"Hello\");\n}\n```";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains("code-block-filename-container"));
+        assert!(html.contains("src/main.rs"));
+        assert!(html.contains("<pre")); // syntect generates <pre style="...">
     }
 }
