@@ -146,17 +146,30 @@ fn extract_domain(url: &str) -> String {
         .unwrap_or_else(|| url.to_string())
 }
 
+/// Truncate string to a maximum number of characters
+fn truncate_text(text: &str, max_chars: usize) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= max_chars {
+        text.to_string()
+    } else {
+        let truncated: String = chars[..max_chars].iter().collect();
+        format!("{}...", truncated)
+    }
+}
+
 /// Render link card HTML (Zenn-style)
 fn render_link_card(ogp: &OgpInfo) -> String {
     let domain = extract_domain(&ogp.url);
+    let title = truncate_text(&ogp.title, 70);
 
     let description_html = ogp
         .description
         .as_ref()
         .map(|d| {
+            let truncated = truncate_text(d, 70);
             format!(
                 r#"<div class="link-card-description">{}</div>"#,
-                html_escape(d)
+                html_escape(&truncated)
             )
         })
         .unwrap_or_default();
@@ -187,7 +200,7 @@ fn render_link_card(ogp: &OgpInfo) -> String {
     format!(
         r#"<div class="link-card-wrapper"><a href="{url}" class="link-card" target="_blank" rel="noopener noreferrer"><div class="link-card-content"><div class="link-card-text"><div class="link-card-title">{title}</div>{description}</div>{image}</div><div class="link-card-footer">{favicon}<span class="link-card-domain">{domain}</span></div></a></div>"#,
         url = html_escape(&ogp.url),
-        title = html_escape(&ogp.title),
+        title = html_escape(&title),
         description = description_html,
         image = image_html,
         favicon = favicon_html,

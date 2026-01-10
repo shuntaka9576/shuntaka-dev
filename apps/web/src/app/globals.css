@@ -913,7 +913,7 @@ a:hover {
 
 .link-card-text {
   flex: 1;
-  padding: 12px 16px;
+  padding: 10px 14px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -924,11 +924,8 @@ a:hover {
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  word-break: break-word;
+  overflow-wrap: break-word;
   color: var(--text-color);
   margin: 0;
 }
@@ -937,27 +934,22 @@ a:hover {
   margin-top: 6px;
   font-size: 0.8rem;
   color: var(--github-embed-meta);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  word-break: break-word;
+  overflow-wrap: break-word;
   line-height: 1.5;
 }
 
 .link-card-content {
   display: flex;
   align-items: stretch;
-  min-height: 120px;
-  max-height: 120px;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 8px 8px 0 0;
 }
 
 .link-card-image {
   flex-shrink: 0;
-  width: 200px;
-  height: 120px;
+  width: 180px;
+  height: 100px;
   background: var(--github-embed-header-bg);
   display: flex;
   align-items: center;
@@ -976,17 +968,15 @@ a:hover {
 }
 
 .link-card-footer {
-  position: absolute;
-  bottom: 8px;
-  right: 216px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
+  margin: 6px 12px 8px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
   background: #fff;
   border: 1px solid var(--github-embed-border);
-  border-radius: 14px;
-  font-size: 0.7rem;
+  border-radius: 12px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -1020,7 +1010,8 @@ a:hover {
 /* Link Card responsive */
 @media (max-width: 576px) {
   .link-card-image {
-    width: 120px;
+    width: 100px;
+    height: 80px;
   }
 
   .link-card-title {
@@ -1028,15 +1019,14 @@ a:hover {
   }
 
   .link-card-description {
-    font-size: 0.75rem;
-    -webkit-line-clamp: 1;
+    font-size: 0.7rem;
   }
 
   .link-card-text {
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
 
   .link-card-footer {
-    padding: 6px 12px;
+    margin: 4px 10px 6px;
   }
 }
