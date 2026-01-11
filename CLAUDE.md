@@ -26,6 +26,10 @@ iac/
 docs/             # Sphinx ドキュメント (Python/uv)
 ```
 
+## Documentation
+
+環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_development.md` を参照。
+
 ## Commands
 
 ```bash
@@ -47,6 +51,13 @@ pnpm type-check   # TypeScript
 
 # デプロイ
 pnpm deploy       # AWS CDK
+```
+
+### AWS CDK（iac/awsディレクトリで実行）
+
+```bash
+cd iac/aws
+pnpm exec dotenv -- cdk synth -c stageName=dev
 ```
 
 ### dsql-cli (マイグレーション)
