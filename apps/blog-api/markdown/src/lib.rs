@@ -107,17 +107,17 @@ fn parse_ogp(html_content: &str, original_url: &str) -> OgpInfo {
 fn extract_favicon(document: &Html, base_url: &str) -> Option<String> {
     let icon_sel = Selector::parse("link[rel='icon'], link[rel='shortcut icon']").unwrap();
 
-    if let Some(element) = document.select(&icon_sel).next() {
-        if let Some(href) = element.value().attr("href") {
-            return Some(resolve_url(base_url, href));
-        }
+    if let Some(element) = document.select(&icon_sel).next()
+        && let Some(href) = element.value().attr("href")
+    {
+        return Some(resolve_url(base_url, href));
     }
 
     // Fallback: /favicon.ico
-    if let Ok(url) = Url::parse(base_url) {
-        if let Some(host) = url.host_str() {
-            return Some(format!("{}://{}/favicon.ico", url.scheme(), host));
-        }
+    if let Ok(url) = Url::parse(base_url)
+        && let Some(host) = url.host_str()
+    {
+        return Some(format!("{}://{}/favicon.ico", url.scheme(), host));
     }
 
     None
@@ -129,10 +129,10 @@ fn resolve_url(base_url: &str, href: &str) -> String {
         return href.to_string();
     }
 
-    if let Ok(base) = Url::parse(base_url) {
-        if let Ok(resolved) = base.join(href) {
-            return resolved.to_string();
-        }
+    if let Ok(base) = Url::parse(base_url)
+        && let Ok(resolved) = base.join(href)
+    {
+        return resolved.to_string();
     }
 
     href.to_string()
@@ -556,35 +556,33 @@ fn process_github_embeds(markdown: &str, converter: &MarkdownConverter) -> Strin
 
         let trimmed = line.trim();
 
-        // Check if line is a standalone GitHub blob URL
-        if trimmed.starts_with("https://github.com/") && trimmed.contains("/blob/") {
-            // Make sure it's not part of a markdown link
-            if !line.contains('[') && !line.contains('(') {
-                if let Some(link) = parse_github_link(trimmed) {
-                    // Try to fetch and render the code
-                    match fetch_github_code(&link) {
-                        Ok(code) => {
-                            let code_to_render = match (link.start_line, link.end_line) {
-                                (Some(start), Some(end)) => extract_lines(&code, start, end),
-                                (Some(start), None) => extract_lines(&code, start, start),
-                                _ => code,
-                            };
+        // Check if line is a standalone GitHub blob URL (not part of a markdown link)
+        if trimmed.starts_with("https://github.com/") && trimmed.contains("/blob/")
+            && !line.contains('[') && !line.contains('(')
+            && let Some(link) = parse_github_link(trimmed)
+        {
+            // Try to fetch and render the code
+            match fetch_github_code(&link) {
+                Ok(code) => {
+                    let code_to_render = match (link.start_line, link.end_line) {
+                        (Some(start), Some(end)) => extract_lines(&code, start, end),
+                        (Some(start), None) => extract_lines(&code, start, start),
+                        _ => code,
+                    };
 
-                            // Apply syntax highlighting using syntect
-                            let lang = detect_language(&link.path);
-                            let highlighted = converter.highlight_code(&code_to_render, lang);
-                            let embed_html = render_github_embed(&link, &highlighted, &code_to_render);
-                            result.push_str(&embed_html);
-                            result.push('\n');
-                            continue;
-                        }
-                        Err(_) => {
-                            // Fallback: keep original link
-                            result.push_str(line);
-                            result.push('\n');
-                            continue;
-                        }
-                    }
+                    // Apply syntax highlighting using syntect
+                    let lang = detect_language(&link.path);
+                    let highlighted = converter.highlight_code(&code_to_render, lang);
+                    let embed_html = render_github_embed(&link, &highlighted, &code_to_render);
+                    result.push_str(&embed_html);
+                    result.push('\n');
+                    continue;
+                }
+                Err(_) => {
+                    // Fallback: keep original link
+                    result.push_str(line);
+                    result.push('\n');
+                    continue;
                 }
             }
         }
