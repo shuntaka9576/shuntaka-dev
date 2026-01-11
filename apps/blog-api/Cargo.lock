@@ -2089,6 +2089,7 @@ dependencies = [
  "comrak",
  "regex",
  "scraper",
+ "serde_json",
  "syntect",
  "ureq",
  "url",
