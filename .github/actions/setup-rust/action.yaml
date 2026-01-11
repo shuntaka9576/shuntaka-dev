@@ -4,44 +4,6 @@ description: Setup Rust toolchain from rust-toolchain.toml
 runs:
   using: "composite"
   steps:
-    - name: Parse rust-toolchain.toml
-      id: parse
-      shell: bash
-      run: |
-        TOOLCHAIN_FILE="rust-toolchain.toml"
-        if [[ ! -f "$TOOLCHAIN_FILE" ]]; then
-          echo "rust-toolchain.toml not found" >&2
-          exit 1
-        fi
-        CHANNEL=$(grep '^channel' "$TOOLCHAIN_FILE" | sed 's/.*= *"\([^"]*\)".*/\1/')
-        COMPONENTS=$(grep '^components' "$TOOLCHAIN_FILE" | sed 's/.*\[\(.*\)\].*/\1/' | tr -d '"' | tr -d ' ')
-        echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
-        echo "components=$COMPONENTS" >> $GITHUB_OUTPUT
-
-    - name: Install rustup if not present
-      shell: bash
-      run: |
-        if ! command -v rustup &> /dev/null; then
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        fi
-
     - name: Setup Rust toolchain
       shell: bash
-      run: |
-        export PATH="$HOME/.cargo/bin:$PATH"
-        rustup toolchain install ${{ steps.parse.outputs.channel }} --profile minimal
-        rustup default ${{ steps.parse.outputs.channel }}
-        if [[ -n "${{ steps.parse.outputs.components }}" ]]; then
-          IFS=',' read -ra COMPS <<< "${{ steps.parse.outputs.components }}"
-          for comp in "${COMPS[@]}"; do
-            rustup component add "$comp"
-          done
-        fi
-
-    - name: Show installed toolchain
-      shell: bash
-      run: |
-        export PATH="$HOME/.cargo/bin:$PATH"
-        rustc --version
-        cargo --version
+      run: rustup show
