@@ -51,7 +51,7 @@ export class BlogAPIConstruct extends Construct {
     const webApiLambda = new lambda.DockerImageFunction(this, 'WebApiLambda', {
       functionName: `${props.physicalPrefix}-blog-api`,
       code: lambda.DockerImageCode.fromImageAsset(
-        path.resolve(__dirname, '../../../../apps/blog-api')
+        path.resolve(__dirname, '../../../..')
       ),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(15 * 60),
