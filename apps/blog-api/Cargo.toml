@@ -7,57 +7,6 @@ edition = "2024"
 name = "server"
 path = "src/bin/app.rs"
 
-[workspace]
-members = ["api", "kernel", "adapter", "shared", "registry", "markdown", "infrastructure"]
-
-[workspace.dependencies]
-adapter = { path = "./adapter" }
-api = { path = "./api" }
-kernel = { path = "./kernel" }
-shared = { path = "./shared" }
-registry = { path = "./registry" }
-markdown = { path = "./markdown" }
-infrastructure = { path = "./infrastructure" }
-anyhow = "1.0.100"
-axum = { version = "0.8.8", features = ["macros"] }
-sqlx = { version = "0.8.6", features = [
-  "runtime-tokio",
-  "tls-rustls",
-  "uuid",
-  "chrono",
-  "macros",
-  "postgres",
-  "migrate",
-] }
-tokio = { version = "1.48.0", features = ["full"] }
-async-trait = "0.1.89"
-derive-new = "0.7.0"
-rstest = "0.26.1"
-utoipa = "5.4.0"
-utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-serde_yaml = "0.9.34"
-uuid = { version = "1.19.0", features = ["serde", "v4"] }
-chrono = { version = "0.4.42", features = ["serde"] }
-aws-config = "1.8.12"
-aws-sdk-dsql = "1.48.0"
-aws-sdk-ssm = "1.101.0"
-tower-http = { version = "0.6.8", features = ["cors", "trace"] }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
-reqwest = { version = "0.12.26", features = ["json", "rustls-tls"] }
-base64 = "0.22.1"
-regex = "1.12.2"
-hmac = "0.12.1"
-sha1 = "0.10.6"
-sha2 = "0.10.9"
-urlencoding = "2.1.3"
-futures = "0.3.31"
-thiserror = "2.0.17"
-tracing = "0.1.44"
-hex = "0.4.3"
-
 [dependencies]
 adapter.workspace = true
 api.workspace = true
