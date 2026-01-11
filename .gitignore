@@ -19,3 +19,4 @@ cdk.context.json
 tsconfig.tsbuildinfo
 
 .legacy
+target

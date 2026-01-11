@@ -1,0 +1,60 @@
+[workspace]
+resolver = "3"
+members = [
+  "apps/blog-api",
+  "apps/blog-api/api",
+  "apps/blog-api/kernel",
+  "apps/blog-api/adapter",
+  "apps/blog-api/shared",
+  "apps/blog-api/registry",
+  "apps/blog-api/markdown",
+  "apps/blog-api/infrastructure",
+]
+
+[workspace.dependencies]
+adapter = { path = "./apps/blog-api/adapter" }
+api = { path = "./apps/blog-api/api" }
+kernel = { path = "./apps/blog-api/kernel" }
+shared = { path = "./apps/blog-api/shared" }
+registry = { path = "./apps/blog-api/registry" }
+markdown = { path = "./apps/blog-api/markdown" }
+infrastructure = { path = "./apps/blog-api/infrastructure" }
+anyhow = "1.0.100"
+axum = { version = "0.8.8", features = ["macros"] }
+sqlx = { version = "0.8.6", features = [
+  "runtime-tokio",
+  "tls-rustls",
+  "uuid",
+  "chrono",
+  "macros",
+  "postgres",
+  "migrate",
+] }
+tokio = { version = "1.48.0", features = ["full"] }
+async-trait = "0.1.89"
+derive-new = "0.7.0"
+rstest = "0.26.1"
+utoipa = "5.4.0"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serde_yaml = "0.9.34"
+uuid = { version = "1.19.0", features = ["serde", "v4"] }
+chrono = { version = "0.4.42", features = ["serde"] }
+aws-config = "1.8.12"
+aws-sdk-dsql = "1.48.0"
+aws-sdk-ssm = "1.101.0"
+tower-http = { version = "0.6.8", features = ["cors", "trace"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
+reqwest = { version = "0.12.26", features = ["json", "rustls-tls"] }
+base64 = "0.22.1"
+regex = "1.12.2"
+hmac = "0.12.1"
+sha1 = "0.10.6"
+sha2 = "0.10.9"
+urlencoding = "2.1.3"
+futures = "0.3.31"
+thiserror = "2.0.17"
+tracing = "0.1.44"
+hex = "0.4.3"
