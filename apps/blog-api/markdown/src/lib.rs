@@ -107,17 +107,17 @@ fn parse_ogp(html_content: &str, original_url: &str) -> OgpInfo {
 fn extract_favicon(document: &Html, base_url: &str) -> Option<String> {
     let icon_sel = Selector::parse("link[rel='icon'], link[rel='shortcut icon']").unwrap();
 
-    if let Some(element) = document.select(&icon_sel).next() {
-        if let Some(href) = element.value().attr("href") {
-            return Some(resolve_url(base_url, href));
-        }
+    if let Some(element) = document.select(&icon_sel).next()
+        && let Some(href) = element.value().attr("href")
+    {
+        return Some(resolve_url(base_url, href));
     }
 
     // Fallback: /favicon.ico
-    if let Ok(url) = Url::parse(base_url) {
-        if let Some(host) = url.host_str() {
-            return Some(format!("{}://{}/favicon.ico", url.scheme(), host));
-        }
+    if let Ok(url) = Url::parse(base_url)
+        && let Some(host) = url.host_str()
+    {
+        return Some(format!("{}://{}/favicon.ico", url.scheme(), host));
     }
 
     None
@@ -129,10 +129,10 @@ fn resolve_url(base_url: &str, href: &str) -> String {
         return href.to_string();
     }
 
-    if let Ok(base) = Url::parse(base_url) {
-        if let Ok(resolved) = base.join(href) {
-            return resolved.to_string();
-        }
+    if let Ok(base) = Url::parse(base_url)
+        && let Ok(resolved) = base.join(href)
+    {
+        return resolved.to_string();
     }
 
     href.to_string()
@@ -223,6 +223,84 @@ fn is_github_blob_url(url: &str) -> bool {
     url.starts_with("https://github.com/") && url.contains("/blob/")
 }
 
+/// Check if URL is an X (formerly Twitter) status URL
+fn is_x_url(url: &str) -> bool {
+    url.starts_with("https://x.com/") && url.contains("/status/")
+}
+
+/// Fetch X embed HTML via oEmbed API
+fn fetch_x_oembed(url: &str) -> Option<String> {
+    let encoded_url = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("url", url)
+        .append_pair("omit_script", "true")
+        .finish();
+
+    let api_url = format!("https://publish.twitter.com/oembed?{encoded_url}");
+
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .build()
+        .new_agent();
+
+    let response = agent.get(&api_url).call().ok()?;
+    let body = response.into_body().read_to_string().ok()?;
+    let json: serde_json::Value = serde_json::from_str(&body).ok()?;
+    json["html"].as_str().map(|s| s.to_string())
+}
+
+/// Process X embeds in markdown
+/// Only processes standalone X URLs at the start of a line
+fn process_x_embeds(markdown: &str) -> (String, bool) {
+    let mut result = String::new();
+    let mut in_code_block = false;
+    let mut has_x_embed = false;
+
+    for line in markdown.lines() {
+        // Track code block state
+        if line.starts_with("```") {
+            in_code_block = !in_code_block;
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        if in_code_block {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        let trimmed = line.trim();
+
+        // Check if line is a standalone X URL
+        if is_x_url(trimmed) && !line.contains('[') && !line.contains('(') {
+            // Try to fetch oEmbed HTML
+            if let Some(embed_html) = fetch_x_oembed(trimmed) {
+                has_x_embed = true;
+                result.push('\n');
+                result.push_str(&embed_html);
+                result.push_str("\n\n");
+                continue;
+            }
+            // Fallback: keep original URL
+        }
+
+        result.push_str(line);
+        result.push('\n');
+    }
+
+    // Remove trailing newline if original didn't have one
+    if !markdown.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    (result, has_x_embed)
+}
+
+/// X widgets.js script tag
+const X_WIDGETS_SCRIPT: &str =
+    r#"<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>"#;
+
 /// Process link cards in markdown
 /// Only processes standalone URLs at the start of a line (excluding GitHub blob URLs)
 fn process_link_cards(markdown: &str) -> String {
@@ -246,8 +324,8 @@ fn process_link_cards(markdown: &str) -> String {
 
         let trimmed = line.trim();
 
-        // Check if line is a standalone URL (not GitHub blob)
-        if is_standalone_url(trimmed) && !is_github_blob_url(trimmed) {
+        // Check if line is a standalone URL (not GitHub blob, not X)
+        if is_standalone_url(trimmed) && !is_github_blob_url(trimmed) && !is_x_url(trimmed) {
             // Skip localhost and internal network URLs
             if trimmed.contains("localhost") || trimmed.contains("127.0.0.1") {
                 result.push_str(line);
@@ -478,35 +556,33 @@ fn process_github_embeds(markdown: &str, converter: &MarkdownConverter) -> Strin
 
         let trimmed = line.trim();
 
-        // Check if line is a standalone GitHub blob URL
-        if trimmed.starts_with("https://github.com/") && trimmed.contains("/blob/") {
-            // Make sure it's not part of a markdown link
-            if !line.contains('[') && !line.contains('(') {
-                if let Some(link) = parse_github_link(trimmed) {
-                    // Try to fetch and render the code
-                    match fetch_github_code(&link) {
-                        Ok(code) => {
-                            let code_to_render = match (link.start_line, link.end_line) {
-                                (Some(start), Some(end)) => extract_lines(&code, start, end),
-                                (Some(start), None) => extract_lines(&code, start, start),
-                                _ => code,
-                            };
+        // Check if line is a standalone GitHub blob URL (not part of a markdown link)
+        if trimmed.starts_with("https://github.com/") && trimmed.contains("/blob/")
+            && !line.contains('[') && !line.contains('(')
+            && let Some(link) = parse_github_link(trimmed)
+        {
+            // Try to fetch and render the code
+            match fetch_github_code(&link) {
+                Ok(code) => {
+                    let code_to_render = match (link.start_line, link.end_line) {
+                        (Some(start), Some(end)) => extract_lines(&code, start, end),
+                        (Some(start), None) => extract_lines(&code, start, start),
+                        _ => code,
+                    };
 
-                            // Apply syntax highlighting using syntect
-                            let lang = detect_language(&link.path);
-                            let highlighted = converter.highlight_code(&code_to_render, lang);
-                            let embed_html = render_github_embed(&link, &highlighted, &code_to_render);
-                            result.push_str(&embed_html);
-                            result.push('\n');
-                            continue;
-                        }
-                        Err(_) => {
-                            // Fallback: keep original link
-                            result.push_str(line);
-                            result.push('\n');
-                            continue;
-                        }
-                    }
+                    // Apply syntax highlighting using syntect
+                    let lang = detect_language(&link.path);
+                    let highlighted = converter.highlight_code(&code_to_render, lang);
+                    let embed_html = render_github_embed(&link, &highlighted, &code_to_render);
+                    result.push_str(&embed_html);
+                    result.push('\n');
+                    continue;
+                }
+                Err(_) => {
+                    // Fallback: keep original link
+                    result.push_str(line);
+                    result.push('\n');
+                    continue;
                 }
             }
         }
@@ -845,8 +921,11 @@ impl MarkdownConverter {
         // Process GitHub embeds (fetch code and render)
         let with_github = process_github_embeds(&escaped, self);
 
+        // Process X embeds (fetch oEmbed HTML)
+        let (with_x, has_x_embed) = process_x_embeds(&with_github);
+
         // Process link cards (OGP cards) for standalone URLs
-        let with_link_cards = process_link_cards(&with_github);
+        let with_link_cards = process_link_cards(&with_x);
 
         // Process code blocks with filename (e.g., ```json:package.json)
         let with_code_blocks = process_code_blocks_with_filename(&with_link_cards, self);
@@ -858,10 +937,17 @@ impl MarkdownConverter {
         let with_containers = process_containers(&preprocessed, |inner| self.convert_simple(inner));
 
         // Convert remaining markdown
-        let html = self.convert_simple(&with_containers);
+        let mut html = self.convert_simple(&with_containers);
 
         // 外部リンクに target="_blank" を追加
-        self.add_target_blank_to_external_links(&html)
+        html = self.add_target_blank_to_external_links(&html);
+
+        // Add X widgets.js script if there are X embeds
+        if has_x_embed {
+            html.push_str(X_WIDGETS_SCRIPT);
+        }
+
+        html
     }
 
     /// Highlight code using syntect
@@ -1335,6 +1421,44 @@ mod tests {
         let result = process_link_cards(markdown);
         // Should not be processed (GitHub blob - handled by GitHub embed)
         assert!(result.contains("https://github.com/owner/repo/blob/main/file.rs"));
+        assert!(!result.contains("link-card"));
+    }
+
+    // X embed tests
+
+    #[test]
+    fn test_is_x_url() {
+        assert!(is_x_url("https://x.com/user/status/1234567890"));
+        assert!(is_x_url("https://x.com/user/status/1234567890?s=20"));
+        assert!(!is_x_url("https://x.com/user"));
+        assert!(!is_x_url("https://twitter.com/user/status/1234567890"));
+        assert!(!is_x_url("https://example.com"));
+    }
+
+    #[test]
+    fn test_x_embed_not_in_code_block() {
+        let markdown = "```\nhttps://x.com/user/status/1234567890\n```";
+        let (result, has_embed) = process_x_embeds(markdown);
+        // Should not be processed (inside code block)
+        assert!(result.contains("https://x.com/user/status/1234567890"));
+        assert!(!has_embed);
+    }
+
+    #[test]
+    fn test_x_url_in_markdown_link_not_processed() {
+        let markdown = "[link](https://x.com/user/status/1234567890)";
+        let (result, has_embed) = process_x_embeds(markdown);
+        // Should not be processed (inside markdown link)
+        assert!(result.contains("[link](https://x.com/user/status/1234567890)"));
+        assert!(!has_embed);
+    }
+
+    #[test]
+    fn test_link_cards_skip_x_url() {
+        let markdown = "https://x.com/user/status/1234567890";
+        let result = process_link_cards(markdown);
+        // Should not be processed (X URL - handled by X embed)
+        assert!(result.contains("https://x.com/user/status/1234567890"));
         assert!(!result.contains("link-card"));
     }
 }

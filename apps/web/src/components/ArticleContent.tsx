@@ -2,6 +2,16 @@
 
 import { useEffect, useRef } from 'react';
 
+declare global {
+  interface Window {
+    twttr?: {
+      widgets: {
+        load: (element?: HTMLElement) => Promise<void>;
+      };
+    };
+  }
+}
+
 interface ArticleContentProps {
   html: string;
 }
@@ -78,6 +88,44 @@ export function ArticleContent({ html }: ArticleContentProps) {
       container.removeEventListener('click', handleCopyClick);
     };
   }, []);
+
+  // Load X (Twitter) widgets.js and initialize embeds
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-run when html changes to detect new X embeds
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+
+    // Check if there are any X embeds
+    const xEmbeds = container.querySelectorAll('.twitter-tweet');
+    if (xEmbeds.length === 0) return;
+
+    // If widgets.js is already loaded, just reinitialize
+    if (window.twttr?.widgets) {
+      window.twttr.widgets.load(container);
+      return;
+    }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector(
+      'script[src="https://platform.twitter.com/widgets.js"]'
+    );
+    if (existingScript) {
+      // Wait for it to load
+      existingScript.addEventListener('load', () => {
+        window.twttr?.widgets.load(container);
+      });
+      return;
+    }
+
+    // Load widgets.js dynamically
+    const script = document.createElement('script');
+    script.src = 'https://platform.twitter.com/widgets.js';
+    script.async = true;
+    script.onload = () => {
+      window.twttr?.widgets.load(container);
+    };
+    document.body.appendChild(script);
+  }, [html]);
 
   return (
     <div
