@@ -89,6 +89,40 @@ export function ArticleContent({ html }: ArticleContentProps) {
     };
   }, []);
 
+  // Handle initial hash scroll on page load
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-run when html changes to scroll after content is rendered
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    const id = hash.slice(1);
+    let attempts = 0;
+    const maxAttempts = 10;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const tryScroll = () => {
+      if (cancelled) return;
+
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        timerId = setTimeout(tryScroll, 100);
+      }
+    };
+
+    timerId = setTimeout(tryScroll, 50);
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [html]);
+
   // Load X (Twitter) widgets.js and initialize embeds
   // biome-ignore lint/correctness/useExhaustiveDependencies: Re-run when html changes to detect new X embeds
   useEffect(() => {
