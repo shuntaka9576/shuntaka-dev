@@ -1,0 +1,25 @@
+name: Setup Rust
+description: Setup Rust toolchain from rust-toolchain.toml
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse rust-toolchain.toml
+      id: parse
+      shell: bash
+      run: |
+        TOOLCHAIN_FILE="rust-toolchain.toml"
+        if [[ ! -f "$TOOLCHAIN_FILE" ]]; then
+          echo "rust-toolchain.toml not found" >&2
+          exit 1
+        fi
+        CHANNEL=$(grep '^channel' "$TOOLCHAIN_FILE" | sed 's/.*= *"\([^"]*\)".*/\1/')
+        COMPONENTS=$(grep '^components' "$TOOLCHAIN_FILE" | sed 's/.*\[\(.*\)\].*/\1/' | tr -d '"' | tr -d ' ')
+        echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+        echo "components=$COMPONENTS" >> $GITHUB_OUTPUT
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561 # master
+      with:
+        toolchain: ${{ steps.parse.outputs.channel }}
+        components: ${{ steps.parse.outputs.components }}
