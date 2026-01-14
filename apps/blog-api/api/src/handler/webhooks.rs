@@ -85,7 +85,11 @@ pub async fn handle_github_webhook(
         .get_parameter(&config.github_webhook_secret_key_name, true)
         .await
         .map_err(|e| {
-            error!("Failed to get webhook secret from SSM: {}", e);
+            error!(
+                ssm_param = %config.github_webhook_secret_key_name,
+                error = ?e,
+                "Failed to get webhook secret from SSM"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(WebhookResponse {
@@ -198,7 +202,12 @@ pub async fn handle_github_webhook(
         .get_parameter(&config.github_app_secret_pem_key_name, true)
         .await
         .map_err(|e| {
-            error!("Failed to get private key from SSM: {}", e);
+            error!(
+                ssm_param = %config.github_app_secret_pem_key_name,
+                installation_id = %push_event.installation.id,
+                error = ?e,
+                "Failed to get private key from SSM"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(WebhookResponse {
@@ -218,7 +227,12 @@ pub async fn handle_github_webhook(
         .get_access_token(push_event.installation.id)
         .await
         .map_err(|e| {
-            error!("Failed to get GitHub access token: {}", e);
+            error!(
+                installation_id = %push_event.installation.id,
+                repo = %push_event.repository.full_name,
+                error = ?e,
+                "Failed to get GitHub access token"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(WebhookResponse {
@@ -249,7 +263,13 @@ pub async fn handle_github_webhook(
         )
         .await
         .map_err(|e| {
-            error!("Failed to list articles directory: {}", e);
+            error!(
+                installation_id = %push_event.installation.id,
+                repo = %push_event.repository.full_name,
+                articles_dir = %config.articles_dir,
+                error = ?e,
+                "Failed to list articles directory"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(WebhookResponse {
@@ -288,7 +308,11 @@ pub async fn handle_github_webhook(
         .find_by_installation_id(push_event.installation.id)
         .await
         .map_err(|e| {
-            error!("Failed to find user by installation_id: {}", e);
+            error!(
+                installation_id = %push_event.installation.id,
+                error = ?e,
+                "Failed to find user by installation_id"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(WebhookResponse {

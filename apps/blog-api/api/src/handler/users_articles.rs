@@ -8,7 +8,7 @@ use kernel::model::article::ArticleType;
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{error, info};
 use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -87,7 +87,12 @@ pub async fn get_users_articles(
         .find_published_by_user_name_and_type(&name, &article_type)
         .await
         .map_err(|e| {
-            error!("Failed to find articles: {}", e);
+            error!(
+                user_name = %name,
+                article_type = %article_type.as_str(),
+                error = ?e,
+                "Failed to find articles"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
@@ -104,7 +109,11 @@ pub async fn get_users_articles(
         .get_parameter(&config.cloudinary_api_secret_key_name, true)
         .await
         .map_err(|e| {
-            error!("Failed to get Cloudinary API secret from SSM: {}", e);
+            error!(
+                ssm_param = %config.cloudinary_api_secret_key_name,
+                error = ?e,
+                "Failed to get Cloudinary API secret from SSM"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
@@ -120,16 +129,22 @@ pub async fn get_users_articles(
         articles: articles
             .into_iter()
             .map(|article| {
+                let slug = article.slug.into_inner();
+                info!(slug = %slug, "Processing article: start");
+
                 let title = article.title.into_inner();
                 let content = article.content.into_inner();
                 let content_html = convert_markdown_to_html(&content);
+                info!(slug = %slug, "Processing article: markdown converted");
+
                 let ogp_url =
                     cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
+                info!(slug = %slug, "Processing article: ogp_url created");
 
                 ArticleResponse {
                     article_id: article.article_id.into_inner().to_string(),
                     title,
-                    slug: article.slug.into_inner(),
+                    slug,
                     content,
                     content_html,
                     description: article.description.into_inner(),
@@ -170,7 +185,12 @@ pub async fn get_users_article(
         .find_published_by_user_name_and_slug(&path.name, &path.slug)
         .await
         .map_err(|e| {
-            error!("Failed to find article: {}", e);
+            error!(
+                user_name = %path.name,
+                slug = %path.slug,
+                error = ?e,
+                "Failed to find article"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
@@ -196,7 +216,11 @@ pub async fn get_users_article(
         .get_parameter(&config.cloudinary_api_secret_key_name, true)
         .await
         .map_err(|e| {
-            error!("Failed to get Cloudinary API secret from SSM: {}", e);
+            error!(
+                ssm_param = %config.cloudinary_api_secret_key_name,
+                error = ?e,
+                "Failed to get Cloudinary API secret from SSM"
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {
