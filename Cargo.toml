@@ -45,7 +45,7 @@ aws-config = "1.8.12"
 aws-sdk-dsql = "1.48.0"
 aws-sdk-ssm = "1.101.0"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 reqwest = { version = "0.12.26", features = ["json", "rustls-tls"] }
 base64 = "0.22.1"

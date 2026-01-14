@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
 
 async fn bootstrap() -> Result<()> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().json())
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "blog_api=debug,tower_http=debug".into()),
