@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Article } from '@/lib/api';
 
@@ -30,10 +31,13 @@ export function ArticleCard({ article, userName }: ArticleCardProps) {
           </div>
           {article.thumbnail && (
             <div>
-              <img
+              <Image
                 src={article.thumbnail}
                 alt={article.title}
-                className="h-[100px] w-[150px] rounded-[10px] object-cover"
+                width={150}
+                height={100}
+                className="rounded-[10px] object-cover"
+                loading="lazy"
               />
             </div>
           )}

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { ArticleContent } from '@/components/ArticleContent';
 import { BaseLayout } from '@/components/BaseLayout';
+import { ArticleJsonLd } from '@/components/JsonLd';
 import { TableOfContents } from '@/components/TableOfContents';
 import { getArticleBySlug } from '@/lib/api';
 import { SITE_URL } from '@/lib/constants';
@@ -75,34 +77,51 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
+  const articleUrl = `${SITE_URL}/${userName}/articles/${slug}`;
+
   return (
-    <BaseLayout>
-      <div className="article-header">
-        <div className="article-title">{article.title}</div>
-        <div className="article-info">
-          <div className="article-time">
-            <p>{formatDate(article.publishedAt)}</p>
-            <p>{formatDate(article.updatedAt)}</p>
+    <>
+      <ArticleJsonLd
+        title={article.title}
+        description={article.description}
+        publishedAt={article.publishedAt}
+        updatedAt={article.updatedAt}
+        authorName={userName}
+        url={articleUrl}
+        imageUrl={article.thumbnail ?? article.ogpUrl}
+      />
+      <BaseLayout>
+        <div className="article-header">
+          <div className="article-title">{article.title}</div>
+          <div className="article-info">
+            <div className="article-time">
+              <p>{formatDate(article.publishedAt)}</p>
+              <p>{formatDate(article.updatedAt)}</p>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="article-body">
-        <article className="article-content">
-          {article.thumbnail && (
-            <img
-              src={article.thumbnail}
-              alt={article.title}
-              className="article-thumbnail"
-            />
-          )}
-          <div className="article-content-wrapper">
-            <ArticleContent html={article.contentHtml ?? ''} />
-          </div>
-        </article>
-        <aside className="right-sidebar">
-          <TableOfContents />
-        </aside>
-      </div>
-    </BaseLayout>
+        <div className="article-body">
+          <article className="article-content">
+            {article.thumbnail && (
+              <Image
+                src={article.thumbnail}
+                alt={article.title}
+                width={800}
+                height={450}
+                className="article-thumbnail"
+                priority
+                sizes="(max-width: 768px) 100vw, 800px"
+              />
+            )}
+            <div className="article-content-wrapper">
+              <ArticleContent html={article.contentHtml ?? ''} />
+            </div>
+          </article>
+          <aside className="right-sidebar">
+            <TableOfContents />
+          </aside>
+        </div>
+      </BaseLayout>
+    </>
   );
 }

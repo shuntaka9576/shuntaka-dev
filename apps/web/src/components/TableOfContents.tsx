@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
-import tocbot from 'tocbot';
+import { useEffect, useRef } from 'react';
+import type tocbotModule from 'tocbot';
 
 export function TableOfContents() {
+  const tocbotRef = useRef<typeof tocbotModule | null>(null);
+
   useEffect(() => {
-    const initTocbot = () => {
+    const initTocbot = async () => {
       const content = document.querySelector('.prose');
       if (!content) return;
 
@@ -18,6 +20,10 @@ export function TableOfContents() {
           heading.id = `heading-${index}`;
         }
       });
+
+      // Dynamic import tocbot
+      const tocbot = (await import('tocbot')).default;
+      tocbotRef.current = tocbot;
 
       tocbot.init({
         tocSelector: '.toc',
@@ -34,7 +40,7 @@ export function TableOfContents() {
 
     return () => {
       clearTimeout(timer);
-      tocbot.destroy();
+      tocbotRef.current?.destroy();
     };
   }, []);
 
