@@ -17,9 +17,11 @@ export function ToggleSwitch() {
   const isDark = colorMode === 'dark';
 
   return (
-    <div
+    <button
+      type="button"
       className="toggle-switch"
       onClick={handleClick}
+      aria-label={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
       style={{ cursor: 'pointer' }}
     >
       <div
@@ -37,6 +39,7 @@ export function ToggleSwitch() {
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
           >
             <circle cx="12" cy="12" r="12" fill="#525457" />
             <path
@@ -48,6 +51,6 @@ export function ToggleSwitch() {
           </svg>
         </span>
       </div>
-    </div>
+    </button>
   );
 }

@@ -33,7 +33,11 @@ export function BaseLayout({
 
       {/* Type Header (tech/note/who?) */}
       {showTypeHeader && (
-        <div className="w-full" style={{ background: 'var(--header-color)' }}>
+        <nav
+          className="w-full"
+          style={{ background: 'var(--header-color)' }}
+          aria-label="カテゴリーナビゲーション"
+        >
           <div className="mx-auto max-w-[1200px] px-8 max-sm:px-[2%] max-sm:pt-3">
             <div className="inline-block mr-2">
               <ProgressLink
@@ -79,7 +83,7 @@ export function BaseLayout({
               </ProgressLink>
             </div>
           </div>
-        </div>
+        </nav>
       )}
 
       {/* Page Body */}

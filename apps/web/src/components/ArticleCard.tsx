@@ -1,4 +1,6 @@
+import Image from 'next/image';
 import Link from 'next/link';
+import { memo } from 'react';
 import type { Article } from '@/lib/api';
 
 interface ArticleCardProps {
@@ -16,10 +18,13 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export function ArticleCard({ article, userName }: ArticleCardProps) {
+export const ArticleCard = memo(function ArticleCard({
+  article,
+  userName,
+}: ArticleCardProps) {
   return (
     <Link href={`/${userName}/articles/${article.slug}`}>
-      <div
+      <article
         className="mb-4 block w-full border-b"
         style={{ borderColor: 'var(--article-record-underline)' }}
       >
@@ -30,15 +35,18 @@ export function ArticleCard({ article, userName }: ArticleCardProps) {
           </div>
           {article.thumbnail && (
             <div>
-              <img
+              <Image
                 src={article.thumbnail}
                 alt={article.title}
-                className="h-[100px] w-[150px] rounded-[10px] object-cover"
+                width={150}
+                height={100}
+                className="rounded-[10px] object-cover"
+                loading="lazy"
               />
             </div>
           )}
         </div>
-      </div>
+      </article>
     </Link>
   );
-}
+});

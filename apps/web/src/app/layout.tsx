@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Noto_Sans_JP, Roboto } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -8,12 +9,32 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
+const roboto = Roboto({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  display: 'swap',
+  variable: '--font-roboto',
+});
+
+const notoSansJP = Noto_Sans_JP({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-noto-sans-jp',
+});
+
 const OG_IMAGE_URL =
   'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png';
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
+  metadataBase: new URL(SITE_URL),
+  alternates: {
+    canonical: '/',
+    types: {
+      'application/rss+xml': '/feed',
+    },
+  },
   icons: {
     icon: '/icons/icon.png',
     apple: '/icons/apple-icon.png',
@@ -36,6 +57,7 @@ export const metadata: Metadata = {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [OG_IMAGE_URL],
+    creator: '@shuntaka_jp',
   },
 };
 
@@ -45,7 +67,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" suppressHydrationWarning>
+    <html
+      lang="ja"
+      className={`${roboto.variable} ${notoSansJP.variable}`}
+      suppressHydrationWarning
+    >
       <GoogleTagManager />
       <body>
         <GoogleTagManagerNoscript />
