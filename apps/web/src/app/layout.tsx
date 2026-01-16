@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Lato, Noto_Sans_JP } from 'next/font/google';
+import { Noto_Sans_JP, Roboto } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -9,11 +9,11 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
-const lato = Lato({
+const roboto = Roboto({
   subsets: ['latin'],
   weight: ['400', '700'],
   display: 'swap',
-  variable: '--font-lato',
+  variable: '--font-roboto',
 });
 
 const notoSansJP = Noto_Sans_JP({
@@ -69,7 +69,7 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${lato.variable} ${notoSansJP.variable}`}
+      className={`${roboto.variable} ${notoSansJP.variable}`}
       suppressHydrationWarning
     >
       <GoogleTagManager />
