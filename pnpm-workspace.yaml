@@ -4,5 +4,10 @@ packages:
   - iac/*
   - tools/*
 
+catalog:
+  typescript: ^5.9.3
+  tsx: ^4.21.0
+  "@types/node": ^24.10.4
+
 ignoredBuiltDependencies:
   - esbuild

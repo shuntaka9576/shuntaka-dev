@@ -57,6 +57,11 @@
       "groupName": "root"
     },
     {
+      "description": "Group pnpm catalog dependencies",
+      "matchFileNames": ["pnpm-workspace.yaml"],
+      "groupName": "pnpm-catalog"
+    },
+    {
       "description": "Immediate updates for pnpm",
       "matchPackageNames": ["pnpm"],
       "minimumReleaseAge": "0 days"
