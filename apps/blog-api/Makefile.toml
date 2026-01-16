@@ -11,7 +11,6 @@ DSQL_CLUSTER_ENDPOINT = { script = [
 ] }
 
 [tasks.run]
-env_files = [".env"]
 command = "cargo"
 args = ["watch", "-x", "run"]
 
