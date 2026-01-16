@@ -114,7 +114,7 @@ html {
 body {
   height: 100%;
   font-family:
-    var(--font-inter), var(--font-noto-sans-jp), -apple-system,
+    var(--font-lato), var(--font-noto-sans-jp), -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
     "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   word-wrap: break-word;

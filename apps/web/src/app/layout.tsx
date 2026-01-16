@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Noto_Sans_JP } from 'next/font/google';
+import { Lato, Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -9,10 +9,11 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
-const inter = Inter({
+const lato = Lato({
   subsets: ['latin'],
+  weight: ['400', '700'],
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-lato',
 });
 
 const notoSansJP = Noto_Sans_JP({
@@ -68,7 +69,7 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${inter.variable} ${notoSansJP.variable}`}
+      className={`${lato.variable} ${notoSansJP.variable}`}
       suppressHydrationWarning
     >
       <GoogleTagManager />
