@@ -26,8 +26,8 @@
     "cspell": "^9.4.0",
     "lefthook": "^2.0.13",
     "prettier": "^3.7.4",
-    "tsx": "^4.21.0",
+    "tsx": "catalog:",
     "turbo": "^2.7.2",
-    "typescript": "^5.9.3"
+    "typescript": "catalog:"
   }
 }
