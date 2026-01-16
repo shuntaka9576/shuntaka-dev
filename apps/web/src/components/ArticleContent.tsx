@@ -158,6 +158,9 @@ export function ArticleContent({ html }: ArticleContentProps) {
     script.onload = () => {
       window.twttr?.widgets.load(container);
     };
+    script.onerror = () => {
+      console.error('Failed to load Twitter widgets.js');
+    };
     document.body.appendChild(script);
   }, [html]);
 
