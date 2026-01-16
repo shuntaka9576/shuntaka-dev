@@ -32,9 +32,9 @@
       "groupName": "apps/web"
     },
     {
-      "description": "Group apps/blog-api (Rust)",
-      "matchFileNames": ["apps/blog-api/**"],
-      "groupName": "apps/blog-api"
+      "description": "Group Rust workspace (blog-api)",
+      "matchFileNames": ["Cargo.toml", "apps/blog-api/**"],
+      "groupName": "rust-workspace"
     },
     {
       "description": "Group tools/dsql-cli",
