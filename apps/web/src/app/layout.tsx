@@ -22,8 +22,7 @@ const notoSansJP = Noto_Sans_JP({
   variable: '--font-noto-sans-jp',
 });
 
-const OG_IMAGE_URL =
-  'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png';
+const OG_IMAGE_URL = `${SITE_URL}/images/og/hashi-light.png`;
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
