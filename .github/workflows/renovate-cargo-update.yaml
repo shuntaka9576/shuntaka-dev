@@ -1,0 +1,40 @@
+name: Renovate Cargo Update
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "apps/blog-api/**/Cargo.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-ci:
+    if: github.actor == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup node
+        uses: ./.github/actions/setup-node
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Update Cargo.lock
+        run: cargo update
+
+      - name: Run CI
+        uses: ./.github/actions/ci
+
+      - name: Commit Cargo.lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git diff --staged --quiet || git commit -m "chore: update Cargo.lock"
+          git push

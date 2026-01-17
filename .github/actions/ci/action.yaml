@@ -1,0 +1,21 @@
+name: CI Steps
+description: Run lint, spell-check, type-check, and test
+
+runs:
+  using: "composite"
+  steps:
+    - name: Lint
+      shell: bash
+      run: pnpm lint
+
+    - name: Spell check
+      shell: bash
+      run: pnpm spell-check
+
+    - name: Type check
+      shell: bash
+      run: pnpm type-check
+
+    - name: Test
+      shell: bash
+      run: pnpm run test
