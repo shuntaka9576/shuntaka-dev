@@ -33,7 +33,10 @@ export async function generateMetadata({
     return { title: 'Article Not Found' };
   }
 
-  const ogImage = article.thumbnail ?? article.ogpUrl;
+  const ogImage =
+    article.type === 'note'
+      ? `${SITE_URL}/images/og/hashi-light.png`
+      : (article.thumbnail ?? article.ogpUrl);
 
   return {
     title: article.title,
@@ -48,6 +51,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: article.type === 'note' ? 'summary' : 'summary_large_image',
+      images: [ogImage],
     },
   };
 }
