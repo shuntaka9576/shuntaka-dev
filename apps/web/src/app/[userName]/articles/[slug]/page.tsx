@@ -47,7 +47,7 @@ export async function generateMetadata({
       images: [{ url: ogImage }],
     },
     twitter: {
-      card: 'summary_large_image',
+      card: article.type === 'note' ? 'summary' : 'summary_large_image',
     },
   };
 }
