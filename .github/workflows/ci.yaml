@@ -19,18 +19,5 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Lint
-        shell: bash
-        run: pnpm lint
-
-      - name: Spell check
-        shell: bash
-        run: pnpm spell-check
-
-      - name: Type check
-        shell: bash
-        run: pnpm type-check
-
-      - name: Test
-        shell: bash
-        run: pnpm run test
+      - name: Run CI
+        uses: ./.github/actions/ci
