@@ -35,7 +35,7 @@ export async function generateMetadata({
 
   const ogImage =
     article.type === 'note'
-      ? `${SITE_URL}/images/og/hashi-light.png`
+      ? 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png'
       : (article.thumbnail ?? article.ogpUrl);
 
   return {
