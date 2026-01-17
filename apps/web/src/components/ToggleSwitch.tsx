@@ -32,7 +32,7 @@ export function ToggleSwitch() {
             : {}
         }
       >
-        <span className="dark-icon" style={{ left: isDark ? '18px' : '-12px' }}>
+        <span className="dark-icon" style={{ left: isDark ? '22px' : '-6px' }}>
           <svg
             width="24"
             height="24"
