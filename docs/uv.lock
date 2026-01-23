@@ -107,7 +107,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "myst-parser", specifier = ">=4.0.1" },
-    { name = "sphinx", specifier = ">=9.0.4" },
+    { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-last-updated-by-git", specifier = ">=0.3.8" },
     { name = "sphinx-rtd-theme", specifier = ">=3.0.2" },
     { name = "sphinxcontrib-mermaid", specifier = ">=1.2.3" },
