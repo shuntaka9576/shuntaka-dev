@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useNavigationProgress } from '@/components/NavigationProgressProvider';
 
 declare global {
   interface Window {
@@ -20,6 +21,17 @@ const COPY_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75
 
 export function ArticleContent({ html }: ArticleContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const { doneProgress } = useNavigationProgress();
+
+  // Complete navigation progress after content is painted
+  useEffect(() => {
+    // Wait for browser to paint the content
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        doneProgress();
+      });
+    });
+  }, [doneProgress]);
 
   // Add copy buttons to all pre elements
   useEffect(() => {

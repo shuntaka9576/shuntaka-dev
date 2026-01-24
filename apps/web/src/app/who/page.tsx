@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { BaseLayout } from '@/components/BaseLayout';
+import { PageReady } from '@/components/PageReady';
 
 const links = [
   {
@@ -71,6 +72,7 @@ export default function WhoPage() {
             <p>Cloudflare</p>
           </div>
         </div>
+        <PageReady />
       </main>
     </BaseLayout>
   );
