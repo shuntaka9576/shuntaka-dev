@@ -10,14 +10,14 @@ AWS DSQL/PostgreSQL用のマイグレーションCLIツール。ローカルPost
 
 ```bash
 # マイグレーション実行
-pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres  # ローカル
-pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT                                    # DSQL
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres  # ローカル
+bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT                                    # DSQL
 
 # スキーマ削除
-pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
 # DynamoDB JSONL → SQL変換
-pnpm convert --input <jsonl-path> --output <sql-path>
+bun run convert --input <jsonl-path> --output <sql-path>
 ```
 
 ## Architecture

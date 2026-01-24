@@ -6,16 +6,16 @@ runs:
   steps:
     - name: Lint
       shell: bash
-      run: pnpm lint
+      run: bun run lint
 
     - name: Spell check
       shell: bash
-      run: pnpm spell-check
+      run: bun run spell-check
 
     - name: Type check
       shell: bash
-      run: pnpm type-check
+      run: bun run type-check
 
     - name: Test
       shell: bash
-      run: pnpm run test
+      run: bun run test

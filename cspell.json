@@ -6,7 +6,7 @@
     "**/build/**",
     "**/.git/**",
     "**/coverage/**",
-    "pnpm-lock.yaml",
+    "bun.lockb",
     "package-lock.json",
     "yarn.lock",
     "turbo.json",
@@ -17,6 +17,7 @@
   "language": "en",
   "words": [
     "adoc",
+    "bunx",
     "apig",
     "dkerzyk",
     "applicationautoscaling",

@@ -20,12 +20,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
-    "@types/node": "catalog:",
     "@types/nprogress": "^0.2.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/rss": "^0.0.32",
-    "tailwindcss": "^4.1.18",
-    "typescript": "catalog:"
+    "tailwindcss": "^4.1.18"
   }
 }
