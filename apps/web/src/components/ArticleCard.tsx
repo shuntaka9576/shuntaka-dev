@@ -1,7 +1,7 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { memo } from 'react';
 import type { Article } from '@/lib/api';
+import { ProgressLink } from './ProgressLink';
 
 interface ArticleCardProps {
   article: Article;
@@ -23,7 +23,7 @@ export const ArticleCard = memo(function ArticleCard({
   userName,
 }: ArticleCardProps) {
   return (
-    <Link href={`/${userName}/articles/${article.slug}`}>
+    <ProgressLink href={`/${userName}/articles/${article.slug}`}>
       <article
         className="mb-4 block w-full border-b"
         style={{ borderColor: 'var(--article-record-underline)' }}
@@ -47,6 +47,6 @@ export const ArticleCard = memo(function ArticleCard({
           )}
         </div>
       </article>
-    </Link>
+    </ProgressLink>
   );
 });
