@@ -38,8 +38,12 @@ export function NavigationProgressProvider({
   stateRef.current = state;
 
   useEffect(() => {
-    void pathname; // ナビゲーション完了検知用
+    void pathname; // Trigger effect on navigation completion
     if (stateRef.current === 'loading') {
+      // Clear fallback timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       setState('completing');
       timeoutRef.current = setTimeout(() => {
         setState('idle');
@@ -58,6 +62,12 @@ export function NavigationProgressProvider({
       clearTimeout(timeoutRef.current);
     }
     setState('loading');
+
+    // Fallback: Force reset to idle after 5 seconds
+    // Handles cases where useEffect doesn't fire (bfcache, React re-render timing)
+    timeoutRef.current = setTimeout(() => {
+      setState('idle');
+    }, 5000);
   }, []);
 
   return (
