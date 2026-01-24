@@ -47,7 +47,7 @@ aws-sdk-ssm = "1.101.0"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
-reqwest = { version = "0.13.1", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13.1", features = ["json", "rustls"] }
 base64 = "0.22.1"
 regex = "1.12.2"
 hmac = "0.12.1"
