@@ -1,72 +1,50 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import NProgress from 'nprogress';
+import { createContext, useCallback, useContext, useRef } from 'react';
 
-type ProgressState = 'idle' | 'loading' | 'completing';
+// NProgress設定
+NProgress.configure({
+  showSpinner: false,
+  minimum: 0.1,
+  trickleSpeed: 200,
+});
 
 interface NavigationProgressContextType {
   startProgress: () => void;
+  doneProgress: () => void;
 }
 
 const NavigationProgressContext = createContext<NavigationProgressContextType>({
   startProgress: () => {},
+  doneProgress: () => {},
 });
 
 export function useNavigationProgress() {
   return useContext(NavigationProgressContext);
 }
 
-interface NavigationProgressProviderProps {
-  children: React.ReactNode;
-}
-
 export function NavigationProgressProvider({
   children,
-}: NavigationProgressProviderProps) {
-  const [state, setState] = useState<ProgressState>('idle');
-  const pathname = usePathname();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const stateRef = useRef(state);
-  stateRef.current = state;
-
-  useEffect(() => {
-    void pathname; // ナビゲーション完了検知用
-    if (stateRef.current === 'loading') {
-      setState('completing');
-      timeoutRef.current = setTimeout(() => {
-        setState('idle');
-      }, 300);
-    }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [pathname]);
+}: {
+  children: React.ReactNode;
+}) {
+  const isNavigatingRef = useRef(false);
 
   const startProgress = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    isNavigatingRef.current = true;
+    NProgress.start();
+  }, []);
+
+  const doneProgress = useCallback(() => {
+    if (isNavigatingRef.current) {
+      NProgress.done();
+      isNavigatingRef.current = false;
     }
-    setState('loading');
   }, []);
 
   return (
-    <NavigationProgressContext.Provider value={{ startProgress }}>
-      {state !== 'idle' && (
-        <div
-          className={`navigation-progress ${state === 'loading' ? 'loading' : 'complete'}`}
-        />
-      )}
+    <NavigationProgressContext.Provider value={{ startProgress, doneProgress }}>
       {children}
     </NavigationProgressContext.Provider>
   );

@@ -1,5 +1,6 @@
 import { ArticleCard } from '@/components/ArticleCard';
 import { BaseLayout } from '@/components/BaseLayout';
+import { PageReady } from '@/components/PageReady';
 import { getArticlesByType } from '@/lib/api';
 
 const USER_NAME = process.env.NEXT_PUBLIC_USER_NAME || 'shuntaka';
@@ -32,6 +33,7 @@ export default async function NotePage() {
             ))
           )}
         </div>
+        <PageReady />
       </main>
     </BaseLayout>
   );

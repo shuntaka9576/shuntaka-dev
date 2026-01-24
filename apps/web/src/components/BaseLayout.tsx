@@ -15,6 +15,9 @@ export function BaseLayout({
   showTypeHeader = false,
 }: BaseLayoutProps) {
   const pathname = usePathname();
+  // NOTE: doneProgress()はここで呼ばない
+  // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
+  // 各ページの末端コンポーネント（PageReady, ArticleContent等）で呼ぶ
 
   return (
     <div className="relative min-h-[110%]">
