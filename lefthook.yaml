@@ -1,4 +1,4 @@
 pre-push:
   commands:
     lint:
-      run: pnpm lint
+      run: bun run lint

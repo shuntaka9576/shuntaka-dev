@@ -34,30 +34,30 @@ docs/             # Sphinx ドキュメント (Python/uv)
 
 ```bash
 # 開発
-pnpm dev
+bun run dev
 
 # ビルド・テスト
-pnpm build
-pnpm test
+bun run build
+bun run test
 
 # コード品質チェック（リント + スペル + 型）
-pnpm check
+bun run check
 
 # 個別実行
-pnpm lint         # Biome + Prettier
-pnpm fix          # 自動修正
-pnpm spell-check  # cspell
-pnpm type-check   # TypeScript
+bun run lint         # Biome + Prettier
+bun run fix          # 自動修正
+bun run spell-check  # cspell
+bun run type-check   # TypeScript
 
 # デプロイ
-pnpm deploy       # AWS CDK
+bun run deploy       # AWS CDK
 ```
 
 ### AWS CDK（iac/awsディレクトリで実行）
 
 ```bash
 cd iac/aws
-pnpm exec dotenv -- cdk synth -c stageName=dev
+bunx dotenv -- cdk synth -c stageName=dev
 ```
 
 ### dsql-cli (マイグレーション)
@@ -66,12 +66,12 @@ pnpm exec dotenv -- cdk synth -c stageName=dev
 cd tools/dsql-cli
 
 # ローカルPostgreSQL
-pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
 # AWS DSQL
-pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
-pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
 ### ローカルDB起動
@@ -83,7 +83,7 @@ docker compose up -d postgres
 
 ## Tech Stack
 
-- **パッケージ管理**: pnpm 10.x + Turbo
+- **パッケージ管理**: Bun + Turbo
 - **フロントエンド**: Next.js 16, React 19, TypeScript 5
 - **バックエンド**: Rust (Axum, SQLx), AWS DSQL
 - **インフラ**: AWS CDK, Docker
@@ -105,13 +105,13 @@ AWS DSQLは以下をサポートしない：
 DSQLではALTER TABLEに制限があるため、スキーマ変更は以下の手順で行う：
 
 1. `tools/dsql-cli/dsl/` 配下の元SQLファイルを直接修正
-2. `pnpm drop` でスキーマ削除
-3. `pnpm migrate` で再作成
+2. `bun run drop` でスキーマ削除
+3. `bun run migrate` で再作成
 
 ```bash
 cd tools/dsql-cli
-pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 ```
 
 ## Legacy Code Reference

@@ -40,7 +40,7 @@ jobs:
 
       - name: CDK Deploy
         working-directory: iac/aws
-        run: pnpm exec cdk deploy "${{ inputs.stageName == 'prd' && 'p' || 'd' }}-st-main" -c stageName=${{ inputs.stageName }} --require-approval never
+        run: bunx cdk deploy "${{ inputs.stageName == 'prd' && 'p' || 'd' }}-st-main" -c stageName=${{ inputs.stageName }} --require-approval never
         env:
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
           GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}

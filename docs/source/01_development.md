@@ -99,7 +99,7 @@ aws ssm put-parameter \
 ```bash
 export STAGE_NAME=""
 # stageNameはこのスタックでは使用しないが、getConfig()の実行に必要
-pnpm exec dotenv -- cdk deploy \
+bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
   st-oidc-provider \
   --require-approval never
@@ -109,7 +109,7 @@ pnpm exec dotenv -- cdk deploy \
 
 ```bash
 export STAGE_NAME=""
-pnpm exec dotenv -- cdk deploy \
+bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
   ${STAGE_NAME:0:1}-st-deploy-role \
   --require-approval never
@@ -120,7 +120,7 @@ pnpm exec dotenv -- cdk deploy \
 ```bash
 export STAGE_NAME=""
 export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query "Account" --output text)
-pnpm exec dotenv -- cdk deploy \
+bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
   ${STAGE_NAME:0:1}-st-global-dns \
   --require-approval never
@@ -134,7 +134,7 @@ AWSのRoute53からホストゾーンのNSレコードを確認し、ムーム�
 
 ```bash
 export STAGE_NAME=""
-pnpm exec dotenv -- cdk deploy \
+bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
   ${STAGE_NAME:0:1}-st-tokyo-cert \
   --require-approval never
@@ -188,7 +188,7 @@ WHERE name = 'shuntaka';
 
 ```bash
 export STAGE_NAME=""
-pnpm exec dotenv -- cdk deploy \
+bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
   ${STAGE_NAME:0:1}-st-main \
   --require-approval never
@@ -205,11 +205,11 @@ cd tools/dsql-cli
 export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
   --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
   --query "Parameter.Value" --output text)
-pnpm convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
+bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
 
 # 既存のデータを削除する場合
-# pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+# bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
 ### Renovate
@@ -263,14 +263,14 @@ docker compose up -d postgres
 ```bash
 cd tools/dsql-cli
 # ローカル
-pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
 # DSQL
 export STAGE_NAME=""
 export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
   --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
   --query "Parameter.Value" --output text)
-pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
 スキーマ削除
@@ -278,10 +278,10 @@ pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```bash
 cd tools/dsql-cli
 # ローカル
-pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
 # DSQL
-pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
 DynamoDB→DSQLデータ変換
@@ -290,13 +290,13 @@ DynamoDB→DSQLデータ変換
 cd tools/dsql-cli
 
 # 本番データを変換（99_seed_data.sqlを生成）
-pnpm convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
+bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
 
 # ローカルDBに投入
-pnpm drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-pnpm migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
 # DSQLに投入
-pnpm drop --endpoint $DSQL_CLUSTER_ENDPOINT
-pnpm migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
+bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
