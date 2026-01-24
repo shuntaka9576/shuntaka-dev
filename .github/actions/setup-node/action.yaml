@@ -13,6 +13,14 @@ runs:
       with:
         bun-version-file: ".bun-version"
 
+    - name: Cache node_modules
+      id: cache-node-modules
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('bun.lockb') }}
+
     - name: Install node modules
+      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       shell: bash
       run: bun install --frozen-lockfile
