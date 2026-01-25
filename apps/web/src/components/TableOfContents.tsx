@@ -36,7 +36,9 @@ export function TableOfContents() {
     };
 
     // Wait for layout to stabilize
-    const timer = setTimeout(initTocbot, 300);
+    const timer = setTimeout(() => {
+      void initTocbot();
+    }, 300);
 
     return () => {
       clearTimeout(timer);

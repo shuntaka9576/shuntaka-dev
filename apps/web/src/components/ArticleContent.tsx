@@ -68,7 +68,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
     const container = contentRef.current;
     if (!container) return;
 
-    const handleCopyClick = async (e: MouseEvent) => {
+    const handleCopyClick = (e: MouseEvent) => {
       const button = (e.target as Element).closest(
         '.github-embed-copy, .code-block-copy, .copy-btn'
       );
@@ -77,22 +77,23 @@ export function ArticleContent({ html }: ArticleContentProps) {
       const code = button.getAttribute('data-code');
       if (!code) return;
 
-      try {
-        await navigator.clipboard.writeText(code);
+      navigator.clipboard.writeText(code).then(
+        () => {
+          // Create floating "Copied!" text
+          const floatingText = document.createElement('span');
+          floatingText.className = 'copied-float';
+          floatingText.textContent = 'Copied!';
+          button.appendChild(floatingText);
 
-        // Create floating "Copied!" text
-        const floatingText = document.createElement('span');
-        floatingText.className = 'copied-float';
-        floatingText.textContent = 'Copied!';
-        button.appendChild(floatingText);
-
-        // Remove after animation
-        setTimeout(() => {
-          floatingText.remove();
-        }, 800);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
+          // Remove after animation
+          setTimeout(() => {
+            floatingText.remove();
+          }, 800);
+        },
+        (err) => {
+          console.error('Failed to copy:', err);
+        }
+      );
     };
 
     container.addEventListener('click', handleCopyClick);
