@@ -147,7 +147,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
     // If widgets.js is already loaded, just reinitialize
     if (window.twttr?.widgets) {
-      window.twttr.widgets.load(container);
+      void window.twttr.widgets.load(container);
       return;
     }
 
@@ -158,7 +158,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
     if (existingScript) {
       // Wait for it to load
       existingScript.addEventListener('load', () => {
-        window.twttr?.widgets.load(container);
+        void window.twttr?.widgets.load(container);
       });
       return;
     }
@@ -168,7 +168,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
     script.src = 'https://platform.twitter.com/widgets.js';
     script.async = true;
     script.onload = () => {
-      window.twttr?.widgets.load(container);
+      void window.twttr?.widgets.load(container);
     };
     script.onerror = () => {
       console.error('Failed to load Twitter widgets.js');

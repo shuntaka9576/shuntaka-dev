@@ -5,6 +5,10 @@
       "dependsOn": [],
       "cache": true
     },
+    "//#lint:oxlint": {
+      "dependsOn": [],
+      "cache": true
+    },
     "blog-api#lint": {
       "dependsOn": [],
       "inputs": ["**/*.rs", "Cargo.toml", "Cargo.lock"],
@@ -28,6 +32,7 @@
     "lint": {
       "dependsOn": [
         "//#lint:biome",
+        "//#lint:oxlint",
         "//#spell-check",
         "type-check",
         "blog-api#lint"
