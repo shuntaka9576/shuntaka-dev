@@ -2,7 +2,7 @@ name: Setup Rust
 description: Setup Rust toolchain from rust-toolchain.toml
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Setup Rust toolchain
       shell: bash

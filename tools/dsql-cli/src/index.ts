@@ -8,9 +8,7 @@ import { convertJsonlToSql } from './convert.js';
 const { Client } = pg;
 
 function isPostgresUrl(endpoint: string): boolean {
-  return (
-    endpoint.startsWith('postgresql://') || endpoint.startsWith('postgres://')
-  );
+  return endpoint.startsWith('postgresql://') || endpoint.startsWith('postgres://');
 }
 
 async function connectDsql(endpoint: string): Promise<pg.Client> {

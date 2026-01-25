@@ -21,18 +21,18 @@
    - Preview: プレビュー用の値を設定
 5. Deploy
 
-| 設定項目 | 値 |
-|----------|-----|
-| Production Branch | `main` |
-| Preview | `preview` |
-| Root Directory | `apps/web` |
-| Framework | Next.js（自動検出） |
+| 設定項目          | 値                  |
+| ----------------- | ------------------- |
+| Production Branch | `main`              |
+| Preview           | `preview`           |
+| Root Directory    | `apps/web`          |
+| Framework         | Next.js（自動検出） |
 
-| 変数名 | 用途 | Production | Preview |
-|--------|------|------------|---------|
-| `NEXT_PUBLIC_API_URL` | バックエンドAPI | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
-| `NEXT_PUBLIC_SITE_URL` | サイトURL | `https://shuntaka.dev` | `https://shuntaka.tech` |
-| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM | `GTM-XXXXXXX` | （空） |
+| 変数名                              | 用途            | Production                 | Preview                     |
+| ----------------------------------- | --------------- | -------------------------- | --------------------------- |
+| `NEXT_PUBLIC_API_URL`               | バックエンドAPI | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
+| `NEXT_PUBLIC_SITE_URL`              | サイトURL       | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM             | `GTM-XXXXXXX`              | （空）                      |
 
 ### GitHub App (Webhook)
 
@@ -92,6 +92,7 @@ aws ssm put-parameter \
   --type "SecureString" \
   --value "your-api-secret"
 ```
+
 #### OIDCプロバイダーの作成
 
 アカウントに1つのみ作成（初回のみ）。
@@ -183,7 +184,6 @@ SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
 ```
 
-
 #### メインスタックのデプロイ
 
 ```bash
@@ -220,7 +220,6 @@ bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 2. 「Install」をクリック
 3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
 4. リポジトリルートの `renovate.json` が自動で読み込まれる
-
 
 ## ツール
 

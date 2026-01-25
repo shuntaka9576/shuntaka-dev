@@ -2,7 +2,7 @@ name: CI Steps
 description: Run lint, spell-check, type-check, and test
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Lint
       shell: bash

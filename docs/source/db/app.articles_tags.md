@@ -4,21 +4,21 @@
 
 ## Columns
 
-| Name | Type | Default | Nullable | Children | Parents | Comment |
-| ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| article_id | uuid |  | false |  | [app.articles](app.articles.md) |  |
-| tag_id | uuid |  | false |  | [app.tags](app.tags.md) |  |
+| Name       | Type | Default | Nullable | Children | Parents                         | Comment |
+| ---------- | ---- | ------- | -------- | -------- | ------------------------------- | ------- |
+| article_id | uuid |         | false    |          | [app.articles](app.articles.md) |         |
+| tag_id     | uuid |         | false    |          | [app.tags](app.tags.md)         |         |
 
 ## Constraints
 
-| Name | Type | Definition |
-| ---- | ---- | ---------- |
+| Name               | Type        | Definition                       |
+| ------------------ | ----------- | -------------------------------- |
 | articles_tags_pkey | PRIMARY KEY | PRIMARY KEY (article_id, tag_id) |
 
 ## Indexes
 
-| Name | Definition |
-| ---- | ---------- |
+| Name               | Definition                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------- |
 | articles_tags_pkey | CREATE UNIQUE INDEX articles_tags_pkey ON app.articles_tags USING btree (article_id, tag_id) |
 
 ## Relations

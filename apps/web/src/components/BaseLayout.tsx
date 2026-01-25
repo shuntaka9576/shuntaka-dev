@@ -10,10 +10,7 @@ interface BaseLayoutProps {
   showTypeHeader?: boolean;
 }
 
-export function BaseLayout({
-  children,
-  showTypeHeader = false,
-}: BaseLayoutProps) {
+export function BaseLayout({ children, showTypeHeader = false }: BaseLayoutProps) {
   const pathname = usePathname();
   // NOTE: doneProgress()はここで呼ばない
   // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
@@ -22,10 +19,7 @@ export function BaseLayout({
   return (
     <div className="relative min-h-[110%]">
       {/* Header */}
-      <div
-        className="h-12 w-full"
-        style={{ background: 'var(--header-color)' }}
-      >
+      <div className="h-12 w-full" style={{ background: 'var(--header-color)' }}>
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-8 pt-3 pb-1 max-sm:px-[2%]">
           <ProgressLink href="/">
             <div className="text-2xl font-bold">shuntaka.dev</div>
@@ -45,11 +39,7 @@ export function BaseLayout({
             <div className="inline-block mr-2">
               <ProgressLink
                 href="/"
-                className={
-                  pathname === '/' || pathname === undefined
-                    ? 'border-b-2 pb-0.5'
-                    : ''
-                }
+                className={pathname === '/' || pathname === undefined ? 'border-b-2 pb-0.5' : ''}
                 style={
                   pathname === '/' || pathname === undefined
                     ? { borderColor: 'var(--text-color)' }
@@ -63,11 +53,7 @@ export function BaseLayout({
               <ProgressLink
                 href="/type/note"
                 className={pathname === '/type/note' ? 'border-b-2 pb-0.5' : ''}
-                style={
-                  pathname === '/type/note'
-                    ? { borderColor: 'var(--text-color)' }
-                    : {}
-                }
+                style={pathname === '/type/note' ? { borderColor: 'var(--text-color)' } : {}}
               >
                 note
               </ProgressLink>
@@ -76,11 +62,7 @@ export function BaseLayout({
               <ProgressLink
                 href="/who"
                 className={pathname === '/who' ? 'border-b-2 pb-0.5' : ''}
-                style={
-                  pathname === '/who'
-                    ? { borderColor: 'var(--text-color)' }
-                    : {}
-                }
+                style={pathname === '/who' ? { borderColor: 'var(--text-color)' } : {}}
               >
                 who?
               </ProgressLink>

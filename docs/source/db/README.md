@@ -2,12 +2,12 @@
 
 ## Tables
 
-| Name | Columns | Comment | Type |
-| ---- | ------- | ------- | ---- |
-| [app.users](app.users.md) | 6 |  | BASE TABLE |
-| [app.tags](app.tags.md) | 2 |  | BASE TABLE |
-| [app.articles](app.articles.md) | 12 |  | BASE TABLE |
-| [app.articles_tags](app.articles_tags.md) | 2 |  | BASE TABLE |
+| Name                                      | Columns | Comment | Type       |
+| ----------------------------------------- | ------- | ------- | ---------- |
+| [app.users](app.users.md)                 | 6       |         | BASE TABLE |
+| [app.tags](app.tags.md)                   | 2       |         | BASE TABLE |
+| [app.articles](app.articles.md)           | 12      |         | BASE TABLE |
+| [app.articles_tags](app.articles_tags.md) | 2       |         | BASE TABLE |
 
 ## Relations
 

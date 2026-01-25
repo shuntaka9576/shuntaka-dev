@@ -23,9 +23,7 @@ interface ArticlePageProps {
   }>;
 }
 
-export async function generateMetadata({
-  params,
-}: ArticlePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { userName, slug } = await params;
   const article = await getArticleBySlug(userName, slug);
 

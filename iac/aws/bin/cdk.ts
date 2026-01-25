@@ -44,37 +44,29 @@ const tokyoCertificateStack = new TokyoCertificateStack(
   }
 );
 
-const mainStack = new MainStack(
-  app,
-  `${config.stageName.short}-${config.projectName.short}-main`,
-  {
-    projectName: config.projectName,
-    stageName: config.stageName,
-    fqdn: config.fqdn,
-    domain: config.domain,
-    ssmParameters: config.ssm,
-    lambda: config.lambda,
-    env: {
-      account: config.cdkEnv.account,
-      region: REGIONS.TOKYO,
-    },
-  }
-);
+const mainStack = new MainStack(app, `${config.stageName.short}-${config.projectName.short}-main`, {
+  projectName: config.projectName,
+  stageName: config.stageName,
+  fqdn: config.fqdn,
+  domain: config.domain,
+  ssmParameters: config.ssm,
+  lambda: config.lambda,
+  env: {
+    account: config.cdkEnv.account,
+    region: REGIONS.TOKYO,
+  },
+});
 
 mainStack.addDependency(globalDnsStack);
 mainStack.addDependency(tokyoCertificateStack);
 
-const oidcProviderStack = new OidcProviderStack(
-  app,
-  `${config.projectName.short}-oidc-provider`,
-  {
-    ssmOidcProviderArn: config.ssm.oidc.providerArn,
-    env: {
-      account: config.cdkEnv.account,
-      region: REGIONS.TOKYO,
-    },
-  }
-);
+const oidcProviderStack = new OidcProviderStack(app, `${config.projectName.short}-oidc-provider`, {
+  ssmOidcProviderArn: config.ssm.oidc.providerArn,
+  env: {
+    account: config.cdkEnv.account,
+    region: REGIONS.TOKYO,
+  },
+});
 
 const deployRoleStack = new DeployRoleStack(
   app,

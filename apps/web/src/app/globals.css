@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --bg-color: #f7fafc;
@@ -35,7 +35,7 @@
   --github-embed-meta: #656d76;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --bg-color: #22272e;
   --header-color: #2d333b;
   --text-color: #c9d5e1;
@@ -71,7 +71,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme='light']) {
     --bg-color: #22272e;
     --header-color: #2d333b;
     --text-color: #c9d5e1;
@@ -114,9 +114,19 @@ html {
 body {
   height: 100%;
   font-family:
-    var(--font-roboto), var(--font-noto-sans-jp), -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    var(--font-roboto),
+    var(--font-noto-sans-jp),
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
   word-wrap: break-word;
   background: var(--bg-color);
   color: var(--text-color);
@@ -158,7 +168,7 @@ a:hover {
 }
 
 .prose h2::after {
-  content: "";
+  content: '';
   display: block;
   position: absolute;
   bottom: -1px;
@@ -480,7 +490,7 @@ a:hover {
 
 .toc > ol::before {
   position: absolute;
-  content: "";
+  content: '';
   width: 2px;
   background: var(--toc-list-color);
   top: 10px;
@@ -496,7 +506,7 @@ a:hover {
 
 .toc ol li::before {
   position: absolute;
-  content: "";
+  content: '';
   top: 8px;
   height: 8px;
   width: 8px;
@@ -730,8 +740,7 @@ a:hover {
   border-radius: 6px 6px 0 0;
   font-size: 0.8rem;
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 .code-block-filename {
@@ -918,12 +927,12 @@ a:hover {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="dark"] .link-card-footer {
+[data-theme='dark'] .link-card-footer {
   background: #2d333b;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .link-card-footer {
+  :root:not([data-theme='light']) .link-card-footer {
     background: #2d333b;
   }
 }

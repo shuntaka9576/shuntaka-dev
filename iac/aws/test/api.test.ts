@@ -10,11 +10,7 @@ vi.mock('aws-cdk-lib/aws-lambda', async (importOriginal) => {
   return {
     ...actual,
     DockerImageFunction: class MockDockerImageFunction extends actual.Function {
-      constructor(
-        scope: Construct,
-        id: string,
-        props: lambda.DockerImageFunctionProps
-      ) {
+      constructor(scope: Construct, id: string, props: lambda.DockerImageFunctionProps) {
         super(scope, id, {
           ...props,
           runtime: actual.Runtime.NODEJS_20_X,
@@ -24,8 +20,7 @@ vi.mock('aws-cdk-lib/aws-lambda', async (importOriginal) => {
       }
     },
     DockerImageCode: {
-      fromImageAsset: () =>
-        actual.Code.fromInline('exports.handler = () => {}'),
+      fromImageAsset: () => actual.Code.fromInline('exports.handler = () => {}'),
     },
   };
 });

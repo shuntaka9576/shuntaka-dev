@@ -13,14 +13,10 @@ export class OidcProviderStack extends cdk.Stack {
   ) {
     super(scope, id, props);
 
-    const provider = new iam.OpenIdConnectProvider(
-      this,
-      'GithubActionsProvider',
-      {
-        url: 'https://token.actions.githubusercontent.com',
-        clientIds: ['sts.amazonaws.com'],
-      }
-    );
+    const provider = new iam.OpenIdConnectProvider(this, 'GithubActionsProvider', {
+      url: 'https://token.actions.githubusercontent.com',
+      clientIds: ['sts.amazonaws.com'],
+    });
 
     new ssm.StringParameter(this, 'OidcProviderArnParam', {
       parameterName: props.ssmOidcProviderArn,

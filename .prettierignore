@@ -1,4 +1,10 @@
-cdk.out
-bun.lockb
-.venv
-target
+.legacy
+**/.venv
+**/cdk.out
+**/dist
+**/docs/build
+.turbo
+**/.next
+**/out
+**/target
+bun.lock

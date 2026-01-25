@@ -25,9 +25,7 @@ function convertArticle(dynamo: DynamoArticle): DsqlArticle {
   // descriptionがない場合はtitleを使用し、警告ログを出力
   let description = dynamo.description;
   if (!description) {
-    console.warn(
-      `[WARN] No description for article: ${dynamo.articleId} (${dynamo.title})`
-    );
+    console.warn(`[WARN] No description for article: ${dynamo.articleId} (${dynamo.title})`);
     description = dynamo.title;
   }
 
@@ -49,12 +47,8 @@ function convertArticle(dynamo: DynamoArticle): DsqlArticle {
 
 // Article INSERT文生成
 function generateArticleInsert(article: DsqlArticle): string {
-  const thumbnail = article.thumbnail
-    ? `'${escapeSql(article.thumbnail)}'`
-    : 'NULL';
-  const publishedAt = article.published_at
-    ? `'${article.published_at}'`
-    : 'NULL';
+  const thumbnail = article.thumbnail ? `'${escapeSql(article.thumbnail)}'` : 'NULL';
+  const publishedAt = article.published_at ? `'${article.published_at}'` : 'NULL';
 
   return `INSERT INTO app.articles (article_id, title, slug, user_id, content, thumbnail, description, status, type, published_at, created_at, updated_at) VALUES ('${article.article_id}', '${escapeSql(article.title)}', '${escapeSql(article.slug)}', '${article.user_id}', '${escapeSql(article.content)}', ${thumbnail}, '${escapeSql(article.description)}', '${article.status}', '${article.type}', ${publishedAt}, '${article.created_at}', '${article.updated_at}');`;
 }
@@ -75,10 +69,7 @@ function generateBaseSeedSql(outputDir: string): void {
 }
 
 // メイン変換処理
-export async function convertJsonlToSql(
-  inputPath: string,
-  outputPath: string
-): Promise<void> {
+export async function convertJsonlToSql(inputPath: string, outputPath: string): Promise<void> {
   const fileStream = fs.createReadStream(inputPath);
   const rl = readline.createInterface({
     input: fileStream,

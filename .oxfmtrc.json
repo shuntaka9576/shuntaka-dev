@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "**/*.json",
+    "**/*.yaml",
+    ".legacy",
+    "**/.venv",
+    "**/cdk.out",
+    "**/dist",
+    "**/docs/build",
+    ".turbo",
+    "**/routeTree.gen.ts",
+    "**/.next",
+    "**/out",
+    "**/target",
+    "**/next-env.d.ts"
+  ],
+  "singleQuote": true,
+  "trailingComma": "es5"
+}

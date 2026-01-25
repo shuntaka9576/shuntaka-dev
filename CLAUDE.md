@@ -92,6 +92,7 @@ docker compose up -d postgres
 ## DSQL Constraints
 
 AWS DSQLは以下をサポートしない：
+
 - `CREATE DATABASE` (postgres固定)
 - `CREATE FUNCTION` (plpgsql)
 - `CREATE TRIGGER`
@@ -119,6 +120,7 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 新機能実装時にレガシーコードを参照する場合の探し方：
 
 ### レガシーバックエンド（Lambda/TypeScript）
+
 ```
 .legacy/hozi-dev-backend/src/lambda/
 ├── handlers/apig-trigger/     # API Gatewayハンドラー
@@ -132,6 +134,7 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 ```
 
 ### レガシーフロントエンド（Next.js Pages Router）
+
 ```
 .legacy/hozi-dev-frontend/
 ├── pages/                     # Pages Router
@@ -143,6 +146,7 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 ```
 
 ### レガシー仕様書
+
 ```
 .legacy/specification/
 ├── hozi-dev-api.yaml          # OpenAPI仕様（エンドポイント定義）
@@ -150,6 +154,7 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 ```
 
 ### DBスキーマドキュメント
+
 ```
 docs/source/db/
 ├── app.articles.md            # 記事テーブル
@@ -162,13 +167,13 @@ docs/source/db/
 
 ### 移植時のマッピング
 
-| レガシー（DynamoDB） | 新規（DSQL） |
-|---------------------|-------------|
+| レガシー（DynamoDB）               | 新規（DSQL）              |
+| ---------------------------------- | ------------------------- |
 | `typePublishAt` ("type-timestamp") | `status` + `published_at` |
-| `type` (tech/note/life) | `type` カラム |
-| `category[]` | 廃止（tagsで代替） |
-| `articleId` | `slug` |
-| `userId` | `user_id` (UUID) |
+| `type` (tech/note/life)            | `type` カラム             |
+| `category[]`                       | 廃止（tagsで代替）        |
+| `articleId`                        | `slug`                    |
+| `userId`                           | `user_id` (UUID)          |
 
 ## Markdown変換
 
@@ -183,6 +188,7 @@ MarkdownからHTMLへの変換はAPI側（Rust）で実行する。
 ### レガシー仕様
 
 レガシーのMarkdown変換仕様は以下を参照：
+
 ```
 .legacy/shuntaka-dev-packages/packages/markdown-to-html/
 ├── src/index.ts           # markdown-it + prismjs
@@ -190,6 +196,7 @@ MarkdownからHTMLへの変換はAPI側（Rust）で実行する。
 ```
 
 主な機能：
+
 - シンタックスハイライト（Prism.js相当 → Rust: syntect）
 - カスタムコンテナ（`:::details`, `:::message`）
 - 埋め込み（SpeakerDeck, CodePen）

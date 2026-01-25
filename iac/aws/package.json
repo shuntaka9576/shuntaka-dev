@@ -1,7 +1,7 @@
 {
   "name": "@shuntaka-dev/aws",
-  "type": "module",
   "version": "0.1.0",
+  "type": "module",
   "scripts": {
     "type-check": "tsc --noEmit",
     "deploy": "dotenv -- cdk deploy",
@@ -9,15 +9,15 @@
     "test:watch": "vitest",
     "test:update": "vitest run --update"
   },
-  "devDependencies": {
-    "aws-cdk": "^2.1103.0",
-    "dotenv-cli": "^11.0.0",
-    "vitest": "^4.0.18"
-  },
   "dependencies": {
     "aws-cdk-lib": "^2.236.0",
     "change-case": "^5.4.4",
     "constructs": "^10.4.5",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1103.0",
+    "dotenv-cli": "^11.0.0",
+    "vitest": "^4.0.18"
   }
 }

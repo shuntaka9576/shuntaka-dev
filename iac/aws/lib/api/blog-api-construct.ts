@@ -50,9 +50,7 @@ export class BlogAPIConstruct extends Construct {
     // Docker Lambda
     const webApiLambda = new lambda.DockerImageFunction(this, 'WebApiLambda', {
       functionName: `${props.physicalPrefix}-blog-api`,
-      code: lambda.DockerImageCode.fromImageAsset(
-        path.resolve(__dirname, '../../../..')
-      ),
+      code: lambda.DockerImageCode.fromImageAsset(path.resolve(__dirname, '../../../..')),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(15 * 60),
       architecture: lambda.Architecture.ARM_64,
@@ -70,8 +68,7 @@ export class BlogAPIConstruct extends Construct {
         GH_WEBHOOK_SECRET_KEY_NAME: props.blogApiEnv.githubWebhookSecretKeyName,
         CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
-        CLOUDINARY_API_SECRET_KEY_NAME:
-          props.blogApiEnv.cloudinaryApiSecretKeyName,
+        CLOUDINARY_API_SECRET_KEY_NAME: props.blogApiEnv.cloudinaryApiSecretKeyName,
       },
     });
 
@@ -110,17 +107,12 @@ export class BlogAPIConstruct extends Construct {
     // Lambda Integration
     const lambdaIntegration = new LambdaIntegration(webApiLambda);
     const rootMethod = restApi.root.addMethod('ANY', lambdaIntegration);
-    const proxyMethod = restApi.root
-      .addResource('{proxy+}')
-      .addMethod('ANY', lambdaIntegration);
+    const proxyMethod = restApi.root.addResource('{proxy+}').addMethod('ANY', lambdaIntegration);
 
     // ストリーミング対応の設定（CloudFormationオーバーライド）
     [rootMethod, proxyMethod].forEach((method) => {
       const cfnMethod = method.node.defaultChild as CfnMethod;
-      cfnMethod.addOverride(
-        'Properties.Integration.ResponseTransferMode',
-        'STREAM'
-      );
+      cfnMethod.addOverride('Properties.Integration.ResponseTransferMode', 'STREAM');
       cfnMethod.addOverride('Properties.Integration.TimeoutInMillis', 900000);
       cfnMethod.addOverride(
         'Properties.Integration.Uri',
@@ -135,9 +127,7 @@ export class BlogAPIConstruct extends Construct {
     new route53.ARecord(this, 'ApiAliasRecord', {
       zone: props.hostedZone,
       recordName: props.domain,
-      target: route53.RecordTarget.fromAlias(
-        new route53Targets.ApiGateway(restApi)
-      ),
+      target: route53.RecordTarget.fromAlias(new route53Targets.ApiGateway(restApi)),
     });
 
     // SSM Parameters

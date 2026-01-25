@@ -24,11 +24,7 @@ export function useNavigationProgress() {
   return useContext(NavigationProgressContext);
 }
 
-export function NavigationProgressProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function NavigationProgressProvider({ children }: { children: React.ReactNode }) {
   const isNavigatingRef = useRef(false);
 
   const startProgress = useCallback(() => {

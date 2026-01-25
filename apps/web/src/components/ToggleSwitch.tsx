@@ -26,11 +26,7 @@ export function ToggleSwitch() {
     >
       <div
         className="toggle-label"
-        style={
-          isDark
-            ? { backgroundColor: '#e40067', borderColor: 'var(--header-color)' }
-            : {}
-        }
+        style={isDark ? { backgroundColor: '#e40067', borderColor: 'var(--header-color)' } : {}}
       >
         <span className="dark-icon" style={{ left: isDark ? '22px' : '-6px' }}>
           <svg

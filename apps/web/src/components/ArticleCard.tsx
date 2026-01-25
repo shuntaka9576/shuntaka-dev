@@ -18,10 +18,7 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export const ArticleCard = memo(function ArticleCard({
-  article,
-  userName,
-}: ArticleCardProps) {
+export const ArticleCard = memo(function ArticleCard({ article, userName }: ArticleCardProps) {
   return (
     <ProgressLink href={`/${userName}/articles/${article.slug}`}>
       <article
