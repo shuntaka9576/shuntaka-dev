@@ -32,6 +32,7 @@ bun run convert --input <jsonl-path> --output <sql-path>
 ## DSQL Constraints
 
 AWS DSQLは以下をサポートしない：
+
 - `CREATE DATABASE`
 - `CREATE FUNCTION` (plpgsql)
 - `CREATE TRIGGER`

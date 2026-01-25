@@ -25,9 +25,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.dataset.theme = saved;
       setColorMode(saved);
     } else {
-      const prefersDark = window.matchMedia(
-        '(prefers-color-scheme: dark)'
-      ).matches;
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const theme = prefersDark ? 'dark' : 'light';
       document.documentElement.dataset.theme = theme;
       setColorMode(theme);

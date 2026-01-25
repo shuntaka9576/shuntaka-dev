@@ -1,7 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "//#lint:biome": {
+    "//#lint:fmt": {
       "dependsOn": [],
       "cache": true
     },
@@ -31,7 +31,7 @@
     },
     "lint": {
       "dependsOn": [
-        "//#lint:biome",
+        "//#lint:fmt",
         "//#lint:oxlint",
         "//#spell-check",
         "type-check",

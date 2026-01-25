@@ -1,13 +1,13 @@
 {
   "name": "docs",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
   "description": "shuntaka.dev Documentation",
+  "keywords": [],
   "scripts": {
     "build-docs": "uv run sphinx-build source build",
     "dev": "uv run sphinx-autobuild source build",
     "doc-gen": "tbls doc --force"
   },
-  "keywords": [],
   "devDependencies": {}
 }

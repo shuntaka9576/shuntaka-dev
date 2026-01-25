@@ -3,8 +3,8 @@ name: Renovate Cargo Update
 on:
   pull_request:
     paths:
-      - "Cargo.toml"
-      - "apps/blog-api/**/Cargo.toml"
+      - 'Cargo.toml'
+      - 'apps/blog-api/**/Cargo.toml'
 
 permissions:
   contents: write

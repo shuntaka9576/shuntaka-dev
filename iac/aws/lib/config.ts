@@ -173,8 +173,7 @@ export const getConfig = (stageName: string): AppParameter => {
         githubWebhookSecretKeyName: lambdaEnvVars.GH_WEBHOOK_SECRET_KEY_NAME,
         cloudinaryCloudName: lambdaEnvVars.CLOUDINARY_CLOUD_NAME,
         cloudinaryApiKey: lambdaEnvVars.CLOUDINARY_API_KEY,
-        cloudinaryApiSecretKeyName:
-          lambdaEnvVars.CLOUDINARY_API_SECRET_KEY_NAME,
+        cloudinaryApiSecretKeyName: lambdaEnvVars.CLOUDINARY_API_SECRET_KEY_NAME,
       },
     },
   };

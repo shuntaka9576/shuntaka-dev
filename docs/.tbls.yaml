@@ -3,7 +3,7 @@ dsn: postgres://postgres:postgres@127.0.0.1:5433/postgres?sslmode=disable&search
 comments:
   - table: app.articles
     columnComments:
-      status: "記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)"
+      status: '記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)'
 
 docPath: source/db
 er:

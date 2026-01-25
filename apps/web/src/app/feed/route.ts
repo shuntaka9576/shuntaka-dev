@@ -1,11 +1,6 @@
 import RSS from 'rss';
 import { getArticlesByType } from '@/lib/api';
-import {
-  SITE_DESCRIPTION,
-  SITE_TITLE,
-  SITE_URL,
-  USER_NAME,
-} from '@/lib/constants';
+import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL, USER_NAME } from '@/lib/constants';
 
 export async function GET() {
   const feed = new RSS({

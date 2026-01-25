@@ -6,12 +6,7 @@ import { useNavigationProgress } from './NavigationProgressProvider';
 
 type ProgressLinkProps = React.ComponentProps<typeof Link>;
 
-export function ProgressLink({
-  children,
-  href,
-  onClick,
-  ...props
-}: ProgressLinkProps) {
+export function ProgressLink({ children, href, onClick, ...props }: ProgressLinkProps) {
   const { startProgress } = useNavigationProgress();
   const pathname = usePathname();
 

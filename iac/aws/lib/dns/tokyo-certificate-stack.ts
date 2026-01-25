@@ -21,14 +21,10 @@ export class TokyoCertificateStack extends cdk.Stack {
       props.hostedZoneIdParameterName
     );
 
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
-      this,
-      'ImportedHostedZone',
-      {
-        hostedZoneId: hostedZoneId,
-        zoneName: props.domainName,
-      }
-    );
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImportedHostedZone', {
+      hostedZoneId: hostedZoneId,
+      zoneName: props.domainName,
+    });
 
     const certificate = new acm.Certificate(this, 'TokyoCertificate', {
       domainName: props.domainName,

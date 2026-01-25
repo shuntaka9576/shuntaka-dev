@@ -5,8 +5,8 @@ on:
     branches:
       - preview
     paths:
-      - "docs/**"
-      - ".github/workflows/docs.yaml"
+      - 'docs/**'
+      - '.github/workflows/docs.yaml'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: 'pages'
   cancel-in-progress: false
 
 jobs:

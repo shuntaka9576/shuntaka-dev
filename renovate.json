@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "customManagers:biomeVersions"],
+  "extends": ["config:recommended"],
   "timezone": "Asia/Tokyo",
   "dependencyDashboard": false,
   "ignoreTests": true,
@@ -54,12 +54,6 @@
     {
       "description": "Group root dependencies",
       "matchFileNames": ["./package.json"],
-      "groupName": "root"
-    },
-    {
-      "description": "Group Biome schema with root dependencies",
-      "matchManagers": ["jsonata"],
-      "matchPackageNames": ["@biomejs/biome"],
       "groupName": "root"
     },
     {

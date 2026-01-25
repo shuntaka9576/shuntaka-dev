@@ -39,9 +39,7 @@ export class DeployRoleStack extends cdk.Stack {
         'sts:AssumeRoleWithWebIdentity'
       ),
       managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          'AWSCloudFormationFullAccess'
-        ),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSCloudFormationFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('IAMFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
       ],

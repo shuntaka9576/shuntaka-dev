@@ -25,11 +25,7 @@ export default async function Home() {
             <p>No articles found.</p>
           ) : (
             articles.map((article) => (
-              <ArticleCard
-                key={article.articleId}
-                article={article}
-                userName={USER_NAME}
-              />
+              <ArticleCard key={article.articleId} article={article} userName={USER_NAME} />
             ))
           )}
         </div>
