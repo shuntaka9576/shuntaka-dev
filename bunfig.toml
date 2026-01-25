@@ -1,5 +1,8 @@
 [install]
 # Bun automatically hoists dependencies, so inject-workspace-packages is not needed
 
+[install.lockfile]
+save = "text"
+
 [workspace]
 packages = ["docs", "apps/*", "iac/*", "tools/*"]

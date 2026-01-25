@@ -7,4 +7,4 @@
 **/.next
 **/out
 **/target
-bun.lockb
+bun.lock

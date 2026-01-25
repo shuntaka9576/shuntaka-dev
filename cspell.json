@@ -6,7 +6,7 @@
     "**/build/**",
     "**/.git/**",
     "**/coverage/**",
-    "bun.lockb",
+    "bun.lock",
     "package-lock.json",
     "yarn.lock",
     "turbo.json",
