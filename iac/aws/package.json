@@ -10,14 +10,14 @@
     "test:update": "vitest run --update"
   },
   "devDependencies": {
-    "aws-cdk": "^2.1102.0",
+    "aws-cdk": "^2.1103.0",
     "dotenv-cli": "^11.0.0",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.236.0",
     "change-case": "^5.4.4",
-    "constructs": "^10.4.4",
-    "zod": "^4.3.4"
+    "constructs": "^10.4.5",
+    "zod": "^4.3.6"
   }
 }
