@@ -13,7 +13,8 @@
     "**/.next",
     "**/out",
     "**/target",
-    "**/next-env.d.ts"
+    "**/next-env.d.ts",
+    "**/node_modules/**"
   ],
   "singleQuote": true,
   "trailingComma": "es5"
