@@ -31,7 +31,7 @@
     "lefthook": "^2.0.15",
     "oxfmt": "^0.26.0",
     "oxlint": "^1.41.0",
-    "oxlint-tsgolint": "^0.11.1",
+    "oxlint-tsgolint": "^0.11.2",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "turbo": "^2.7.6",
