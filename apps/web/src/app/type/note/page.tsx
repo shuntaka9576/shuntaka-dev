@@ -16,7 +16,7 @@ export default async function NotePage() {
   }
 
   return (
-    <BaseLayout showTypeHeader>
+    <BaseLayout showTypeHeader currentTab="note">
       <main className="w-full">
         <div className="max-w-[600px]">
           {error ? (

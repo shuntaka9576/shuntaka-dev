@@ -8,10 +8,17 @@ import { ToggleSwitch } from './ToggleSwitch';
 interface BaseLayoutProps {
   children: React.ReactNode;
   showTypeHeader?: boolean;
+  currentTab?: 'tech' | 'note' | 'who';
 }
 
-export function BaseLayout({ children, showTypeHeader = false }: BaseLayoutProps) {
+export function BaseLayout({ children, showTypeHeader = false, currentTab }: BaseLayoutProps) {
   const pathname = usePathname();
+
+  // Use currentTab if provided, otherwise fall back to pathname
+  const isTechActive =
+    currentTab === 'tech' || (!currentTab && (pathname === '/' || pathname === undefined));
+  const isNoteActive = currentTab === 'note' || (!currentTab && pathname === '/type/note');
+  const isWhoActive = currentTab === 'who' || (!currentTab && pathname === '/who');
   // NOTE: doneProgress()はここで呼ばない
   // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
   // 各ページの末端コンポーネント（PageReady, ArticleContent等）で呼ぶ
@@ -39,12 +46,8 @@ export function BaseLayout({ children, showTypeHeader = false }: BaseLayoutProps
             <div className="inline-block mr-2">
               <ProgressLink
                 href="/"
-                className={pathname === '/' || pathname === undefined ? 'border-b-2 pb-0.5' : ''}
-                style={
-                  pathname === '/' || pathname === undefined
-                    ? { borderColor: 'var(--text-color)' }
-                    : {}
-                }
+                className={isTechActive ? 'border-b-2 pb-0.5' : ''}
+                style={isTechActive ? { borderColor: 'var(--text-color)' } : {}}
               >
                 tech
               </ProgressLink>
@@ -52,8 +55,8 @@ export function BaseLayout({ children, showTypeHeader = false }: BaseLayoutProps
             <div className="inline-block mr-2">
               <ProgressLink
                 href="/type/note"
-                className={pathname === '/type/note' ? 'border-b-2 pb-0.5' : ''}
-                style={pathname === '/type/note' ? { borderColor: 'var(--text-color)' } : {}}
+                className={isNoteActive ? 'border-b-2 pb-0.5' : ''}
+                style={isNoteActive ? { borderColor: 'var(--text-color)' } : {}}
               >
                 note
               </ProgressLink>
@@ -61,8 +64,8 @@ export function BaseLayout({ children, showTypeHeader = false }: BaseLayoutProps
             <div className="inline-block mr-2">
               <ProgressLink
                 href="/who"
-                className={pathname === '/who' ? 'border-b-2 pb-0.5' : ''}
-                style={pathname === '/who' ? { borderColor: 'var(--text-color)' } : {}}
+                className={isWhoActive ? 'border-b-2 pb-0.5' : ''}
+                style={isWhoActive ? { borderColor: 'var(--text-color)' } : {}}
               >
                 who?
               </ProgressLink>
