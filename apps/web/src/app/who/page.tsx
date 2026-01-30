@@ -37,7 +37,7 @@ const links = [
 
 export default function WhoPage() {
   return (
-    <BaseLayout showTypeHeader>
+    <BaseLayout showTypeHeader currentTab="who">
       <main className="w-full">
         <div className="pb-2">髙橋俊一 a.k.a shuntaka</div>
         <div className="flex pb-4">

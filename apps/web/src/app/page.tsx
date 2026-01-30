@@ -16,7 +16,7 @@ export default async function Home() {
   }
 
   return (
-    <BaseLayout showTypeHeader>
+    <BaseLayout showTypeHeader currentTab="tech">
       <main className="w-full">
         <div className="max-w-[600px]">
           {error ? (
