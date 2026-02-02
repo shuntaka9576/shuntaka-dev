@@ -10,7 +10,7 @@
     "test:update": "vitest run --update"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.236.0",
+    "aws-cdk-lib": "^2.237.0",
     "change-case": "^5.4.4",
     "constructs": "^10.4.5",
     "zod": "^4.3.6"
