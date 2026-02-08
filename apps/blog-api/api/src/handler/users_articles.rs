@@ -7,7 +7,6 @@ use kernel::model::article::ArticleType;
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
-use tracing::info;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::error::AppError;
@@ -91,16 +90,11 @@ pub async fn get_users_articles(
             .into_iter()
             .map(|article| {
                 let slug = article.slug.into_inner();
-                info!(slug = %slug, "Processing article: start");
-
                 let title = article.title.into_inner();
                 let content = article.content.into_inner();
                 let content_html = convert_markdown_to_html(&content);
-                info!(slug = %slug, "Processing article: markdown converted");
-
                 let ogp_url =
                     cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
-                info!(slug = %slug, "Processing article: ogp_url created");
 
                 ArticleResponse {
                     article_id: article.article_id.into_inner().to_string(),
