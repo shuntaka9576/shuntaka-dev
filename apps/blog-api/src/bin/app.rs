@@ -11,7 +11,8 @@ use axum::Router;
 use shared::config::AppConfig;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -24,7 +25,7 @@ async fn bootstrap() -> Result<()> {
         .with(tracing_subscriber::fmt::layer().json())
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "blog_api=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "blog_api=debug,api=debug,tower_http=debug".into()),
         )
         .init();
 
@@ -54,7 +55,11 @@ async fn bootstrap() -> Result<()> {
         .merge(build_users_articles_routers())
         .merge(build_webhooks_routers())
         .merge(build_swagger_router())
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .layer(cors)
         .with_state(registry);
 

@@ -1,6 +1,5 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
     Json,
 };
 use infrastructure::cloudinary::client::{CloudinaryClient, CloudinaryClientImpl};
@@ -8,8 +7,10 @@ use kernel::model::article::ArticleType;
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::info;
 use utoipa::{IntoParams, ToSchema};
+
+use crate::error::AppError;
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesQuery {
@@ -47,12 +48,6 @@ pub struct UsersArticlesResponse {
     pub articles: Vec<ArticleResponse>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub message: String,
-}
-
 #[utoipa::path(
     get,
     path = "/users/{name}/articles",
@@ -71,36 +66,15 @@ pub async fn get_users_articles(
     State(registry): State<AppRegistry>,
     Path(name): Path<String>,
     Query(query): Query<UsersArticlesQuery>,
-) -> Result<Json<UsersArticlesResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let article_type = ArticleType::new(query.article_type).map_err(|_| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "BAD_REQUEST".to_string(),
-                message: "Invalid article type".to_string(),
-            }),
-        )
-    })?;
+) -> Result<Json<UsersArticlesResponse>, AppError> {
+    let article_type = ArticleType::new(query.article_type)
+        .map_err(|_| AppError::bad_request("Invalid article type"))?;
 
     let articles = registry
         .users_articles_repository()
         .find_published_by_user_name_and_type(&name, &article_type)
         .await
-        .map_err(|e| {
-            error!(
-                user_name = %name,
-                article_type = %article_type.as_str(),
-                error = ?e,
-                "Failed to find articles"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "INTERNAL_SERVER_ERROR".to_string(),
-                    message: "Internal server error".to_string(),
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to find articles", e))?;
 
     // Get Cloudinary config and create client
     let config = registry.webhook_config();
@@ -108,20 +82,7 @@ pub async fn get_users_articles(
         .ssm_client()
         .get_parameter(&config.cloudinary_api_secret_key_name, true)
         .await
-        .map_err(|e| {
-            error!(
-                ssm_param = %config.cloudinary_api_secret_key_name,
-                error = ?e,
-                "Failed to get Cloudinary API secret from SSM"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "INTERNAL_SERVER_ERROR".to_string(),
-                    message: "Internal server error".to_string(),
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
 
     let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
 
@@ -179,35 +140,13 @@ pub async fn get_users_articles(
 pub async fn get_users_article(
     State(registry): State<AppRegistry>,
     Path(path): Path<ArticlePath>,
-) -> Result<Json<ArticleResponse>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<Json<ArticleResponse>, AppError> {
     let article = registry
         .users_articles_repository()
         .find_published_by_user_name_and_slug(&path.name, &path.slug)
         .await
-        .map_err(|e| {
-            error!(
-                user_name = %path.name,
-                slug = %path.slug,
-                error = ?e,
-                "Failed to find article"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "INTERNAL_SERVER_ERROR".to_string(),
-                    message: "Internal server error".to_string(),
-                }),
-            )
-        })?
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(ErrorResponse {
-                    error: "NOT_FOUND".to_string(),
-                    message: "Article not found".to_string(),
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to find article", e))?
+        .ok_or_else(|| AppError::not_found("Article not found"))?;
 
     // Get Cloudinary config and create client
     let config = registry.webhook_config();
@@ -215,20 +154,7 @@ pub async fn get_users_article(
         .ssm_client()
         .get_parameter(&config.cloudinary_api_secret_key_name, true)
         .await
-        .map_err(|e| {
-            error!(
-                ssm_param = %config.cloudinary_api_secret_key_name,
-                error = ?e,
-                "Failed to get Cloudinary API secret from SSM"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: "INTERNAL_SERVER_ERROR".to_string(),
-                    message: "Internal server error".to_string(),
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
 
     let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
 

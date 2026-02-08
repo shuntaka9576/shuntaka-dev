@@ -1,7 +1,7 @@
 use axum::{
     body::Bytes,
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     Json,
 };
 use futures::future::join_all;
@@ -14,6 +14,8 @@ use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
+
+use crate::error::AppError;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct WebhookResponse {
@@ -57,7 +59,7 @@ pub async fn handle_github_webhook(
     State(registry): State<AppRegistry>,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<Json<WebhookResponse>, (StatusCode, Json<WebhookResponse>)> {
+) -> Result<Json<WebhookResponse>, AppError> {
     // Get config from registry
     let config = registry.webhook_config();
 
@@ -67,16 +69,7 @@ pub async fn handle_github_webhook(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| {
             warn!("Missing X-Hub-Signature-256 header");
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Missing X-Hub-Signature-256 header".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
+            AppError::unauthorized("Missing X-Hub-Signature-256 header")
         })?;
 
     // Get webhook secret from SSM
@@ -84,53 +77,17 @@ pub async fn handle_github_webhook(
         .ssm_client()
         .get_parameter(&config.github_webhook_secret_key_name, true)
         .await
-        .map_err(|e| {
-            error!(
-                ssm_param = %config.github_webhook_secret_key_name,
-                error = ?e,
-                "Failed to get webhook secret from SSM"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Failed to get webhook secret".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to get webhook secret from SSM", e))?;
 
     // Verify signature
     verify_signature(&webhook_secret, &body, signature).map_err(|e| {
         warn!("Webhook signature verification failed: {}", e);
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(WebhookResponse {
-                status: "error".to_string(),
-                message: Some("Invalid signature".to_string()),
-                processed: None,
-                succeeded: None,
-                failed: None,
-            }),
-        )
+        AppError::unauthorized("Invalid signature")
     })?;
 
     // Parse JSON body
-    let parsed_body: serde_json::Value = serde_json::from_slice(&body).map_err(|e| {
-        error!("Failed to parse JSON body: {}", e);
-        (
-            StatusCode::BAD_REQUEST,
-            Json(WebhookResponse {
-                status: "error".to_string(),
-                message: Some(format!("Invalid JSON: {e}")),
-                processed: None,
-                succeeded: None,
-                failed: None,
-            }),
-        )
-    })?;
+    let parsed_body: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|e| AppError::bad_request_with("Invalid JSON", e))?;
 
     // Get X-GitHub-Event header
     let event_type = headers
@@ -151,19 +108,8 @@ pub async fn handle_github_webhook(
     }
 
     // Parse as PushEvent
-    let push_event: PushEvent = serde_json::from_value(parsed_body).map_err(|e| {
-        error!("Failed to parse push event: {}", e);
-        (
-            StatusCode::BAD_REQUEST,
-            Json(WebhookResponse {
-                status: "error".to_string(),
-                message: Some(format!("Invalid payload: {e}")),
-                processed: None,
-                succeeded: None,
-                failed: None,
-            }),
-        )
-    })?;
+    let push_event: PushEvent = serde_json::from_value(parsed_body)
+        .map_err(|e| AppError::bad_request_with("Invalid payload", e))?;
 
     info!(
         "Processing push event: ref={}, repo={}",
@@ -201,24 +147,7 @@ pub async fn handle_github_webhook(
         .ssm_client()
         .get_parameter(&config.github_app_secret_pem_key_name, true)
         .await
-        .map_err(|e| {
-            error!(
-                ssm_param = %config.github_app_secret_pem_key_name,
-                installation_id = %push_event.installation.id,
-                error = ?e,
-                "Failed to get private key from SSM"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Failed to get GitHub App private key".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to get private key from SSM", e))?;
 
     // Create GitHub client and get access token
     let github_client = GitHubAppClientImpl::new(config.github_app_id.clone(), private_key);
@@ -226,24 +155,7 @@ pub async fn handle_github_webhook(
     let access_token = github_client
         .get_access_token(push_event.installation.id)
         .await
-        .map_err(|e| {
-            error!(
-                installation_id = %push_event.installation.id,
-                repo = %push_event.repository.full_name,
-                error = ?e,
-                "Failed to get GitHub access token"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Failed to get GitHub access token".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to get GitHub access token", e))?;
 
     // Get owner name
     let owner = push_event
@@ -262,25 +174,7 @@ pub async fn handle_github_webhook(
             &access_token,
         )
         .await
-        .map_err(|e| {
-            error!(
-                installation_id = %push_event.installation.id,
-                repo = %push_event.repository.full_name,
-                articles_dir = %config.articles_dir,
-                error = ?e,
-                "Failed to list articles directory"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Failed to list articles directory".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
-        })?;
+        .map_err(|e| AppError::internal("Failed to list articles directory", e))?;
 
     // Filter markdown files
     let file_paths: Vec<_> = contents
@@ -307,38 +201,13 @@ pub async fn handle_github_webhook(
         .users_repository()
         .find_by_installation_id(push_event.installation.id)
         .await
-        .map_err(|e| {
-            error!(
-                installation_id = %push_event.installation.id,
-                error = ?e,
-                "Failed to find user by installation_id"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("Failed to find user".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
-        })?
+        .map_err(|e| AppError::internal("Failed to find user by installation_id", e))?
         .ok_or_else(|| {
             error!(
                 "User not found for installation_id: {}",
                 push_event.installation.id
             );
-            (
-                StatusCode::NOT_FOUND,
-                Json(WebhookResponse {
-                    status: "error".to_string(),
-                    message: Some("User not found".to_string()),
-                    processed: None,
-                    succeeded: None,
-                    failed: None,
-                }),
-            )
+            AppError::not_found("User not found")
         })?;
 
     // Process each article
