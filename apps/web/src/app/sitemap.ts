@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { getArticlesByType } from '@/lib/api';
 import { SITE_URL, USER_NAME } from '@/lib/constants';
 
-export const revalidate = 3600;
+export const revalidate = 60;
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
