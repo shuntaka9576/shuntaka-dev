@@ -6,6 +6,8 @@ on:
       - preview
     paths:
       - 'docs/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
       - '.github/workflows/docs.yaml'
   workflow_dispatch:
 
