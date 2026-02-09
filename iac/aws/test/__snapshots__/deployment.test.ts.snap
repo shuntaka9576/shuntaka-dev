@@ -161,7 +161,7 @@ exports[`OidcProviderStack > snapshot 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
-          "S3Key": "62fa02efcaa700e1c247e1d3cc2aa0cd07a0808a9a3e3d2230e51f57a02233fb.zip",
+          "S3Key": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50.zip",
         },
         "Handler": "__entrypoint__.handler",
         "MemorySize": 128,
@@ -225,7 +225,7 @@ exports[`OidcProviderStack > snapshot 1`] = `
         "ClientIDList": [
           "sts.amazonaws.com",
         ],
-        "CodeHash": "62fa02efcaa700e1c247e1d3cc2aa0cd07a0808a9a3e3d2230e51f57a02233fb",
+        "CodeHash": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50",
         "RejectUnauthorized": false,
         "ServiceToken": {
           "Fn::GetAtt": [
