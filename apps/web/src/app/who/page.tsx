@@ -33,13 +33,27 @@ const links = [
     name: 'shuntaka',
     href: 'https://dev.classmethod.jp/author/takahashi-shunichi/',
   },
+  {
+    icon: '/assets/bluesky.svg',
+    name: 'shuntaka.bsky.social',
+    href: 'https://bsky.app/profile/shuntaka.bsky.social',
+  },
 ];
 
 export default function WhoPage() {
   return (
     <BaseLayout showTypeHeader currentTab="who">
       <main className="w-full">
-        <div className="pb-2">髙橋俊一 a.k.a shuntaka</div>
+        <div className="flex items-center pb-2">
+          <span>髙橋俊一 a.k.a shuntaka</span>
+          <Image
+            src="/icons/hashi-light.png"
+            alt="hashi"
+            width={48}
+            height={48}
+            className="rounded-full"
+          />
+        </div>
         <div className="flex pb-4">
           {links.map((link) => (
             <a
