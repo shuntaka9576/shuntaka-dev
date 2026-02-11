@@ -44,15 +44,9 @@ export default function WhoPage() {
   return (
     <BaseLayout showTypeHeader currentTab="who">
       <main className="w-full">
-        <div className="flex items-center pb-2">
+        <div className="flex items-center gap-2 pb-2">
           <span>髙橋俊一 a.k.a shuntaka</span>
-          <Image
-            src="/icons/hashi-light.png"
-            alt="hashi"
-            width={48}
-            height={48}
-            className="rounded-full"
-          />
+          <Image src="/icons/hashi-light.png" alt="hashi" width={36} height={36} />
         </div>
         <div className="flex pb-4">
           {links.map((link) => (
