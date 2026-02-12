@@ -8,3 +8,4 @@
 **/out
 **/target
 bun.lock
+.claude

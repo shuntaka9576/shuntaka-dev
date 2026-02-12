@@ -16,6 +16,18 @@
     "enabled": true,
     "schedule": ["at any time"]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update ARG RUST_VERSION in Dockerfile",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["ARG RUST_VERSION=(?<currentValue>\\d+\\.\\d+)\\n"],
+      "depNameTemplate": "rust",
+      "packageNameTemplate": "rust-lang/rust",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+)"
+    }
+  ],
   "packageRules": [
     {
       "matchUpdateTypes": ["patch", "minor", "major"],
@@ -76,6 +88,12 @@
       "description": "Immediate updates for bun",
       "matchManagers": ["bun"],
       "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Group Rust toolchain updates (rust-toolchain.toml + Dockerfile)",
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["rust-lang/rust"],
+      "groupName": "rust-toolchain"
     }
   ]
 }
