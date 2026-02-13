@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 
 FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.0 AS aws-lambda-adapter
 
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 COPY --from=aws-lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 
 WORKDIR /app
