@@ -19,11 +19,11 @@
     "tocbot": "^4.36.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/postcss": "^4.2.0",
     "@types/nprogress": "^0.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/rss": "^0.0.32",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.2.0"
   }
 }
