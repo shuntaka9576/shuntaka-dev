@@ -19,7 +19,7 @@ shared = { path = "./apps/blog-api/shared" }
 registry = { path = "./apps/blog-api/registry" }
 markdown = { path = "./apps/blog-api/markdown" }
 infrastructure = { path = "./apps/blog-api/infrastructure" }
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 axum = { version = "0.8.8", features = ["macros"] }
 sqlx = { version = "0.8.6", features = [
   "runtime-tokio",
