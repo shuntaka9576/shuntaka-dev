@@ -43,7 +43,7 @@ uuid = { version = "1.21.0", features = ["serde", "v4"] }
 chrono = { version = "0.4.43", features = ["serde"] }
 aws-config = "1.8.14"
 aws-sdk-dsql = "1.52.0"
-aws-sdk-ssm = "1.105.0"
+aws-sdk-ssm = "1.106.0"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
