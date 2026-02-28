@@ -16,7 +16,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "aws-cdk": "^2.1107.0",
+    "aws-cdk": "^2.1108.0",
     "dotenv-cli": "^11.0.0",
     "vitest": "^4.0.18"
   }
