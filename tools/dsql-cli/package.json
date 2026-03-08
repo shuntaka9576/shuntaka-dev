@@ -8,10 +8,10 @@
     "convert": "tsx src/index.ts convert"
   },
   "dependencies": {
-    "@aws-sdk/client-dsql": "^3.1000.0",
-    "@aws-sdk/dsql-signer": "^3.1000.0",
+    "@aws-sdk/client-dsql": "^3.1004.0",
+    "@aws-sdk/dsql-signer": "^3.1004.0",
     "commander": "^14.0.3",
-    "pg": "^8.19.0"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/pg": "^8.18.0"
