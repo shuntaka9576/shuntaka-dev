@@ -30,7 +30,7 @@ sqlx = { version = "0.8.6", features = [
   "postgres",
   "migrate",
 ] }
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 async-trait = "0.1.89"
 derive-new = "0.7.0"
 rstest = "0.26.1"
@@ -39,11 +39,11 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yaml = "0.9.34"
-uuid = { version = "1.21.0", features = ["serde", "v4"] }
+uuid = { version = "1.22.0", features = ["serde", "v4"] }
 chrono = { version = "0.4.44", features = ["serde"] }
-aws-config = "1.8.14"
-aws-sdk-dsql = "1.52.0"
-aws-sdk-ssm = "1.106.0"
+aws-config = "1.8.15"
+aws-sdk-dsql = "1.53.0"
+aws-sdk-ssm = "1.107.0"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
