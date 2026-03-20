@@ -19,7 +19,7 @@
     "type-check": "bun --filter '*' type-check",
     "test": "turbo test",
     "lint:fmt": "vp fmt --check && prettier --check '**/*.{json,yaml}'",
-    "lint:vp": "vp lint --deny-warnings",
+    "lint:vp": "vp lint . --deny-warnings",
     "lint": "turbo lint",
     "fix": "vp fmt && prettier --write '**/*.{json,yaml}'",
     "deploy": "bun --filter @shuntaka-dev/aws deploy",
