@@ -21,7 +21,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export async function getArticlesByType(
   userName: string,
-  type: 'tech' | 'note'
+  type: 'tech' | 'note',
 ): Promise<Article[]> {
   const res = await fetch(`${API_BASE_URL}/users/${userName}/articles?type=${type}`, {
     next: { revalidate: 30 },

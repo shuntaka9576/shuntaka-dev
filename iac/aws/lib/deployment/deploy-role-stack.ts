@@ -13,18 +13,18 @@ export class DeployRoleStack extends cdk.Stack {
       gitHubOwner: string;
       gitHubRepo: string;
       ssmOidcProviderArn: string;
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props);
 
     const oidcProviderArn = ssm.StringParameter.valueForStringParameter(
       this,
-      props.ssmOidcProviderArn
+      props.ssmOidcProviderArn,
     );
     const oidcProvider = iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
       this,
       'OidcProvider',
-      oidcProviderArn
+      oidcProviderArn,
     );
 
     new iam.Role(this, 'AssumeRole', {
@@ -36,7 +36,7 @@ export class DeployRoleStack extends cdk.Stack {
             'token.actions.githubusercontent.com:sub': `repo:${props.gitHubOwner}/${props.gitHubRepo}:*`,
           },
         },
-        'sts:AssumeRoleWithWebIdentity'
+        'sts:AssumeRoleWithWebIdentity',
       ),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('AWSCloudFormationFullAccess'),

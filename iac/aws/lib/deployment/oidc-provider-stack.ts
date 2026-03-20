@@ -9,7 +9,7 @@ export class OidcProviderStack extends cdk.Stack {
     id: string,
     props: {
       ssmOidcProviderArn: string;
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props);
 

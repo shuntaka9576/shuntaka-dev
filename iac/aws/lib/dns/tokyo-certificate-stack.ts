@@ -12,13 +12,13 @@ export class TokyoCertificateStack extends cdk.Stack {
       domainName: string;
       hostedZoneIdParameterName: string;
       certificateArnParameterName: string;
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props);
 
     const hostedZoneId = ssm.StringParameter.valueForStringParameter(
       this,
-      props.hostedZoneIdParameterName
+      props.hostedZoneIdParameterName,
     );
 
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImportedHostedZone', {

@@ -18,10 +18,10 @@
     "build": "turbo build",
     "type-check": "bun --filter '*' type-check",
     "test": "turbo test",
-    "lint:fmt": "oxfmt --check . && prettier --check '**/*.{json,yaml}'",
-    "lint:oxlint": "oxlint . --type-aware --type-check --deny-warnings",
+    "lint:fmt": "vp fmt --check && prettier --check '**/*.{json,yaml}'",
+    "lint:vp": "vp lint . --deny-warnings",
     "lint": "turbo lint",
-    "fix": "oxfmt . && prettier --write '**/*.{json,yaml}'",
+    "fix": "vp fmt && prettier --write '**/*.{json,yaml}'",
     "deploy": "bun --filter @shuntaka-dev/aws deploy",
     "postinstall": "lefthook install"
   },
@@ -29,13 +29,11 @@
     "@types/node": "^25.5.0",
     "cspell": "^9.7.0",
     "lefthook": "^2.1.4",
-    "oxfmt": "^0.40.0",
-    "oxlint": "^1.55.0",
-    "oxlint-tsgolint": "^0.16.0",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "turbo": "^2.8.17",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite-plus": "^0.1.13"
   },
   "packageManager": "bun@1.3.6"
 }
