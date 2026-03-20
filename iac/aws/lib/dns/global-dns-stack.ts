@@ -10,7 +10,7 @@ export class GlobalDnsStack extends cdk.Stack {
     props: {
       domainName: string;
       hostedZoneIdParameterName: string;
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props);
 

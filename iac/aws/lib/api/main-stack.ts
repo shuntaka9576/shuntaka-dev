@@ -42,14 +42,14 @@ export class MainStack extends cdk.Stack {
           cloudinaryApiSecretKeyName: string;
         };
       };
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props);
 
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImportedHostedZone', {
       hostedZoneId: ssm.StringParameter.valueForStringParameter(
         this,
-        props.ssmParameters.globalDns.hostedZoneId
+        props.ssmParameters.globalDns.hostedZoneId,
       ),
       zoneName: props.fqdn,
     });
@@ -57,7 +57,7 @@ export class MainStack extends cdk.Stack {
     const tokyoCertificate = acm.Certificate.fromCertificateArn(
       this,
       'ImportedTokyoCertificate',
-      ssm.StringParameter.valueForStringParameter(this, props.ssmParameters.tokyo.certificateArn)
+      ssm.StringParameter.valueForStringParameter(this, props.ssmParameters.tokyo.certificateArn),
     );
 
     // Aurora DSQL Cluster（シングルリージョン・最小構成）
