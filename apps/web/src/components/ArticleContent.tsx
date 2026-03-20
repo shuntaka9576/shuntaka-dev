@@ -70,7 +70,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
     const handleCopyClick = (e: MouseEvent) => {
       const button = (e.target as Element).closest(
-        '.github-embed-copy, .code-block-copy, .copy-btn'
+        '.github-embed-copy, .code-block-copy, .copy-btn',
       );
       if (!button) return;
 
@@ -92,7 +92,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
         },
         (err) => {
           console.error('Failed to copy:', err);
-        }
+        },
       );
     };
 
@@ -154,7 +154,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
     // Check if script is already being loaded
     const existingScript = document.querySelector(
-      'script[src="https://platform.twitter.com/widgets.js"]'
+      'script[src="https://platform.twitter.com/widgets.js"]',
     );
     if (existingScript) {
       // Wait for it to load

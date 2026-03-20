@@ -27,7 +27,7 @@ const globalDnsStack = new GlobalDnsStack(
       account: config.cdkEnv.account,
       region: REGIONS.TOKYO,
     },
-  }
+  },
 );
 
 const tokyoCertificateStack = new TokyoCertificateStack(
@@ -41,7 +41,7 @@ const tokyoCertificateStack = new TokyoCertificateStack(
       account: config.cdkEnv.account,
       region: REGIONS.TOKYO,
     },
-  }
+  },
 );
 
 const mainStack = new MainStack(app, `${config.stageName.short}-${config.projectName.short}-main`, {
@@ -81,7 +81,7 @@ const deployRoleStack = new DeployRoleStack(
       account: config.cdkEnv.account,
       region: REGIONS.TOKYO,
     },
-  }
+  },
 );
 
 deployRoleStack.addDependency(oidcProviderStack);
