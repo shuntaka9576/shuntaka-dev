@@ -113,7 +113,7 @@ program
   .option(
     '-e, --endpoint <endpoint>',
     'DSQL endpoint or PostgreSQL URL (postgresql://...)',
-    process.env.DSQL_CLUSTER_ENDPOINT
+    process.env.DSQL_CLUSTER_ENDPOINT,
   )
   .option('-s, --sql-dir <dir>', 'Path to SQL files directory', 'dsl')
   .action(async (options) => {
@@ -121,7 +121,7 @@ program
 
     if (!endpoint) {
       console.error(
-        'Error: endpoint is required. Use --endpoint or set DSQL_CLUSTER_ENDPOINT env var'
+        'Error: endpoint is required. Use --endpoint or set DSQL_CLUSTER_ENDPOINT env var',
       );
       process.exit(1);
     }
@@ -140,14 +140,14 @@ program
   .option(
     '-e, --endpoint <endpoint>',
     'DSQL endpoint or PostgreSQL URL (postgresql://...)',
-    process.env.DSQL_CLUSTER_ENDPOINT
+    process.env.DSQL_CLUSTER_ENDPOINT,
   )
   .action(async (options) => {
     const { endpoint } = options;
 
     if (!endpoint) {
       console.error(
-        'Error: endpoint is required. Use --endpoint or set DSQL_CLUSTER_ENDPOINT env var'
+        'Error: endpoint is required. Use --endpoint or set DSQL_CLUSTER_ENDPOINT env var',
       );
       process.exit(1);
     }

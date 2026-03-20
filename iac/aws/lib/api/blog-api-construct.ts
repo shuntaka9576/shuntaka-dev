@@ -43,7 +43,7 @@ export class BlogAPIConstruct extends Construct {
         cloudinaryApiKey: string;
         cloudinaryApiSecretKeyName: string;
       };
-    }
+    },
   ) {
     super(scope, id);
 
@@ -78,7 +78,7 @@ export class BlogAPIConstruct extends Construct {
         effect: iam.Effect.ALLOW,
         actions: ['dsql:DbConnectAdmin'],
         resources: [props.dsqlClusterArn],
-      })
+      }),
     );
 
     // SSM Parameter Store読み取り用IAMポリシー
@@ -91,7 +91,7 @@ export class BlogAPIConstruct extends Construct {
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubWebhookSecretKeyName}`,
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.cloudinaryApiSecretKeyName}`,
         ],
-      })
+      }),
     );
 
     // REST API with custom domain
@@ -118,8 +118,8 @@ export class BlogAPIConstruct extends Construct {
         'Properties.Integration.Uri',
         cdk.Fn.sub(
           'arn:aws:apigateway:${AWS::Region}:lambda:path/2021-11-15/functions/${LambdaArn}/response-streaming-invocations',
-          { LambdaArn: webApiLambda.functionArn }
-        )
+          { LambdaArn: webApiLambda.functionArn },
+        ),
       );
     });
 

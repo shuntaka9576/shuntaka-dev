@@ -44,7 +44,7 @@ bun run test
 bun run check
 
 # 個別実行
-bun run lint         # Biome + Prettier
+bun run lint         # Vite+ (oxlint, oxfmt) + Prettier
 bun run fix          # 自動修正
 bun run spell-check  # cspell
 bun run type-check   # TypeScript
@@ -87,7 +87,7 @@ docker compose up -d postgres
 - **フロントエンド**: Next.js 16, React 19, TypeScript 5
 - **バックエンド**: Rust (Axum, SQLx), AWS DSQL
 - **インフラ**: AWS CDK, Docker
-- **コード品質**: Biome, Prettier (YAML), cspell
+- **コード品質**: Vite+ (oxlint, oxfmt), Prettier (YAML), cspell
 
 ## DSQL Constraints
 

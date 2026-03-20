@@ -5,7 +5,7 @@
       "dependsOn": [],
       "cache": true
     },
-    "//#lint:oxlint": {
+    "//#lint:vp": {
       "dependsOn": [],
       "cache": true
     },
@@ -32,7 +32,7 @@
     "lint": {
       "dependsOn": [
         "//#lint:fmt",
-        "//#lint:oxlint",
+        "//#lint:vp",
         "//#spell-check",
         "type-check",
         "blog-api#lint"
