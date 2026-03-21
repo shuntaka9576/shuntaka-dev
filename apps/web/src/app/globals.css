@@ -982,37 +982,19 @@ a:hover {
   }
 }
 
-/* X (Twitter) Embed */
-/* Common styles for twitter-tweet blockquote (overrides .prose blockquote) */
-.prose blockquote.twitter-tweet {
-  border-left: none;
+/* X (Twitter) Embed - react-tweet */
+.tweet-container {
   margin: 1.5rem auto;
-  padding-left: 0;
   max-width: 550px;
 }
 
-/* Rendered iframe container (after widgets.js loads) */
-.twitter-tweet-rendered {
-  margin: 1.5rem auto !important;
-  max-width: 550px;
+/* Prevent .prose styles from interfering with react-tweet internals */
+.prose .tweet-container img {
+  margin: 0;
+  display: initial;
 }
 
-/* Fallback styles before widgets.js loads */
-blockquote.twitter-tweet:not(.twitter-tweet-rendered) {
-  border: 1px solid var(--github-embed-border);
-  border-radius: 12px;
-  padding: 12px 16px;
-  background: var(--github-embed-header-bg);
-  max-width: 550px;
-  margin: 1.5rem auto;
-}
-
-blockquote.twitter-tweet:not(.twitter-tweet-rendered) p {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-color);
-}
-
-blockquote.twitter-tweet:not(.twitter-tweet-rendered) a {
-  color: var(--tag-a-color);
-  word-break: break-all;
+[data-theme='dark'] .tweet-container {
+  --tweet-bg-color: var(--card-bg);
+  --tweet-border: 1px solid var(--github-embed-border);
 }

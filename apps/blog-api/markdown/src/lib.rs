@@ -228,24 +228,13 @@ fn is_x_url(url: &str) -> bool {
     url.starts_with("https://x.com/") && url.contains("/status/")
 }
 
-/// Fetch X embed HTML via oEmbed API
-fn fetch_x_oembed(url: &str) -> Option<String> {
-    let encoded_url = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("url", url)
-        .append_pair("omit_script", "true")
-        .finish();
-
-    let api_url = format!("https://publish.twitter.com/oembed?{encoded_url}");
-
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build()
-        .new_agent();
-
-    let response = agent.get(&api_url).call().ok()?;
-    let body = response.into_body().read_to_string().ok()?;
-    let json: serde_json::Value = serde_json::from_str(&body).ok()?;
-    json["html"].as_str().map(|s| s.to_string())
+/// Extract tweet ID from X URL
+fn extract_x_tweet_id(url: &str) -> Option<&str> {
+    url.split("/status/")
+        .nth(1)?
+        .split(&['?', '/', '#'][..])
+        .next()
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
 }
 
 /// Process X embeds in markdown
@@ -273,16 +262,16 @@ fn process_x_embeds(markdown: &str) -> (String, bool) {
         let trimmed = line.trim();
 
         // Check if line is a standalone X URL
-        if is_x_url(trimmed) && !line.contains('[') && !line.contains('(') {
-            // Try to fetch oEmbed HTML
-            if let Some(embed_html) = fetch_x_oembed(trimmed) {
-                has_x_embed = true;
-                result.push('\n');
-                result.push_str(&embed_html);
-                result.push_str("\n\n");
-                continue;
-            }
-            // Fallback: keep original URL
+        if is_x_url(trimmed)
+            && !line.contains('[')
+            && !line.contains('(')
+            && let Some(tweet_id) = extract_x_tweet_id(trimmed)
+        {
+            has_x_embed = true;
+            result.push('\n');
+            result.push_str(&format!("<div data-tweet-id=\"{tweet_id}\"></div>"));
+            result.push_str("\n\n");
+            continue;
         }
 
         result.push_str(line);
@@ -296,10 +285,6 @@ fn process_x_embeds(markdown: &str) -> (String, bool) {
 
     (result, has_x_embed)
 }
-
-/// X widgets.js script tag
-const X_WIDGETS_SCRIPT: &str =
-    r#"<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>"#;
 
 /// Process link cards in markdown
 /// Only processes standalone URLs at the start of a line (excluding GitHub blob URLs)
@@ -921,8 +906,8 @@ impl MarkdownConverter {
         // Process GitHub embeds (fetch code and render)
         let with_github = process_github_embeds(&escaped, self);
 
-        // Process X embeds (fetch oEmbed HTML)
-        let (with_x, has_x_embed) = process_x_embeds(&with_github);
+        // Process X embeds (output placeholder divs with tweet IDs)
+        let (with_x, _has_x_embed) = process_x_embeds(&with_github);
 
         // Process link cards (OGP cards) for standalone URLs
         let with_link_cards = process_link_cards(&with_x);
@@ -941,11 +926,6 @@ impl MarkdownConverter {
 
         // 外部リンクに target="_blank" を追加
         html = self.add_target_blank_to_external_links(&html);
-
-        // Add X widgets.js script if there are X embeds
-        if has_x_embed {
-            html.push_str(X_WIDGETS_SCRIPT);
-        }
 
         html
     }
@@ -1433,6 +1413,27 @@ mod tests {
         assert!(!is_x_url("https://x.com/user"));
         assert!(!is_x_url("https://twitter.com/user/status/1234567890"));
         assert!(!is_x_url("https://example.com"));
+    }
+
+    #[test]
+    fn test_extract_x_tweet_id() {
+        assert_eq!(
+            extract_x_tweet_id("https://x.com/user/status/1234567890"),
+            Some("1234567890")
+        );
+        assert_eq!(
+            extract_x_tweet_id("https://x.com/user/status/1234567890?s=20"),
+            Some("1234567890")
+        );
+        assert_eq!(extract_x_tweet_id("https://x.com/user"), None);
+    }
+
+    #[test]
+    fn test_x_embed_produces_placeholder() {
+        let markdown = "https://x.com/user/status/1234567890";
+        let (result, has_embed) = process_x_embeds(markdown);
+        assert!(result.contains("<div data-tweet-id=\"1234567890\"></div>"));
+        assert!(has_embed);
     }
 
     #[test]

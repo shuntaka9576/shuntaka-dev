@@ -1,20 +1,42 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import type { ComponentProps } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { Tweet } from 'react-tweet';
 import { useNavigationProgress } from '@/components/NavigationProgressProvider';
 
-declare global {
-  interface Window {
-    twttr?: {
-      widgets: {
-        load: (element?: HTMLElement) => Promise<void>;
-      };
-    };
-  }
+function AvatarImg({ src, ...props }: ComponentProps<'img'>) {
+  const hiResSrc = typeof src === 'string' ? src.replace('_normal.', '_bigger.') : src;
+  // biome-ignore lint/a11y/useAltText: alt is passed via ...props
+  return <img src={hiResSrc} {...props} />;
 }
 
 interface ArticleContentProps {
   html: string;
+}
+
+type ContentPart = { type: 'html'; content: string } | { type: 'tweet'; id: string };
+
+const TWEET_PLACEHOLDER_REGEX = /<div data-tweet-id="(\d+)"><\/div>/g;
+
+function parseHtmlWithTweets(html: string): ContentPart[] {
+  const parts: ContentPart[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  TWEET_PLACEHOLDER_REGEX.lastIndex = 0;
+  while ((match = TWEET_PLACEHOLDER_REGEX.exec(html)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'html', content: html.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'tweet', id: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < html.length) {
+    parts.push({ type: 'html', content: html.slice(lastIndex) });
+  }
+
+  return parts;
 }
 
 const COPY_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>`;
@@ -23,9 +45,10 @@ export function ArticleContent({ html }: ArticleContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const { doneProgress } = useNavigationProgress();
 
+  const parts = useMemo(() => parseHtmlWithTweets(html), [html]);
+
   // Complete navigation progress after content is painted
   useEffect(() => {
-    // Wait for browser to paint the content
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         doneProgress();
@@ -40,19 +63,15 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
     const preElements = container.querySelectorAll('pre');
     preElements.forEach((pre) => {
-      // Skip if already has a copy button
       if (pre.querySelector('.copy-btn')) {
         return;
       }
 
-      // Make pre position relative for absolute positioning of button
       pre.style.position = 'relative';
 
-      // Get code content
       const codeElement = pre.querySelector('code');
       const code = codeElement?.textContent || pre.textContent || '';
 
-      // Create copy button
       const button = document.createElement('button');
       button.className = 'copy-btn';
       button.setAttribute('data-code', code);
@@ -79,13 +98,11 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
       navigator.clipboard.writeText(code).then(
         () => {
-          // Create floating "Copied!" text
           const floatingText = document.createElement('span');
           floatingText.className = 'copied-float';
           floatingText.textContent = 'Copied!';
           button.appendChild(floatingText);
 
-          // Remove after animation
           setTimeout(() => {
             floatingText.remove();
           }, 800);
@@ -136,52 +153,17 @@ export function ArticleContent({ html }: ArticleContentProps) {
     };
   }, [html]);
 
-  // Load X (Twitter) widgets.js and initialize embeds
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-run when html changes to detect new X embeds
-  useEffect(() => {
-    const container = contentRef.current;
-    if (!container) return;
-
-    // Check if there are any X embeds
-    const xEmbeds = container.querySelectorAll('.twitter-tweet');
-    if (xEmbeds.length === 0) return;
-
-    // If widgets.js is already loaded, just reinitialize
-    if (window.twttr?.widgets) {
-      void window.twttr.widgets.load(container);
-      return;
-    }
-
-    // Check if script is already being loaded
-    const existingScript = document.querySelector(
-      'script[src="https://platform.twitter.com/widgets.js"]',
-    );
-    if (existingScript) {
-      // Wait for it to load
-      existingScript.addEventListener('load', () => {
-        void window.twttr?.widgets.load(container);
-      });
-      return;
-    }
-
-    // Load widgets.js dynamically
-    const script = document.createElement('script');
-    script.src = 'https://platform.twitter.com/widgets.js';
-    script.async = true;
-    script.onload = () => {
-      void window.twttr?.widgets.load(container);
-    };
-    script.onerror = () => {
-      console.error('Failed to load Twitter widgets.js');
-    };
-    document.body.appendChild(script);
-  }, [html]);
-
   return (
-    <div
-      ref={contentRef}
-      className="prose prose-lg max-w-none"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div ref={contentRef} className="prose prose-lg max-w-none">
+      {parts.map((part, i) =>
+        part.type === 'html' ? (
+          <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
+        ) : (
+          <div key={i} className="tweet-container">
+            <Tweet id={part.id} components={{ AvatarImg }} />
+          </div>
+        ),
+      )}
+    </div>
   );
 }
