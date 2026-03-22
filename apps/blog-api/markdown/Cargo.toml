@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 comrak = { version = "0.51.0", default-features = false, features = ["syntect"] }
 regex = "1.12.3"
-ureq = { version = "3.2.0", features = ["rustls"] }
+ureq = { version = "3.3.0", features = ["rustls"] }
 syntect = "5.3.0"
 scraper = "0.26.0"
 url = "2.5.8"
