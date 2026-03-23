@@ -12,12 +12,12 @@
   "dependencies": {
     "aws-cdk-lib": "^2.244.0",
     "change-case": "^5.4.4",
-    "constructs": "^10.5.1",
+    "constructs": "^10.6.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "aws-cdk": "^2.1112.0",
     "dotenv-cli": "^11.0.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.1"
   }
 }
