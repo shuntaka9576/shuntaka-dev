@@ -56,7 +56,7 @@
         "zod": "^4.3.6",
       },
       "devDependencies": {
-        "aws-cdk": "^2.1112.0",
+        "aws-cdk": "^2.1113.0",
         "dotenv-cli": "^11.0.0",
         "vitest": "^4.1.1",
       },
@@ -764,7 +764,7 @@
 
     "astral-regex": ["astral-regex@2.0.0", "", {}, "sha512-Z7tMw1ytTXt5jqMcOP+OQteU1VuNK9Y02uuJtKQ1Sv69jXQKKg5cibLwGJow8yzZP+eAc18EmLGPal0bp36rvQ=="],
 
-    "aws-cdk": ["aws-cdk@2.1112.0", "", { "bin": { "cdk": "bin/cdk" } }, "sha512-IYUbsd9tpBQRqEO2evWsG+p2ZNa6wG5/sJvmWaqo45V1ep8BW+mrf+jEpFLD9uDPXqRA57EZGVGils7QLbOhNA=="],
+    "aws-cdk": ["aws-cdk@2.1113.0", "", { "bin": { "cdk": "bin/cdk" } }, "sha512-7D2cVJ66tRZ7KbdTfQLgwPu/XvAeb3r42MMVG605kaxWdIUczdJcuk9x5JVahDCFKRcjepLLYu5N+ovnHFYxBQ=="],
 
     "aws-cdk-lib": ["aws-cdk-lib@2.244.0", "", { "dependencies": { "@aws-cdk/asset-awscli-v1": "2.2.263", "@aws-cdk/asset-node-proxy-agent-v6": "^2.1.1", "@aws-cdk/cloud-assembly-api": "^2.1.1", "@aws-cdk/cloud-assembly-schema": "^52.1.0", "@balena/dockerignore": "^1.0.2", "case": "1.6.3", "fs-extra": "^11.3.3", "ignore": "^5.3.2", "jsonschema": "^1.5.0", "mime-types": "^2.1.35", "minimatch": "^10.2.3", "punycode": "^2.3.1", "semver": "^7.7.4", "table": "^6.9.0", "yaml": "1.10.2" }, "peerDependencies": { "constructs": "^10.5.0" } }, "sha512-j5FVeZv5W+v6j6OnW8RjoN04T+8pYvDJJV7yXhhj4IiGDKPgMH3fflQLQXJousd2QQk+nSAjghDVJcrZ4GFyGA=="],
 
