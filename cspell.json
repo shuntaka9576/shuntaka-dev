@@ -12,7 +12,8 @@
     "turbo.json",
     ".legacy/**",
     "**/target/**",
-    "**/__snapshots__/**"
+    "**/__snapshots__/**",
+    "docs/source/incidents/**"
   ],
   "language": "en",
   "words": [

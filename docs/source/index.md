@@ -5,10 +5,11 @@
 ## 目次
 
 ```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 
 01_development
 02_database
 03_authorization
+incidents/index
 99_memo
 ```
