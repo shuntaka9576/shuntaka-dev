@@ -2,7 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import type * as lambda from 'aws-cdk-lib/aws-lambda';
 import type { Construct } from 'constructs';
-import { MainStack } from '../lib/api/main-stack';
+import { MainStack } from '../lib/api/main-stack.js';
 
 // DockerImageFunctionをモックしてDockerビルドをスキップ
 vi.mock('aws-cdk-lib/aws-lambda', async (importOriginal) => {

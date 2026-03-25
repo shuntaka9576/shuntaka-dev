@@ -2,7 +2,7 @@
   "compilerOptions": {
     "types": ["vitest/globals"],
     "target": "es2022",
-    "module": "es2022",
+    "module": "node16",
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -18,7 +18,7 @@
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
     "skipLibCheck": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "incremental": true

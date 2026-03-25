@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { DeployRoleStack } from '../lib/deployment/deploy-role-stack';
-import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack';
+import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
+import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 
 describe('OidcProviderStack', () => {
   it('snapshot', () => {

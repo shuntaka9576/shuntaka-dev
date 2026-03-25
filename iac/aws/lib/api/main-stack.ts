@@ -4,7 +4,7 @@ import * as dsql from 'aws-cdk-lib/aws-dsql';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
-import { BlogAPIConstruct } from './blog-api-construct';
+import { BlogAPIConstruct } from './blog-api-construct.js';
 
 export class MainStack extends cdk.Stack {
   constructor(

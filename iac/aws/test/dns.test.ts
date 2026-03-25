@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { GlobalDnsStack } from '../lib/dns/global-dns-stack';
-import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack';
+import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
+import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
 
 describe('GlobalDnsStack', () => {
   it('snapshot', () => {
