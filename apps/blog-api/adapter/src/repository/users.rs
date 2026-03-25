@@ -31,7 +31,7 @@ impl UsersRepository for UsersRepositoryImpl {
             "#,
         )
         .bind(installation_id)
-        .fetch_optional(self.db.inner_ref())
+        .fetch_optional(&self.db.pool().await)
         .await?;
 
         Ok(row.map(|r| UserId::new(r.user_id)))

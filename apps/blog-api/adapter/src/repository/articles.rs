@@ -90,7 +90,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
         )
         .bind(user_id.as_uuid())
         .bind(slug)
-        .fetch_optional(self.db.inner_ref())
+        .fetch_optional(&self.db.pool().await)
         .await?;
 
         row.map(Article::try_from).transpose()
@@ -178,7 +178,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 .bind(published_at)
                 .bind(now)
                 .bind(article.article_id.as_uuid())
-                .execute(self.db.inner_ref())
+                .execute(&self.db.pool().await)
                 .await?;
 
                 Ok(UpsertResult::Updated(article.article_id))
@@ -229,7 +229,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 .bind(published_at)
                 .bind(now)
                 .bind(now)
-                .execute(self.db.inner_ref())
+                .execute(&self.db.pool().await)
                 .await?;
 
                 Ok(UpsertResult::Created(ArticleId::new(article_id)))

@@ -12,5 +12,7 @@ anyhow.workspace = true
 sqlx.workspace = true
 aws-config.workspace = true
 aws-sdk-dsql.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 chrono.workspace = true
 uuid.workspace = true
