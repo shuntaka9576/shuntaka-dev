@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Language
-
-日本語で回答してください。
-
 ## Git Rules
 
 - PR のベースブランチは常に `preview`。`main` 向けの PR は作成しない
