@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 日本語で回答してください。
 
+## Git Rules
+
+- PR のベースブランチは常に `preview`。`main` 向けの PR は作成しない
+- `main` へのマージは人間が行う
+
 ## Project Overview
 
 フルスタックのモノレポプロジェクト。ブログシステム（Web + API）とインフラ、ドキュメントを含む。
