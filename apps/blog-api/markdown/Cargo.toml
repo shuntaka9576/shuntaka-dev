@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-comrak = { version = "0.51.0", default-features = false, features = ["syntect"] }
+comrak = { version = "0.52.0", default-features = false, features = ["syntect"] }
 regex = "1.12.3"
 ureq = { version = "3.3.0", features = ["rustls"] }
 syntect = "5.3.0"
