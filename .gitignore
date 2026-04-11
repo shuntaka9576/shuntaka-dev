@@ -1,6 +1,8 @@
 # common
 dist
 .env.development.local
+.env.local
+.envrc
 
 # turbo
 .turbo

@@ -6,7 +6,7 @@
   "keywords": [],
   "scripts": {
     "build-docs": "uv run sphinx-build source build",
-    "dev": "uv run sphinx-autobuild source build",
+    "dev": "uv run sphinx-autobuild source build --port ${DOCS_PORT:-8000}",
     "doc-gen": "tbls doc --force"
   },
   "devDependencies": {}

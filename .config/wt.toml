@@ -1,0 +1,29 @@
+# Parallel worktree support: unique ports per worktree via hash_port
+
+[pre-start]
+env = """
+cat > .env.local <<'ENVEOF'
+WEB_PORT={{ ('web-' ~ branch) | hash_port }}
+API_PORT={{ ('api-' ~ branch) | hash_port }}
+NEXT_PUBLIC_SITE_URL=http://localhost:{{ ('web-' ~ branch) | hash_port }}
+NEXT_PUBLIC_API_URL=http://localhost:{{ ('api-' ~ branch) | hash_port }}
+PORT={{ ('api-' ~ branch) | hash_port }}
+DOCS_PORT={{ ('docs-' ~ branch) | hash_port }}
+ENVEOF
+"""
+envrc = """
+cat > .envrc <<'ENVRCEOF'
+source_up
+dotenv .env.local
+ENVRCEOF
+direnv allow .
+"""
+copy = "wt step copy-ignored"
+install = "bun install"
+
+[post-remove]
+kill-web = "lsof -ti :{{ ('web-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+kill-api = "lsof -ti :{{ ('api-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+
+[list]
+url = "http://localhost:{{ ('web-' ~ branch) | hash_port }}"

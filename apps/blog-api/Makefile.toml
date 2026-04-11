@@ -2,7 +2,7 @@
 default_to_workspace = false
 
 [env]
-PORT = "8080"
+PORT = { script = ["echo ${API_PORT:-8080}"] }
 AWS_REGION = "ap-northeast-1"
 
 [env.development]
