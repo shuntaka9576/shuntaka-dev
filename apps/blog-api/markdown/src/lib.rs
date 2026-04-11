@@ -956,7 +956,7 @@ impl MarkdownConverter {
         options.extension.table = true;
         options.extension.autolink = true;
         options.extension.tasklist = true;
-        options.extension.header_ids = Some("".to_string());
+        options.extension.header_id_prefix = Some("".to_string());
 
         // Render options
         options.render.r#unsafe = true; // Allow raw HTML (for custom embeds)
