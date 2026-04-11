@@ -221,6 +221,122 @@ bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
 4. リポジトリルートの `renovate.json` が自動で読み込まれる
 
+## ローカル開発
+
+本リポジトリはbare clone + git worktree構成で管理している。worktreeの管理には[Worktrunk](https://worktrunk.dev)を使用する。
+
+```
+shuntaka-dev/          # bare clone
+├── .bare/             # git bare repository
+├── .envrc             # 共通環境変数（秘匿情報等）
+├── preview/           # メインworktree（previewブランチ）
+├── feature-foo/       # 作業worktree（wt switchで自動作成）
+└── fix-bar/           # 作業worktree
+```
+
+### 初回セットアップ
+
+#### lefthook
+
+bare clone環境では`core.hooksPath`が不正なパスを指している場合がある。lefthookがworktreeで動作しない場合は以下を実行する（リポジトリに対して一度だけ）。
+
+```bash
+git config --local --unset core.hooksPath
+```
+
+#### previewワークツリーの環境変数
+
+previewはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
+
+```bash
+cat > .env.local <<'EOF'
+WEB_PORT=3000
+API_PORT=8080
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8080
+PORT=8080
+DOCS_PORT=8000
+EOF
+
+cat > .envrc <<'EOF'
+source_up
+dotenv .env.local
+EOF
+direnv allow .
+```
+
+### 開発サーバーの起動
+
+```bash
+# 依存関係のインストール
+bun install
+
+# PostgreSQL起動（全worktreeで共有）
+docker compose up -d postgres
+
+# DBマイグレーション（初回のみ）
+cd tools/dsql-cli
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+cd ../..
+
+# dev server起動（Next.js + Rust API + Sphinx）
+bun run dev
+```
+
+### ブランチ作業
+
+`wt switch --create`で新しいworktreeを作成する。pre-startフックにより`.env.local`（ポート設定）、`.envrc`、依存関係のインストールが自動で行われる。
+
+```bash
+# worktree作成＆切り替え
+wt switch --create feature/new-thing
+
+# dev server起動
+bun run dev
+```
+
+初回のみフック承認が求められるので`y`で承認する。承認は`~/.config/worktrunk/approvals.toml`に保存され、次回以降は自動実行される。
+
+```
+▲ shuntaka-dev needs approval to execute 4 commands:
+○ pre-start env: ...
+○ pre-start envrc: ...
+○ pre-start copy: ...
+○ pre-start install: ...
+
+❯ Allow and remember? [y/N] y
+```
+
+その他の操作。
+
+```bash
+# 既存worktreeに切り替え
+wt switch preview
+
+# worktree一覧（URLも表示）
+wt list
+
+# worktreeの削除
+wt remove feature/new-thing
+
+# previewブランチへマージ＆削除
+wt merge
+```
+
+### ポートマッピング
+
+複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。
+
+| 変数                   | 内容                      | preview（既定）         |
+| ---------------------- | ------------------------- | ----------------------- |
+| `WEB_PORT`             | Next.js devサーバーポート | 3000                    |
+| `API_PORT` / `PORT`    | Rust APIポート            | 8080                    |
+| `DOCS_PORT`            | Sphinxドキュメントポート  | 8000                    |
+| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL         | `http://localhost:3000` |
+| `NEXT_PUBLIC_API_URL`  | API URL                   | `http://localhost:8080` |
+
+新規worktreeではブランチ名から10000-19999の範囲でポートが決定的に生成される。同じブランチ名なら常に同じポートになる。
+
 ## ツール
 
 ### psql接続（DSQL）
