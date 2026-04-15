@@ -20,7 +20,7 @@ registry = { path = "./apps/blog-api/registry" }
 markdown = { path = "./apps/blog-api/markdown" }
 infrastructure = { path = "./apps/blog-api/infrastructure" }
 anyhow = "1.0.102"
-axum = { version = "0.8.8", features = ["macros"] }
+axum = { version = "0.8.9", features = ["macros"] }
 sqlx = { version = "0.8.6", features = [
   "runtime-tokio",
   "tls-rustls",
