@@ -4,10 +4,7 @@ export default function ArticleLoading() {
   return (
     <BaseLayout>
       <div className="article-header">
-        <div
-          className="h-10 w-3/4 mx-auto animate-pulse rounded"
-          style={{ background: 'var(--article-area-color)' }}
-        />
+        <div className="h-10 w-3/4 mx-auto animate-pulse rounded bg-[var(--color-surface)]" />
       </div>
       <div className="article-body">
         <article className="article-content">
@@ -16,11 +13,8 @@ export default function ArticleLoading() {
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="h-4 animate-pulse rounded"
-                  style={{
-                    background: 'var(--article-area-color)',
-                    width: `${60 + i * 8}%`,
-                  }}
+                  className="h-4 animate-pulse rounded bg-[var(--color-surface)]"
+                  style={{ width: `${60 + i * 8}%` }}
                 />
               ))}
             </div>

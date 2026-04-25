@@ -4,13 +4,9 @@ export default function NoteLoading() {
   return (
     <BaseLayout showTypeHeader>
       <main className="w-full">
-        <div className="max-w-[600px]">
+        <div className="max-w-[var(--layout-list-max)]">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="mb-4 h-24 animate-pulse rounded-lg"
-              style={{ background: 'var(--article-area-color)' }}
-            />
+            <div key={i} className="mb-4 h-24 animate-pulse rounded-lg bg-[var(--color-surface)]" />
           ))}
         </div>
       </main>

@@ -154,7 +154,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
   }, [html]);
 
   return (
-    <div ref={contentRef} className="prose prose-lg max-w-none">
+    <div ref={contentRef} className="prose max-w-none">
       {parts.map((part, i) =>
         part.type === 'html' ? (
           <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
