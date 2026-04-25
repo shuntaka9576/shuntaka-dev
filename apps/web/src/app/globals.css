@@ -33,6 +33,63 @@
   --github-embed-code-bg: #ffffff;
   --github-embed-link: #0969da;
   --github-embed-meta: #656d76;
+
+  /* === Semantic design tokens (see apps/web/DESIGN.md) === */
+  --color-bg: var(--bg-color);
+  --color-surface: var(--article-area-color);
+  --color-surface-raised: var(--header-color);
+  --color-text: var(--text-color);
+  --color-text-muted: #57595b8a;
+  --color-border: var(--tag-h1-border-line-color);
+  --color-border-subtle: var(--article-record-underline);
+  --color-accent: #e4007f;
+  --color-link: var(--tag-a-color);
+  --color-link-hover: var(--tag-a-hover-color);
+  --color-link-visited: var(--tag-a-visited-color);
+  --color-code-inline-bg: var(--tag-code-background-color);
+  --color-code-inline-fg: var(--tag-code-color);
+  --color-code-block-bg: #1e1e1e;
+  --color-code-block-fg: #d4d4d4;
+  --color-info-bg: #e7f1ff;
+  --color-info-border: #3b82f6;
+  --color-success-bg: #e7f7ed;
+  --color-success-border: #16a34a;
+  --color-warning-bg: var(--message-warn-color);
+  --color-warning-border: var(--message-warn-border-color);
+  --color-danger-bg: var(--message-error-color);
+  --color-danger-border: var(--message-error-border-color);
+  --color-toggle-moon: #525457;
+  --color-toggle-sun: #fff33f;
+  --color-progress: #29d;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --space-10: 4.5rem;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.9375rem;
+  --radius-full: 9999px;
+
+  /* Layout */
+  --layout-max: 1200px;
+  --layout-list-max: 600px;
+  --layout-sidebar-w: 296px;
+  --layout-header-h: 48px;
+  --layout-nav-h: 40px;
+  --layout-footer-h: 58px;
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 400ms;
 }
 
 [data-theme='dark'] {
@@ -68,6 +125,12 @@
   --github-embed-code-bg: #0d1117;
   --github-embed-link: #58a6ff;
   --github-embed-meta: #8b949e;
+
+  /* Semantic token overrides for dark */
+  --color-text-muted: rgb(255 255 255 / 47%);
+  --color-border: #30363d;
+  --color-info-bg: #1f2a37;
+  --color-success-bg: #1c2b24;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -104,6 +167,12 @@
     --github-embed-code-bg: #0d1117;
     --github-embed-link: #58a6ff;
     --github-embed-meta: #8b949e;
+
+    /* Semantic token overrides for dark */
+    --color-text-muted: rgb(255 255 255 / 47%);
+    --color-border: #30363d;
+    --color-info-bg: #1f2a37;
+    --color-success-bg: #1c2b24;
   }
 }
 
@@ -139,6 +208,12 @@ a {
 
 a:hover {
   text-decoration: none;
+}
+
+/* Focus-visible ring for interactive elements */
+:is(a, button, [role='button'], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Article prose styles */
@@ -264,8 +339,8 @@ a:hover {
 }
 
 .prose pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--color-code-block-bg);
+  color: var(--color-code-block-fg);
   padding: 1rem;
   border-radius: 0.5rem;
   overflow-x: auto;
@@ -357,8 +432,23 @@ a:hover {
 }
 
 .message.error {
-  background: var(--message-error-color);
-  border: 1px solid var(--message-error-border-color);
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+
+.message.info {
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
+}
+
+.message.success {
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+}
+
+.message.warning {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
 }
 
 /* SpeakerDeck embed */
@@ -393,7 +483,7 @@ a:hover {
   .article-title {
     text-align: left;
     font-size: 1.4em;
-    font-weight: 530;
+    font-weight: 700;
   }
 }
 
@@ -421,7 +511,7 @@ a:hover {
 
 .article-content {
   position: relative;
-  width: calc(100% - 312px);
+  width: calc(100% - var(--layout-sidebar-w) - var(--space-4));
 }
 
 @media (max-width: 1024px) {
@@ -459,7 +549,7 @@ a:hover {
 }
 
 .right-sidebar {
-  width: 296px;
+  width: var(--layout-sidebar-w);
 }
 
 @media (max-width: 1024px) {
@@ -473,14 +563,14 @@ a:hover {
   background: var(--article-area-color);
   max-height: 600px;
   overflow-y: auto;
-  max-width: 296px;
+  max-width: var(--layout-sidebar-w);
   overflow-x: hidden;
   white-space: nowrap;
   position: sticky;
-  top: 112px;
-  border-radius: 10px;
+  top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5));
+  border-radius: var(--radius-md);
   border: 1px solid var(--article-area-border-color);
-  padding: 8px;
+  padding: var(--space-2);
   line-height: 1.6em;
 }
 
@@ -576,7 +666,7 @@ a:hover {
 }
 
 #nprogress .bar {
-  background: #29d;
+  background: var(--color-progress);
   position: fixed;
   z-index: 9999;
   top: 0;
@@ -592,8 +682,8 @@ a:hover {
   width: 100px;
   height: 100%;
   box-shadow:
-    0 0 10px #29d,
-    0 0 5px #29d;
+    0 0 10px var(--color-progress),
+    0 0 5px var(--color-progress);
   opacity: 1;
   transform: rotate(3deg) translateY(-4px);
 }
@@ -696,8 +786,8 @@ a:hover {
   cursor: pointer;
   color: var(--github-embed-meta);
   transition:
-    color 0.2s,
-    background-color 0.2s;
+    color var(--motion-base),
+    background-color var(--motion-base);
 }
 
 .github-embed-copy:hover {
@@ -768,11 +858,11 @@ a:hover {
   padding: 4px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: #9da5b4;
   opacity: 0.4;
-  transition: opacity 0.2s;
+  transition: opacity var(--motion-base);
 }
 
 .prose pre .copy-btn:hover {
@@ -841,8 +931,8 @@ a:hover {
   text-decoration: none;
   color: inherit;
   transition:
-    box-shadow 0.2s,
-    border-color 0.2s;
+    box-shadow var(--motion-base),
+    border-color var(--motion-base);
 }
 
 .link-card:hover {

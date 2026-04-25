@@ -18,9 +18,9 @@ export default async function NotePage() {
   return (
     <BaseLayout showTypeHeader currentTab="note">
       <main className="w-full">
-        <div className="max-w-[600px]">
+        <div className="max-w-[var(--layout-list-max)]">
           {error ? (
-            <p className="text-red-500">{error}</p>
+            <p className="text-[var(--color-danger-border)]">{error}</p>
           ) : articles.length === 0 ? (
             <p>No articles found.</p>
           ) : (

@@ -21,10 +21,7 @@ function formatDate(dateString: string | null): string {
 export const ArticleCard = memo(function ArticleCard({ article, userName }: ArticleCardProps) {
   return (
     <ProgressLink href={`/${userName}/articles/${article.slug}`}>
-      <article
-        className="mb-4 block w-full border-b"
-        style={{ borderColor: 'var(--article-record-underline)' }}
-      >
+      <article className="mb-4 block w-full border-b border-[var(--color-border-subtle)]">
         <div className="mb-2 flex justify-between">
           <div>
             <div className="pt-2 pr-2 pb-4 text-base">{article.title}</div>
