@@ -122,8 +122,8 @@
 - **フッター** (`Footer.tsx`)
   - 固定配置 (`absolute bottom-0`)、フォントサイズ `caption`。
 - **記事本文ラッパ** (`.article-content-wrapper`)
-  - 背景 `--color-surface`、角丸 `15px`、ボーダー 1px `--color-border-subtle`、パディング `3.2em 16px`（デスクトップ）／ `0`（sm 以下）。
-  - **To-be**: 単位を `rem` と 4px 基点スケールに寄せる（`padding: 3rem 1rem` 等）。
+  - 背景 `--color-surface`、角丸 `15px`、ボーダー 1px `--color-border-subtle`、パディング `3rem 1rem`（デスクトップ）／ `1.5rem 1rem`（sm 以下）。
+  - sm 以下で外側 `BaseLayout` の `px-4` (16px) と合わせて左右合計 32px の余白を確保し、本文・コード・画像が画面端に張り付かないようにする。
 - **右サイドバー / TOC** (`.right-sidebar`, `.toc`)
   - 幅 `296px`（`--layout-sidebar-w: 296px`）。
   - `position: sticky; top: 112px;` はヘッダー + タイプナビ分の高さ。ヘッダー高さが変わったら一緒に変える。**マジックナンバーを避けるため `calc(var(--layout-header-h) + var(--layout-nav-h) + 16px)` で算出するのが理想**。
@@ -222,7 +222,7 @@
   - `margin-bottom: 13px`（リスト項目）→ `--space-3` (12px) に寄せる。
   - `margin-top: 10px`（ul / ol）→ `--space-2` (8px) or `--space-3` (12px)。
   - `pb-[58px]`（コンテナ下）→ フッター高さトークン `--layout-footer-h: 58px`。
-  - `padding: 3.2em 16px`（`.article-content-wrapper`）→ `3rem 1rem`（`--space-6 × --space-4`）で揃える。
+  - `padding: 3.2em 16px`（`.article-content-wrapper`）→ `3rem 1rem`（`--space-6 × --space-4`）で揃え済み。sm 以下は `1.5rem 1rem`（`--space-5 × --space-4`）。
 
 ### 5.2 コンテナ幅トークン
 

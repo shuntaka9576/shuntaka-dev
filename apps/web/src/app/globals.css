@@ -522,7 +522,7 @@ a:hover {
 
 /* Article Content Wrapper */
 .article-content-wrapper {
-  padding: 3.2em 16px;
+  padding: 3rem 1rem;
   background: var(--article-area-color);
   border-radius: 15px;
   border: 1px solid var(--article-area-border-color);
@@ -530,7 +530,7 @@ a:hover {
 
 @media (max-width: 576px) {
   .article-content-wrapper {
-    padding: 0;
+    padding: 1.5rem 1rem;
   }
 }
 
