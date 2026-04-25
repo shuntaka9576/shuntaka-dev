@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "cargo make run",
     "lint": "cargo clippy --all --all-targets -- -D warnings",
-    "test": "cargo test --all"
+    "test": "cargo test --all",
+    "clean": "cargo clean"
   }
 }

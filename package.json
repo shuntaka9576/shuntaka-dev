@@ -23,6 +23,7 @@
     "lint": "turbo lint",
     "fix": "vp fmt && prettier --write '**/*.{json,yaml}'",
     "deploy": "bun --filter @shuntaka-dev/aws deploy",
+    "clean": "turbo clean",
     "postinstall": "lefthook install"
   },
   "devDependencies": {

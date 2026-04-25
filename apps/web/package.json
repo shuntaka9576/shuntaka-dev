@@ -6,7 +6,8 @@
     "dev": "next dev -p ${WEB_PORT:-3000}",
     "build": "next build",
     "start": "next start",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next .turbo"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
