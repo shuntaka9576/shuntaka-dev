@@ -1,66 +1,92 @@
 @import 'tailwindcss';
 
 :root {
-  --bg-color: #f7fafc;
-  --header-color: #fffefc;
-  --text-color: #525457;
-  --article-record-underline: rgba(162, 177, 202, 0.3);
-  --article-area-color: #fff;
+  /* Surfaces & text */
+  --color-bg: #f7fafc;
+  --color-surface: #ffffff;
+  --color-surface-raised: #fffefc;
+  --color-text: #525457;
+  --color-text-muted: #57595b8a;
+  --color-border: #c4c4c4;
+  --color-border-subtle: rgba(162, 177, 202, 0.3);
+
+  /* Brand accent */
+  --color-accent: #e4007f;
+  --color-accent-alt: #e40067;
+
+  /* Links */
+  --color-link: #5c6eb1;
+  --color-link-hover: #6686ff;
+  --color-link-visited: #6200ac;
+
+  /* Code */
+  --color-code-inline-bg: rgb(27 31 35 / 5%);
+  --color-code-inline-fg: #333;
+  --color-code-block-bg: #1e1e1e;
+  --color-code-block-fg: #d4d4d4;
+  --color-code-tab-bg: #2b303b;
+  --color-code-tab-fg: #9da5b4;
+
+  /* Feedback (callouts) */
+  --color-info-bg: #e7f1ff;
+  --color-info-border: #3b82f6;
+  --color-success-bg: #e7f7ed;
+  --color-success-border: #16a34a;
+  --color-warning-bg: #fff2b8;
+  --color-warning-border: #fcc800;
+  --color-danger-bg: #eb6e9f36;
+  --color-danger-border: #e4007f;
+
+  /* Misc */
+  --color-toggle-moon: #525457;
+  --color-toggle-sun: #fff33f;
+  --color-progress: #29d;
+  --color-success-icon: #3fb950;
+
+  /* Domain-specific tokens (not yet migrated to --color-* naming) */
   --article-area-border-color: #fff;
-  --tag-a-color: #5c6eb1;
-  --tag-a-hover-color: #6686ff;
-  --tag-a-visited-color: #6200ac;
   --tag-th-background-color: #f7fafc;
   --tag-th-color: #525457;
   --tag-td-background-color: #fff;
   --tag-th-td-border-color: #525457;
-  --tag-h1-border-line-color: #c4c4c4;
   --tag-h2-border-line-color: #c4c4c4;
   --tag-h2-border-line-after-color: #525457;
   --tag-blockquote-color: #ddd;
   --tag-blockquote-font-color: #777;
-  --tag-code-background-color: rgb(27 31 35 / 5%);
-  --tag-code-color: #333;
   --toc-list-color: rgba(162, 177, 202, 0.3);
   --toc-list-text-color: #57595b87;
   --toc-list-color-active: #525457;
-  --message-warn-color: #fff2b8;
-  --message-warn-border-color: #fcc800;
-  --message-error-color: #eb6e9f36;
-  --message-error-border-color: #e4007f;
   --github-embed-border: #d0d7de;
   --github-embed-header-bg: #f6f8fa;
   --github-embed-code-bg: #ffffff;
   --github-embed-link: #0969da;
   --github-embed-meta: #656d76;
 
-  /* === Semantic design tokens === */
-  --color-bg: var(--bg-color);
-  --color-surface: var(--article-area-color);
-  --color-surface-raised: var(--header-color);
-  --color-text: var(--text-color);
-  --color-text-muted: #57595b8a;
-  --color-border: var(--tag-h1-border-line-color);
-  --color-border-subtle: var(--article-record-underline);
-  --color-accent: #e4007f;
-  --color-link: var(--tag-a-color);
-  --color-link-hover: var(--tag-a-hover-color);
-  --color-link-visited: var(--tag-a-visited-color);
-  --color-code-inline-bg: var(--tag-code-background-color);
-  --color-code-inline-fg: var(--tag-code-color);
-  --color-code-block-bg: #1e1e1e;
-  --color-code-block-fg: #d4d4d4;
-  --color-info-bg: #e7f1ff;
-  --color-info-border: #3b82f6;
-  --color-success-bg: #e7f7ed;
-  --color-success-border: #16a34a;
-  --color-warning-bg: var(--message-warn-color);
-  --color-warning-border: var(--message-warn-border-color);
-  --color-danger-bg: var(--message-error-color);
-  --color-danger-border: var(--message-error-border-color);
-  --color-toggle-moon: #525457;
-  --color-toggle-sun: #fff33f;
-  --color-progress: #29d;
+  /* Type scale (rem; 1rem = 16px) */
+  --fs-display: 2rem;
+  --fs-h1: 1.7rem;
+  --fs-h2: 1.5rem;
+  --fs-h3: 1.25rem;
+  --fs-h4: 1.125rem;
+  --fs-body-lg: 1rem;
+  --fs-body: 0.9375rem;
+  --fs-caption: 0.8125rem;
+  --fs-code: 0.875rem;
+
+  /* Line-height */
+  --lh-tight: 1.3;
+  --lh-heading: 1.4;
+  --lh-list: 1.7;
+  --lh-body: 1.9;
+
+  /* Font weight */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+
+  /* Mono font stack (sans is supplied by next/font: --font-roboto, --font-noto-sans-jp) */
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* Spacing scale (4px base) */
   --space-1: 0.25rem;
@@ -90,89 +116,96 @@
   --motion-fast: 150ms;
   --motion-base: 250ms;
   --motion-slow: 400ms;
+  --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  /* Elevation (reserved; only --shadow-2 is used today on link-card:hover) */
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 
 [data-theme='dark'] {
-  --bg-color: #22272e;
-  --header-color: #2d333b;
-  --text-color: #c9d5e1;
-  --article-record-underline: rgba(247, 250, 252, 0.3);
-  --article-area-color: #22272e;
+  --color-bg: #22272e;
+  --color-surface: #22272e;
+  --color-surface-raised: #2d333b;
+  --color-text: #c9d5e1;
+  --color-text-muted: rgb(255 255 255 / 47%);
+  --color-border: #30363d;
+  --color-border-subtle: rgba(247, 250, 252, 0.3);
+
+  --color-link: #539bf5;
+  --color-link-hover: #539bf5;
+  --color-link-visited: #539bf5;
+
+  --color-code-inline-bg: rgb(69 75 83);
+  --color-code-inline-fg: #c9d5e1;
+
+  --color-info-bg: #1f2a37;
+  --color-success-bg: #1c2b24;
+  --color-warning-bg: #2d333b;
+  --color-danger-bg: #2d333b;
+
+  /* Domain-specific overrides */
   --article-area-border-color: rgba(65, 132, 228, 0.4);
-  --tag-a-color: #539bf5;
-  --tag-a-hover-color: #539bf5;
-  --tag-a-visited-color: #539bf5;
   --tag-th-background-color: #2d333b;
   --tag-th-color: #c9d5e1;
   --tag-td-background-color: #2d333b;
   --tag-th-td-border-color: #c9d5e1;
-  --tag-h1-border-line-color: #c9d5e1;
   --tag-h2-border-line-color: #584f45;
   --tag-h2-border-line-after-color: #c9d5e1;
   --tag-blockquote-color: #c9d5e19e;
   --tag-blockquote-font-color: #c9d5e19e;
-  --tag-code-background-color: rgb(69 75 83);
-  --tag-code-color: #c9d5e1;
   --toc-list-color: rgba(247, 250, 252, 0.3);
   --toc-list-text-color: rgb(255 255 255 / 47%);
   --toc-list-color-active: #539bf5;
-  --message-warn-color: #2d333b;
-  --message-warn-border-color: #fcc800;
-  --message-error-color: #2d333b;
-  --message-error-border-color: #e4007f;
   --github-embed-border: #30363d;
   --github-embed-header-bg: #161b22;
   --github-embed-code-bg: #0d1117;
   --github-embed-link: #58a6ff;
   --github-embed-meta: #8b949e;
-
-  /* Semantic token overrides for dark */
-  --color-text-muted: rgb(255 255 255 / 47%);
-  --color-border: #30363d;
-  --color-info-bg: #1f2a37;
-  --color-success-bg: #1c2b24;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg-color: #22272e;
-    --header-color: #2d333b;
-    --text-color: #c9d5e1;
-    --article-record-underline: rgba(247, 250, 252, 0.3);
-    --article-area-color: #22272e;
+    --color-bg: #22272e;
+    --color-surface: #22272e;
+    --color-surface-raised: #2d333b;
+    --color-text: #c9d5e1;
+    --color-text-muted: rgb(255 255 255 / 47%);
+    --color-border: #30363d;
+    --color-border-subtle: rgba(247, 250, 252, 0.3);
+
+    --color-link: #539bf5;
+    --color-link-hover: #539bf5;
+    --color-link-visited: #539bf5;
+
+    --color-code-inline-bg: rgb(69 75 83);
+    --color-code-inline-fg: #c9d5e1;
+
+    --color-info-bg: #1f2a37;
+    --color-success-bg: #1c2b24;
+    --color-warning-bg: #2d333b;
+    --color-danger-bg: #2d333b;
+
+    /* Domain-specific overrides */
     --article-area-border-color: rgba(65, 132, 228, 0.4);
-    --tag-a-color: #539bf5;
-    --tag-a-hover-color: #539bf5;
-    --tag-a-visited-color: #539bf5;
     --tag-th-background-color: #2d333b;
     --tag-th-color: #c9d5e1;
     --tag-td-background-color: #2d333b;
     --tag-th-td-border-color: #c9d5e1;
-    --tag-h1-border-line-color: #c9d5e1;
     --tag-h2-border-line-color: #584f45;
     --tag-h2-border-line-after-color: #c9d5e1;
     --tag-blockquote-color: #c9d5e19e;
     --tag-blockquote-font-color: #c9d5e19e;
-    --tag-code-background-color: rgb(69 75 83);
-    --tag-code-color: #c9d5e1;
     --toc-list-color: rgba(247, 250, 252, 0.3);
     --toc-list-text-color: rgb(255 255 255 / 47%);
     --toc-list-color-active: #539bf5;
-    --message-warn-color: #2d333b;
-    --message-warn-border-color: #fcc800;
-    --message-error-color: #2d333b;
-    --message-error-border-color: #e4007f;
     --github-embed-border: #30363d;
     --github-embed-header-bg: #161b22;
     --github-embed-code-bg: #0d1117;
     --github-embed-link: #58a6ff;
     --github-embed-meta: #8b949e;
-
-    /* Semantic token overrides for dark */
-    --color-text-muted: rgb(255 255 255 / 47%);
-    --color-border: #30363d;
-    --color-info-bg: #1f2a37;
-    --color-success-bg: #1c2b24;
   }
 }
 
@@ -197,8 +230,8 @@ body {
     'Helvetica Neue',
     sans-serif;
   word-wrap: break-word;
-  background: var(--bg-color);
-  color: var(--text-color);
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 a {
@@ -218,7 +251,7 @@ a:hover {
 
 /* Article prose styles */
 .prose {
-  line-height: 1.9;
+  line-height: var(--lh-body);
 }
 
 .prose h1 {
@@ -226,7 +259,7 @@ a:hover {
   margin-bottom: 1.1rem;
   padding-bottom: 0.2em;
   position: relative;
-  border-bottom: solid 1px var(--tag-h1-border-line-color);
+  border-bottom: solid 1px var(--color-border);
 }
 
 .prose h1:not(:first-child) {
@@ -294,20 +327,20 @@ a:hover {
 .prose p {
   margin-block-start: 1em;
   margin-block-end: 1em;
-  line-height: 1.9;
+  line-height: var(--lh-body);
 }
 
 .prose a {
-  color: var(--tag-a-color);
+  color: var(--color-link);
   word-break: break-all;
 }
 
 .prose a:hover {
-  color: var(--tag-a-hover-color);
+  color: var(--color-link-hover);
 }
 
 .prose a:visited {
-  color: var(--tag-a-visited-color);
+  color: var(--color-link-visited);
 }
 
 .prose ul {
@@ -328,21 +361,21 @@ a:hover {
 }
 
 .prose ul li::marker {
-  color: var(--text-color);
+  color: var(--color-text);
 }
 
 .prose code:not([class]) {
   padding: 0 0.4em;
-  color: var(--tag-code-color);
-  background-color: var(--tag-code-background-color);
-  border-radius: 5px;
+  color: var(--color-code-inline-fg);
+  background-color: var(--color-code-inline-bg);
+  border-radius: var(--radius-sm);
 }
 
 .prose pre {
   background: var(--color-code-block-bg);
   color: var(--color-code-block-fg);
   padding: 1rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   overflow-x: auto;
   margin: 1rem 0;
 }
@@ -370,7 +403,7 @@ a:hover {
   width: auto;
   border-collapse: collapse;
   font-size: 0.95em;
-  line-height: 1.5;
+  line-height: var(--lh-list);
   word-break: normal;
   display: block;
   overflow: auto;
@@ -410,11 +443,11 @@ a:hover {
   position: relative;
   margin: 1.5rem 0;
   padding: 16px;
-  border-radius: 6px;
-  background: var(--message-warn-color);
-  border: 1px solid var(--message-warn-border-color);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
   font-size: 14.5px;
-  line-height: 1.6;
+  line-height: var(--lh-body);
 }
 
 .message > * {
@@ -523,8 +556,8 @@ a:hover {
 /* Article Content Wrapper */
 .article-content-wrapper {
   padding: 3rem 1rem;
-  background: var(--article-area-color);
-  border-radius: 15px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--article-area-border-color);
 }
 
@@ -537,7 +570,7 @@ a:hover {
 .article-thumbnail {
   height: auto;
   width: 100%;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
 
@@ -560,7 +593,7 @@ a:hover {
 
 /* Table of Contents */
 .toc {
-  background: var(--article-area-color);
+  background: var(--color-surface);
   max-height: 600px;
   overflow-y: auto;
   max-width: var(--layout-sidebar-w);
@@ -571,7 +604,7 @@ a:hover {
   border-radius: var(--radius-md);
   border: 1px solid var(--article-area-border-color);
   padding: var(--space-2);
-  line-height: 1.6em;
+  line-height: var(--lh-list);
 }
 
 .toc > ol.toc-list {
@@ -586,7 +619,7 @@ a:hover {
   top: 10px;
   bottom: 0;
   left: 2px;
-  border-radius: 0 0 5px 5px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
 .toc ol li {
@@ -616,14 +649,14 @@ a:hover {
   height: 6px;
   width: 6px;
   left: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 .toc ol ol ol li::before {
   height: 4px;
   width: 4px;
   left: 1px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 .toc a {
@@ -645,16 +678,16 @@ a:hover {
   width: 30px;
   height: 16px;
   display: inline-block;
-  border-radius: 46px;
+  border-radius: var(--radius-full);
   transition: 0.4s;
-  border: 1px solid #525457;
+  border: 1px solid var(--color-toggle-moon);
 }
 
 .dark-icon {
   position: absolute;
   width: 24px;
   height: 24px;
-  border-radius: 100%;
+  border-radius: var(--radius-full);
   top: -4px;
   transition: 0.2s;
   box-sizing: border-box;
@@ -691,7 +724,7 @@ a:hover {
 /* GitHub Embed Card */
 .github-embed-card {
   border: 1px solid var(--github-embed-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   margin: 1rem 0;
 }
@@ -782,7 +815,7 @@ a:hover {
   padding: 4px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--github-embed-meta);
   transition:
@@ -806,7 +839,7 @@ a:hover {
 
 .github-embed-check-icon {
   display: none;
-  color: #3fb950;
+  color: var(--color-success-icon);
 }
 
 .github-embed-copy.copied .github-embed-copy-icon {
@@ -826,25 +859,24 @@ a:hover {
 .code-block-filename-container {
   display: inline-block;
   padding: 6px 16px;
-  background: #2b303b;
-  border-radius: 6px 6px 0 0;
+  background: var(--color-code-tab-bg);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   font-size: 0.8rem;
-  font-family:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .code-block-filename {
-  color: #9da5b4;
+  color: var(--color-code-tab-fg);
 }
 
 .code-block-container pre {
   margin: 0;
   padding: 1rem;
-  border-radius: 0 6px 6px 6px;
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
 }
 
 .code-block-container pre[style] {
-  background: #2b303b;
+  background: var(--color-code-tab-bg);
 }
 
 /* Generic copy button for all pre elements */
@@ -860,7 +892,7 @@ a:hover {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  color: #9da5b4;
+  color: var(--color-code-tab-fg);
   opacity: 0.4;
   transition: opacity var(--motion-base);
 }
@@ -885,7 +917,7 @@ a:hover {
   transform: translateY(-50%);
   margin-right: 4px;
   font-size: 12px;
-  color: #3fb950;
+  color: var(--color-success-icon);
   white-space: nowrap;
   animation: float-up 0.8s ease-out forwards;
   pointer-events: none;
@@ -926,7 +958,7 @@ a:hover {
   display: block;
   position: relative;
   border: 1px solid var(--github-embed-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: visible;
   text-decoration: none;
   color: inherit;
@@ -937,7 +969,7 @@ a:hover {
 
 .link-card:hover {
   border-color: var(--github-embed-link);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-2);
 }
 
 .link-card:visited {
@@ -956,10 +988,10 @@ a:hover {
 .link-card-title {
   font-size: 0.95rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: var(--lh-heading);
   word-break: break-word;
   overflow-wrap: break-word;
-  color: var(--text-color);
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -969,7 +1001,7 @@ a:hover {
   color: var(--github-embed-meta);
   word-break: break-word;
   overflow-wrap: break-word;
-  line-height: 1.5;
+  line-height: var(--lh-heading);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -980,7 +1012,7 @@ a:hover {
   display: flex;
   align-items: stretch;
   overflow: hidden;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .link-card-image {
@@ -1011,10 +1043,9 @@ a:hover {
   margin: 6px 12px 8px;
   padding: 2px 8px;
   font-size: 0.7rem;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--github-embed-border);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-full);
 }
 
 [data-theme='dark'] .link-card-footer {

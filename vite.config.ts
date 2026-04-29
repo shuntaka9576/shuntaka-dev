@@ -3,6 +3,7 @@ import { defineConfig } from 'vite-plus';
 export default defineConfig({
   lint: {
     ignorePatterns: [
+      '.claude',
       '.legacy',
       '**/.venv',
       '**/cdk.out',
@@ -14,6 +15,7 @@ export default defineConfig({
       '**/out',
       '**/target',
       '**/next-env.d.ts',
+      '**/storybook-static',
     ],
     options: {
       typeAware: true,
@@ -30,6 +32,7 @@ export default defineConfig({
     ignorePatterns: [
       '**/*.json',
       '**/*.yaml',
+      '.claude',
       '.legacy',
       '**/.venv',
       '**/cdk.out',
@@ -42,6 +45,7 @@ export default defineConfig({
       '**/target',
       '**/next-env.d.ts',
       '**/node_modules/**',
+      '**/storybook-static',
     ],
     singleQuote: true,
   },

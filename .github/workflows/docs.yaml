@@ -6,6 +6,7 @@ on:
       - preview
     paths:
       - 'docs/**'
+      - 'apps/web/**'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/docs.yaml'
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -37,13 +38,24 @@ jobs:
         working-directory: docs
         run: uv python install
 
-      - name: Install dependencies
+      - name: Install Sphinx dependencies
         working-directory: docs
         run: uv sync
 
       - name: Build Sphinx documentation
         working-directory: docs
         run: uv run sphinx-build source build
+
+      - name: Setup node
+        uses: ./.github/actions/setup-node
+
+      - name: Build Storybook into docs/build/storybook/
+        env:
+          STORYBOOK_BASE_PATH: /shuntaka-dev/storybook/
+        run: |
+          bun --filter @shuntaka-dev/web build-storybook
+          mkdir -p docs/build/storybook
+          cp -r apps/web/storybook-static/. docs/build/storybook/
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

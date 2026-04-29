@@ -13,7 +13,8 @@
     ".legacy/**",
     "**/target/**",
     "**/__snapshots__/**",
-    "docs/source/incidents/**"
+    "docs/source/incidents/**",
+    "**/storybook-static/**"
   ],
   "language": "en",
   "words": [
@@ -21,6 +22,7 @@
     "bsky",
     "bunx",
     "apig",
+    "Classmethod",
     "dkerzyk",
     "applicationautoscaling",
     "autobuild",
@@ -49,7 +51,9 @@
     "elasticloadbalancingv",
     "elisp",
     "elbv",
+    "glassmorphism",
     "hashi",
+    "Hiragino",
     "hexdigit",
     "hozi",
     "iconify",
@@ -85,6 +89,7 @@
     "oxlintrc",
     "pgdg",
     "pgpassword",
+    "prioritises",
     "pkey",
     "plpgsql",
     "psql",
