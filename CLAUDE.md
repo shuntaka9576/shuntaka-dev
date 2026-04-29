@@ -31,8 +31,6 @@ docs/             # Sphinx ドキュメント (Python/uv)
 
 環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_development.md` を参照。
 
-フロントエンド（`apps/web`）のデザインシステム（色・タイポグラフィ・コンポーネント規約・Do/Don't）は `apps/web/DESIGN.md` を参照。新しい色・サイズ・コンポーネントを追加したらこのファイルも更新すること。
-
 ## Commands
 
 ```bash

@@ -34,7 +34,7 @@
   --github-embed-link: #0969da;
   --github-embed-meta: #656d76;
 
-  /* === Semantic design tokens (see apps/web/DESIGN.md) === */
+  /* === Semantic design tokens === */
   --color-bg: var(--bg-color);
   --color-surface: var(--article-area-color);
   --color-surface-raised: var(--header-color);
