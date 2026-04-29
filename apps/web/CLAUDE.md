@@ -29,8 +29,8 @@ shuntaka.dev の本番フロントエンド。Next.js 16 + React 19 + Tailwind C
 
 - 単一アクセント色: `#e4007f`（`--color-accent`）。他のアクセントを増やさない
 - グラデーション禁止、静止カードへの drop-shadow 禁止
-- UI に絵文字を入れない（mascot ochaIcon 🍵 のみが視覚的アクセント）
-- 本文 line-height は `1.9`、見出し `1.4`、リスト `1.7`
+- UI に絵文字を入れない（mascot `ochaIcon` フルカラー SVG のみが視覚的アクセント）
+- 本文 line-height は `--lh-body`、見出し `--lh-heading`、リスト `--lh-list`（実値は `globals.css`）
 - 日付は常に `YYYY/MM/DD`
 - nav / tab ラベルは小文字（`tech`、`note`、`who?`）
 - Tailwind preset 色クラス（`bg-blue-500` 等）禁止 → CSS 変数を使う
