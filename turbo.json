@@ -71,6 +71,18 @@
       "inputs": ["src/**"],
       "cache": true
     },
+    "build-storybook": {
+      "dependsOn": [],
+      "inputs": ["src/**", ".storybook/**", "package.json"],
+      "outputs": ["storybook-static/**"],
+      "cache": true,
+      "passThroughEnv": ["STORYBOOK_BASE_PATH"]
+    },
+    "storybook": {
+      "dependsOn": [],
+      "cache": false,
+      "persistent": true
+    },
     "clean": {
       "cache": false
     }

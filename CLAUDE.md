@@ -31,6 +31,8 @@ docs/             # Sphinx ドキュメント (Python/uv)
 
 環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_development.md` を参照。
 
+apps/web の作業時は `apps/web/CLAUDE.md` を参照（workspace 専用ガイド + ブランド仕様 `apps/web/DESIGN.md`）。
+
 ## Commands
 
 ```bash
