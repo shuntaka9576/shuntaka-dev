@@ -1,179 +1,179 @@
-# shuntaka.dev Design System
+# shuntaka.dev デザインシステム
 
-A design system for **shuntaka.dev** — a quiet, reading-first Japanese tech blog by **髙橋俊一 (a.k.a. shuntaka)**. The brand is built around a single visual mascot, the **matcha tea cup (ochaIcon)** 🍵, a single accent color (**magenta-pink `#e4007f`**), and a GitHub-Dark-flavored dark mode.
+**shuntaka.dev**（髙橋俊一 / shuntaka による、読み物中心の静かな日本語テックブログ）のデザインシステム。ブランドは 1 つのマスコット **抹茶カップ (ochaIcon)** 🍵、1 色のアクセント **マゼンタピンク `#e4007f`**、そして GitHub-Dark 風のダークモードで構成される。
 
-## Source materials
+## 仕様の出どころ
 
-- **Source of truth** — this file (rules + voice) plus `src/app/globals.css` (token implementation).
-- **Visual catalog** — `apps/web/.storybook/` (run `bun run storybook`); deployed to GitHub Pages on `main` merge.
-- **Figma** (`shuntaka.dev.fig`) — early concept frames showing logo studies, share-button OGPs, MacBook Pro list view, search/tag view, and the Timeline reading-history widget. The Figma is _concept fidelity_ — the codebase is the source of truth where they conflict.
+- **Source of truth** — このファイル（ルール + voice）と `src/app/globals.css`（トークン実装）。
+- **視覚カタログ** — `apps/web/.storybook/`（`bun run storybook` で起動）。`main` マージで GitHub Pages に自動デプロイ。
+- **Figma**（`shuntaka.dev.fig`）— ロゴ検討、シェアボタン OGP、MacBook Pro 一覧ビュー、検索 / タグビュー、Timeline 読書履歴ウィジェットなどの初期コンセプト。Figma は _コンセプト精度_ であり、衝突した場合はコードベースが正。
 
-## Brand context
+## ブランドコンテキスト
 
-shuntaka.dev is the personal tech blog of a Japanese software engineer (currently at Classmethod). It hosts **tech**, **note**, and **who?** sections; articles are written in Markdown and converted server-side (Rust + comrak + syntect). The reader experience prioritises:
+shuntaka.dev は、日本人ソフトウェアエンジニア（現在クラスメソッド所属）の個人テックブログ。**tech**、**note**、**who?** の 3 セクション構成で、記事は Markdown で書かれサーバーサイド（Rust + comrak + syntect）で HTML に変換される。読書体験で重視するのは：
 
-- **Long-form readability** over flashy chrome
-- **Code blocks, link cards, and embeds** as the visual centerpiece (not photography)
-- A single calm accent — magenta — used only as a brand mark or a focused state
+- 派手な装飾より **長文の読みやすさ**
+- 写真ではなく **コードブロック・リンクカード・埋め込み** を視覚の中心に
+- マゼンタというただ 1 つの落ち着いたアクセント色（ブランドマークまたはフォーカス状態のみで使用）
 
-Sister project: `blog.hozi.dev` (legacy frontend). The matcha cup mascot appears on both.
-
----
-
-## Content fundamentals
-
-The blog is **bilingual but Japanese-first**. UI labels and microcopy mix lowercase English nouns (`tech`, `note`, `who?`, `Career`, `Like`) with Japanese body text. The voice is engineer-to-engineer: factual, low-frill, often listing tech stacks without commentary.
-
-- **Voice & person.** Third-person and impersonal (no "I"/"you"). Author bio simply lists `Career` and `Like`. No marketing copy.
-- **Casing.** Tab labels are lowercase (`tech`, `note`, `who?`). Site title is lowercase too (`shuntaka.dev`). Headings within articles follow Japanese sentence case — no Title Case.
-- **Punctuation.** `who?` is the only punctuated nav item — adds a touch of whimsy in an otherwise restrained interface.
-- **Dates.** Always `YYYY/MM/DD` (e.g. `2021/03/12`) in Japanese locale. Article timestamps add `MM/DD HH:mm YYYY`.
-- **Tags.** Hash-prefixed (`#NestJS`, `#Rust`). Tag chip shape: rounded rectangle, 1px black border, no fill.
-- **Emoji.** Used **sparingly** in commit/PR titles (🍵, 🍞, 🍙, 📝) but **never** in product UI. Do not introduce emoji into the UI; the mascot already carries the warmth.
-- **Numbers / stats.** None. The blog never advertises view counts, follower counts, or "trending" badges. Avoid data slop.
-- **Tone samples**
-  - `No articles found.` — empty state
-  - `ライトモードに切り替え` / `ダークモードに切り替え` — accessible labels
-  - `Posted on blog.hozi.dev/ 1 days ago` — timeline records
-  - `Career` `201204 TDU EC` `201604 株式会社QUICK` — bio entries (date-prefixed, terse)
-- **Don't.** No "Welcome!" headers, no "Subscribe to my newsletter" CTAs, no emoji buttons, no exclamation marks in prose.
+兄弟プロジェクト：`blog.hozi.dev`（レガシーフロントエンド）。抹茶カップのマスコットは両方に登場する。
 
 ---
 
-## Visual foundations
+## コンテンツの基本
+
+ブログは **バイリンガルだが日本語ファースト**。UI ラベルやマイクロコピーは小文字英単語（`tech`, `note`, `who?`, `Career`, `Like`）と日本語本文を混ぜる。voice はエンジニア向けに事実ベース、装飾を抑え、技術スタックを淡々と並べる文体。
+
+- **Voice / 人称.** 三人称・非人称（"I" や "you" は使わない）。プロフィールも `Career` と `Like` を並べるだけ。マーケティングコピーは書かない。
+- **大文字小文字.** タブラベルは小文字（`tech`, `note`, `who?`）。サイトタイトルも小文字（`shuntaka.dev`）。記事内の見出しは日本語の文章ケース、Title Case にしない。
+- **句読点.** `who?` だけがナビ唯一の句読点付きラベルで、抑制的な UI に少しの遊び心を加える。
+- **日付.** 常に `YYYY/MM/DD`（例: `2021/03/12`）の日本語ロケール。記事タイムスタンプは `MM/DD HH:mm YYYY` を追加する。
+- **タグ.** ハッシュ前置き（`#NestJS`, `#Rust`）。タグチップ形状：角丸長方形、1px 黒ボーダー、塗りなし。
+- **絵文字.** コミット / PR タイトルでは **控えめに** 使う（🍵, 🍞, 🍙, 📝）が、プロダクト UI では **絶対に使わない**。マスコットがすでにあたたかみを担っているので UI に絵文字を入れない。
+- **数字 / 統計.** 出さない。閲覧数・フォロワー数・「トレンド」バッジなどはブログに表示しない。data slop を避ける。
+- **トーン例**
+  - `No articles found.` — 空状態
+  - `ライトモードに切り替え` / `ダークモードに切り替え` — アクセシブルラベル
+  - `Posted on blog.hozi.dev/ 1 days ago` — Timeline レコード
+  - `Career` `201204 TDU EC` `201604 株式会社QUICK` — 略式の日付前置き bio エントリ
+- **Don't.** "Welcome!" 見出しなし、"Subscribe to my newsletter" CTA なし、絵文字ボタンなし、本文の感嘆符なし。
+
+---
+
+## ビジュアル基盤
 
 ### Color
 
-- **Light:** off-white `#f7fafc` page on `#ffffff` surfaces; nearly-white `#fffefc` for the header. Body text `#525457` — a warm dark grey, **not** pure black.
-- **Dark:** GitHub-Dark navy. `#22272e` page, `#2d333b` raised, body `#c9d5e1`.
-- **Accent:** **`#e4007f`** magenta-pink. Used for: the dark-mode toggle ON track, the NProgress bar, focus-visible outline, and the danger callout border. **Never** for body text, **never** as a fill on cards.
-- **Borders:** `#c4c4c4` for general; `rgba(162,177,202,0.3)` for the article-list under-line — almost invisible, just a typographic baseline.
+- **Light:** オフホワイト `#f7fafc` をページ背景に、`#ffffff` をサーフェスに、ヘッダーはほぼ白の `#fffefc`。本文テキストは `#525457` の暖色寄りダークグレー（純黒では **ない**）。
+- **Dark:** GitHub-Dark のネイビー。`#22272e` ページ、`#2d333b` 持ち上げ、本文 `#c9d5e1`。
+- **Accent:** **`#e4007f`** マゼンタピンク。用途：ダークモードトグル ON のトラック、NProgress バー、focus-visible アウトライン、danger callout のボーダー。本文テキストには **絶対** 使わない、カードの fill にも **絶対** 使わない。
+- **Borders:** 一般用途は `#c4c4c4`、記事リスト下線は `rgba(162,177,202,0.3)`（ほぼ見えない、タイポグラフィのベースライン的な存在）。
 
 ### Typography
 
-- **English:** Roboto (400/700) — loaded via `next/font/google`, exposed as `--font-roboto`.
-- **Japanese:** Noto Sans JP — exposed as `--font-noto-sans-jp`. (Figma drafts use Hiragino Sans; the production build uses Noto Sans JP because Hiragino is macOS-only.)
-- **Mono:** system stack (`ui-monospace, SFMono-Regular, …`).
-- **Scale (rem-based, 1rem = 16px).** `display 32 / h1 27 / h2 24 / h3 20 / h4 18 / body-lg 16 / body 15 / caption 13 / code 14`.
-- **Line-height.** Body `1.9` (generous — reading ergonomics). Headings `1.4`. Lists `1.7`.
-- **No `em`/`px` mixing.** Type uses `rem`; layout uses `px` or layout tokens.
-- **`<strong>` is the only emphasis.** No colored emphasis, no all-caps, no letter-spacing tweaks.
+- **英語:** Roboto (400/700) — `next/font/google` で読み込み、`--font-roboto` で公開。
+- **日本語:** Noto Sans JP — `--font-noto-sans-jp` で公開。（Figma 下書きは Hiragino Sans を使うが、本番は macOS 限定を避けて Noto Sans JP）
+- **Mono:** システムスタック（`ui-monospace, SFMono-Regular, …`）。
+- **スケール（rem ベース、1rem = 16px）.** `display 32 / h1 27 / h2 24 / h3 20 / h4 18 / body-lg 16 / body 15 / caption 13 / code 14`。
+- **行高.** 本文 `1.9`（読書体験のため大きめ）。見出し `1.4`。リスト `1.7`。
+- **`em` と `px` を混ぜない.** タイポは `rem`、レイアウトは `px` またはレイアウトトークン。
+- **強調は `<strong>` のみ.** 着色強調・全大文字・letter-spacing いじりはしない。
 
-### Backgrounds
+### 背景
 
-- **No imagery.** No hero photos, no full-bleed gradients, no patterns, no grain. Surfaces are flat `#fff` (light) or flat navy (dark).
-- **No gradients** anywhere. The system explicitly rejects "rainbow gradients, neon shadows".
-- **Article wrapper** is a flat `#fff` panel with `15px` corner radius, `1px` subtle border.
+- **画像なし.** ヒーロー写真・全画面グラデーション・パターン・グレインはなし。サーフェスはフラット `#fff`（light）またはフラットネイビー（dark）。
+- **グラデーション禁止.** "rainbow gradients, neon shadows" は明示的に拒絶される。
+- **記事ラッパー** はフラット `#fff` パネル、コーナー半径 `15px`、subtle な 1px ボーダー。
 
-### Borders & corners
+### ボーダー / 角
 
-- **Radii: 4 levels.** `4px` (buttons, tags), `10px` (cards, thumbnails), `15px` (article wrapper), `9999px` (toggle, circular icons).
-- **Borders are 1px solid.** Color usually `--color-border` or its `subtle` sibling. No double borders, no dashed.
+- **半径は 4 段階.** `4px`（ボタン、タグ）、`10px`（カード、サムネイル）、`15px`（記事ラッパー）、`9999px`（トグル、円形アイコン）。
+- **ボーダーは 1px solid のみ.** 色は通常 `--color-border` または `subtle` 兄弟。double / dashed なし。
 
-### Shadows / elevation
+### 影 / elevation
 
-- The production CSS uses **one** real shadow: `0 2px 8px rgba(0,0,0,0.10)` on `link-card:hover`.
-- A 4-step elevation token set is reserved (`--shadow-0`…`--shadow-3`) for future modals/popovers but is currently unused.
-- **Don't** add drop shadows to cards at rest. The system reads as flat-by-default.
+- 本番 CSS で実際に使う影は **1 つだけ**：`link-card:hover` の `0 2px 8px rgba(0,0,0,0.10)`。
+- 4 段階の elevation トークン（`--shadow-0`…`--shadow-3`）は将来のモーダル / ポップオーバー用に予約済みだが、現状未使用。
+- **静止状態のカードに drop-shadow を追加しない.** システムは flat-by-default で読まれる。
 
 ### Motion
 
-- **Tokens:** `--motion-fast 150ms / --motion-base 250ms / --motion-slow 400ms`. Easing is browser-default (linear / ease).
-- **Used for:** copy-button opacity (`0.4 → 1.0`), link-card border-color & shadow, NProgress bar.
-- **No bounces, no spring, no entrance animations** on page load. The blog is meant to feel "instant".
+- **トークン:** `--motion-fast 150ms / --motion-base 250ms / --motion-slow 400ms`。easing はブラウザデフォルト（linear / ease）。
+- **用途:** copy ボタンの opacity（`0.4 → 1.0`）、link-card の border-color と shadow、NProgress バー。
+- **bounce / spring / ページロード時のエントランスアニメーションなし.** ブログは「即座に表示される」感じを目指す。
 
 ### Hover / press / focus
 
-- **Hover.** Change _one_ property by one step — usually `filter: brightness(95%)` for buttons, or a border-color swap for link cards.
-- **Focus-visible.** Universal `outline: 2px solid var(--color-accent); outline-offset: 2px;` — applied to every `a`, `button`, `[role="button"]`, input, summary in `globals.css`. Critical accessibility primitive.
-- **Active.** `filter: brightness(90%)` for buttons.
-- **Disabled.** `opacity: 0.5; pointer-events: none;` + `aria-disabled="true"`.
+- **Hover.** 1 つのプロパティを 1 段階だけ変える — ボタンは `filter: brightness(95%)`、リンクカードは border-color を入れ替える程度。
+- **Focus-visible.** 全要素共通の `outline: 2px solid var(--color-accent); outline-offset: 2px;` を `globals.css` で `a`、`button`、`[role="button"]`、input、summary に当てる。アクセシビリティの基盤。
+- **Active.** ボタンは `filter: brightness(90%)`。
+- **Disabled.** `opacity: 0.5; pointer-events: none;` + `aria-disabled="true"`。
 
-### Layout rules
+### レイアウトルール
 
-- Single `--layout-max: 1200px` outer column, centered. Article list inside is capped to `--layout-list-max: 600px`.
-- Article page = `flex justify-between` of a left content column + `296px` sticky right TOC sidebar; sidebar collapses below `lg`.
-- Sticky TOC offset is computed: `top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5))` — never magic numbers.
-- Footer is `position: absolute; bottom: 0;` with reserved `58px` of bottom padding on the body. Header is **not** sticky.
-- **No `display: grid`** in the codebase today. Multi-column layouts use Flex + `gap`.
+- 外側は `--layout-max: 1200px` の単一カラム中央寄せ。記事一覧は `--layout-list-max: 600px` で内側を絞る。
+- 記事ページ = 左コンテンツ + `296px` 固定の右 TOC サイドバーを `flex justify-between` で並べる。`lg` 以下でサイドバーは折りたたまれる。
+- TOC の sticky オフセットは `top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5))` で計算する。マジックナンバー禁止。
+- フッターは `position: absolute; bottom: 0;` で body 下部に `58px` の余白を予約。ヘッダーは sticky **にしない**。
+- **`display: grid` を使わない.** マルチカラムは Flex + `gap`。
 
-### Transparency & blur
+### 透過 / blur
 
-- **None.** No `backdrop-filter`, no glassmorphism, no semi-transparent overlays. The TOC's `is-active` track uses an opacity-based color (`#57595b87`) but that's it.
+- **使わない.** `backdrop-filter` なし、glassmorphism なし、半透明オーバーレイなし。TOC の `is-active` トラックで opacity ベースの色（`#57595b87`）を使うのが唯一の例外。
 
-### Imagery vibe
+### イメージの雰囲気
 
-- Article thumbnails are user-supplied OGP images, treated as content. Container: `150×100`, `object-cover`, `10px` radius, `loading="lazy"`. No filters, no tints, no overlays.
+- 記事サムネは user 提供の OGP 画像をコンテンツとして扱う。コンテナ：`150×100`、`object-cover`、`10px` radius、`loading="lazy"`。フィルタ・ティント・オーバーレイなし。
 
-### What this system rejects
+### このシステムが拒絶するもの
 
-- Rainbow / blue-purple gradients
-- Neon shadows
-- Emoji-laden UI
-- Cards with rounded corners + colored left-border accent
-- Tailwind preset palette (`bg-blue-500`, `text-red-500`) — banned in favour of CSS variables
-- Hardcoded inline `style={{ color: '#…' }}` — banned
+- レインボー / 青紫グラデーション
+- ネオン影
+- 絵文字まみれの UI
+- 角丸 + 着色レフトボーダーアクセントのカード
+- Tailwind プリセットパレット（`bg-blue-500`, `text-red-500`）— CSS 変数を使う方針なので禁止
+- インラインの `style={{ color: '#…' }}` ハードコード — 禁止
 
 ---
 
-## Iconography
+## アイコン
 
-**Approach.** A small, hand-curated set of single-color SVGs sits in `public/assets/`. There is **no icon font** and **no icon library** (no Lucide, no Heroicons). When new icons are needed, copy the existing ones in style: a single fill or stroke, no gradients, no multi-color glyphs.
+**方針.** `public/assets/` に小規模な手作りの単色 SVG セットがある。アイコンフォントもアイコンライブラリも使わない（Lucide も Heroicons も使わない）。新しいアイコンが必要なときは既存のスタイルに合わせる：単一 fill or stroke、グラデーション禁止、多色グリフ禁止。
 
-### Mascot — `ochaIcon` 🍵
+### マスコット — `ochaIcon` 🍵
 
-A friendly matcha cup with a smile. It's the brand mark; it appears as the favicon, the timeline-record bullet, the logo on the marketing concept, and the social-link "homepage" icon. **Always full-color** (matcha green body `#6e9050`, foam `#bde030`, blush cheeks `#fff9f9`). Do not invert it, do not recolor it.
+笑顔の抹茶カップ。これがブランドマーク。favicon、Timeline レコードの bullet、マーケティングコンセプトのロゴ、ソーシャルリンクの「homepage」アイコンとして登場する。**常にフルカラー**（抹茶ボディ `#6e9050`、フォーム `#bde030`、頬 `#fff9f9`）。反転したり再着色したりしない。
 
-### Social-link glyphs
+### ソーシャルリンクのグリフ
 
-Single-color brand marks (`#525457` in light, `#c9d5e1` in dark via container `color: inherit`). All sized to a `24×24` box.
+単色ブランドマーク（light: `#525457`、dark: `#c9d5e1`、コンテナの `color: inherit` で切替）。すべて `24×24` ボックスサイズ。
 
-| File                         | Service                                   |
-| ---------------------------- | ----------------------------------------- |
-| `public/assets/github.svg`   | GitHub (`shuntaka9576`)                   |
-| `public/assets/x.svg`        | X / Twitter (`shuntaka_dev`)              |
-| `public/assets/zenn.svg`     | Zenn (`shuntaka`)                         |
-| `public/assets/sd.svg`       | SpeakerDeck                               |
-| `public/assets/devio.svg`    | DevelopersIO (Classmethod author profile) |
-| `public/assets/bluesky.svg`  | Bluesky                                   |
-| `public/assets/ochaIcon.svg` | the personal site itself                  |
+| ファイル                     | サービス                                     |
+| ---------------------------- | -------------------------------------------- |
+| `public/assets/github.svg`   | GitHub (`shuntaka9576`)                      |
+| `public/assets/x.svg`        | X / Twitter (`shuntaka_dev`)                 |
+| `public/assets/zenn.svg`     | Zenn (`shuntaka`)                            |
+| `public/assets/sd.svg`       | SpeakerDeck                                  |
+| `public/assets/devio.svg`    | DevelopersIO（Classmethod 著者プロフィール） |
+| `public/assets/bluesky.svg`  | Bluesky                                      |
+| `public/assets/ochaIcon.svg` | 個人サイト本体                               |
 
-### Functional glyphs
+### 機能アイコン
 
-Inlined SVG paths, not imported as files:
+ファイルとしてではなく、SVG パスをインライン埋め込みする：
 
-- **Toggle moon/sun** (in `ToggleSwitch.tsx`) — moon `circle` + sun `path` SVG, paired with a sliding pill knob.
-- **Copy button** (in `globals.css` + `ArticleContent.tsx` injected DOM) — clipboard glyph.
-- **GitHub-embed copy / check** — same family as the copy button.
+- **トグルの月 / 太陽**（`ToggleSwitch.tsx`）— moon `circle` + sun `path` SVG をスライド式 pill ノブと組み合わせ。
+- **コピーボタン**（`globals.css` + `ArticleContent.tsx` の DOM 注入）— クリップボードグリフ。
+- **GitHub-embed のコピー / チェック** — コピーボタンと同系列。
 
 ### `404.svg`
 
-A custom illustrated `404` mark used on the 404 page (and once in the Figma marketing frame).
+404 ページで使う、独自にイラスト化された 404 マーク（Figma マーケティングフレームでも一度使われている）。
 
-### Emoji & unicode
+### 絵文字 / unicode
 
-- **Not used in product UI.** The `who?` page punctuation is the only typographic flourish.
-- Used only in commit messages / repo READMEs (🍵 🍞 🍙 ✨ 📝).
+- **プロダクト UI では使わない.** `who?` ページの句読点だけが唯一のタイポグラフィの遊び。
+- コミットメッセージ / リポジトリ README でだけ使う（🍵 🍞 🍙 ✨ 📝）。
 
-### Substitutions
+### 代替
 
-None — the production icon set is small enough to use entirely. If you need a glyph not in `public/assets/`, prefer **Lucide** (matching stroke style: 1.5px, no fill) and flag the substitution in the PR description.
-
----
-
-## CAVEATS
-
-- **Fonts.** Production uses `next/font` for Roboto + Noto Sans JP, exposed as `--font-roboto` and `--font-noto-sans-jp`. No CDN dependency; `next/font` self-hosts subsets at build time.
-- **Hiragino Sans (Figma) → Noto Sans JP (production).** The Figma file lists Hiragino Sans because it's the macOS default; we use Noto Sans JP everywhere because it ships everywhere. Treat the two as visually equivalent.
-- **Dark mode.** Tokens are wired up via `[data-theme='dark']` on `<html>`, toggled by `ToggleSwitch`. The `prefers-color-scheme: dark` media query is also honored when no explicit theme is saved.
+なし — 本番アイコンセットは小さく、すべてそのまま使える。`public/assets/` に無いグリフが必要な場合は **Lucide**（stroke スタイル：1.5px、塗りなし）を優先し、PR description で代替したことを明記する。
 
 ---
 
-## Implementation pointers
+## 留意点
 
-- **Token implementation.** All design tokens (colors, spacing, radius, line-height, type scale, motion, shadows) live in `src/app/globals.css`. Light values are in `:root`, dark overrides in `[data-theme='dark']` and the `prefers-color-scheme: dark` block.
-- **Visual catalog.** `apps/web/.storybook/` hosts Storybook (Storybook 10 + `@storybook/nextjs-vite`). Stories cover real production components and token swatches.
-  - Run locally: `bun run storybook` (`http://localhost:6006`)
-  - Static build: `bun run build-storybook` → `apps/web/storybook-static/`
-  - Deploy: pushes to `main` trigger `.github/workflows/deploy-storybook.yaml`, which publishes to GitHub Pages with `STORYBOOK_BASE_PATH=/<repo>/`.
-- **Components.** `src/components/*.tsx` is the canonical UI. When introducing a new visual element, prefer extending an existing component or adding a new Story over hand-rolling raw HTML.
+- **フォント.** 本番は `next/font` で Roboto + Noto Sans JP を読み込み、`--font-roboto` / `--font-noto-sans-jp` として公開する。CDN 依存はなく、`next/font` がビルド時にサブセットをセルフホスト。
+- **Hiragino Sans (Figma) → Noto Sans JP（本番）.** Figma が macOS デフォルトの Hiragino Sans を表示しているのは見た目確認用。本番は環境を問わず動く Noto Sans JP を使う。視覚的にはほぼ等価とみなす。
+- **Dark mode.** トークンは `<html>` の `[data-theme='dark']` で切り替わり、`ToggleSwitch` がそれを操作する。明示的な theme が保存されていないとき `prefers-color-scheme: dark` も尊重する。
+
+---
+
+## 実装ポインタ
+
+- **トークン実装.** すべてのデザイントークン（color、spacing、radius、line-height、type scale、motion、shadow）は `src/app/globals.css` にある。Light の値は `:root` に、Dark の上書きは `[data-theme='dark']` と `prefers-color-scheme: dark` ブロックに置く。
+- **視覚カタログ.** `apps/web/.storybook/` に Storybook（Storybook 10 + `@storybook/nextjs-vite`）を置く。Story は本番コンポーネントとトークンのスウォッチをカバーする。
+  - ローカル起動: `bun run storybook`（`http://localhost:6006`）
+  - 静的ビルド: `bun run build-storybook` → `apps/web/storybook-static/`
+  - デプロイ: `main` への push で `.github/workflows/docs.yaml` がトリガーされ、Sphinx docs と同じ artifact に同梱されて GitHub Pages に公開される（`STORYBOOK_BASE_PATH=/shuntaka-dev/storybook/`）。
+- **コンポーネント.** `src/components/*.tsx` が UI の正本。新しい視覚要素を作るときは生 HTML を書くより、既存コンポーネントを拡張するか新しい Story を追加することを優先する。
