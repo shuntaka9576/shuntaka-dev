@@ -5,7 +5,7 @@ use api::route::webhooks::build_webhooks_routers;
 use registry::{AppRegistry, WebhookConfig};
 use std::net::{Ipv4Addr, SocketAddr};
 
-use adapter::database::{connect_database_with, spawn_refresh_task};
+use adapter::database::connect_database_with;
 use anyhow::{Error, Result};
 use axum::Router;
 use shared::config::AppConfig;
@@ -31,7 +31,6 @@ async fn bootstrap() -> Result<()> {
 
     let app_config = AppConfig::new()?;
     let pool = connect_database_with(&app_config.database).await?;
-    let _refresh_handle = spawn_refresh_task(pool.clone());
 
     let webhook_config = WebhookConfig {
         github_app_id: app_config.webhook.github_app_id,
