@@ -30,6 +30,7 @@ sqlx = { version = "0.8.6", features = [
   "postgres",
   "migrate",
 ] }
+aurora-dsql-sqlx-connector = { version = "0.1.2", features = ["pool"] }
 tokio = { version = "1.52.0", features = ["full"] }
 async-trait = "0.1.89"
 derive-new = "0.7.0"
@@ -42,7 +43,6 @@ serde_yaml = "0.9.34"
 uuid = { version = "1.23.0", features = ["serde", "v4"] }
 chrono = { version = "0.4.44", features = ["serde"] }
 aws-config = "1.8.15"
-aws-sdk-dsql = "1.54.0"
 aws-sdk-ssm = "1.108.0"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }

@@ -13,7 +13,7 @@ pub struct HealthCheckRepositoryImpl {
 impl HealthCheckRepository for HealthCheckRepositoryImpl {
     async fn check_db(&self) -> bool {
         sqlx::query("SELECT 1")
-            .fetch_one(&self.db.pool().await)
+            .fetch_one(&self.db.pool())
             .await
             .is_ok()
     }

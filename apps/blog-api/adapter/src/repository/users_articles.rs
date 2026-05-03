@@ -92,7 +92,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         )
         .bind(article_type.as_str())
         .bind(user_name)
-        .fetch_all(&self.db.pool().await)
+        .fetch_all(&self.db.pool())
         .await?;
 
         rows.into_iter().map(Article::try_from).collect()
@@ -125,7 +125,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         )
         .bind(slug)
         .bind(user_name)
-        .fetch_optional(&self.db.pool().await)
+        .fetch_optional(&self.db.pool())
         .await?;
 
         row.map(Article::try_from).transpose()
