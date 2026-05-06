@@ -59,7 +59,7 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <GoogleTagManager />
       <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/400.css`} precedence="default" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/300.css`} precedence="default" />
       <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/700.css`} precedence="default" />
       <body>
         <GoogleTagManagerNoscript />
