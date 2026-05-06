@@ -24,8 +24,8 @@ export const ArticleCard = memo(function ArticleCard({ article, userName }: Arti
       <article className="mb-4 block w-full border-b border-[var(--color-border-subtle)]">
         <div className="mb-2 flex justify-between">
           <div>
-            <div className="pt-2 pr-2 pb-4 text-base">{article.title}</div>
-            <div className="text-xs">{formatDate(article.publishedAt)}</div>
+            <div className="pt-2 pr-2 pb-4 text-base font-normal">{article.title}</div>
+            <div className="text-xs font-light">{formatDate(article.publishedAt)}</div>
           </div>
           {article.thumbnail && (
             <div>

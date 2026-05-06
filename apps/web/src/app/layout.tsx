@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_JP, Roboto } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -9,18 +8,8 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
-const roboto = Roboto({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-  variable: '--font-roboto',
-});
-
-const notoSansJP = Noto_Sans_JP({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-noto-sans-jp',
-});
+const GEN_INTERFACE_JP_VERSION = '0.1.1';
+const GEN_INTERFACE_JP_BASE = `https://cdn.jsdelivr.net/npm/gen-interface-jp@${GEN_INTERFACE_JP_VERSION}`;
 
 const OG_IMAGE_URL =
   'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png';
@@ -67,12 +56,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ja"
-      className={`${roboto.variable} ${notoSansJP.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="ja" suppressHydrationWarning>
       <GoogleTagManager />
+      <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/300.css`} precedence="default" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/400.css`} precedence="default" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/500.css`} precedence="default" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/600.css`} precedence="default" />
+      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/700.css`} precedence="default" />
       <body>
         <GoogleTagManagerNoscript />
         <ThemeProvider>

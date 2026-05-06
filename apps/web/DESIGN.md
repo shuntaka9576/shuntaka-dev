@@ -29,10 +29,21 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### Typography
 
-- **英語:** Roboto (400/700) — `next/font/google` で読み込み、`--font-roboto` で公開。
-- **日本語:** Noto Sans JP — `--font-noto-sans-jp` で公開。（Figma 下書きは Hiragino Sans を使うが、本番は macOS 限定を避けて Noto Sans JP）
+- **本文 / 見出し:** [Gen Interface JP](https://gen.typesetting.jp/)（300 / 400 / 500 / 600 / 700 の 5 weight）。Inter（欧文）と Noto Sans JP（和文）を合成した OFL ライセンスの UI 書体で、欧文と和文を 1 ファミリーで賄う。jsDelivr CDN（`https://cdn.jsdelivr.net/npm/gen-interface-jp@<version>/{300,400,500,600,700}.css`）から読み込み、Google Fonts と同じ unicode-range サブセット化により必要な woff2 だけが動的にロードされる。CSS 上は `font-family: 'Gen Interface JP', …` として参照。
 - **Mono:** システムスタック（`ui-monospace, SFMono-Regular, …`）。
 - **スケール.** 9 段階の `--fs-display` / `--fs-h1` / `--fs-h2` / `--fs-h3` / `--fs-h4` / `--fs-body-lg` / `--fs-body` / `--fs-caption` / `--fs-code`。実値は `globals.css` と Storybook `Design System/Tokens` を参照。
+- **Weight ladder.** 5 段階のトークン `--fw-light` (300) / `--fw-regular` (400) / `--fw-medium` (500) / `--fw-semibold` (600) / `--fw-bold` (700)。要素ごとの割り当ては以下:
+
+  | 要素                                                                                          | Weight                |
+  | --------------------------------------------------------------------------------------------- | --------------------- |
+  | body / `.prose p` / `.prose li` / `.prose blockquote` / `.prose code` / nav タブ / 一覧の日付 | 300 (`--fw-light`)    |
+  | `.prose h3`〜`.prose h6` / 一覧の記事タイトル                                                 | 400 (`--fw-regular`)  |
+  | `.prose h1`, `.prose h2` / Button                                                             | 500 (`--fw-medium`)   |
+  | `.link-card-title` / ロゴ「shuntaka.dev」                                                     | 600 (`--fw-semibold`) |
+  | `.article-title` / `strong`                                                                   | 700 (`--fw-bold`)     |
+
+  body は Light で読み物寄り、見出しは 400–500 の細やかな段階で立ち上げる。最強調（700）は記事冒頭タイトルと `<strong>` のみで、見出しを含む他の要素は控えめに保つ。font-weight は数値リテラルではなく必ず `var(--fw-*)` または対応する Tailwind の `font-*` クラスで参照する。
+
 - **行高.** 本文 `--lh-body`（読書体験のため大きめ）。見出し `--lh-heading`。リスト `--lh-list`。
 - **`em` と `px` を混ぜない.** タイポは `rem`、レイアウトは `px` またはレイアウトトークン。
 - **強調は `<strong>` のみ.** 着色強調・全大文字・letter-spacing いじりはしない。
@@ -147,8 +158,8 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ## 留意点
 
-- **フォント.** 本番は `next/font` で Roboto + Noto Sans JP を読み込み、`--font-roboto` / `--font-noto-sans-jp` として公開する。CDN 依存はなく、`next/font` がビルド時にサブセットをセルフホスト。
-- **Hiragino Sans (Figma) → Noto Sans JP（本番）.** Figma が macOS デフォルトの Hiragino Sans を表示しているのは見た目確認用。本番は環境を問わず動く Noto Sans JP を使う。視覚的にはほぼ等価とみなす。
+- **フォント.** 本番は `apps/web/src/app/layout.tsx` の `<head>` に jsDelivr の `<link rel="stylesheet">` を 2 本（400 / 700）読み込ませている。書体名は `Gen Interface JP` で、`globals.css` の `body { font-family: 'Gen Interface JP', … }` から参照する。和文グリフの中身は Noto Sans JP（合成元）なので、CDN 障害時もシステムフォントスタックへフォールバックすれば見た目の劣化は最小限。
+- **Hiragino Sans (Figma) → Gen Interface JP（本番）.** Figma が macOS デフォルトの Hiragino Sans で表示するのは下書き確認用。本番は環境を問わず動く Gen Interface JP（和文は Noto Sans JP 合成）に統一する。
 - **Dark mode.** トークンは `<html>` の `[data-theme='dark']` で切り替わり、`ToggleSwitch` がそれを操作する。明示的な theme が保存されていないとき `prefers-color-scheme: dark` も尊重する。
 
 ---
