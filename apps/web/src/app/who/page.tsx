@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { BaseLayout } from '@/components/BaseLayout';
+import { HashiMascot } from '@/components/HashiMascot';
 import { PageReady } from '@/components/PageReady';
 
 const links = [
@@ -46,7 +47,7 @@ export default function WhoPage() {
       <main className="w-full">
         <div className="flex items-center gap-2 pb-2">
           <span>髙橋俊一 a.k.a shuntaka</span>
-          <Image src="/icons/hashi-light.png" alt="hashi" width={36} height={36} />
+          <HashiMascot width={32} height={42} />
         </div>
         <div className="flex pb-4">
           {links.map((link) => (
