@@ -31,7 +31,7 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
       <div className="h-12 w-full bg-[var(--color-surface-raised)]">
         <div className="mx-auto flex max-w-[var(--layout-max)] items-center justify-between px-8 pt-3 pb-1 max-sm:px-4">
           <ProgressLink href="/">
-            <div className="text-2xl font-bold">shuntaka.dev</div>
+            <div className="text-2xl font-semibold">shuntaka.dev</div>
           </ProgressLink>
           <ToggleSwitch />
         </div>
