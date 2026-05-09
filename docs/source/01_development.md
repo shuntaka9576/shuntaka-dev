@@ -415,3 +415,31 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
+
+### skills CLI
+
+`.claude/skills/<name>/` に置く [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills) を [vercel-labs/skills](https://github.com/vercel-labs/skills) で管理する。スキル本体は git に commit する。
+
+一覧
+
+```bash
+bunx skills list
+```
+
+追加
+
+```bash
+bunx skills add vercel-labs/agent-skills --skill <skill-name> -a claude-code -y
+```
+
+更新（差分をレビューしてから commit）
+
+```bash
+bunx skills update --copy
+```
+
+削除
+
+```bash
+bunx skills remove <skill-name>
+```
