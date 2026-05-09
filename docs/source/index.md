@@ -12,5 +12,6 @@
 03_authorization
 incidents/index
 refactors/index
+survey/index
 99_memo
 ```
