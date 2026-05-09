@@ -71,7 +71,7 @@ category アルファベット順 → name 順。1 列目は通し番号、推�
 
 ## 取り込みコマンド
 
-AWS Toolkit は `skills/<category>/<name>/SKILL.md` の入れ子構造のため `--full-depth` が必要（無いと 50 件中 27 件しか検出されない）。`bunx skills add` の package 引数は `<owner>/<repo>` のみで、パスは渡せない。
+`bunx skills add` の package 引数は `<owner>/<repo>` のみで、パスは渡せない。AWS Toolkit は `skills/<category>-skills/<name>/SKILL.md`（カノニカル 43 件）と `plugins/<plugin>/skills/<name>/SKILL.md`（plugin バンドル側コピー）の二系統を持つため `--full-depth` 必須（無いと 27 件しか検出されない）。`--full-depth` を付けると両系統が辿られて合計 50 件検出となり、CLI は `plugins/aws-core/skills/<name>/SKILL.md` 側を採用する（`plugins/` がアルファベット順で先のため）。実体内容は同一。
 
 ◎ Highly recommended の 4 件。
 
@@ -95,4 +95,4 @@ bunx skills add aws/agent-toolkit-for-aws --skill troubleshooting-application-fa
 bunx skills add aws/agent-toolkit-for-aws --skill creating-secrets-using-best-practices -a claude-code -y --full-depth
 ```
 
-実行後、`skills-lock.json` に `source: aws/agent-toolkit-for-aws`、`sourceType: github`、`skillPath: skills/<category>-skills/<name>/SKILL.md`、`computedHash: ...` の各エントリが追加される（既存 vercel エントリと同じ形式）。
+実行後、`skills-lock.json` に `source: aws/agent-toolkit-for-aws`、`sourceType: github`、`skillPath: plugins/aws-core/skills/<name>/SKILL.md`、`computedHash: ...` の各エントリが追加される（既存 vercel エントリと同じ形式）。SKILL.md と `references/` 配下が `.claude/skills/<name>/` にコピーされる。
