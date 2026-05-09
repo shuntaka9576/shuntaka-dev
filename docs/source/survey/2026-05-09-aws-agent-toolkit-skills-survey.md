@@ -69,14 +69,30 @@ category アルファベット順 → name 順。1 列目は通し番号、推�
 
 > 注: DSQL 専用 skill は現状なし。
 
-## 取り込みコマンド（参考）
+## 取り込みコマンド
+
+AWS Toolkit は `skills/<category>/<name>/SKILL.md` の入れ子構造のため `--full-depth` が必要（無いと 50 件中 27 件しか検出されない）。`bunx skills add` の package 引数は `<owner>/<repo>` のみで、パスは渡せない。
+
+◎ Highly recommended の 4 件。
 
 ```bash
-# Highly recommended の 4 件のみ
-npx skills add aws/agent-toolkit-for-aws/skills/developer-tools-skills/aws-cdk
-npx skills add aws/agent-toolkit-for-aws/skills/compute-skills/connecting-lambda-to-api-gateway
-npx skills add aws/agent-toolkit-for-aws/skills/security-and-identity-skills/aws-iam
-npx skills add aws/agent-toolkit-for-aws/skills/operations-skills/aws-observability
+bunx skills add aws/agent-toolkit-for-aws --skill aws-cdk -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill connecting-lambda-to-api-gateway -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill aws-iam -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill aws-observability -a claude-code -y --full-depth
 ```
 
-実行後、`skills-lock.json` に `source: aws/agent-toolkit-for-aws`、`sourceType: github`、`skillPath: skills/.../SKILL.md`、`computedHash: ...` の 4 エントリが追加される（既存 vercel エントリと同じ形式）。
+○ Optional の 8 件。
+
+```bash
+bunx skills add aws/agent-toolkit-for-aws --skill creating-api-gateway-stage -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill debugging-lambda-timeouts -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill routing-traffic-with-route53-and-cloudfront -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill aws-sdk-js-v3-usage -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill aws-cloudformation -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill setting-up-cloudwatch-alarm-notifications -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill troubleshooting-application-failures -a claude-code -y --full-depth
+bunx skills add aws/agent-toolkit-for-aws --skill creating-secrets-using-best-practices -a claude-code -y --full-depth
+```
+
+実行後、`skills-lock.json` に `source: aws/agent-toolkit-for-aws`、`sourceType: github`、`skillPath: skills/<category>-skills/<name>/SKILL.md`、`computedHash: ...` の各エントリが追加される（既存 vercel エントリと同じ形式）。
