@@ -1,8 +1,11 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Annotations, Match, Template } from 'aws-cdk-lib/assertions';
 import type * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NagSuppressions } from 'cdk-nag';
 import type { Construct } from 'constructs';
 import { MainStack } from '../lib/api/main-stack.js';
+import { applyNag } from '../lib/nag.js';
+import { applyMainStackSuppressions } from '../lib/nag-suppressions.js';
 
 // DockerImageFunctionをモックしてDockerビルドをスキップ
 vi.mock('aws-cdk-lib/aws-lambda', async (importOriginal) => {
@@ -65,6 +68,28 @@ describe('MainStack', () => {
         region: 'ap-northeast-1',
       },
     });
+
+    applyNag(stack);
+    applyMainStackSuppressions(stack);
+    // テスト用に DockerImageFunction を NODEJS_20_X の Function に差し替えているため
+    // L1 (latest runtime) ルールが発火する。本番は Docker イメージなので該当しない。
+    NagSuppressions.addResourceSuppressionsByPath(
+      stack,
+      '/TestMainStack/BlogAPI/WebApiLambda/Resource',
+      [
+        {
+          id: 'AwsSolutions-L1',
+          reason:
+            'テスト用に DockerImageFunction をモックして Node.js ランタイム関数に差し替えている。本番は Docker イメージのため非該当。',
+        },
+      ],
+    );
+
+    const nagErrors = Annotations.fromStack(stack).findError(
+      '*',
+      Match.stringLikeRegexp('AwsSolutions-.*'),
+    );
+    expect(nagErrors).toEqual([]);
 
     const template = Template.fromStack(stack);
     expect(template.toJSON()).toMatchSnapshot();
