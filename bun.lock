@@ -56,6 +56,7 @@
       "version": "0.1.0",
       "dependencies": {
         "aws-cdk-lib": "^2.253.1",
+        "cdk-nag": "^2.38.2",
         "change-case": "^5.4.4",
         "constructs": "^10.6.0",
         "zod": "^4.4.3",
@@ -876,6 +877,8 @@
     "caniuse-lite": ["caniuse-lite@1.0.30001792", "", {}, "sha512-hVLMUZFgR4JJ6ACt1uEESvQN1/dBVqPAKY0hgrV70eN3391K6juAfTjKZLKvOMsx8PxA7gsY1/tLMMTcfFLLpw=="],
 
     "case": ["case@1.6.3", "", {}, "sha512-mzDSXIPaFwVDvZAHqZ9VlbyF4yyXRuX6IvB06WvPYkqJVO24kX1PPhv9bfpKNFZyxYFmmgo03HUiD8iklmJYRQ=="],
+
+    "cdk-nag": ["cdk-nag@2.38.2", "", { "peerDependencies": { "aws-cdk-lib": "^2.176.0", "constructs": "^10.5.1" } }, "sha512-Ddim1r8IwAPQn95KB2owbHoU4YHveHg4PfM+k7TdcANqfVmoHem6cTFMpcIuoDM16BkQQ+xshxYxZgcAoeVKGw=="],
 
     "chai": ["chai@6.2.2", "", {}, "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg=="],
 

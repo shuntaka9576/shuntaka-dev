@@ -6,6 +6,11 @@ import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
 import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
+import { applyNag } from '../lib/nag.js';
+import {
+  applyDeployRoleSuppressions,
+  applyMainStackSuppressions,
+} from '../lib/nag-suppressions.js';
 
 const REGIONS = {
   TOKYO: 'ap-northeast-1',
@@ -85,3 +90,7 @@ const deployRoleStack = new DeployRoleStack(
 );
 
 deployRoleStack.addDependency(oidcProviderStack);
+
+applyNag(app);
+applyMainStackSuppressions(mainStack);
+applyDeployRoleSuppressions(deployRoleStack);
