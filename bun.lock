@@ -55,7 +55,7 @@
       "name": "@shuntaka-dev/aws",
       "version": "0.1.0",
       "dependencies": {
-        "aws-cdk-lib": "^2.253.0",
+        "aws-cdk-lib": "^2.253.1",
         "change-case": "^5.4.4",
         "constructs": "^10.6.0",
         "zod": "^4.4.3",
