@@ -8,7 +8,7 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
-const GEN_INTERFACE_JP_VERSION = '0.1.1';
+const GEN_INTERFACE_JP_VERSION = '0.1.7';
 const GEN_INTERFACE_JP_BASE = `https://cdn.jsdelivr.net/npm/gen-interface-jp@${GEN_INTERFACE_JP_VERSION}`;
 
 const OG_IMAGE_URL =
