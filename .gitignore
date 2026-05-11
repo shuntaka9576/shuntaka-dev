@@ -26,3 +26,9 @@ target
 
 # storybook
 storybook-static
+
+
+# APM dependencies
+apm_modules/
+.claude/skills/
+.agents/skills/

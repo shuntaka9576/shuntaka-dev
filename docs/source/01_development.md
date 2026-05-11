@@ -416,30 +416,37 @@ bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
-### skills CLI
+### APM CLI
 
-`.claude/skills/<name>/` に置く [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills) を [vercel-labs/skills](https://github.com/vercel-labs/skills) で管理する。スキル本体は git に commit する。
+`.claude/skills/<name>/` に置く [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills) を [microsoft/apm](https://github.com/microsoft/apm) で管理する。スキル本体は git に commit せず、`apm.yml` と `apm.lock.yaml` のみ commit する。`apm install` で `.claude/skills/` を都度展開する運用。
 
-一覧
+初回セットアップ（macOS）
 
 ```bash
-bunx skills list
+brew install apm
+apm install -t claude
+```
+
+取り込み（依存追加・clone 直後・lockfile 更新後）
+
+```bash
+apm install -t claude
 ```
 
 追加
 
 ```bash
-bunx skills add vercel-labs/agent-skills --skill <skill-name> -a claude-code -y
+apm install <owner>/<repo>/skills/<path>/<name> -t claude
 ```
 
-更新（差分をレビューしてから commit）
+更新（upstream の最新を取り込み、lockfile を更新）
 
 ```bash
-bunx skills update --copy
+apm install --update -t claude
 ```
 
 削除
 
 ```bash
-bunx skills remove <skill-name>
+apm uninstall <package> -t claude
 ```
