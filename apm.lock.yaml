@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-05-11T05:57:18.658413+00:00'
+generated_at: '2026-05-11T06:25:15.828123+00:00'
 apm_version: 0.12.4
 dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/compute-skills/connecting-lambda-to-api-gateway
   is_virtual: true
   package_type: claude_skill
@@ -14,8 +14,8 @@ dependencies:
   content_hash: sha256:8a5264f97d13fe4954d4368548100702da08ab43c7b25b4df38558120b266299
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/compute-skills/creating-api-gateway-stage
   is_virtual: true
   package_type: claude_skill
@@ -24,8 +24,8 @@ dependencies:
   content_hash: sha256:9b55be54c03cdbc6e9059cadd22c859c20570f76014e28f920112d33c788fe48
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/compute-skills/debugging-lambda-timeouts
   is_virtual: true
   package_type: claude_skill
@@ -34,8 +34,8 @@ dependencies:
   content_hash: sha256:6cbbec857526e2983fec3f13d46016893bd99225b0ec411e47864fd09f559559
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/compute-skills/routing-traffic-with-route53-and-cloudfront
   is_virtual: true
   package_type: claude_skill
@@ -44,8 +44,8 @@ dependencies:
   content_hash: sha256:030bd804c68cc4570c4e698a6e947d699b4775143e3410bc9b5d387ea942637c
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/developer-tools-skills/aws-cdk
   is_virtual: true
   package_type: claude_skill
@@ -54,8 +54,8 @@ dependencies:
   content_hash: sha256:3240c05ab5f879ab004af7f9e2eebf42e61954ded8aeee257448f39d46de1d39
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/developer-tools-skills/aws-sdk-js-v3-usage
   is_virtual: true
   package_type: claude_skill
@@ -64,8 +64,8 @@ dependencies:
   content_hash: sha256:4fda5595deafac7384c16b9cf86a6c90a894e54949d149e9f8c68a29f189ea9e
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/management-tools-skills/aws-cloudformation
   is_virtual: true
   package_type: claude_skill
@@ -74,8 +74,8 @@ dependencies:
   content_hash: sha256:8961ad5785b117ea44a9f4cc013b32990c6fa363dd6d86cbbfc2ad12c07e2845
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/operations-skills/aws-observability
   is_virtual: true
   package_type: claude_skill
@@ -84,8 +84,8 @@ dependencies:
   content_hash: sha256:0e228cc1cc543b5b420768e6ceb88015d93958e0eee78768193381ddeaa3b2e8
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/operations-skills/setting-up-cloudwatch-alarm-notifications
   is_virtual: true
   package_type: claude_skill
@@ -94,8 +94,8 @@ dependencies:
   content_hash: sha256:e6de6e254091b5e12840d9098edd8b131894d94d4bdd6531b07d4a0887c0e570
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/operations-skills/troubleshooting-application-failures
   is_virtual: true
   package_type: claude_skill
@@ -104,8 +104,8 @@ dependencies:
   content_hash: sha256:a473523223098b52b94c7638d30654d4cf1b558ed49555d919ef04fc3cbb1ca4
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/security-and-identity-skills/aws-iam
   is_virtual: true
   package_type: claude_skill
@@ -114,8 +114,8 @@ dependencies:
   content_hash: sha256:ee2040ac65acb7bc94e2e1cb36092b962ba76010a34bb315c4ca10a56c9f9847
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
-  resolved_commit: b2520950040503a2d75afe23a0e2d30beff10912
-  resolved_ref: b2520950040503a2d75afe23a0e2d30beff10912
+  resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
+  resolved_ref: 750230758fbf23acd60d075dedd7ead4092127ce
   virtual_path: skills/security-and-identity-skills/creating-secrets-using-best-practices
   is_virtual: true
   package_type: claude_skill
@@ -124,8 +124,8 @@ dependencies:
   content_hash: sha256:7fe5c304e58b8fe965b3e92ec885a6edaa281b8c228b23f270f5bd30b9a8a664
 - repo_url: vercel-labs/agent-skills
   host: github.com
-  resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
+  resolved_commit: ce3e64e468f8fa09a2d075d102771838061fdac0
+  resolved_ref: ce3e64e468f8fa09a2d075d102771838061fdac0
   virtual_path: skills/composition-patterns
   is_virtual: true
   package_type: claude_skill
@@ -134,8 +134,8 @@ dependencies:
   content_hash: sha256:5b3564ca435f4714d5e65023351e1999e4744818603a9cfb6a6f6a61b7d84918
 - repo_url: vercel-labs/agent-skills
   host: github.com
-  resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
+  resolved_commit: ce3e64e468f8fa09a2d075d102771838061fdac0
+  resolved_ref: ce3e64e468f8fa09a2d075d102771838061fdac0
   virtual_path: skills/react-best-practices
   is_virtual: true
   package_type: claude_skill
@@ -144,8 +144,8 @@ dependencies:
   content_hash: sha256:74f142d28d360d78e8bac4f239a84c87f0ced9015729bc72b5458d82ff45b015
 - repo_url: vercel-labs/agent-skills
   host: github.com
-  resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
+  resolved_commit: ce3e64e468f8fa09a2d075d102771838061fdac0
+  resolved_ref: ce3e64e468f8fa09a2d075d102771838061fdac0
   virtual_path: skills/web-design-guidelines
   is_virtual: true
   package_type: claude_skill
