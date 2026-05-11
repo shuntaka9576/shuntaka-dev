@@ -9,3 +9,4 @@
 **/target
 bun.lock
 .claude
+apm.lock.yaml
