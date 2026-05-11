@@ -30,24 +30,24 @@ sqlx = { version = "0.8.6", features = [
   "postgres",
   "migrate",
 ] }
-aurora-dsql-sqlx-connector = { version = "0.1.2", features = ["pool"] }
-tokio = { version = "1.52.0", features = ["full"] }
+aurora-dsql-sqlx-connector = { version = "0.2.0", features = ["pool"] }
+tokio = { version = "1.52.3", features = ["full"] }
 async-trait = "0.1.89"
 derive-new = "0.7.0"
 rstest = "0.26.1"
-utoipa = "5.4.0"
+utoipa = "5.5.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yaml = "0.9.34"
-uuid = { version = "1.23.0", features = ["serde", "v4"] }
+uuid = { version = "1.23.1", features = ["serde", "v4"] }
 chrono = { version = "0.4.44", features = ["serde"] }
-aws-config = "1.8.15"
-aws-sdk-ssm = "1.108.0"
-tower-http = { version = "0.6.8", features = ["cors", "trace"] }
+aws-config = "1.8.16"
+aws-sdk-ssm = "1.109.0"
+tower-http = { version = "0.6.10", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
-reqwest = { version = "0.13.2", features = ["json", "rustls"] }
+reqwest = { version = "0.13.3", features = ["json", "rustls"] }
 base64 = "0.22.1"
 regex = "1.12.3"
 hmac = "0.13.0"
