@@ -3,5 +3,6 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-05-11-vercel-labs-skills-vs-apm
 2026-05-09-aws-agent-toolkit-skills-survey
 ```
