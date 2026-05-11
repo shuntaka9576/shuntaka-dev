@@ -37,6 +37,17 @@
       "depNameTemplate": "rust",
       "packageNameTemplate": "rust-lang/rust",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Update APM dependencies pinned by commit sha in apm.yml",
+      "managerFilePatterns": ["/(^|/)apm\\.yml$/"],
+      "matchStrings": [
+        "- (?<depName>[^/\\s]+/[^/\\s#]+)/[^#\\s]+#(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "packageNameTemplate": "https://github.com/{{depName}}",
+      "datasourceTemplate": "git-refs",
+      "currentValueTemplate": "main"
     }
   ],
   "packageRules": [
@@ -105,6 +116,11 @@
       "matchDatasources": ["github-releases"],
       "matchPackageNames": ["rust-lang/rust"],
       "groupName": "rust-toolchain"
+    },
+    {
+      "description": "Group all APM dependency updates (apm.yml)",
+      "matchFileNames": ["apm.yml"],
+      "groupName": "apm"
     }
   ]
 }
