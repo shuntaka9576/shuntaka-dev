@@ -1,0 +1,46 @@
+name: Renovate APM Update
+
+on:
+  pull_request:
+    paths:
+      - 'apm.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-audit:
+    if: github.actor == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APM_VERSION: 0.13.0
+      APM_SHA256: ed02b1103ef4bc49559a81f7e109b424a49d95cf978515ad224e5eeb701b1f8a
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install APM
+        run: |
+          set -euo pipefail
+          curl -sL "https://github.com/microsoft/apm/releases/download/v${APM_VERSION}/apm-linux-x86_64.tar.gz" -o apm.tar.gz
+          echo "${APM_SHA256}  apm.tar.gz" | sha256sum -c -
+          mkdir -p "${HOME}/.apm"
+          tar xzf apm.tar.gz -C "${HOME}/.apm" --strip-components=1
+          rm apm.tar.gz
+          echo "${HOME}/.apm" >> "${GITHUB_PATH}"
+
+      - name: apm install
+        run: apm install -t claude
+
+      - name: apm audit (lockfile + drift + content scan)
+        run: apm audit --ci
+
+      - name: Commit apm.lock.yaml
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apm.lock.yaml
+          git diff --staged --quiet || git commit -m "chore: sync apm.lock.yaml"
+          git push
