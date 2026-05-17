@@ -16,16 +16,22 @@ on:
       CLOUDINARY_API_KEY:
         required: true
 
+permissions: {}
+
 jobs:
   deploy:
-    runs-on: [self-hosted, macOS, ARM64]
+    name: Deploy CDK
+    # Apple Silicon ビルド用 self-hosted runner。呼び出し元のトリガ制限で pull_request 由来では起動しない。
+    runs-on: [self-hosted, macOS, ARM64] # zizmor: ignore[self-hosted-runner]
     timeout-minutes: 30
     environment: ${{ inputs.stageName }}
     permissions:
-      id-token: write
+      id-token: write # AWS IAM Role に OIDC AssumeRole するため
       contents: read
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node
 
@@ -40,8 +46,14 @@ jobs:
 
       - name: CDK Deploy
         working-directory: iac/aws
-        run: bunx cdk deploy "${{ inputs.stageName == 'prd' && 'p' || 'd' }}-st-main" -c stageName=${{ inputs.stageName }} --require-approval never
+        run: |
+          case "$STAGE_NAME" in
+            prd) PREFIX=p ;;
+            *)   PREFIX=d ;;
+          esac
+          bunx cdk deploy "${PREFIX}-st-main" -c "stageName=${STAGE_NAME}" --require-approval never
         env:
+          STAGE_NAME: ${{ inputs.stageName }}
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
           GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}
           GH_WEBHOOK_SECRET_KEY_NAME: ${{ vars.GH_WEBHOOK_SECRET_KEY_NAME }}
