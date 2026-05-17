@@ -221,6 +221,14 @@ bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
 4. リポジトリルートの `renovate.json` が自動で読み込まれる
 
+### zizmor
+
+GitHub Actions ワークフローのセキュリティ監査を行う zizmor の設定。`.github/workflows/zizmor.yaml` が push / PR 時に自動実行され、SARIF を Code scanning にアップロードする。
+
+1. `https://github.com/<owner>/<repo>/security/code-scanning` から Code scanning を有効化
+2. push / PR 時に workflow が自動実行される
+3. 結果は Security タブの Code scanning alerts で確認
+
 ## ローカル開発
 
 本リポジトリはbare clone + git worktree構成で管理している。worktreeの管理には[Worktrunk](https://worktrunk.dev)を使用する。

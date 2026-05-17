@@ -102,6 +102,7 @@
     "rsplit",
     "rstest",
     "rustls",
+    "sarif",
     "segoe",
     "serde",
     "shuntaka",
@@ -128,7 +129,8 @@
     "worktrees",
     "worktrunk",
     "wwsg",
-    "zenn"
+    "zenn",
+    "zizmor"
   ],
   "flagWords": [],
   "dictionaries": ["npm", "node", "typescript", "html", "css", "bash"]

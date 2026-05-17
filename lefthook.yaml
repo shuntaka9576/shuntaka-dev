@@ -2,3 +2,5 @@ pre-push:
   commands:
     lint:
       run: bun run lint
+    zizmor:
+      run: uvx zizmor .
