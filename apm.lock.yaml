@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-05-12T21:54:58.996635+00:00'
+generated_at: '2026-05-17T11:05:41.735670+00:00'
 apm_version: 0.13.0
 dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/compute-skills/connecting-lambda-to-api-gateway
   is_virtual: true
   package_type: claude_skill
@@ -15,7 +15,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/compute-skills/creating-api-gateway-stage
   is_virtual: true
   package_type: claude_skill
@@ -25,7 +25,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/compute-skills/debugging-lambda-timeouts
   is_virtual: true
   package_type: claude_skill
@@ -35,7 +35,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/compute-skills/routing-traffic-with-route53-and-cloudfront
   is_virtual: true
   package_type: claude_skill
@@ -45,7 +45,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/developer-tools-skills/aws-cdk
   is_virtual: true
   package_type: claude_skill
@@ -55,7 +55,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/developer-tools-skills/aws-sdk-js-v3-usage
   is_virtual: true
   package_type: claude_skill
@@ -65,7 +65,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/management-tools-skills/aws-cloudformation
   is_virtual: true
   package_type: claude_skill
@@ -75,7 +75,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/operations-skills/aws-observability
   is_virtual: true
   package_type: claude_skill
@@ -85,7 +85,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/operations-skills/setting-up-cloudwatch-alarm-notifications
   is_virtual: true
   package_type: claude_skill
@@ -95,7 +95,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/operations-skills/troubleshooting-application-failures
   is_virtual: true
   package_type: claude_skill
@@ -105,7 +105,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/security-and-identity-skills/aws-iam
   is_virtual: true
   package_type: claude_skill
@@ -115,7 +115,7 @@ dependencies:
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: 750230758fbf23acd60d075dedd7ead4092127ce
-  resolved_ref: 8bc62f2f1f625cbc1f8d8aaf3172abd8b567d318
+  resolved_ref: 14780bf3440aa1532eadfbb2ff547f58969fcfb2
   virtual_path: skills/security-and-identity-skills/creating-secrets-using-best-practices
   is_virtual: true
   package_type: claude_skill
