@@ -1,0 +1,13 @@
+name: vuln-test
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  bad:
+    runs-on: ubuntu-latest
+    steps:
+      - name: template injection
+        run: echo "title is ${{ github.event.pull_request.title }}"
