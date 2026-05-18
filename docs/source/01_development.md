@@ -223,9 +223,7 @@ bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 
 zizmorをGitHub Code Scanningに連携し、GitHub Actionsのセキュリティリスクに対する静的解析を行っている。[こちら](https://dev.classmethod.jp/articles/shuntaka-zizmor-sarif-code-scanning/)の手順で導入。[gh-infra](.github/infra.yaml)側にも設定あり。
 
-
 ## 開発
-
 
 ### 開発サーバーの起動
 
@@ -242,7 +240,7 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 cd ../..
 
 # AWS資格情報の取得が必要
-aws-valut exec <プロファイル名>
+aws-vault exec <プロファイル名>
 
 # dev server起動（Next.js + Rust API + Sphinx）
 bun run dev
@@ -283,7 +281,6 @@ apm install --update -t claude
 apm uninstall <package> -t claude
 ```
 
-
 ### GitHub設定変更作業
 
 [babarot/gh-infra](https://github.com/babarot/gh-infra)でリポジトリ設定（visibility, labels, features, merge_strategy, security, rulesets, actions）を [`.github/infra.yaml`](.github/infra.yaml) で宣言的に管理。CI連携はせず手動運用。
@@ -305,9 +302,6 @@ GitHub の現状をマニフェストに再取り込み
 ```bash
 gh infra import shuntaka9576/shuntaka-dev > .github/infra.yaml
 ```
-
-
-
 
 ### bare clone環境でworktree開発をする場合(任意)
 
