@@ -27,7 +27,7 @@
     "postinstall": "lefthook install"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.8.0",
     "cspell": "^10.0.0",
     "lefthook": "^2.1.6",
     "prettier": "^3.8.3",
