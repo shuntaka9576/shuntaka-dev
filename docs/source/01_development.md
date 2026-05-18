@@ -52,7 +52,7 @@
 
 ### AWS
 
-#### SSM Parameter Storeの登録
+SSM Parameter Storeの登録
 
 GitHub App秘密鍵を登録
 
@@ -93,9 +93,7 @@ aws ssm put-parameter \
   --value "your-api-secret"
 ```
 
-#### OIDCプロバイダーの作成
-
-アカウントに1つのみ作成（初回のみ）。
+OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
 
 ```bash
 export STAGE_NAME=""
@@ -106,7 +104,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-#### GitHub Actions用のデプロイロールの作成
+GitHub Actions用のデプロイロールの作成
 
 ```bash
 export STAGE_NAME=""
@@ -116,7 +114,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-#### ホストゾーンの作成
+ホストゾーンの作成
 
 ```bash
 export STAGE_NAME=""
@@ -127,7 +125,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-#### Route53にNSレコードを登録
+Route53にNSレコードを登録
 
 AWSのRoute53からホストゾーンのNSレコードを確認し、ムームードメインのコンソール画面のNSレコードを変更
 
@@ -143,7 +141,7 @@ bunx dotenv -- cdk deploy \
 # デプロイ中にAWSコンソール ap-northeast-1 リージョンのACMで、*.shuntaka.techドメインのDNS検証レコードをRoute53に追加
 ```
 
-#### GitHu ActionsにEnvironmentを登録
+GitHub ActionsにEnvironmentを登録
 
 `gh`コマンドで環境変数を設定（実際のシークレットはSSM Parameter Storeに格納）:
 
@@ -184,7 +182,7 @@ SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
 ```
 
-#### メインスタックのデプロイ
+メインスタックのデプロイ
 
 ```bash
 export STAGE_NAME=""
@@ -196,7 +194,7 @@ bunx dotenv -- cdk deploy \
 
 完了したら、VercelとRoute53にAレコードの紐付けをしてください。
 
-#### DBマイグレーション
+DBマイグレーション
 
 ```bash
 export STAGE_NAME=""
@@ -212,24 +210,106 @@ bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
-### Renovate
+### ライブラリ更新
 
-依存関係の自動アップデートPRを作成するためのRenovate設定。
+依存関係の自動アップデートPRを作成するためのRenovateを利用。以下の設定で導入が可能。
 
 1. https://github.com/apps/renovate にアクセス
 2. 「Install」をクリック
 3. 対象リポジトリ（shuntaka9576/shuntaka-dev）を選択してインストール
 4. リポジトリルートの `renovate.json` が自動で読み込まれる
 
-### zizmor
+### GitHub Actions
 
-GitHub Actions ワークフローのセキュリティ監査を行う zizmor の設定。`.github/workflows/zizmor.yaml` が push / PR 時に自動実行され、SARIF を Code scanning にアップロードする。
+zizmorをGitHub Code Scanningに連携し、GitHub Actionsのセキュリティリスクに対する静的解析を行っている。[こちら](https://dev.classmethod.jp/articles/shuntaka-zizmor-sarif-code-scanning/)の手順で導入。[gh-infra](.github/infra.yaml)側にも設定あり。
 
-1. `https://github.com/<owner>/<repo>/security/code-scanning` から Code scanning を有効化
-2. push / PR 時に workflow が自動実行される
-3. 結果は Security タブの Code scanning alerts で確認
 
-## ローカル開発
+## 開発
+
+
+### 開発サーバーの起動
+
+```bash
+# 依存関係のインストール
+bun install
+
+# PostgreSQL起動（全worktreeで共有）
+docker compose up -d postgres
+
+# DBマイグレーション（初回のみ）
+cd tools/dsql-cli
+bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
+cd ../..
+
+# AWS資格情報の取得が必要
+aws-valut exec <プロファイル名>
+
+# dev server起動（Next.js + Rust API + Sphinx）
+bun run dev
+```
+
+### Agents SKillsの設定
+
+[microsoft/apm](https://github.com/microsoft/apm) で管理。AIコーディングエージェントはClaude Codeを利用するものとする。
+
+初回セットアップ（macOS）
+
+```bash
+brew install apm
+apm install -t claude
+```
+
+取り込み（依存追加・clone 直後・lockfile 更新後）
+
+```bash
+apm install -t claude
+```
+
+追加
+
+```bash
+apm install <owner>/<repo>/skills/<path>/<name> -t claude
+```
+
+更新（upstream の最新を取り込み、lockfile を更新）
+
+```bash
+apm install --update -t claude
+```
+
+削除
+
+```bash
+apm uninstall <package> -t claude
+```
+
+
+### GitHub設定変更作業
+
+[babarot/gh-infra](https://github.com/babarot/gh-infra)でリポジトリ設定（visibility, labels, features, merge_strategy, security, rulesets, actions）を [`.github/infra.yaml`](.github/infra.yaml) で宣言的に管理。CI連携はせず手動運用。
+
+差分確認
+
+```bash
+gh infra plan .github/infra.yaml
+```
+
+適用
+
+```bash
+gh infra apply .github/infra.yaml --auto-approve
+```
+
+GitHub の現状をマニフェストに再取り込み
+
+```bash
+gh infra import shuntaka9576/shuntaka-dev > .github/infra.yaml
+```
+
+
+
+
+### bare clone環境でworktree開発をする場合(任意)
 
 本リポジトリはbare clone + git worktree構成で管理している。worktreeの管理には[Worktrunk](https://worktrunk.dev)を使用する。
 
@@ -242,19 +322,13 @@ shuntaka-dev/          # bare clone
 └── fix-bar/           # 作業worktree
 ```
 
-### 初回セットアップ
-
-#### lefthook
-
 bare clone環境では`core.hooksPath`が不正なパスを指している場合がある。lefthookがworktreeで動作しない場合は以下を実行する（リポジトリに対して一度だけ）。
 
 ```bash
 git config --local --unset core.hooksPath
 ```
 
-#### previewワークツリーの環境変数
-
-previewはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
+previewワークツリーの環境変数は、previewはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
 
 ```bash
 cat > .env.local <<'EOF'
@@ -273,27 +347,19 @@ EOF
 direnv allow .
 ```
 
-### 開発サーバーの起動
+ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。
 
-```bash
-# 依存関係のインストール
-bun install
+| 変数                   | 内容                      | preview（既定）         |
+| ---------------------- | ------------------------- | ----------------------- |
+| `WEB_PORT`             | Next.js devサーバーポート | 3000                    |
+| `API_PORT` / `PORT`    | Rust APIポート            | 8080                    |
+| `DOCS_PORT`            | Sphinxドキュメントポート  | 8000                    |
+| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL         | `http://localhost:3000` |
+| `NEXT_PUBLIC_API_URL`  | API URL                   | `http://localhost:8080` |
 
-# PostgreSQL起動（全worktreeで共有）
-docker compose up -d postgres
+新規worktreeではブランチ名から10000-19999の範囲でポートが決定的に生成される。同じブランチ名なら常に同じポートになる。
 
-# DBマイグレーション（初回のみ）
-cd tools/dsql-cli
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-cd ../..
-
-# dev server起動（Next.js + Rust API + Sphinx）
-bun run dev
-```
-
-### ブランチ作業
-
-`wt switch --create`で新しいworktreeを作成する。pre-startフックにより`.env.local`（ポート設定）、`.envrc`、依存関係のインストールが自動で行われる。
+ブランチ作業は、`wt switch --create`で新しいworktreeを作成する。pre-startフックにより`.env.local`（ポート設定）、`.envrc`、依存関係のインストールが自動で行われる。
 
 ```bash
 # worktree作成＆切り替え
@@ -331,21 +397,7 @@ wt remove feature/new-thing
 wt merge
 ```
 
-### ポートマッピング
-
-複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。
-
-| 変数                   | 内容                      | preview（既定）         |
-| ---------------------- | ------------------------- | ----------------------- |
-| `WEB_PORT`             | Next.js devサーバーポート | 3000                    |
-| `API_PORT` / `PORT`    | Rust APIポート            | 8080                    |
-| `DOCS_PORT`            | Sphinxドキュメントポート  | 8000                    |
-| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL         | `http://localhost:3000` |
-| `NEXT_PUBLIC_API_URL`  | API URL                   | `http://localhost:8080` |
-
-新規worktreeではブランチ名から10000-19999の範囲でポートが決定的に生成される。同じブランチ名なら常に同じポートになる。
-
-## ツール
+## 運用コマンド
 
 ### psql接続（DSQL）
 
@@ -422,39 +474,4 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 # DSQLに投入
 bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
-```
-
-### APM CLI
-
-`.claude/skills/<name>/` に置く [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills) を [microsoft/apm](https://github.com/microsoft/apm) で管理する。スキル本体は git に commit せず、`apm.yml` と `apm.lock.yaml` のみ commit する。`apm install` で `.claude/skills/` を都度展開する運用。
-
-初回セットアップ（macOS）
-
-```bash
-brew install apm
-apm install -t claude
-```
-
-取り込み（依存追加・clone 直後・lockfile 更新後）
-
-```bash
-apm install -t claude
-```
-
-追加
-
-```bash
-apm install <owner>/<repo>/skills/<path>/<name> -t claude
-```
-
-更新（upstream の最新を取り込み、lockfile を更新）
-
-```bash
-apm install --update -t claude
-```
-
-削除
-
-```bash
-apm uninstall <package> -t claude
 ```
