@@ -303,6 +303,16 @@ GitHub の現状をマニフェストに再取り込み
 gh infra import shuntaka9576/shuntaka-dev > .github/infra.yaml
 ```
 
+### シークレット漏洩対策
+
+Claude Code 経由のシークレット漏洩を `.claude/settings.json` の env scrub と UserPromptSubmit hook、`lefthook.yaml` の pre-commit (secretlint + gitleaks) の3層で防ぐ。設計の詳細は CLAUDE.md の Security セクション参照。
+
+gitleaks のバイナリインストール（初回のみ）。
+
+```bash
+brew install gitleaks
+```
+
 ### bare clone環境でworktree開発をする場合(任意)
 
 本リポジトリはbare clone + git worktree構成で管理している。worktreeの管理には[Worktrunk](https://worktrunk.dev)を使用する。

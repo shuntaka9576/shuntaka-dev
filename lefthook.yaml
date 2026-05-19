@@ -1,3 +1,15 @@
+pre-commit:
+  commands:
+    secretlint:
+      run: |
+        out=$(bun x secretlint --secretlintrc .secretlintrc.json {staged_files} 2>&1) || {
+          echo "$out" | grep -q "Not found target files" && exit 0
+          echo "$out" >&2
+          exit 1
+        }
+    gitleaks:
+      run: gitleaks git --pre-commit --staged --no-banner --redact
+
 pre-push:
   commands:
     lint:

@@ -7,6 +7,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - PR のベースブランチは常に `preview`。`main` 向けの PR は作成しない
 - `main` へのマージは人間が行う
 
+## Security (Secret Leak Defense)
+
+Claude Code 経由でのシークレット漏洩を3層で防ぐ。
+
+| 層  | 何を守るか                           | しくみ                                                                                                                                                                                                                       |
+| --- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | サブプロセスへの環境変数経由の漏洩   | `.claude/settings.json` で `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` を設定。Anthropic / AWS secret・session・Bedrock / Azure client secret / Google ADC / Anthropic Foundry の7変数を Bash・Hook・MCP stdio サブプロセスから除去 |
+| 2   | プロンプト本文に書かれたシークレット | `.claude/hooks/secretlint-prompt.ts` (UserPromptSubmit, Bun shell) で secretlint を実行。検出時は exit 2 でプロンプト送信をブロックして再入力を促す                                                                          |
+| 3   | Git staged に混入したシークレット    | `lefthook.yaml` の `pre-commit` で secretlint と gitleaks を両方実行。Claude 経由でない手動コミットもカバー                                                                                                                  |
+
+secretlint と gitleaks は検出範囲が異なる（Slack Webhook / Anthropic API Key は secretlint、Stripe / PEM は gitleaks）ため、pre-commit に併置している。Claude が `git commit` を実行した時点で検出されれば、stderr のフィードバックで自己修正できる。
+
+### 前提ツール
+
+- `gitleaks` バイナリを `brew install gitleaks` で導入する。未インストールだと pre-commit が失敗する
+- `jq` (macOS 標準では未導入のため `brew install jq` が必要な場合あり)
+- secretlint は `bun install` で自動的に揃う
+
+### 誤検知の調整
+
+`.secretlintrc.json` の `@secretlint/secretlint-rule-database-connection-string` で localhost / 127.0.0.1 / `db` ホスト名向けのローカル接続文字列を `allows` 正規表現で許可している。新たに誤検知が出たらここに追加。
+
+### スコープ外
+
+- env scrub は `OPENAI_API_KEY` / `CLOUDFLARE_API_TOKEN` / `AWS_ACCESS_KEY_ID` を伝播させる
+- secretlint デフォルトは AWS Access Key ID の単独 ID 検出が OFF
+- gitleaks デフォルトルールには Anthropic API Key が未収録（secretlint 側でカバー）
+
 ## Project Overview
 
 フルスタックのモノレポプロジェクト。ブログシステム（Web + API）とインフラ、ドキュメントを含む。
