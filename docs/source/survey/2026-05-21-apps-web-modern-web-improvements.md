@@ -2,12 +2,18 @@
 
 - 対象: `apps/web/`（Next.js 16 + React 19 + Tailwind CSS 4）
 - 調査日: 2026-05-21
-- 根拠: `modern-web-guidance` の `dark-mode` / `cross-document-transitions` / `optimize-image-priority` / `optimize-preload-priority` / `visually-stable-font-fallbacks` ガイド
+- 根拠: [`modern-web-guidance`](https://github.com/GoogleChrome/modern-web-guidance/tree/main/skills/modern-web-guidance/guides) の `dark-mode` / `cross-document-transitions` / `optimize-image-priority` / `optimize-preload-priority` / `visually-stable-font-fallbacks` ガイド（各項目に該当行リンクを掲載）
 - 結論: FOUC・LCP・フォント周りに Baseline 対応の伸びしろがあるので段階的に手を入れる
 
 ## High priority
 
 ### 1. ダークモード FOUC 対策 — [x]
+
+**該当ガイド**
+
+- [dark-mode.md?plain=1#L9](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/dark-mode.md?plain=1#L9) — MANDATORY: `<meta name="color-scheme">` を `<head>` に置いて FOUC を回避
+- [dark-mode.md?plain=1#L18-L26](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/dark-mode.md?plain=1#L18-L26) — MANDATORY: `:root { color-scheme: light dark; }` で viewport 全体のテーマを宣言
+- [dark-mode.md?plain=1#L132-L144](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/dark-mode.md?plain=1#L132-L144) — ユーザーピン留めの色スキームを反映するため inline script で hydrate 前に確定
 
 **現状の問題**
 `ThemeProvider.tsx:22-33` で `colorMode` を `undefined` 初期化 → `useEffect` で確定、という流れ。`ToggleSwitch.tsx:13-15` が `colorMode === undefined` の間 `null` を返すため、初回ロードで一瞬トグルが消える。`layout.tsx:59` の `suppressHydrationWarning` で凌いでいるだけで、スクロールバー / canvas はネイティブテーマで一瞬ライトが出る。
@@ -75,8 +81,17 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ### 2. ArticleCard 先頭サムネを LCP 候補として優先読み込み — [ ]
 
+**該当ガイド**
+
+- [optimize-image-priority.md?plain=1#L48-L53](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/performance/optimize-image-priority.md?plain=1#L48-L53) — MANDATORY: LCP 画像に `fetchpriority="high"`、`fetchpriority="high"` は 1〜2 枚まで、`loading="lazy"` と `fetchpriority="high"` は同時に付けない
+
 **現状の問題**
 `ArticleCard.tsx:38` で全カード一律 `loading="lazy"`。リスト先頭のサムネは above-the-fold で LCP 候補だが、ガイドは「LCP 画像に lazy を付けるな／`fetchpriority="high"` を 1〜2 枚に絞れ」と明記。
+
+![ArticleCard LCP 最適化の Before / After](./2026-05-21-apps-web-modern-web-improvements/lcp-article-card-comparison.png)
+
+- **左 (Before)**: 全カードのサムネに `loading="lazy"`。above-the-fold にある先頭サムネ＝LCP 候補も lazy なので、ブラウザは「これは後回しで良い」と解釈してダウンロード優先度を下げる → LCP が遅くなる
+- **右 (After)**: 先頭 1〜2 枚だけ `priority`（内部的に `fetchpriority="high"` ＋非 lazy）にし、3 枚目以降は lazy のまま。LCP 候補だけが優先ダウンロードされる
 
 **対応内容**
 
@@ -87,6 +102,11 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 ---
 
 ### 3. Web フォント読み込みを 5 リクエスト → 2 に削減 — [ ]
+
+**該当ガイド**
+
+- [optimize-preload-priority.md?plain=1#L27-L33](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/performance/optimize-preload-priority.md?plain=1#L27-L33) — preload は 1 ページあたり画像 2 本＋必須フォント 2〜3 本まで。フォント preload は `crossorigin` 必須
+- [visually-stable-font-fallbacks.md?plain=1#L13-L26](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/visually-stable-font-fallbacks.md?plain=1#L13-L26) — MANDATORY: `font-size-adjust: from-font;` でフォールバック時の CLS を抑える
 
 **現状の問題**
 `layout.tsx:62-66` で 300/400/500/600/700 の CSS を 5 本ロード。`DESIGN.md:161` には「400 / 700 の 2 本」と書いてあり仕様と実装が食い違っている。`optimize-preload-priority` ガイドはフォント preload を 2〜3 本までに抑えることを推奨。フォールバック時の CLS 対策も入っていない。
@@ -105,6 +125,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ### 4. Cross-document View Transitions でナビ周りを簡素化 — [ ]
 
+**該当ガイド**
+
+- [cross-document-transitions.md?plain=1#L9-L18](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/cross-document-transitions.md?plain=1#L9-L18) — `@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }` で opt-in（source/destination の両方で必要）
+
 **現状の問題**
 `NavigationProgressProvider` / `ProgressLink` / `PageReady` + `ArticleContent.tsx:51-57` の `requestAnimationFrame` 2 段ネストで合計 150 行強のコード。Next.js 16 + React 19.2 ならクロスドキュメント View Transition で大半が消える。
 
@@ -119,6 +143,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ### 5. ArticleContent のハッシュスクロールをポーリングから脱却 — [ ]
 
+**該当ガイド**
+
+- [scroll-target-on-load.md?plain=1#L42-L56](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/scroll-target-on-load.md?plain=1#L42-L56) — `DOMContentLoaded` + `scrollIntoView({ behavior: 'instant' })` パターン。`scroll-initial-target` が普及するまでの fallback として参考になる
+
 **現状の問題**
 `ArticleContent.tsx:124-154` で最大 10 回 × 100ms のポーリングで要素を探している。`dangerouslySetInnerHTML` は同期で DOM に入るので、本来ポーリングは不要。
 
@@ -132,6 +160,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ### 6. ToggleSwitch のインライン style を CSS 側に移す — [ ]
 
+**該当ガイド**
+
+- [individual-transform-properties.md?plain=1#L17-L35](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/individual-transform-properties.md?plain=1#L17-L35) — MANDATORY: `transform`/`translate` を遷移で使う要素にはベース値で identity transformation を入れ、stacking context のズレを防ぐ。ノブの位置は `left` ではなく `translate` で GPU 合成
+
 **現状の問題**
 `DESIGN.md:115` ハードルール「インライン `style={{ color: '#…' }}` 禁止」に違反。`ToggleSwitch.tsx:25, 29-36, 38` で `cursor` / `backgroundColor` / `borderColor` / `left` をインライン指定している。
 
@@ -144,6 +176,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 ---
 
 ### 7. TableOfContents の tocbot 依存を外す — [ ]
+
+**該当ガイド**
+
+- [identify-heavy-scripts.md?plain=1#L1-L7](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/performance/identify-heavy-scripts.md?plain=1#L1-L7) — third-party / 「忘れがちなライブラリ」が長時間 JS の主因になる前提を示す。tocbot は IntersectionObserver の薄いラッパで代替可能
 
 **現状の問題**
 `TableOfContents.tsx:39-41` で `setTimeout(300)` → 動的 import → tocbot init、という race condition 含みの初期化。tocbot は約 10KB あり、機能の大半（IntersectionObserver による active 状態管理）は自前実装で代替可能。
@@ -174,6 +210,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ### 9. `next.config.ts` の `X-XSS-Protection` を撤去 — [ ]
 
+**該当ガイド**
+
+- [security.md?plain=1#L194-L210](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/security/security.md?plain=1#L194-L210) — 3.2 Transitioning to CSP Enforcement。XSS 対策の中核は `script-src` + nonce/hash + `base-uri 'none'`。`X-XSS-Protection` は同ガイドにそもそも登場しない（CSP に置き換える前提）
+
 **現状の問題**
 `next.config.ts:30-32` の `X-XSS-Protection: 1; mode=block` は廃止仕様。モダンブラウザは無視するか、過去には逆効果になるバグもあった。
 
@@ -186,6 +226,10 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 ---
 
 ### 10. globals.css のダークモード定義二重化を `light-dark()` に統合 — [ ]
+
+**該当ガイド**
+
+- [dark-mode.md?plain=1#L28-L48](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/dark-mode.md?plain=1#L28-L48) — `--xxx-light` / `--xxx-dark` の生値を分けて持ち、`light-dark(var(--xxx-light), var(--xxx-dark))` でトークン化する推奨パターン
 
 **現状の問題**
 `globals.css:130-200` で `[data-theme='dark']` ブロックと `@media (prefers-color-scheme: dark) :root:not([data-theme='light'])` ブロックに同じトークンをコピペしており、片方だけ更新する事故が起きうる。
