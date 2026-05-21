@@ -1,14 +1,17 @@
 'use client';
 
 import type React from 'react';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
+
+type ColorMode = 'light' | 'dark';
 
 type ColorTheme = {
-  colorMode?: string;
-  changeColorMode: (cm: string) => void;
+  colorMode: ColorMode;
+  changeColorMode: (cm: ColorMode) => void;
 };
 
 const ColorThemeContext = createContext<ColorTheme>({
+  colorMode: 'light',
   changeColorMode: () => {},
 });
 
@@ -16,23 +19,17 @@ export function useColorTheme() {
   return useContext(ColorThemeContext);
 }
 
+function readInitialColorMode(): ColorMode {
+  if (typeof document === 'undefined') return 'light';
+  const fromDom = document.documentElement.dataset.theme;
+  if (fromDom === 'dark' || fromDom === 'light') return fromDom;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [colorMode, setColorMode] = useState<string | undefined>(undefined);
+  const [colorMode, setColorMode] = useState<ColorMode>(readInitialColorMode);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem('color-mode');
-    if (saved) {
-      document.documentElement.dataset.theme = saved;
-      setColorMode(saved);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = prefersDark ? 'dark' : 'light';
-      document.documentElement.dataset.theme = theme;
-      setColorMode(theme);
-    }
-  }, []);
-
-  const changeColorMode = (mode: string) => {
+  const changeColorMode = (mode: ColorMode) => {
     document.documentElement.dataset.theme = mode;
     setColorMode(mode);
     window.localStorage.setItem('color-mode', mode);

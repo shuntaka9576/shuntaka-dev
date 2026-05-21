@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -13,6 +13,12 @@ const GEN_INTERFACE_JP_BASE = `https://cdn.jsdelivr.net/npm/gen-interface-jp@${G
 
 const OG_IMAGE_URL =
   'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png';
+
+const COLOR_SCHEME_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('color-mode');if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;}}catch(e){}})();`;
+
+export const viewport: Viewport = {
+  colorScheme: 'light dark',
+};
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
@@ -57,6 +63,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" suppressHydrationWarning>
+      <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_BOOT_SCRIPT }} />
       <GoogleTagManager />
       <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
       <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/300.css`} precedence="default" />

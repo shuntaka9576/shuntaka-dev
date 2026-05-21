@@ -7,17 +7,69 @@
 
 ## High priority
 
-### 1. ダークモード FOUC 対策 — [ ]
+### 1. ダークモード FOUC 対策 — [x]
 
 **現状の問題**
 `ThemeProvider.tsx:22-33` で `colorMode` を `undefined` 初期化 → `useEffect` で確定、という流れ。`ToggleSwitch.tsx:13-15` が `colorMode === undefined` の間 `null` を返すため、初回ロードで一瞬トグルが消える。`layout.tsx:59` の `suppressHydrationWarning` で凌いでいるだけで、スクロールバー / canvas はネイティブテーマで一瞬ライトが出る。
 
 **対応内容**
 
-- [ ] `app/globals.css` の `:root` に `color-scheme: light dark;` を追加
-- [ ] `layout.tsx` の `<head>` に `<meta name="color-scheme" content="light dark">` を追加
-- [ ] `<head>` 先頭にインライン boot script（`type=module` でも `defer` でもない）を挿入し、`localStorage.getItem('color-mode')` を読んで `documentElement.dataset.theme` を hydrate 前にセット
-- [ ] 上記が入ったら `ThemeProvider` の `useEffect` 初期化処理と `ToggleSwitch` の `colorMode === undefined` ガードを撤去
+- [x] `app/globals.css` の `:root` に `color-scheme: light dark;` を追加、`[data-theme='light' | 'dark']` でピン留め
+- [x] `layout.tsx` で `viewport` export の `colorScheme: 'light dark'` を宣言（Next.js 14 以降は `metadata.colorScheme` ではなく `viewport` が正）
+- [x] `<html>` 直下にインライン boot script（`type=module` でも `defer` でもない `<script dangerouslySetInnerHTML>`）を挿入し、`localStorage.getItem('color-mode')` を読んで `documentElement.dataset.theme` を hydrate 前にセット
+- [x] `ThemeProvider` を `useState(readInitialColorMode)` で初期化し `useEffect` の初期化処理を撤去（`colorMode` の型も `'light' | 'dark'` に narrowing）
+- [x] `ToggleSwitch` の `colorMode === undefined` ガードを撤去、`aria-pressed` 追加、インライン style を CSS（`[data-theme='dark'] .toggle-label / .dark-icon`）へ移管。`aria-label` のみ hydration 差分が残るので `suppressHydrationWarning` を付与
+
+#### 補足: なぜ `color-scheme` が必要か
+
+CSS の `color-scheme: light dark` を宣言すると、**ブラウザがネイティブ UI（スクロールバー・フォーム部品・ページ初期背景）をテーマに追従させてくれる**ようになる。宣言しないと、ページ本体は暗くなってもスクロールバーは白いまま、初期描画では一瞬白背景がチラつく。
+
+![color-scheme なし / あり の見た目比較](./2026-05-21-apps-web-modern-web-improvements/color-scheme-comparison.png)
+
+- **左 (`color-scheme: なし`)**: ページ本体は暗いのに、右側のスクロールバーが白いライト基調のまま。ページ上部にも一瞬白フラッシュが見える
+- **右 (`color-scheme: light dark`)**: スクロールバーも暗くなり、フラッシュも消える
+
+違いを生んでいるのは `globals.css` に追加したたった 1 行:
+
+```css
+:root {
+  color-scheme: light dark;
+}
+```
+
+##### ロード時系列で何が違うか
+
+ブラウザがページを開くとき、内部的にはおおむね 3 段階ある。
+
+| t    | 何が起きるか                                               |
+| ---- | ---------------------------------------------------------- |
+| 0ms  | HTML を受信開始。まだ何も描画していない                    |
+| 10ms | HTML をパースして最初のフレームを描画                      |
+| 30ms | CSS を解釈して `body { background: ... }` などが適用される |
+
+![ロード時系列の比較](./2026-05-21-apps-web-modern-web-improvements/color-scheme-timeline.png)
+
+**宣言なしのとき（上段）**: ブラウザは「このページがダーク対応か」分からないので、初期値として **白い canvas** + **ライトテーマのスクロールバー** で描画を始める。10ms 地点で白フラッシュ、30ms で `body` の暗い背景が当たってもスクロールバーは白いまま。
+
+**`color-scheme: light dark` 宣言ありのとき（下段）**: ブラウザは「ダークも対応している」と知っているので、OS が dark なら**最初から暗い canvas** + **ダークなスクロールバー**で描画を始める。フラッシュなし。
+
+##### canvas って何？
+
+ここでの canvas は HTML の `<canvas>` 要素ではなく、**ブラウザが HTML/CSS を適用する前に塗りつぶす土台のサーフェス** のこと（W3C 用語）。具体的にはこういうもの。
+
+| 場所                              | `color-scheme` なし | `color-scheme: light dark` あり |
+| --------------------------------- | ------------------- | ------------------------------- |
+| ページ初期背景 (canvas)           | 真っ白              | OS 設定に追従                   |
+| スクロールバー                    | 常にライト          | OS に追従                       |
+| `<input>` の枠線・autofill 黄背景 | ライト前提          | ダーク版                        |
+| `<select>` のドロップダウン       | 白背景              | 黒背景                          |
+| 空 iframe (`about:blank`)         | 白                  | OS に追従                       |
+
+要するに「**自分の CSS が touch しない領域**」をブラウザに自動でテーマしてもらう機能。
+
+##### `<meta name="color-scheme">` も入れた理由
+
+CSS 内の `color-scheme` は **CSS が parse され終わってから**効く。一方、Next.js の `viewport.colorScheme` export 経由で出力される `<meta name="color-scheme">` は HTML の `<head>` を読んだ瞬間に効くので、**CSS のダウンロードが遅い回線でも canvas の白フラッシュが出ない**。両方入れることで早期と確実性の両方をカバーしている。
 
 ---
 

@@ -6,13 +6,8 @@ export function ToggleSwitch() {
   const { colorMode, changeColorMode } = useColorTheme();
 
   const handleClick = () => {
-    const mode = colorMode === 'dark' ? 'light' : 'dark';
-    changeColorMode(mode);
+    changeColorMode(colorMode === 'dark' ? 'light' : 'dark');
   };
-
-  if (colorMode === undefined) {
-    return null;
-  }
 
   const isDark = colorMode === 'dark';
 
@@ -22,20 +17,11 @@ export function ToggleSwitch() {
       className="toggle-switch"
       onClick={handleClick}
       aria-label={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
-      style={{ cursor: 'pointer' }}
+      aria-pressed={isDark}
+      suppressHydrationWarning
     >
-      <div
-        className="toggle-label"
-        style={
-          isDark
-            ? {
-                backgroundColor: 'var(--color-accent-alt)',
-                borderColor: 'var(--color-surface-raised)',
-              }
-            : {}
-        }
-      >
-        <span className="dark-icon" style={{ left: isDark ? '22px' : '-6px' }}>
+      <div className="toggle-label">
+        <span className="dark-icon">
           <svg
             width="24"
             height="24"
