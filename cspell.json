@@ -80,6 +80,7 @@
     "newtype",
     "nodegroup",
     "nofile",
+    "noverify",
     "nonroot",
     "nosniff",
     "notesansjpmid",
