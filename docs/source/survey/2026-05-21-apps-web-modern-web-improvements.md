@@ -16,9 +16,9 @@
 
 - [x] `app/globals.css` の `:root` に `color-scheme: light dark;` を追加、`[data-theme='light' | 'dark']` でピン留め
 - [x] `layout.tsx` で `viewport` export の `colorScheme: 'light dark'` を宣言（Next.js 14 以降は `metadata.colorScheme` ではなく `viewport` が正）
-- [x] `<html>` 直下にインライン boot script（`type=module` でも `defer` でもない `<script dangerouslySetInnerHTML>`）を挿入し、`localStorage.getItem('color-mode')` を読んで `documentElement.dataset.theme` を hydrate 前にセット
+- [x] `<html>` 内の明示的な `<head>` に `next/script` の `<Script id="color-scheme-boot" strategy="beforeInteractive">` で boot script を埋め込み、`localStorage.getItem('color-mode')` ＋ `matchMedia('(prefers-color-scheme: dark)')` を見て hydrate 前に `documentElement.dataset.theme` をセット
 - [x] `ThemeProvider` を `useState(readInitialColorMode)` で初期化し `useEffect` の初期化処理を撤去（`colorMode` の型も `'light' | 'dark'` に narrowing）
-- [x] `ToggleSwitch` の `colorMode === undefined` ガードを撤去、`aria-pressed` 追加、インライン style を CSS（`[data-theme='dark'] .toggle-label / .dark-icon`）へ移管。`aria-label` のみ hydration 差分が残るので `suppressHydrationWarning` を付与
+- [x] `ToggleSwitch` の `colorMode === undefined` ガードを撤去、`aria-pressed` 追加。インライン style と SVG ノブ位置はそのまま残し、SSR/CSR 差分を黙らせるため button / toggle-label / dark-icon の 3 階層に `suppressHydrationWarning` を付与（CSS への完全移管は item 6 で実施）
 
 #### 補足: なぜ `color-scheme` が必要か
 

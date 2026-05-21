@@ -18,10 +18,26 @@ export function ToggleSwitch() {
       onClick={handleClick}
       aria-label={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
       aria-pressed={isDark}
+      style={{ cursor: 'pointer' }}
       suppressHydrationWarning
     >
-      <div className="toggle-label">
-        <span className="dark-icon">
+      <div
+        className="toggle-label"
+        style={
+          isDark
+            ? {
+                backgroundColor: 'var(--color-accent-alt)',
+                borderColor: 'var(--color-surface-raised)',
+              }
+            : {}
+        }
+        suppressHydrationWarning
+      >
+        <span
+          className="dark-icon"
+          style={{ left: isDark ? '22px' : '-6px' }}
+          suppressHydrationWarning
+        >
           <svg
             width="24"
             height="24"
