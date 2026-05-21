@@ -6,6 +6,7 @@ import { ProgressLink } from './ProgressLink';
 interface ArticleCardProps {
   article: Article;
   userName: string;
+  priority?: boolean;
 }
 
 function formatDate(dateString: string | null): string {
@@ -18,7 +19,11 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-export const ArticleCard = memo(function ArticleCard({ article, userName }: ArticleCardProps) {
+export const ArticleCard = memo(function ArticleCard({
+  article,
+  userName,
+  priority = false,
+}: ArticleCardProps) {
   return (
     <ProgressLink href={`/${userName}/articles/${article.slug}`}>
       <article className="mb-4 block w-full border-b border-[var(--color-border-subtle)]">
@@ -29,14 +34,27 @@ export const ArticleCard = memo(function ArticleCard({ article, userName }: Arti
           </div>
           {article.thumbnail && (
             <div>
-              <Image
-                src={article.thumbnail}
-                alt={article.title}
-                width={150}
-                height={100}
-                className="rounded-[10px] object-cover"
-                loading="lazy"
-              />
+              {priority ? (
+                <Image
+                  src={article.thumbnail}
+                  alt={article.title}
+                  width={150}
+                  height={100}
+                  className="rounded-[10px] object-cover"
+                  style={{ width: 'auto', height: 'auto' }}
+                  priority
+                />
+              ) : (
+                <Image
+                  src={article.thumbnail}
+                  alt={article.title}
+                  width={150}
+                  height={100}
+                  className="rounded-[10px] object-cover"
+                  style={{ width: 'auto', height: 'auto' }}
+                  loading="lazy"
+                />
+              )}
             </div>
           )}
         </div>

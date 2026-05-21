@@ -15,6 +15,13 @@ export default async function NotePage() {
     error = e instanceof Error ? e.message : 'Failed to fetch articles';
   }
 
+  const priorityArticleIds = new Set(
+    articles
+      .filter((a) => a.thumbnail)
+      .slice(0, 2)
+      .map((a) => a.articleId),
+  );
+
   return (
     <BaseLayout showTypeHeader currentTab="note">
       <main className="w-full">
@@ -25,7 +32,12 @@ export default async function NotePage() {
             <p>No articles found.</p>
           ) : (
             articles.map((article) => (
-              <ArticleCard key={article.articleId} article={article} userName={USER_NAME} />
+              <ArticleCard
+                key={article.articleId}
+                article={article}
+                userName={USER_NAME}
+                priority={priorityArticleIds.has(article.articleId)}
+              />
             ))
           )}
         </div>
