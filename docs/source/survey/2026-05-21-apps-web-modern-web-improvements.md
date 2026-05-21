@@ -1,0 +1,152 @@
+# apps/web モダンWeb準拠の改善 TODO
+
+- 対象: `apps/web/`（Next.js 16 + React 19 + Tailwind CSS 4）
+- 調査日: 2026-05-21
+- 根拠: `modern-web-guidance` の `dark-mode` / `cross-document-transitions` / `optimize-image-priority` / `optimize-preload-priority` / `visually-stable-font-fallbacks` ガイド
+- 結論: FOUC・LCP・フォント周りに Baseline 対応の伸びしろがあるので段階的に手を入れる
+
+## High priority
+
+### 1. ダークモード FOUC 対策 — [ ]
+
+**現状の問題**
+`ThemeProvider.tsx:22-33` で `colorMode` を `undefined` 初期化 → `useEffect` で確定、という流れ。`ToggleSwitch.tsx:13-15` が `colorMode === undefined` の間 `null` を返すため、初回ロードで一瞬トグルが消える。`layout.tsx:59` の `suppressHydrationWarning` で凌いでいるだけで、スクロールバー / canvas はネイティブテーマで一瞬ライトが出る。
+
+**対応内容**
+
+- [ ] `app/globals.css` の `:root` に `color-scheme: light dark;` を追加
+- [ ] `layout.tsx` の `<head>` に `<meta name="color-scheme" content="light dark">` を追加
+- [ ] `<head>` 先頭にインライン boot script（`type=module` でも `defer` でもない）を挿入し、`localStorage.getItem('color-mode')` を読んで `documentElement.dataset.theme` を hydrate 前にセット
+- [ ] 上記が入ったら `ThemeProvider` の `useEffect` 初期化処理と `ToggleSwitch` の `colorMode === undefined` ガードを撤去
+
+---
+
+### 2. ArticleCard 先頭サムネを LCP 候補として優先読み込み — [ ]
+
+**現状の問題**
+`ArticleCard.tsx:38` で全カード一律 `loading="lazy"`。リスト先頭のサムネは above-the-fold で LCP 候補だが、ガイドは「LCP 画像に lazy を付けるな／`fetchpriority="high"` を 1〜2 枚に絞れ」と明記。
+
+**対応内容**
+
+- [ ] `ArticleCard` に `priority?: boolean` prop を追加（または `index` を受けて内部で判定）
+- [ ] `page.tsx` / `type/note/page.tsx` でリスト先頭の 1〜2 枚に `priority` を渡す
+- [ ] 先頭カードは `<Image priority />` に変更（裏で `fetchpriority="high"` ＋非 lazy になる）
+
+---
+
+### 3. Web フォント読み込みを 5 リクエスト → 2 に削減 — [ ]
+
+**現状の問題**
+`layout.tsx:62-66` で 300/400/500/600/700 の CSS を 5 本ロード。`DESIGN.md:161` には「400 / 700 の 2 本」と書いてあり仕様と実装が食い違っている。`optimize-preload-priority` ガイドはフォント preload を 2〜3 本までに抑えることを推奨。フォールバック時の CLS 対策も入っていない。
+
+**対応内容**
+
+- [ ] `DESIGN.md` と実装のどちらが正かを決定（推奨: 400 / 700 のみに削減）
+- [ ] `layout.tsx` のフォント `<link>` を必要 weight だけに削る
+- [ ] `globals.css` の `body` に `font-size-adjust: from-font;` を追加（`visually-stable-font-fallbacks` 準拠、Baseline Newly available なので fallback 不要）
+- [ ] (任意) 400 weight の woff2 を `<link rel="preload" as="font" type="font/woff2" fetchpriority="high" crossorigin>` で明示 preload
+- [ ] (検討) `next/font/local` で self-host し jsDelivr 依存を切る
+
+---
+
+## Medium priority
+
+### 4. Cross-document View Transitions でナビ周りを簡素化 — [ ]
+
+**現状の問題**
+`NavigationProgressProvider` / `ProgressLink` / `PageReady` + `ArticleContent.tsx:51-57` の `requestAnimationFrame` 2 段ネストで合計 150 行強のコード。Next.js 16 + React 19.2 ならクロスドキュメント View Transition で大半が消える。
+
+**対応内容**
+
+- [ ] `globals.css` に `@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }` を追加
+- [ ] NProgress を残す場合は `startProgress` を 200ms 遅延起動にして、速い遷移ではバーを出さない UX にする
+- [ ] `PageReady` / `ArticleContent` の rAF×2 完了通知を撤去できるか検証
+- [ ] Firefox 未対応は progressive enhancement として許容することをチームで確認
+
+---
+
+### 5. ArticleContent のハッシュスクロールをポーリングから脱却 — [ ]
+
+**現状の問題**
+`ArticleContent.tsx:124-154` で最大 10 回 × 100ms のポーリングで要素を探している。`dangerouslySetInnerHTML` は同期で DOM に入るので、本来ポーリングは不要。
+
+**対応内容**
+
+- [ ] ポーリングを 1 回の `requestAnimationFrame` + `scrollIntoView` に置換
+- [ ] CSS で `.prose :is(h1,h2,h3,h4,h5,h6)[id] { scroll-margin-top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5)); }` を追加し、`:target` 経由でブラウザ任せのオフセット計算を効かせる
+- [ ] `prefers-reduced-motion: reduce` のときは `behavior: 'instant'` に切り替える
+
+---
+
+### 6. ToggleSwitch のインライン style を CSS 側に移す — [ ]
+
+**現状の問題**
+`DESIGN.md:115` ハードルール「インライン `style={{ color: '#…' }}` 禁止」に違反。`ToggleSwitch.tsx:25, 29-36, 38` で `cursor` / `backgroundColor` / `borderColor` / `left` をインライン指定している。
+
+**対応内容**
+
+- [ ] `button[aria-pressed="true"]` または `[data-mode='dark']` でスタイルを分岐する CSS を `globals.css` に追加
+- [ ] ノブの `left` 値を `transform: translateX(var(--toggle-x))` に変えて GPU 合成に乗せる（INP 改善）
+- [ ] `style={{ cursor: 'pointer' }}` は CSS の `.toggle-switch { cursor: pointer; }` に移管
+
+---
+
+### 7. TableOfContents の tocbot 依存を外す — [ ]
+
+**現状の問題**
+`TableOfContents.tsx:39-41` で `setTimeout(300)` → 動的 import → tocbot init、という race condition 含みの初期化。tocbot は約 10KB あり、機能の大半（IntersectionObserver による active 状態管理）は自前実装で代替可能。
+
+**対応内容**
+
+- [ ] 記事 HTML から見出しを API（Rust comrak アダプター）側で抽出して JSON で返す
+- [ ] TOC 本体は Server Component で SSR
+- [ ] active ハイライトだけ IntersectionObserver の小さな Client Component に切り出す（30 行程度の想定）
+- [ ] `tocbot` を `package.json` の dependencies から削除
+
+---
+
+## Low priority
+
+### 8. ArticleContent の copy ボタン DOM 注入を API 側に寄せる — [ ]
+
+**現状の問題**
+`ArticleContent.tsx:60-83` で `useEffect` から `pre` に `<button class="copy-btn">` を `appendChild` している。React 管理外の imperative な DOM 操作で、SSR とのズレも発生しうる。
+
+**対応内容**
+
+- [ ] Rust 側 comrak アダプターで `<pre>` の直後に `<button class="copy-btn" data-code="...">` を出力するよう変更
+- [ ] `ArticleContent` 側の `useEffect`（コピーボタン注入）を削除
+- [ ] click ハンドラは delegated listener 1 本だけ残す（`ArticleContent.tsx:86-120` 相当）
+
+---
+
+### 9. `next.config.ts` の `X-XSS-Protection` を撤去 — [ ]
+
+**現状の問題**
+`next.config.ts:30-32` の `X-XSS-Protection: 1; mode=block` は廃止仕様。モダンブラウザは無視するか、過去には逆効果になるバグもあった。
+
+**対応内容**
+
+- [ ] `X-XSS-Protection` ヘッダー設定を削除
+- [ ] 代替として最小限の CSP を段階的に導入（`default-src 'self'; img-src 'self' data: https://res.cloudinary.com https://pbs.twimg.com; script-src 'self' https://www.googletagmanager.com; ...`）
+- [ ] react-tweet / GTM の許可ドメインを精査してから本番投入
+
+---
+
+### 10. globals.css のダークモード定義二重化を `light-dark()` に統合 — [ ]
+
+**現状の問題**
+`globals.css:130-200` で `[data-theme='dark']` ブロックと `@media (prefers-color-scheme: dark) :root:not([data-theme='light'])` ブロックに同じトークンをコピペしており、片方だけ更新する事故が起きうる。
+
+**対応内容**
+
+- [ ] 各トークンを `--color-xxx-light` / `--color-xxx-dark` の raw 値に分解
+- [ ] `--color-xxx: light-dark(var(--color-xxx-light), var(--color-xxx-dark));` に置換
+- [ ] `[data-theme='dark']` では `color-scheme: dark;` を、`[data-theme='light']` では `color-scheme: light;` を切り替えるだけにする
+- [ ] 重複していた `@media (prefers-color-scheme: dark)` ブロックを削除（`light-dark()` が自動で解決）
+
+---
+
+## 着手順の推奨
+
+1（FOUC）→ 2（LCP）→ 3（フォント）→ 4（View Transitions で大量削除）→ 5〜7 → 8〜10。1〜3 は Core Web Vitals に直結、4 は LOC が一番削れる。
