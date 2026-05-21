@@ -79,7 +79,7 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 ---
 
-### 2. ArticleCard 先頭サムネを LCP 候補として優先読み込み — [ ]
+### 2. ArticleCard 先頭サムネを LCP 候補として優先読み込み — [x]
 
 **該当ガイド**
 
@@ -95,9 +95,94 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 
 **対応内容**
 
-- [ ] `ArticleCard` に `priority?: boolean` prop を追加（または `index` を受けて内部で判定）
-- [ ] `page.tsx` / `type/note/page.tsx` でリスト先頭の 1〜2 枚に `priority` を渡す
-- [ ] 先頭カードは `<Image priority />` に変更（裏で `fetchpriority="high"` ＋非 lazy になる）
+- [x] `ArticleCard` に `priority?: boolean` prop を追加（デフォルト `false`、true のとき `loading="lazy"` を外して `<Image priority />` に切替）
+- [x] `page.tsx` / `type/note/page.tsx` で **サムネを持つ上位 2 件** を `priorityArticleIds` (`Set<string>`) に事前計算し、各 `ArticleCard` に `priority={priorityArticleIds.has(article.articleId)}` を渡す
+- [x] `ArticleCard.stories.tsx` に `Priority` story を追加
+- [x] `<Image>` に `style={{ width: 'auto', height: 'auto' }}` を追加（下記「Next.js Image の width/height 警告」参照）
+
+#### 補足: Next.js dev server の LCP 警告
+
+修正前は dev server から以下の警告が出ていた。
+
+```
+Image with src "...青梅2025..." was detected as the Largest Contentful Paint (LCP).
+Please add the `loading="eager"` property if this image is above the fold.
+```
+
+**意味**: Next.js Image は実ブラウザの PerformanceObserver で LCP element を測定している。dev session 中、ビューポートに収まった画像のうち最も大きく最後に描画された **3 枚目 (`青梅2025`)** が LCP として検出され、「above the fold ならその画像に eager を付けろ」と促していた。
+
+##### "above the fold" とは
+
+元々は新聞用語で、二つ折りの新聞の **折り目より上**＝広げずに見える上半分のこと。Web に転用されて「**ブラウザを開いた瞬間、スクロールせずに見える領域**」を指す。
+
+```
+┌────────────────────────┐
+│  ヘッダー              │
+│  カード 1 (LCP 候補)   │  ← above the fold（見える）
+│  カード 2              │
+│  カード 3              │
+│ ─ ─ ─ viewport 下端 ─ ─│  ← fold
+│  カード 4              │  ← below the fold（スクロールしないと見えない）
+│  カード 5              │
+└────────────────────────┘
+```
+
+警告で言っていたのは「その画像が最初の表示領域に映っているなら lazy じゃなくて eager にしろ」という条件付き提案。lazy のままだと、ユーザーが見ているのにダウンロード優先度が下がってしまうため。逆に below the fold の画像は lazy のままで OK。`<Image priority />` を **viewport 内に入る 1〜2 枚に絞る** のがガイドの主旨。
+
+サムネはすべて 150x100 で同サイズなので、LCP は単純に「**上から数えて何枚目までが viewport に入るか × どれが最後に paint されたか**」で決まる。当時は全カードが `loading="lazy"` だったので、ビューポート内の最後のサムネ（3 枚目）が paint 完了 = LCP になりやすい状況だった。
+
+**対応後**: 上位 2 枚に `priority`（= preload + eager + fetchpriority=high）が付いたことで、それらが優先的にダウンロード・描画される。LCP は通常 1〜2 枚目のどちらかになるはずで、警告も消える。
+
+ただし、もし viewport によって 3 枚目が LCP に残り続ける場合（例: 大きめウィンドウで 3 枚以上が above the fold に入る）は、`slice(0, 2)` を `slice(0, 3)` に拡張するか、上部レイアウト（ヘッダー高さ等）を見直して LCP 候補を確実に 1〜2 枚目に収める。`fetchpriority="high"` は guide 上「1〜2 枚まで」が推奨なので 3 枚以上には無闇に増やさない。
+
+#### 補足: なぜ `index < 2` ではダメだったか
+
+最初は `priority={index < 2}` で実装したが、prod ビルド出力を見ると **先頭 2 件のうち 1 件にしか** priority が効いていなかった。
+
+理由は `articles` 配列の上位にサムネを持たない記事が混じることがあるため。たとえば:
+
+| index | article            | thumbnail | `priority={index<2}` | サムネ表示 |
+| ----- | ------------------ | --------- | -------------------- | ---------- |
+| 0     | 2025年の振り返り   | あり      | true                 | ⬆ 1 枚目   |
+| 1     | （サムネ無し記事） | なし      | true                 | ―          |
+| 2     | VimConf 2025 Small | あり      | false                | ⬇ 2 枚目   |
+| 3     | 青梅2025           | あり      | false                | ⬇ 3 枚目   |
+
+ユーザーに見える「サムネ 2 枚目」（VimConf 2025）は articles[] 上では index=2 にいるため、`index < 2` だと priority が付かない。
+
+修正後は articles をフィルタしてから上位 2 件の `articleId` を抽出する形に変更:
+
+```tsx
+const priorityArticleIds = new Set(
+  articles
+    .filter((a) => a.thumbnail)
+    .slice(0, 2)
+    .map((a) => a.articleId),
+);
+```
+
+これで「実際に表示されるサムネの上位 2 枚」にだけ確実に priority が付く。
+
+#### 補足: Next.js Image の width/height 警告
+
+dev server を立ち上げると Next.js が以下の警告を出していた。
+
+```
+Image with src "..." has either width or height modified, but not the other.
+If you use CSS to change the size of your image, also include the styles
+'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+```
+
+**原因**: Tailwind v4 の preflight に `img, video { max-width: 100%; height: auto; }` が含まれている。そのため `<Image width={150} height={100}>` で HTML 属性として渡した `height` が CSS で `auto` に上書きされ、Next.js は「片方の dimension を変えるとアスペクト比が崩れる可能性がある」と判定して警告を出す。
+
+**対応**: Next.js の公式ガイダンス通り `style={{ width: 'auto', height: 'auto' }}` を `<Image>` に追加。これで以下が成立する。
+
+- Tailwind の `height: auto` が引き続き効く（preflight に乗っかる形）
+- 明示的に `width: auto` も足すことで Next.js の警告条件（「片方だけ auto」）を回避
+- `width=150 / height=100` の HTML 属性は残るので intrinsic size として CLS 防止に効く
+- 実描画サイズは親要素（150x100 の親 div）と `object-cover` で 150x100 に収束
+
+`DESIGN.md` の「インライン `style={{ color: '#…' }}` 禁止」ルールは色トークンを直書きさせないためのもの。`width: 'auto'` は Next.js 側が公式に提示する書き方で、color トークン直書きとは性質が違うため許容範囲と判断。
 
 ---
 

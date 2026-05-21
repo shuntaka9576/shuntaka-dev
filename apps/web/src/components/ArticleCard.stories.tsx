@@ -33,6 +33,12 @@ type Story = StoryObj<typeof meta>;
 
 export const WithThumbnail: Story = {};
 
+export const Priority: Story = {
+  args: {
+    priority: true,
+  },
+};
+
 export const NoThumbnail: Story = {
   args: {
     article: { ...baseArticle, thumbnail: null },
