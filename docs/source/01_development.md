@@ -305,7 +305,7 @@ gh infra import shuntaka9576/shuntaka-dev > .github/infra.yaml
 
 ### シークレット漏洩対策
 
-Claude Code 経由のシークレット漏洩を `.claude/settings.json` の env scrub と UserPromptSubmit hook、`lefthook.yaml` の pre-commit (secretlint + gitleaks) の3層で防ぐ。設計の詳細は CLAUDE.md の Security セクション参照。
+Claude Code 経由のシークレット漏洩を `.claude/settings.json` の env scrub と UserPromptSubmit hook、`lefthook.yaml` の pre-commit (secretlint + gitleaks)、PreToolUse Bash hook (`block-noverify.ts`) による `--no-verify` バイパス拒否の4層で防ぐ。設計の詳細は CLAUDE.md の Security セクション参照。
 
 gitleaks のバイナリインストール（初回のみ）。
 
