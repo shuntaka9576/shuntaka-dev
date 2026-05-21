@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 
 :root {
+  color-scheme: light dark;
+
   /* Surfaces & text */
   --color-bg: #f7fafc;
   --color-surface: #ffffff;
@@ -127,7 +129,12 @@
   --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 
+[data-theme='light'] {
+  color-scheme: light;
+}
+
 [data-theme='dark'] {
+  color-scheme: dark;
   --color-bg: #22272e;
   --color-surface: #22272e;
   --color-surface-raised: #2d333b;
