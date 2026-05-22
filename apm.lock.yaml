@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-05-22T11:17:02.110074+00:00'
+generated_at: '2026-05-22T13:34:09.929765+00:00'
 apm_version: 0.13.0
 dependencies:
 - repo_url: GoogleChrome/modern-web-guidance
   host: github.com
   resolved_commit: 1dee00c2ae94d2e0c26d4a0c9fecb87c52bd82f9
-  resolved_ref: 532a7ec07be99ece9609d429d044ec8a12d6cfad
+  resolved_ref: 65d7f20ac85517a362107ce89b7be7f905105fd3
   virtual_path: skills/modern-web-guidance
   is_virtual: true
   package_type: claude_skill
