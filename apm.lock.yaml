@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-05-22T13:34:09.929765+00:00'
+generated_at: '2026-05-22T21:36:03.053730+00:00'
 apm_version: 0.13.0
 dependencies:
 - repo_url: GoogleChrome/modern-web-guidance
@@ -135,7 +135,7 @@ dependencies:
 - repo_url: vercel-labs/agent-skills
   host: github.com
   resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
+  resolved_ref: 18a24346600009dc3fcb99e4b2cd83b301601775
   virtual_path: skills/composition-patterns
   is_virtual: true
   package_type: claude_skill
@@ -145,7 +145,7 @@ dependencies:
 - repo_url: vercel-labs/agent-skills
   host: github.com
   resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
+  resolved_ref: 18a24346600009dc3fcb99e4b2cd83b301601775
   virtual_path: skills/react-best-practices
   is_virtual: true
   package_type: claude_skill
@@ -155,7 +155,7 @@ dependencies:
 - repo_url: vercel-labs/agent-skills
   host: github.com
   resolved_commit: b9c8ee0643d87d3c5a953d1e22382ff2ead39229
-  resolved_ref: da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
+  resolved_ref: 18a24346600009dc3fcb99e4b2cd83b301601775
   virtual_path: skills/web-design-guidelines
   is_virtual: true
   package_type: claude_skill
