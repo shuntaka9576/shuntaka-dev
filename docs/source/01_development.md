@@ -210,6 +210,26 @@ bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
+### GitHub App (Utils)
+
+Renovate のワークフロー（`renovate-apm-update.yaml` / `renovate-cargo-update.yaml`）が lockfile 同期コミットを push した際、後続のチェック（CI / zizmor）が再トリガーされるよう、`GITHUB_TOKEN` ではなく App トークンで push するための GitHub App。
+
+1. GitHub Settings → Developer settings → GitHub Apps → New GitHub App
+2. 設定値:
+   - GitHub App name: `shuntaka-dev-utils`（任意）
+   - Webhook: Active のチェックを外す
+   - Repository permissions → Contents: Read and write
+3. 作成後、App ID を控える
+4. Private key を生成してダウンロード
+5. `shuntaka9576/shuntaka-dev` にインストール
+
+リポジトリの Variables / Secrets に登録。
+
+```bash
+gh variable set SHUNTAKA_DEV_UTILS_APP_ID --body "<App ID>"
+gh secret set SHUNTAKA_DEV_UTILS_PRIVATE_KEY < path/to/private-key.pem
+```
+
 ### ライブラリ更新
 
 依存関係の自動アップデートPRを作成するためのRenovateを利用。以下の設定で導入が可能。
