@@ -26,8 +26,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
-          app-id: ${{ secrets.RENOVATE_APP_ID }}
-          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
+          app-id: ${{ vars.SHUNTAKA_DEV_UTILS_APP_ID }}
+          private-key: ${{ secrets.SHUNTAKA_DEV_UTILS_PRIVATE_KEY }}
           repositories: |
             shuntaka-dev
           permission-contents: write
