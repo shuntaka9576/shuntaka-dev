@@ -17,12 +17,23 @@ jobs:
     if: github.event.pull_request.user.login == 'renovate[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write # apm.lock.yaml の同期コミットを PR ブランチへ push するため
+    permissions: {}
     env:
       APM_VERSION: 0.13.0
       APM_SHA256: ed02b1103ef4bc49559a81f7e109b424a49d95cf978515ad224e5eeb701b1f8a
     steps:
+      # GITHUB_TOKEN で push すると後続ワークフローがトリガーされない仕様を回避するため、
+      # GitHub App トークンを発行してそれで push する
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
+          repositories: |
+            shuntaka-dev
+          permission-contents: write
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.head_ref }}
@@ -46,7 +57,7 @@ jobs:
 
       - name: Commit apm.lock.yaml
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
