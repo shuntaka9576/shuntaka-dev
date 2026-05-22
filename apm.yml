@@ -20,9 +20,9 @@ dependencies:
     - aws/agent-toolkit-for-aws/skills/operations-skills/setting-up-cloudwatch-alarm-notifications#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
     - aws/agent-toolkit-for-aws/skills/operations-skills/troubleshooting-application-failures#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
     # vercel-labs (3)
-    - vercel-labs/agent-skills/skills/composition-patterns#da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
-    - vercel-labs/agent-skills/skills/react-best-practices#da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
-    - vercel-labs/agent-skills/skills/web-design-guidelines#da22a4c9e85b3a3f6f4b4e8cd415016117643bb2
+    - vercel-labs/agent-skills/skills/composition-patterns#18a24346600009dc3fcb99e4b2cd83b301601775
+    - vercel-labs/agent-skills/skills/react-best-practices#18a24346600009dc3fcb99e4b2cd83b301601775
+    - vercel-labs/agent-skills/skills/web-design-guidelines#18a24346600009dc3fcb99e4b2cd83b301601775
     # GoogleChrome (1)
     - GoogleChrome/modern-web-guidance/skills/modern-web-guidance#65d7f20ac85517a362107ce89b7be7f905105fd3
   mcp: []
