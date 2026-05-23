@@ -2,8 +2,8 @@
 
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
-import { Tweet } from 'react-tweet';
 import { useNavigationProgress } from '@/components/NavigationProgressProvider';
+import { SafeTweet } from '@/components/SafeTweet';
 
 function AvatarImg({ src, ...props }: ComponentProps<'img'>) {
   const hiResSrc = typeof src === 'string' ? src.replace('_normal.', '_bigger.') : src;
@@ -160,7 +160,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
           <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
         ) : (
           <div key={i} className="tweet-container">
-            <Tweet id={part.id} components={{ AvatarImg }} />
+            <SafeTweet id={part.id} components={{ AvatarImg }} />
           </div>
         ),
       )}

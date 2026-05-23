@@ -1146,3 +1146,18 @@ a:hover {
   --tweet-bg-color: var(--card-bg);
   --tweet-border: 1px solid var(--github-embed-border);
 }
+
+.tweet-fallback {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9999px;
+  color: var(--color-link);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.tweet-fallback:hover {
+  color: var(--color-link-hover);
+  border-color: var(--color-link-hover);
+}
