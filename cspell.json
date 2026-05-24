@@ -101,6 +101,7 @@
     "pkey",
     "plpgsql",
     "psql",
+    "pypi",
     "qlapi",
     "reqwest",
     "rsplit",
