@@ -301,6 +301,19 @@ apm install --update -t claude
 apm uninstall <package> -t claude
 ```
 
+完全リセット（apm.yml のパス書き換えが反映されないときに使う。apm は `apm_modules/` をローカル展開先として保持し、ここに旧構造のスナップショットが残っていると新パスを書いても `(cached)` 表示でそのまま再利用されるため、apm_modules と lockfile を消してから入れ直す）
+
+```bash
+rm -rf apm_modules apm.lock.yaml
+apm install -t claude
+```
+
+新しい `apm.lock.yaml` の `virtual_path` が apm.yml と同じパスになっていることを確認する。
+
+```bash
+grep virtual_path apm.lock.yaml
+```
+
 ### GitHub設定変更作業
 
 [babarot/gh-infra](https://github.com/babarot/gh-infra)でリポジトリ設定（visibility, labels, features, merge_strategy, security, rulesets, actions）を [`.github/infra.yaml`](.github/infra.yaml) で宣言的に管理。CI連携はせず手動運用。
