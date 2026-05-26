@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-05-26T22:53:08.622097+00:00'
+generated_at: '2026-05-26T22:53:32.538280+00:00'
 apm_version: 0.13.0
 dependencies:
 - repo_url: GoogleChrome/modern-web-guidance
