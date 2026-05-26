@@ -49,8 +49,15 @@ jobs:
           rm apm.tar.gz
           echo "${HOME}/.apm" >> "${GITHUB_PATH}"
 
-      - name: apm install
-        run: apm install -t claude
+      # Renovate が apm.yml の ref を bump しても apm install は lockfile の
+      # resolved_commit を優先して fetch するため、ref と commit が乖離した状態
+      # で lockfile が更新されることがある。lockfile を消してから install する
+      # ことで、新 ref で必ず resolve し直し、新 ref に存在しないパスは fail
+      # させる
+      - name: apm install (force re-resolve)
+        run: |
+          rm -f apm.lock.yaml
+          apm install -t claude
 
       - name: apm audit (lockfile + drift + content scan)
         run: apm audit --ci
