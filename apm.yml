@@ -24,7 +24,7 @@ dependencies:
     - vercel-labs/agent-skills/skills/react-best-practices#18a24346600009dc3fcb99e4b2cd83b301601775
     - vercel-labs/agent-skills/skills/web-design-guidelines#18a24346600009dc3fcb99e4b2cd83b301601775
     # GoogleChrome (1)
-    - GoogleChrome/modern-web-guidance/skills/modern-web-guidance#65d7f20ac85517a362107ce89b7be7f905105fd3
+    - GoogleChrome/modern-web-guidance/skills/modern-web-guidance#d0f7544492d329e87b4878d96c266799ac5eeeba
   mcp: []
 includes: auto
 scripts: {}

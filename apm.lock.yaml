@@ -1,17 +1,17 @@
 lockfile_version: '1'
-generated_at: '2026-05-26T02:05:15.329567+00:00'
-apm_version: 0.12.4
+generated_at: '2026-05-26T23:23:06.969071+00:00'
+apm_version: 0.13.0
 dependencies:
 - repo_url: GoogleChrome/modern-web-guidance
   host: github.com
-  resolved_commit: 65d7f20ac85517a362107ce89b7be7f905105fd3
-  resolved_ref: 65d7f20ac85517a362107ce89b7be7f905105fd3
+  resolved_commit: d0f7544492d329e87b4878d96c266799ac5eeeba
+  resolved_ref: d0f7544492d329e87b4878d96c266799ac5eeeba
   virtual_path: skills/modern-web-guidance
   is_virtual: true
   package_type: claude_skill
   deployed_files:
   - .claude/skills/modern-web-guidance
-  content_hash: sha256:322b3f5620be102387bbdddae4ed5aa80d67427c6e38dd6a76ba09b12b48717e
+  content_hash: sha256:6f666fa7c384d08f10270bd5f5915cf5583164e5b60b59174a5c7eb736cb8de1
 - repo_url: aws/agent-toolkit-for-aws
   host: github.com
   resolved_commit: ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
