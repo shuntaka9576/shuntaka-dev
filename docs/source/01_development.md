@@ -314,6 +314,12 @@ apm install -t claude
 grep virtual_path apm.lock.yaml
 ```
 
+Renovate APM Update PR のマージ前は zizmor を手動トリガーする。`renovate-apm-update.yaml` の lockfile 同期コミットが `[skip ci]` 付きで push されるため、最新コミットの zizmor が走らずブランチ保護でブロックされる（背景は `docs/source/survey/2026-05-27-renovate-apm-update-ci-loop.md`）。
+
+```bash
+gh workflow run zizmor.yaml --ref <PRブランチ名>
+```
+
 ### GitHub設定変更作業
 
 [babarot/gh-infra](https://github.com/babarot/gh-infra)でリポジトリ設定（visibility, labels, features, merge_strategy, security, rulesets, actions）を [`.github/infra.yaml`](.github/infra.yaml) で宣言的に管理。CI連携はせず手動運用。
