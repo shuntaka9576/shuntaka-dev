@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG RUST_VERSION=1.95
+ARG RUST_VERSION=1.96
 
 FROM lukemathwalker/cargo-chef:latest-rust-${RUST_VERSION} AS chef
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
