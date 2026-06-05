@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.15.15", "sphinx-autobuild>=2025.8.25"]
+dev = ["ruff>=0.15.16", "sphinx-autobuild>=2025.8.25"]
 
 [tool.uv]
 override-dependencies = ["sphinx>=9.0.4"]
