@@ -21,7 +21,7 @@ markdown = { path = "./apps/blog-api/markdown" }
 infrastructure = { path = "./apps/blog-api/infrastructure" }
 anyhow = "1.0.102"
 axum = { version = "0.8.9", features = ["macros"] }
-sqlx = { version = "0.8.6", features = [
+sqlx = { version = "0.9.0", features = [
   "runtime-tokio",
   "tls-rustls",
   "uuid",
@@ -30,7 +30,7 @@ sqlx = { version = "0.8.6", features = [
   "postgres",
   "migrate",
 ] }
-aurora-dsql-sqlx-connector = { version = "0.2.0", features = ["pool"] }
+aurora-dsql-sqlx-connector = { version = "0.2.1", features = ["pool"] }
 tokio = { version = "1.52.3", features = ["full"] }
 async-trait = "0.1.89"
 derive-new = "0.7.0"
@@ -38,18 +38,18 @@ rstest = "0.26.1"
 utoipa = "5.5.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 serde_yaml = "0.9.34"
-uuid = { version = "1.23.1", features = ["serde", "v4"] }
-chrono = { version = "0.4.44", features = ["serde"] }
-aws-config = "1.8.17"
-aws-sdk-ssm = "1.110.0"
+uuid = { version = "1.23.3", features = ["serde", "v4"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+aws-config = "1.8.18"
+aws-sdk-ssm = "1.112.0"
 tower-http = { version = "0.6.11", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
-reqwest = { version = "0.13.3", features = ["json", "rustls"] }
+reqwest = { version = "0.13.4", features = ["json", "rustls"] }
 base64 = "0.22.1"
-regex = "1.12.3"
+regex = "1.12.4"
 hmac = "0.13.0"
 sha1 = "0.11.0"
 sha2 = "0.11.0"
