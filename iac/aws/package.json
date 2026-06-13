@@ -11,15 +11,15 @@
     "clean": "rm -rf cdk.out .turbo"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.257.0",
+    "aws-cdk-lib": "^2.259.0",
     "cdk-nag": "^2.38.2",
     "change-case": "^5.4.4",
     "constructs": "^10.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "aws-cdk": "^2.1125.0",
+    "aws-cdk": "^2.1126.0",
     "dotenv-cli": "^11.0.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
