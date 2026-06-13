@@ -7,24 +7,24 @@ targets:
 dependencies:
   apm:
     # AWS Agent Toolkit (12)
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cdk#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cloudformation#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-iam#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-observability#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-sdk-js-v3-usage#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/connecting-lambda-to-api-gateway#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/creating-api-gateway-stage#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/security-and-identity-skills/creating-secrets-using-best-practices#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/debugging-lambda-timeouts#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/networking-and-content-delivery-skills/routing-traffic-with-route53-and-cloudfront#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/setting-up-cloudwatch-alarm-notifications#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/troubleshooting-application-failures#ba1cc8ca4f063d88ca40c6acf3f670e6321b7a7f
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cdk#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cloudformation#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-iam#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-observability#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-sdk-js-v3-usage#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/connecting-lambda-to-api-gateway#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/creating-api-gateway-stage#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/security-and-identity-skills/creating-secrets-using-best-practices#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/debugging-lambda-timeouts#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/networking-and-content-delivery-skills/routing-traffic-with-route53-and-cloudfront#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/setting-up-cloudwatch-alarm-notifications#7cd875e7e48b45469d66afe3988ed3cc9b144546
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/troubleshooting-application-failures#7cd875e7e48b45469d66afe3988ed3cc9b144546
     # vercel-labs (3)
-    - vercel-labs/agent-skills/skills/composition-patterns#4ec6f84b61cd3c931046c3e6e398f3ae7de372f7
-    - vercel-labs/agent-skills/skills/react-best-practices#4ec6f84b61cd3c931046c3e6e398f3ae7de372f7
-    - vercel-labs/agent-skills/skills/web-design-guidelines#4ec6f84b61cd3c931046c3e6e398f3ae7de372f7
+    - vercel-labs/agent-skills/skills/composition-patterns#f8a72b9603728bb92a217a879b7e62e43ad76c81
+    - vercel-labs/agent-skills/skills/react-best-practices#f8a72b9603728bb92a217a879b7e62e43ad76c81
+    - vercel-labs/agent-skills/skills/web-design-guidelines#f8a72b9603728bb92a217a879b7e62e43ad76c81
     # GoogleChrome (1)
-    - GoogleChrome/modern-web-guidance/skills/modern-web-guidance#d0f7544492d329e87b4878d96c266799ac5eeeba
+    - GoogleChrome/modern-web-guidance/skills/modern-web-guidance#5733cdd9f89b0f19119e855532f8b8ac7997ecb6
   mcp: []
 includes: auto
 scripts: {}
