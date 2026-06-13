@@ -49,6 +49,14 @@ jobs:
       - name: Run CI
         uses: ./.github/actions/ci
 
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
       - name: Commit Cargo.lock
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
