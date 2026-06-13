@@ -154,10 +154,14 @@ export function ArticleContent({ html }: ArticleContentProps) {
   }, [html]);
 
   return (
-    <div ref={contentRef} className="prose max-w-none">
+    <div ref={contentRef}>
       {parts.map((part, i) =>
         part.type === 'html' ? (
-          <div key={i} dangerouslySetInnerHTML={{ __html: part.content }} />
+          <div
+            key={i}
+            className="prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: part.content }}
+          />
         ) : (
           <div key={i} className="tweet-container">
             <SafeTweet id={part.id} components={{ AvatarImg }} />

@@ -18,7 +18,7 @@
     "nprogress": "^0.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-tweet": "^3.3.0",
+    "react-tweet": "^3.3.1",
     "rss": "^1.2.2",
     "tocbot": "^4.36.8"
   },
