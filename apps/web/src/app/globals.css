@@ -1136,10 +1136,11 @@ a:hover {
   max-width: 550px;
 }
 
-/* Prevent .prose styles from interfering with react-tweet internals */
-.prose .tweet-container img {
-  margin: 0;
-  display: initial;
+/* 動画埋め込み右上の「Watch on X」ピル。背景 rgba(15,20,25,0.75) がダーク背景上で
+   輪郭を失い視覚的にうるさい。X への導線はヘッダの X アイコン、作成日時、Read more on X
+   ボタン、本文 x.com リンクで足りているので非表示にする */
+.tweet-container [class*='__watchOnTwitter'] {
+  display: none;
 }
 
 [data-theme='dark'] .tweet-container {
