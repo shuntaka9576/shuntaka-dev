@@ -190,7 +190,7 @@ exports[`OidcProviderStack > snapshot 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
-          "S3Key": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50.zip",
+          "S3Key": "c0d9f24649426c60a1bc01108070535a40353ae6cd8ceccb812969319b936e5d.zip",
         },
         "Handler": "__entrypoint__.handler",
         "MemorySize": 128,
@@ -200,7 +200,7 @@ exports[`OidcProviderStack > snapshot 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 900,
       },
       "Type": "AWS::Lambda::Function",
@@ -254,7 +254,7 @@ exports[`OidcProviderStack > snapshot 1`] = `
         "ClientIDList": [
           "sts.amazonaws.com",
         ],
-        "CodeHash": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50",
+        "CodeHash": "c0d9f24649426c60a1bc01108070535a40353ae6cd8ceccb812969319b936e5d",
         "RejectUnauthorized": false,
         "ServiceToken": {
           "Fn::GetAtt": [
