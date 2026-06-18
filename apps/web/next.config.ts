@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['tocbot'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/who',
+        destination: '/about',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
