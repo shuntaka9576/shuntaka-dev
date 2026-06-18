@@ -58,7 +58,7 @@
       "version": "0.1.0",
       "dependencies": {
         "aws-cdk-lib": "^2.260.0",
-        "cdk-nag": "^2.38.2",
+        "cdk-nag": "^3.0.1",
         "change-case": "^5.4.4",
         "constructs": "^10.6.0",
         "zod": "^4.4.3",
@@ -928,7 +928,7 @@
 
     "caniuse-lite": ["caniuse-lite@1.0.30001792", "", {}, "sha512-hVLMUZFgR4JJ6ACt1uEESvQN1/dBVqPAKY0hgrV70eN3391K6juAfTjKZLKvOMsx8PxA7gsY1/tLMMTcfFLLpw=="],
 
-    "cdk-nag": ["cdk-nag@2.38.2", "", { "peerDependencies": { "aws-cdk-lib": "^2.176.0", "constructs": "^10.5.1" } }, "sha512-Ddim1r8IwAPQn95KB2owbHoU4YHveHg4PfM+k7TdcANqfVmoHem6cTFMpcIuoDM16BkQQ+xshxYxZgcAoeVKGw=="],
+    "cdk-nag": ["cdk-nag@3.0.1", "", { "peerDependencies": { "aws-cdk-lib": "^2.257.0", "constructs": "^10.5.1" } }, "sha512-Ppa8oDRduUJl9CAzuJzXszg5GmltfQL95BvkTXXdtpOpi801n8ik4gKDjvrJahFikjTBgnJjRsS/2AG3AGVfDg=="],
 
     "chai": ["chai@6.2.2", "", {}, "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg=="],
 
