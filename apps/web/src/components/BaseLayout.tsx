@@ -8,7 +8,7 @@ import { ToggleSwitch } from './ToggleSwitch';
 interface BaseLayoutProps {
   children: React.ReactNode;
   showTypeHeader?: boolean;
-  currentTab?: 'tech' | 'note' | 'who';
+  currentTab?: 'tech' | 'note' | 'about';
 }
 
 export function BaseLayout({ children, showTypeHeader = false, currentTab }: BaseLayoutProps) {
@@ -18,7 +18,7 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
   const isTechActive =
     currentTab === 'tech' || (!currentTab && (pathname === '/' || pathname === undefined));
   const isNoteActive = currentTab === 'note' || (!currentTab && pathname === '/type/note');
-  const isWhoActive = currentTab === 'who' || (!currentTab && pathname === '/who');
+  const isAboutActive = currentTab === 'about' || (!currentTab && pathname === '/about');
   // NOTE: doneProgress()はここで呼ばない
   // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
   // 各ページの末端コンポーネント（PageReady, ArticleContent等）で呼ぶ
@@ -37,7 +37,7 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
         </div>
       </div>
 
-      {/* Type Header (tech/note/who?) */}
+      {/* Type Header (tech/note/about) */}
       {showTypeHeader && (
         <nav
           className="w-full bg-[var(--color-surface-raised)]"
@@ -55,8 +55,8 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
               </ProgressLink>
             </div>
             <div className="inline-block mr-2">
-              <ProgressLink href="/who" className={isWhoActive ? tabActiveClass : ''}>
-                who?
+              <ProgressLink href="/about" className={isAboutActive ? tabActiveClass : ''}>
+                about
               </ProgressLink>
             </div>
           </div>

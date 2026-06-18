@@ -41,9 +41,9 @@ const links = [
   },
 ];
 
-export default function WhoPage() {
+export default function AboutPage() {
   return (
-    <BaseLayout showTypeHeader currentTab="who">
+    <BaseLayout showTypeHeader currentTab="about">
       <main className="w-full">
         <div className="flex items-center gap-2 pb-2">
           <span>髙橋俊一 a.k.a shuntaka</span>
