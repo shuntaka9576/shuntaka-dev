@@ -11,7 +11,7 @@
     "@aws-sdk/client-dsql": "^3.1072.0",
     "@aws-sdk/dsql-signer": "^3.1072.0",
     "commander": "^15.0.0",
-    "pg": "^8.21.0"
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0"
