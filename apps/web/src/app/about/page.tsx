@@ -46,7 +46,7 @@ export default function AboutPage() {
     <BaseLayout showTypeHeader currentTab="about">
       <main className="w-full">
         <div className="flex items-center gap-2 pb-2">
-          <span>髙橋俊一 a.k.a shuntaka</span>
+          <span>Shunichi Takahashi a.k.a shuntaka</span>
           <HashiMascot width={32} height={42} />
         </div>
         <div className="flex pb-4">
@@ -66,8 +66,8 @@ export default function AboutPage() {
           <div>Career</div>
           <div className="p-2">
             <p>201204 TDU EC</p>
-            <p>201604 株式会社QUICK</p>
-            <p>201908 株式会社クラスメソッド</p>
+            <p>201604 QUICK Corp.</p>
+            <p>201908 Classmethod, Inc.</p>
           </div>
         </div>
         <div>
