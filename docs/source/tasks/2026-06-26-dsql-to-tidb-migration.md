@@ -29,13 +29,13 @@
 
 ## 互換性差分
 
-| 既存 (DSQL / PostgreSQL) | TiDB / MySQL |
-| --- | --- |
-| `UUID PRIMARY KEY DEFAULT gen_random_uuid()` | `CHAR(36) NOT NULL DEFAULT (UUID()) PRIMARY KEY` |
+| 既存 (DSQL / PostgreSQL)                             | TiDB / MySQL                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| `UUID PRIMARY KEY DEFAULT gen_random_uuid()`         | `CHAR(36) NOT NULL DEFAULT (UUID()) PRIMARY KEY`                    |
 | `TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP` | `DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)`（UTC 固定運用） |
-| `CHECK (status IN ('draft', ...))` | TiDB 7.x の `CHECK` 互換構文でそのまま |
-| スキーマ修飾 `app.<table>` | TiDB は `database.table` として等価 |
-| バインドパラメータ `$1, $2, ...` | `?` |
+| `CHECK (status IN ('draft', ...))`                   | TiDB 7.x の `CHECK` 互換構文でそのまま                              |
+| スキーマ修飾 `app.<table>`                           | TiDB は `database.table` として等価                                 |
+| バインドパラメータ `$1, $2, ...`                     | `?`                                                                 |
 
 ## タスク1: dsql-cli export サブコマンド追加
 
