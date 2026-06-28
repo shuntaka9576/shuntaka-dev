@@ -5,6 +5,7 @@
   "scripts": {
     "migrate": "tsx src/index.ts migrate",
     "drop": "tsx src/index.ts drop",
+    "export": "bun src/index.ts export",
     "convert": "tsx src/index.ts convert"
   },
   "dependencies": {
