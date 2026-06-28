@@ -72,6 +72,13 @@ type launcherConfig struct {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
+	// state dir が空 (cold start 毎) のとき AuthKey を強制使用する。
+	// これが無いと tsnet は "Authkey is set; but state is NoState. Ignoring authkey." と
+	// 表示し AuthKey を捨ててログインしない。Lambda は state を persist できないため必須。
+	if err := os.Setenv("TSNET_FORCE_LOGIN", "1"); err != nil {
+		log.Fatalf("setenv TSNET_FORCE_LOGIN: %v", err)
+	}
+
 	ctx := context.Background()
 
 	cfg, err := loadConfig(ctx)
@@ -105,10 +112,15 @@ func main() {
 		log.Fatalf("listen %s: %v", cfg.ListenAddr, err)
 	}
 	log.Printf("forwarder: %s -> tailnet:%s", listener.Addr(), cfg.ForwardTarget)
+	// ts.Dial は tsnet 内部 dialer 経由で netmap に居る peer の MagicDNS 名を
+	// 解決して接続する。ACL で tag:aws-app -> tag:k8s が許可されていれば
+	// TiDB Operator Proxy peer (`tidb.<TAILNET>`) が netmap に降りてきて
+	// 解決可能になる。ACL 未許可だと netmap に peer が無く OS resolver に
+	// フォールバックして 169.254.78.1 を引きにいき NXDOMAIN になる点に注意。
 	go runForwarder(ts, listener, cfg.ForwardTarget)
 
 	// Pre-warm DERP / DNS by dialing once before handing off to Rust.
-	prewarmCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	prewarmCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	if conn, err := ts.Dial(prewarmCtx, "tcp", cfg.ForwardTarget); err == nil {
 		conn.Close()
 		log.Printf("forwarder: pre-warm dial ok")
