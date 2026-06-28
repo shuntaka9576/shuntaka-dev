@@ -254,8 +254,8 @@ curl -sS -o /dev/null -w "HTTP %{http_code} time=%{time_total}s\n" \
 ### 設計
 
 - DSQL クラスタ / 関連 IAM / `DSQL_CLUSTER_ENDPOINT` を削除
-- TiDB 接続情報を Secrets Manager または SSM Parameter Store に格納
-- Lambda/ECS の環境変数を `DATABASE_URL`（`mysql://` 形式）に切替
+- TiDB 接続情報を SSM Parameter Store (SecureString) に格納 (既存規約 `/<stage>/<project>/...` に揃える)
+- Lambda の環境変数を `DATABASE_URL`（`mysql://` 形式）に切替
 
 ### チェックリスト
 
@@ -312,27 +312,25 @@ Lambda は cold start 毎に新規ノードとして Tailnet に join する。�
    | **Tags**        | `tag:aws-app` を選択             | **必須**。未指定だと API 経由の auth key 発行が 400 で落ちる。この client は `tag:aws-app` 付きのキーしか発行できない |
 
 4. **Generate client** を押すと `client_id` と `client_secret` が表示される (secret はこの画面でしか出ない、必ずコピー)
-5. **`client_id` / `client_secret` の組** を AWS Secrets Manager に格納する (下記)
+5. **`client_id` / `client_secret` / `tailnet_suffix`** を AWS SSM Parameter Store (SecureString / String) に格納する (下記)
 
 #### 用途別に分ける運用
 
 OAuth client は **`tag:aws-app` 用 / 他バッチ用** といった具合に **tag 単位で分ける** のがベストプラクティス。`client_id` を取り違えても発行可能な tag が違うため、blast radius を tag 一つ分に絞れる。`tag:k8s` 用が必要になったら別途 `k8s-cluster` 等の名前で新規 client を切る。
 
-### Secrets Manager への配置
+### SSM Parameter Store への配置
 
-CDK の SSM パス規約 (`/<stage>/<project>/...`) に合わせて、Secrets Manager に下記の構造で格納する想定:
+CDK の SSM パス規約 (`/<stage>/<project>/...`) と既存 GH App / Cloudinary パターン (path だけ env に渡し値は SSM 側) に揃え、3 つの parameter に分けて格納する。詳細手順は `docs/source/01_development.md` 参照:
 
-```jsonc
-// Secret name: /dev/shuntaka/tailscale/oauth-client
-{
-  "client_id": "<paste-from-tailscale-admin>",
-  "client_secret": "<paste-from-tailscale-admin>",
-}
+```text
+/<stage>/shuntaka/tailscale/oauth-client-id      (SecureString)
+/<stage>/shuntaka/tailscale/oauth-client-secret  (SecureString)
+/<stage>/shuntaka/tailscale/tailnet-suffix       (String, tailscale CLI から動的取得)
 ```
 
 Lambda は起動時 (INIT phase) に下記の順で動く:
 
-1. Secrets Manager から `client_id` / `client_secret` を取得 (1 回のみ、warm 中は再利用)
+1. SSM Parameter Store から上記 3 つを取得 (cold start で 1 回、warm 中は再利用)
 2. `POST https://api.tailscale.com/api/v2/oauth/token` (`client_credentials` grant) で OAuth access token を取得 (1h 有効)
 3. `POST https://api.tailscale.com/api/v2/tailnet/-/keys` で auth key を発行
    ```json
@@ -384,14 +382,14 @@ A1 を採用する場合、`adapter/src/database/mod.rs` の `ensure_tailnet_rea
 
 ### チェックリスト
 
-- [ ] Tailscale admin で OAuth client `blog-api-lambda` を作成 (Scopes: `auth_keys` write、Tags: `tag:aws-app`)
-- [ ] `client_id` / `client_secret` を Secrets Manager `/dev/shuntaka/tailscale/oauth-client` に JSON で格納
-- [ ] `apps/blog-api/Dockerfile` を multi-stage 化し、tsnet forwarder バイナリ (or `tailscaled`) を同梱
-- [ ] entrypoint で Secrets Manager → OAuth token → auth key → `tailscale up` / `tsnet up` のチェーンを実装
-- [ ] CDK で Lambda の env に `FORWARD_TARGET=tidb.${TAILNET}:4000` と `TS_OAUTH_SECRET_NAME=/dev/shuntaka/tailscale/oauth-client` を注入
-- [ ] Lambda IAM role に `secretsmanager:GetSecretValue` を付与
-- [ ] 初回 invoke で `tailscale status` 相当のログを出し、ノードが `tag:aws-app` で join されていることを確認
-- [ ] blog-api 経由で `tidb.${TAILNET}:4000` に接続でき、記事一覧 API が 200 を返すことを確認
+- [x] Tailscale admin で OAuth client `blog-api-lambda` を作成 (Scopes: `auth_keys` write、Tags: `tag:aws-app`)
+- [x] `client_id` / `client_secret` / `tailnet_suffix` を SSM Parameter Store `/<stage>/shuntaka/tailscale/{oauth-client-id, oauth-client-secret, tailnet-suffix}` に SecureString / String で格納 (dev/prd 共通 OAuth client を両 stage の path に投入、詳細は `docs/source/01_development.md`)
+- [x] `apps/blog-api/Dockerfile` を multi-stage 化し、tsnet-launcher バイナリ (Go) を同梱
+- [x] tsnet-launcher で SSM Parameter Store → OAuth token → auth key → `tsnet.Server.Up()` のチェーンを実装
+- [x] CDK で Lambda の env に `DATABASE_URL` (`mysql://root@127.0.0.1:13306/blog_${stageName.long}`) と `TS_OAUTH_CLIENT_ID_KEY_NAME` / `TS_OAUTH_CLIENT_SECRET_KEY_NAME` / `TS_TAILNET_SUFFIX_KEY_NAME` を注入
+- [x] Lambda IAM role に `ssm:GetParameter` を 3 つの Tailscale Parameter ARN に付与 (GH App / Cloudinary 既存 3 つと合わせて計 6)
+- [x] 初回 invoke で `tsnet up: hostname=blog-api-lambda` と forwarder の pre-warm dial ok が CloudWatch ログに出ることを確認
+- [x] blog-api 経由で `tidb.${TAILNET}:4000` に接続でき、dev `api.shuntaka.tech` / prd `api.shuntaka.dev` の記事一覧 API が 200 を返すことを確認
 
 ### 地雷 (Tailscale 経験者からの受け売り)
 
