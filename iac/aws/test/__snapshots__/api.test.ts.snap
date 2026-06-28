@@ -483,7 +483,7 @@ exports[`MainStack > snapshot 1`] = `
             "CLOUDINARY_API_KEY": "test-api-key",
             "CLOUDINARY_API_SECRET_KEY_NAME": "/test/cloudinary-secret",
             "CLOUDINARY_CLOUD_NAME": "test-cloud",
-            "DATABASE_URL": "mysql://root@127.0.0.1:13306/blog_dev",
+            "DATABASE_URL": "mysql://root@127.0.0.1:13306/blog_development",
             "GH_APP_ID": "12345",
             "GH_APP_SECRET_PEM_KEY_NAME": "/test/gh-app-secret",
             "GH_WEBHOOK_SECRET_KEY_NAME": "/test/gh-webhook-secret",

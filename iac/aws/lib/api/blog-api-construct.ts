@@ -28,6 +28,7 @@ export class BlogAPIConstruct extends Construct {
       domain: string;
       hostedZone: route53.IHostedZone;
       certificate: acm.ICertificate;
+      databaseName: string;
       ssmParameters: {
         apiGateway: {
           apiUrl: string;
@@ -65,7 +66,8 @@ export class BlogAPIConstruct extends Construct {
         AWS_LWA_INVOKE_MODE: 'response_stream',
         // tsnet-launcher が 127.0.0.1:13306 -> tidb.<TAILNET>:4000 を forward する。
         // Rust 側はこの loopback URL を見る (TiDB の private IP は知らない)。
-        DATABASE_URL: 'mysql://root@127.0.0.1:13306/blog_dev',
+        // database 名は stage 別 (blog_dev / blog_prd) を main-stack から受け取る。
+        DATABASE_URL: `mysql://root@127.0.0.1:13306/${props.databaseName}`,
         GH_APP_ID: props.blogApiEnv.githubAppId,
         GH_APP_SECRET_PEM_KEY_NAME: props.blogApiEnv.githubAppSecretPemKeyName,
         GH_WEBHOOK_SECRET_KEY_NAME: props.blogApiEnv.githubWebhookSecretKeyName,

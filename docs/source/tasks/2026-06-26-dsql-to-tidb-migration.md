@@ -160,7 +160,67 @@ mysql -h tidb.$TAILNET -P 4000 -u root -e "DROP DATABASE IF EXISTS blog_dev"
 bash dsl-tidb/load.sh -d blog_dev -t ./backup -H tidb.$TAILNET
 ```
 
-本番への適用は `--database blog_prod` 等にスキーマ名だけ変えて同じスクリプトを使う。AWS DSQL を export 元にする場合は `bun run export --endpoint $DSQL_CLUSTER_ENDPOINT` （`SET TIME ZONE 'UTC'` 済み）。
+### 本番環境への適用（prd）
+
+前提:
+
+- 取り元 DSQL endpoint の SSM パラメータが `/prd/shuntaka/dsql/cluster-endpoint`、AWS 認証は prd への ssm:GetParameter / dsql:DbConnectAdmin 権限を持つプロファイル (`aws-vault exec <profile>`)
+- prd 用 SSM Parameter (`/prd/shuntaka/tailscale/*`) と gh variable (`TS_*_KEY_NAME --env prd`) は `docs/source/01_development.md` の手順で投入済み (dev/prd 共通の Tailscale OAuth client を `for STAGE_NAME in dev prd` の形で両方の path に入れる)
+- 取り込み先 TiDB のデータベース名は `blog_prd` (stage 名の long と一致、`blog_prod` ではない)
+- blog-api Lambda の `DATABASE_URL` は CDK の `blog-api-construct.ts` で `mysql://root@127.0.0.1:13306/blog_dev` がハードコードされている。prd デプロイ前に `blog_${stageName.long}` で stage 別に分岐するよう修正する (差分はタスク4 の実装記録に追記)
+- 旧 prd DSQL への書き込みを止めるため、GitHub App の Webhook を一時的に Active off にしてから export を行う (export 中に記事が書き込まれると TiDB との差分が発生する)
+
+```bash
+# 0) Tailnet を環境変数化（生のホスト名は手順に書かない）
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+echo "TAILNET=$TAILNET"
+
+# 1) prd DSQL -> TSV（AWS prd 認証が通ったサブシェルで実行）
+cd tools/dsql-cli
+
+DSQL_ENDPOINT=$(
+  aws ssm get-parameter \
+    --name /prd/shuntaka/dsql/cluster-endpoint \
+    --query Parameter.Value --output text
+)
+echo "DSQL_ENDPOINT=$DSQL_ENDPOINT"
+
+bun run export --endpoint "$DSQL_ENDPOINT" --out-dir ./backup-prd
+
+# 行数を控えておく（この後 TiDB 側と突合する）
+ls -la backup-prd/
+wc -l backup-prd/*.tsv
+
+# 2) TiDB blog_prd に投入（DDL→LOAD DATA→SHOW WARNINGS→SELECT COUNT(*)）
+bash dsl-tidb/load.sh \
+  --database blog_prd \
+  --tsv-dir ./backup-prd \
+  --host tidb.$TAILNET
+
+# 3) 取り込み確認: warning 0 + 行数が DSQL と一致
+mysql -h tidb.$TAILNET -P 4000 -u root -N -B -e "
+  SELECT 'users'         AS t, COUNT(*) FROM blog_prd.users UNION ALL
+  SELECT 'tags',              COUNT(*) FROM blog_prd.tags UNION ALL
+  SELECT 'articles',          COUNT(*) FROM blog_prd.articles UNION ALL
+  SELECT 'articles_tags',     COUNT(*) FROM blog_prd.articles_tags"
+
+# 4) blog-api prd を TiDB 向きにデプロイ（CDK 経由）
+#    DATABASE_URL の database 部分が blog_prd になる修正を含むコミットを preview に
+#    マージしてから deploy.yaml を起動する。
+gh workflow run deploy.yaml --ref preview -f stageName=prd
+
+# 5) 本番 API 疎通（cold start を込みで長めに見る）
+curl -sS -o /dev/null -w "HTTP %{http_code} time=%{time_total}s\n" \
+  --max-time 60 https://api.shuntaka.dev/health
+curl -sS -o /dev/null -w "HTTP %{http_code} time=%{time_total}s\n" \
+  --max-time 60 'https://api.shuntaka.dev/users/shuntaka/articles?type=tech'
+
+# 6) GitHub App の Webhook を Active on に戻す
+```
+
+`backup-prd/` は記事本文を含むため git にコミットしない (`tools/dsql-cli/.gitignore` の `backup/` を `backup*/` のように広げるか、`backup-prd/` を個別に追加)。
+
+旧 prd DSQL クラスタは rollback 余地のため当面残し、撤去はタスク4「iac/aws の DSQL 撤去」で実施する。
 
 `SHOW WARNINGS` の出力が `Empty set` であれば取り込みは無警告で完了。warning が出た場合の典型例:
 

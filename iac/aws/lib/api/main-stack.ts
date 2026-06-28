@@ -107,6 +107,8 @@ export class MainStack extends cdk.Stack {
       domain: props.domain.api,
       hostedZone,
       certificate: tokyoCertificate,
+      // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。
+      databaseName: `blog_${props.stageName.long}`,
       ssmParameters: {
         apiGateway: props.ssmParameters.apiGateway,
       },

@@ -15,7 +15,7 @@
     "**/__snapshots__/**",
     "docs/source/incidents/**",
     "**/storybook-static/**",
-    "tools/dsql-cli/backup/**",
+    "tools/dsql-cli/backup*/**",
     "**/go.mod",
     "**/go.sum"
   ],
