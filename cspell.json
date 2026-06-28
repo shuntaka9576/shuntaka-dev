@@ -73,6 +73,7 @@
     "innodb",
     "jsonata",
     "jsonnet",
+    "keyspace",
     "knggn",
     "kuromoji",
     "langchain",

@@ -224,6 +224,39 @@ WHERE DB_NAME = 'blog_prd' AND TABLE_NAME = 'articles';
 -- WHERE DB_NAME = 'blog_prd' AND TABLE_NAME = 'articles';   -- => 1
 
 -- ---------------------------------------------------------------------------
+-- 5 行の正体を IS_INDEX / INDEX_NAME で列挙
+-- ---------------------------------------------------------------------------
+SELECT REGION_ID, IS_INDEX, INDEX_ID, INDEX_NAME
+FROM INFORMATION_SCHEMA.TIKV_REGION_STATUS
+WHERE DB_NAME = 'blog_prd' AND TABLE_NAME = 'articles';
+
+-- +-----------+----------+----------+----------------------------------+
+-- | REGION_ID | IS_INDEX | INDEX_ID | INDEX_NAME                       |
+-- +-----------+----------+----------+----------------------------------+
+-- |       384 |        1 |        1 | PRIMARY                          |
+-- |       384 |        1 |        2 | uq_articles_slug                 |
+-- |       384 |        1 |        3 | idx_articles_user_id             |
+-- |       384 |        1 |        4 | idx_articles_status_published_at |
+-- |       384 |        0 |     NULL | NULL                             |  ← 行データ本体
+-- +-----------+----------+----------+----------------------------------+
+-- 5 rows in set (0.01 sec)
+--
+-- 内訳:
+--   * PRIMARY (IS_INDEX=1, INDEX_ID=1)
+--       → clustered PK のため独立した keyspace は持たず、行データ (下) と
+--         同じ物理ストレージを共有する。ビュー上は論理エントリとして 1 行返る。
+--   * uq_articles_slug / idx_articles_user_id / idx_articles_status_published_at
+--       → セカンダリインデックス。それぞれ独立した keyspace (t<id>_i<n>_...) を持つ。
+--   * IS_INDEX=0, INDEX_NAME=NULL の行
+--       → テーブルの行データ本体 (t<id>_r<clustered PK>)
+--
+-- つまり「5」の正体は:
+--   行データ 1 + セカンダリインデックス 3 + 論理 PRIMARY エントリ 1
+--   = 物理的には 4 keyspace 相当のデータ
+--   = それらすべてが 1 物理 Region (REGION_ID=384) に収まっている
+--   = TIKV_REGION_STATUS ビューが論理エントリごとに行を返すので 5 行に見える
+
+-- ---------------------------------------------------------------------------
 -- わかったこと: articles の物理 Region 数と「どのレコードがどの Region か」
 -- ---------------------------------------------------------------------------
 -- * articles の物理 Region は 1 個 (REGION_ID=384) のみ
