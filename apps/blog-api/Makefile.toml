@@ -6,8 +6,10 @@ PORT = { script = ["echo ${API_PORT:-8080}"] }
 AWS_REGION = "ap-northeast-1"
 
 [env.development]
-DSQL_CLUSTER_ENDPOINT = { script = [
-  "aws ssm get-parameter --name '/dev/shuntaka/dsql/cluster-endpoint' --query 'Parameter.Value' --output text",
+# Tailnet 名は環境ごとに変わるため、tailscale CLI から動的取得して URL を組み立てる。
+# 取り込み先 database は dsql-cli の dsl-tidb で作成した `blog_dev` を既定値とする。
+DATABASE_URL = { script = [
+  "TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix); echo \"mysql://root@tidb.${TAILNET}:4000/${TIDB_DATABASE:-blog_dev}\"",
 ] }
 
 [tasks.run]

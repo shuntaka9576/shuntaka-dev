@@ -27,10 +27,9 @@ sqlx = { version = "0.9.0", features = [
   "uuid",
   "chrono",
   "macros",
-  "postgres",
+  "mysql",
   "migrate",
 ] }
-aurora-dsql-sqlx-connector = { version = "0.2.1", features = ["pool"] }
 tokio = { version = "1.52.3", features = ["full"] }
 async-trait = "0.1.89"
 derive-new = "0.7.0"

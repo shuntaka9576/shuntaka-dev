@@ -203,6 +203,9 @@ gh variable set GH_WEBHOOK_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_
 gh secret set CLOUDINARY_CLOUD_NAME --env ${STAGE_NAME} --body "${CLOUDINARY_CLOUD_NAME}"
 gh secret set CLOUDINARY_API_KEY --env ${STAGE_NAME} --body "${CLOUDINARY_API_KEY}"
 gh variable set CLOUDINARY_API_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/cloudinary/api-secret"
+gh variable set TS_OAUTH_CLIENT_ID_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-id"
+gh variable set TS_OAUTH_CLIENT_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-secret"
+gh variable set TS_TAILNET_SUFFIX_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/tailnet-suffix"
 ```
 
 usersテーブルにinstallation_idを登録。GitHub Appをリポジトリにインストール後、installation_idを確認して登録。

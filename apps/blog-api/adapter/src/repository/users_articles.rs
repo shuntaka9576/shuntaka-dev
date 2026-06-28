@@ -12,10 +12,10 @@ use crate::database::ConnectionPool;
 
 #[derive(FromRow)]
 struct ArticleRow {
-    article_id: Uuid,
+    article_id: String,
     title: String,
     slug: String,
-    user_id: Uuid,
+    user_id: String,
     content: String,
     thumbnail: Option<String>,
     description: String,
@@ -31,6 +31,11 @@ impl TryFrom<ArticleRow> for Article {
     type Error = anyhow::Error;
 
     fn try_from(row: ArticleRow) -> Result<Self, Self::Error> {
+        let article_id = Uuid::parse_str(&row.article_id)
+            .map_err(|e| anyhow::anyhow!("Invalid article_id UUID: {e}"))?;
+        let user_id = Uuid::parse_str(&row.user_id)
+            .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
+
         let status =
             Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
 
@@ -41,10 +46,10 @@ impl TryFrom<ArticleRow> for Article {
             .map_err(|e| anyhow::anyhow!("Invalid article type: {e}"))?;
 
         Ok(Article::new(
-            ArticleId::new(row.article_id),
+            ArticleId::new(article_id),
             Title::new(row.title),
             Slug::new(row.slug),
-            UserId::new(row.user_id),
+            UserId::new(user_id),
             Content::new(row.content),
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
@@ -80,13 +85,13 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.thumbnail,
                 a.description,
                 a.status,
-                a.type,
+                a.`type`,
                 a.published_at,
                 a.created_at,
                 a.updated_at
-            FROM app.articles a
-            JOIN app.users u ON a.user_id = u.user_id
-            WHERE a.status = 'published' AND a.type = $1 AND u.name = $2
+            FROM articles a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
             ORDER BY a.published_at DESC
             "#,
         )
@@ -114,13 +119,13 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.thumbnail,
                 a.description,
                 a.status,
-                a.type,
+                a.`type`,
                 a.published_at,
                 a.created_at,
                 a.updated_at
-            FROM app.articles a
-            JOIN app.users u ON a.user_id = u.user_id
-            WHERE a.status = 'published' AND a.slug = $1 AND u.name = $2
+            FROM articles a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.status = 'published' AND a.slug = ? AND u.name = ?
             "#,
         )
         .bind(slug)
