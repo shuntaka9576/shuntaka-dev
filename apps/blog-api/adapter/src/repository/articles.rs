@@ -12,10 +12,10 @@ use crate::database::ConnectionPool;
 
 #[derive(FromRow)]
 struct ArticleRow {
-    article_id: Uuid,
+    article_id: String,
     title: String,
     slug: String,
-    user_id: Uuid,
+    user_id: String,
     content: String,
     thumbnail: Option<String>,
     description: String,
@@ -31,6 +31,11 @@ impl TryFrom<ArticleRow> for Article {
     type Error = anyhow::Error;
 
     fn try_from(row: ArticleRow) -> Result<Self, Self::Error> {
+        let article_id = Uuid::parse_str(&row.article_id)
+            .map_err(|e| anyhow::anyhow!("Invalid article_id UUID: {e}"))?;
+        let user_id = Uuid::parse_str(&row.user_id)
+            .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
+
         let status =
             Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
 
@@ -41,10 +46,10 @@ impl TryFrom<ArticleRow> for Article {
             .map_err(|e| anyhow::anyhow!("Invalid article type: {e}"))?;
 
         Ok(Article::new(
-            ArticleId::new(row.article_id),
+            ArticleId::new(article_id),
             Title::new(row.title),
             Slug::new(row.slug),
-            UserId::new(row.user_id),
+            UserId::new(user_id),
             Content::new(row.content),
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
@@ -80,15 +85,15 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 thumbnail,
                 description,
                 status,
-                type,
+                `type`,
                 published_at,
                 created_at,
                 updated_at
-            FROM app.articles
-            WHERE user_id = $1 AND slug = $2
+            FROM articles
+            WHERE user_id = ? AND slug = ?
             "#,
         )
-        .bind(user_id.as_uuid())
+        .bind(user_id.as_uuid().to_string())
         .bind(slug)
         .fetch_optional(&self.db.pool())
         .await?;
@@ -100,14 +105,12 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
         &self,
         input: UpsertArticleInput,
     ) -> Result<UpsertResult, anyhow::Error> {
-        // Check if article exists
         let existing = self
             .find_by_user_id_and_slug(&input.user_id, input.slug.as_str())
             .await?;
 
         match existing {
             Some(article) => {
-                // Check if content changed
                 let content_changed = article.content.as_str() != input.content;
                 let title_changed = article.title.as_str() != input.title;
                 let type_changed = article
@@ -123,7 +126,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     .map(|d| article.description.as_str() != d)
                     .unwrap_or(false);
 
-                // Determine new status
                 let new_status = if input.should_publish {
                     "published"
                 } else {
@@ -141,7 +143,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     return Ok(UpsertResult::NoChange(article.article_id));
                 }
 
-                // Update article
                 let now = Utc::now();
                 let published_at = if input.should_publish && article.published_at.is_none() {
                     Some(now)
@@ -157,16 +158,16 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
 
                 sqlx::query(
                     r#"
-                    UPDATE app.articles
-                    SET title = $1,
-                        content = $2,
-                        thumbnail = $3,
-                        description = $4,
-                        type = $5,
-                        status = $6,
-                        published_at = $7,
-                        updated_at = $8
-                    WHERE article_id = $9
+                    UPDATE articles
+                    SET title = ?,
+                        content = ?,
+                        thumbnail = ?,
+                        description = ?,
+                        `type` = ?,
+                        status = ?,
+                        published_at = ?,
+                        updated_at = ?
+                    WHERE article_id = ?
                     "#,
                 )
                 .bind(&input.title)
@@ -177,14 +178,13 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 .bind(new_status)
                 .bind(published_at)
                 .bind(now)
-                .bind(article.article_id.as_uuid())
+                .bind(article.article_id.as_uuid().to_string())
                 .execute(&self.db.pool())
                 .await?;
 
                 Ok(UpsertResult::Updated(article.article_id))
             }
             None => {
-                // Create new article
                 let article_id = Uuid::new_v4();
                 let now = Utc::now();
                 let status = if input.should_publish {
@@ -201,7 +201,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
 
                 sqlx::query(
                     r#"
-                    INSERT INTO app.articles (
+                    INSERT INTO articles (
                         article_id,
                         user_id,
                         title,
@@ -209,16 +209,16 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         content,
                         thumbnail,
                         description,
-                        type,
+                        `type`,
                         status,
                         published_at,
                         created_at,
                         updated_at
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     "#,
                 )
-                .bind(article_id)
-                .bind(input.user_id.as_uuid())
+                .bind(article_id.to_string())
+                .bind(input.user_id.as_uuid().to_string())
                 .bind(&input.title)
                 .bind(input.slug.as_str())
                 .bind(&input.content)

@@ -28,8 +28,7 @@ export class BlogAPIConstruct extends Construct {
       domain: string;
       hostedZone: route53.IHostedZone;
       certificate: acm.ICertificate;
-      dsqlClusterEndpoint: string;
-      dsqlClusterArn: string;
+      databaseName: string;
       ssmParameters: {
         apiGateway: {
           apiUrl: string;
@@ -42,6 +41,9 @@ export class BlogAPIConstruct extends Construct {
         cloudinaryCloudName: string;
         cloudinaryApiKey: string;
         cloudinaryApiSecretKeyName: string;
+        tsOauthClientIdName: string;
+        tsOauthClientSecretName: string;
+        tsTailnetSuffixName: string;
       };
     },
   ) {
@@ -62,26 +64,24 @@ export class BlogAPIConstruct extends Construct {
       }),
       environment: {
         AWS_LWA_INVOKE_MODE: 'response_stream',
-        DSQL_CLUSTER_ENDPOINT: props.dsqlClusterEndpoint,
+        // tsnet-launcher が 127.0.0.1:13306 -> tidb.<TAILNET>:4000 を forward する。
+        // Rust 側はこの loopback URL を見る (TiDB の private IP は知らない)。
+        // database 名は stage 別 (blog_dev / blog_prd) を main-stack から受け取る。
+        DATABASE_URL: `mysql://root@127.0.0.1:13306/${props.databaseName}`,
         GH_APP_ID: props.blogApiEnv.githubAppId,
         GH_APP_SECRET_PEM_KEY_NAME: props.blogApiEnv.githubAppSecretPemKeyName,
         GH_WEBHOOK_SECRET_KEY_NAME: props.blogApiEnv.githubWebhookSecretKeyName,
         CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
         CLOUDINARY_API_SECRET_KEY_NAME: props.blogApiEnv.cloudinaryApiSecretKeyName,
+        // tsnet-launcher が SSM から取得する 3 つ (path 渡し、値は SSM SecureString)
+        TS_OAUTH_CLIENT_ID_KEY_NAME: props.blogApiEnv.tsOauthClientIdName,
+        TS_OAUTH_CLIENT_SECRET_KEY_NAME: props.blogApiEnv.tsOauthClientSecretName,
+        TS_TAILNET_SUFFIX_KEY_NAME: props.blogApiEnv.tsTailnetSuffixName,
       },
     });
 
-    // DSQL接続用IAMポリシー
-    webApiLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['dsql:DbConnectAdmin'],
-        resources: [props.dsqlClusterArn],
-      }),
-    );
-
-    // SSM Parameter Store読み取り用IAMポリシー
+    // SSM Parameter Store読み取り用IAMポリシー (GH App / Cloudinary / Tailscale OAuth)
     webApiLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -90,6 +90,9 @@ export class BlogAPIConstruct extends Construct {
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubAppSecretPemKeyName}`,
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubWebhookSecretKeyName}`,
           `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.cloudinaryApiSecretKeyName}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsOauthClientIdName}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsOauthClientSecretName}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsTailnetSuffixName}`,
         ],
       }),
     );

@@ -9,7 +9,7 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn new() -> Result<Self> {
         let database = DatabaseConfig {
-            cluster_endpoint: std::env::var("DSQL_CLUSTER_ENDPOINT")?,
+            url: std::env::var("DATABASE_URL")?,
         };
 
         let port = std::env::var("PORT")
@@ -43,7 +43,8 @@ impl AppConfig {
 }
 
 pub struct DatabaseConfig {
-    pub cluster_endpoint: String,
+    /// MySQL/TiDB 接続 URL。例: mysql://root@tidb.<TAILNET>:4000/blog_dev
+    pub url: String,
 }
 
 pub struct ServerConfig {

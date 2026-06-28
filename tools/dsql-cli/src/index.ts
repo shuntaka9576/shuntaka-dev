@@ -4,6 +4,7 @@ import { DsqlSigner } from '@aws-sdk/dsql-signer';
 import { program } from 'commander';
 import pg from 'pg';
 import { convertJsonlToSql } from './convert.js';
+import { exportTables } from './export.js';
 
 const { Client } = pg;
 
@@ -157,6 +158,65 @@ program
     } catch (error) {
       console.error('Drop failed:', error);
       process.exit(1);
+    }
+  });
+
+program
+  .command('export')
+  .description('Export tables to PostgreSQL TEXT-format TSV (for TiDB LOAD DATA)')
+  .option(
+    '-e, --endpoint <endpoint>',
+    'DSQL endpoint or PostgreSQL URL (postgresql://...)',
+    process.env.DSQL_CLUSTER_ENDPOINT,
+  )
+  .option('-o, --out-dir <dir>', 'Output directory for TSV files', 'backup')
+  .option('-s, --schema <name>', 'Source schema name', 'app')
+  .option(
+    '-t, --tables <list>',
+    'Comma-separated table list (load order)',
+    'users,tags,articles,articles_tags',
+  )
+  .option('--page-size <n>', 'Rows per page (keyset pagination)', '1000')
+  .action(async (options) => {
+    const { endpoint, outDir, schema, tables, pageSize } = options;
+
+    if (!endpoint) {
+      console.error(
+        'Error: endpoint is required. Use --endpoint or set DSQL_CLUSTER_ENDPOINT env var',
+      );
+      process.exit(1);
+    }
+
+    const tableList = String(tables)
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const pageSizeNum = Number.parseInt(String(pageSize), 10);
+    if (!Number.isInteger(pageSizeNum) || pageSizeNum <= 0) {
+      console.error(`Error: --page-size must be a positive integer (got ${pageSize})`);
+      process.exit(1);
+    }
+
+    const mode = isPostgresUrl(endpoint) ? 'PostgreSQL' : 'DSQL';
+    console.log(`Connecting to ${mode}: ${endpoint}`);
+    const client = await connect(endpoint);
+    console.log('Connected successfully');
+    console.log(`Exporting ${tableList.length} tables from schema "${schema}" -> ${outDir}/`);
+
+    try {
+      await exportTables({
+        client,
+        schema,
+        tables: tableList,
+        outDir,
+        pageSize: pageSizeNum,
+      });
+      console.log('Export completed successfully');
+    } catch (error) {
+      console.error('Export failed:', error);
+      process.exit(1);
+    } finally {
+      await client.end();
     }
   });
 

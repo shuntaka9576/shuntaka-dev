@@ -93,6 +93,41 @@ aws ssm put-parameter \
   --value "your-api-secret"
 ```
 
+Tailscale OAuth client の登録（blog-api Lambda の Tailnet 参加用）。Tailnet と tag が dev/prd 共通のため client は 1 つだけ発行し、両環境の SSM に同じ値を投入する。
+
+1. [Tailscale admin console](https://login.tailscale.com/admin/settings/oauth) で OAuth client を発行（Description: `blog-api-lambda`、Scopes: `auth_keys` write、Tags: `tag:aws-app`）
+2. 表示された client_id / client_secret を控える（secret はこの画面でしか表示されない）
+3. dev / prd 両方の SSM Parameter Storeに同じ値を登録
+
+```bash
+# 値を一時的に環境変数へ（履歴・ps への漏れを避ける）
+export TS_OAUTH_CLIENT_ID="<client-id>"
+export TS_OAUTH_CLIENT_SECRET="<client-secret>"
+export TS_TAILNET_SUFFIX=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+for STAGE_NAME in dev prd; do
+  aws ssm put-parameter \
+    --name "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-id" \
+    --type "SecureString" \
+    --value "$TS_OAUTH_CLIENT_ID" \
+    --overwrite
+
+  aws ssm put-parameter \
+    --name "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-secret" \
+    --type "SecureString" \
+    --value "$TS_OAUTH_CLIENT_SECRET" \
+    --overwrite
+
+  aws ssm put-parameter \
+    --name "/${STAGE_NAME}/shuntaka/tailscale/tailnet-suffix" \
+    --type "String" \
+    --value "$TS_TAILNET_SUFFIX" \
+    --overwrite
+done
+
+unset TS_OAUTH_CLIENT_ID TS_OAUTH_CLIENT_SECRET TS_TAILNET_SUFFIX
+```
+
 OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
 
 ```bash
@@ -168,6 +203,9 @@ gh variable set GH_WEBHOOK_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_
 gh secret set CLOUDINARY_CLOUD_NAME --env ${STAGE_NAME} --body "${CLOUDINARY_CLOUD_NAME}"
 gh secret set CLOUDINARY_API_KEY --env ${STAGE_NAME} --body "${CLOUDINARY_API_KEY}"
 gh variable set CLOUDINARY_API_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/cloudinary/api-secret"
+gh variable set TS_OAUTH_CLIENT_ID_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-id"
+gh variable set TS_OAUTH_CLIENT_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-secret"
+gh variable set TS_TAILNET_SUFFIX_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/tailnet-suffix"
 ```
 
 usersテーブルにinstallation_idを登録。GitHub Appをリポジトリにインストール後、installation_idを確認して登録。

@@ -9,7 +9,7 @@ use crate::database::ConnectionPool;
 
 #[derive(FromRow)]
 struct UserIdRow {
-    user_id: Uuid,
+    user_id: String,
 }
 
 #[derive(new)]
@@ -26,14 +26,19 @@ impl UsersRepository for UsersRepositoryImpl {
         let row: Option<UserIdRow> = sqlx::query_as(
             r#"
             SELECT user_id
-            FROM app.users
-            WHERE github_installation_id = $1
+            FROM users
+            WHERE github_installation_id = ?
             "#,
         )
         .bind(installation_id)
         .fetch_optional(&self.db.pool())
         .await?;
 
-        Ok(row.map(|r| UserId::new(r.user_id)))
+        row.map(|r| {
+            Uuid::parse_str(&r.user_id)
+                .map(UserId::new)
+                .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))
+        })
+        .transpose()
     }
 }

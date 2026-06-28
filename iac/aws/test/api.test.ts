@@ -61,6 +61,9 @@ describe('MainStack', () => {
           cloudinaryCloudName: 'test-cloud',
           cloudinaryApiKey: 'test-api-key',
           cloudinaryApiSecretKeyName: '/test/cloudinary-secret',
+          tsOauthClientIdName: '/test/tailscale/oauth-client-id',
+          tsOauthClientSecretName: '/test/tailscale/oauth-client-secret',
+          tsTailnetSuffixName: '/test/tailscale/tailnet-suffix',
         },
       },
       env: {
