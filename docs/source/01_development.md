@@ -128,6 +128,27 @@ done
 unset TS_OAUTH_CLIENT_ID TS_OAUTH_CLIENT_SECRET TS_TAILNET_SUFFIX
 ```
 
+Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は `docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md` の「事前準備」を参照。
+
+```bash
+export TS_PROXY_AUTHKEY=""  # tskey-auth-... を貼り付け
+export TS_TAILNET_SUFFIX=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/proxy-auth-key" \
+  --type "SecureString" \
+  --value "$TS_PROXY_AUTHKEY" \
+  --overwrite
+
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/tailnet-suffix" \
+  --type "String" \
+  --value "$TS_TAILNET_SUFFIX" \
+  --overwrite
+
+unset TS_PROXY_AUTHKEY TS_TAILNET_SUFFIX
+```
+
 OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
 
 ```bash
@@ -218,6 +239,58 @@ usersテーブルにinstallation_idを登録。GitHub Appをリポジトリに�
 UPDATE app.users
 SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
+```
+
+tidb-proxy スタックのデプロイ（dev / prd 共用、初回のみ）。VPC / ECS Cluster / ECR / IAM / LogGroup / SG / Cloud Map / SSM パラメータを作成する。Task Definition と ECS Service は ecspresso 側で扱う。
+
+```bash
+export STAGE_NAME=""
+# stageName はこのスタックでは使われないが getConfig() の評価に必要
+bunx dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  st-tidb-proxy \
+  --require-approval never
+```
+
+ecspresso CLI のインストール（tidb-proxy の Task Definition / ECS Service を管理するため、初回のみ）。
+
+```bash
+brew install kayac/tap/ecspresso
+ecspresso version
+```
+
+tidb-proxy コンテナ image を ECR に push してから、ecspresso で ECS Service を起動する。`IMAGE_TAG` には git short SHA を渡し、再現可能なタグ付けにする。コマンドは repo root から実行する前提。
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+
+ECR_URI=$(aws ssm get-parameter \
+  --name /tidb-proxy/proxy/ecr-repository-uri \
+  --query "Parameter.Value" --output text)
+IMAGE_TAG=$(git rev-parse --short HEAD)
+
+aws ecr get-login-password --region ap-northeast-1 \
+  | docker login --username AWS --password-stdin "${ECR_URI%/*}"
+
+docker buildx build \
+  --platform linux/arm64 \
+  -t "${ECR_URI}:${IMAGE_TAG}" \
+  --push \
+  apps/tidb-proxy
+
+IMAGE_TAG="${IMAGE_TAG}" ecspresso deploy \
+  --config iac/aws/ecspresso/tidb-proxy/ecspresso.jsonnet
+```
+
+tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
+
+```bash
+aws ecs describe-services \
+  --cluster tidb-proxy \
+  --services tidb-proxy \
+  --query "services[0].{Status:status, Running:runningCount, Desired:desiredCount, Events:events[0:3]}"
+
+aws logs tail /ecs/tidb-proxy --follow --since 5m
 ```
 
 メインスタックのデプロイ

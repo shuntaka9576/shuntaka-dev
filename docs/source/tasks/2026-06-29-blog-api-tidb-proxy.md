@@ -651,7 +651,7 @@ image-tag.jsonnet は `IMAGE_TAG` 環境変数から読む。CI/CD では git SH
 
 #### チェックリスト
 
-- [ ] `iac/aws/ecspresso/tidb-proxy/` 配下に 5 ファイル作成（IaC 構成セクション参照）
+- [x] `iac/aws/ecspresso/tidb-proxy/` 配下に 5 ファイル作成（IaC 構成セクション参照）
 - [ ] 初回 image を build & push (`IMAGE_TAG=$(git rev-parse --short HEAD)`)
 - [ ] `ecspresso deploy --config ecspresso.jsonnet` で初回 task 起動
 - [ ] Fargate task が Tailnet に join できることを admin console で確認
