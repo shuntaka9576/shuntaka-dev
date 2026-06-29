@@ -346,27 +346,23 @@ tidb-proxy-sg-<env>:
 
 dev / prd は SG レベルで完全に分離。Lambda は `tidb-proxy-sg-<env>` 以外への egress を持たない。
 
-### squid の egress 制限（narrow whitelist）
-
-レビュー指摘を受け、`.amazonaws.com` ワイルドカードは廃止して具体的な FQDN のみ許可する:
+### squid の egress 制限
 
 ```
 acl SSL_ports port 443
 acl CONNECT method CONNECT
 
-acl allowed_dst dstdomain
-    api.github.com
-    api.tailscale.com
-    ssm.ap-northeast-1.amazonaws.com
-    kms.ap-northeast-1.amazonaws.com
-    logs.ap-northeast-1.amazonaws.com
-    # 他、実コードで実際に使う FQDN のみ追加
-
-http_access allow localnet CONNECT SSL_ports allowed_dst
+http_access allow localnet CONNECT SSL_ports
 http_access deny all
 ```
 
-⚠ Cloudinary は現コードでは signed URL 生成のみで外部 API call は無いはず（タスク1 で要確認）。確認後に必要なら `api.cloudinary.com` を追加。raw.githubusercontent.com 等を新規利用する際は ACL 更新が必要なため、squid ログを定期的に確認する運用も入れる。
+destination FQDN の whitelist は持たず、VPC 内 (localnet) からの CONNECT 443 のみを通す方針。理由:
+
+- proxy は VPC 外公開していない (private DNS `tidb-proxy.internal`)。攻撃者が CONNECT を発行するには、まず VPC 内 Lambda のコードを乗っ取る必要がある
+- markdown 描画で OGP / link-card / GitHub blob embed のために任意のユーザー指定 FQDN へ HTTPS が必要 (`apps/blog-api/markdown` の `fetch_ogp_html` / `fetch_github_code`)。whitelist 方式だと記事追加のたびに ACL 更新が要る
+- 個人ブログの脅威モデルでは Lambda RCE → C2 や悪性 crate の phone-home の影響度が低い (盗まれる secret は GH App PEM のみ)
+
+将来 SSRF を厳しく管理したい場合は、whitelist 復活ではなく **記事 HTML を webhook 受信時に DB へ pre-render** して runtime の外部 fetch を消す方向 (task 文書の改善メモ参照)。
 
 ### Tailscale Auth Key
 
@@ -547,7 +543,7 @@ curl -x http://127.0.0.1:3128 https://api.github.com/zen
 # 何らかの格言が返れば OK
 ```
 
-`TCP_DENIED/403` が返るときは `apps/tidb-proxy/squid.conf` の `allowed_dst` リストに該当 FQDN が無いケース。
+`TCP_DENIED/403` が返るときは src IP が `10.0.0.0/8` の `localnet` ACL に含まれていない (loopback や Pause container 由来) 可能性。
 
 ##### 4. admin console で device 確認
 
