@@ -93,39 +93,25 @@ aws ssm put-parameter \
   --value "your-api-secret"
 ```
 
-Tailscale OAuth client の登録（blog-api Lambda の Tailnet 参加用）。Tailnet と tag が dev/prd 共通のため client は 1 つだけ発行し、両環境の SSM に同じ値を投入する。
-
-1. [Tailscale admin console](https://login.tailscale.com/admin/settings/oauth) で OAuth client を発行（Description: `blog-api-lambda`、Scopes: `auth_keys` write、Tags: `tag:aws-app`）
-2. 表示された client_id / client_secret を控える（secret はこの画面でしか表示されない）
-3. dev / prd 両方の SSM Parameter Storeに同じ値を登録
+Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は `docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md` の「事前準備」を参照。
 
 ```bash
-# 値を一時的に環境変数へ（履歴・ps への漏れを避ける）
-export TS_OAUTH_CLIENT_ID="<client-id>"
-export TS_OAUTH_CLIENT_SECRET="<client-secret>"
+export TS_PROXY_AUTHKEY=""  # tskey-auth-... を貼り付け
 export TS_TAILNET_SUFFIX=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 
-for STAGE_NAME in dev prd; do
-  aws ssm put-parameter \
-    --name "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-id" \
-    --type "SecureString" \
-    --value "$TS_OAUTH_CLIENT_ID" \
-    --overwrite
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/proxy-auth-key" \
+  --type "SecureString" \
+  --value "$TS_PROXY_AUTHKEY" \
+  --overwrite
 
-  aws ssm put-parameter \
-    --name "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-secret" \
-    --type "SecureString" \
-    --value "$TS_OAUTH_CLIENT_SECRET" \
-    --overwrite
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/tailnet-suffix" \
+  --type "String" \
+  --value "$TS_TAILNET_SUFFIX" \
+  --overwrite
 
-  aws ssm put-parameter \
-    --name "/${STAGE_NAME}/shuntaka/tailscale/tailnet-suffix" \
-    --type "String" \
-    --value "$TS_TAILNET_SUFFIX" \
-    --overwrite
-done
-
-unset TS_OAUTH_CLIENT_ID TS_OAUTH_CLIENT_SECRET TS_TAILNET_SUFFIX
+unset TS_PROXY_AUTHKEY TS_TAILNET_SUFFIX
 ```
 
 OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
@@ -203,9 +189,6 @@ gh variable set GH_WEBHOOK_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_
 gh secret set CLOUDINARY_CLOUD_NAME --env ${STAGE_NAME} --body "${CLOUDINARY_CLOUD_NAME}"
 gh secret set CLOUDINARY_API_KEY --env ${STAGE_NAME} --body "${CLOUDINARY_API_KEY}"
 gh variable set CLOUDINARY_API_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/cloudinary/api-secret"
-gh variable set TS_OAUTH_CLIENT_ID_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-id"
-gh variable set TS_OAUTH_CLIENT_SECRET_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/oauth-client-secret"
-gh variable set TS_TAILNET_SUFFIX_KEY_NAME --env ${STAGE_NAME} --body "/${STAGE_NAME}/shuntaka/tailscale/tailnet-suffix"
 ```
 
 usersテーブルにinstallation_idを登録。GitHub Appをリポジトリにインストール後、installation_idを確認して登録。
@@ -218,6 +201,41 @@ usersテーブルにinstallation_idを登録。GitHub Appをリポジトリに�
 UPDATE app.users
 SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
+```
+
+tidb-proxy スタックのデプロイ（dev / prd 共用、初回のみ）。VPC / ECS Cluster / ECR / IAM / LogGroup / SG / Cloud Map / SSM パラメータを作成する。Task Definition と ECS Service は ecspresso 側で扱う。
+
+```bash
+export STAGE_NAME=""
+# stageName はこのスタックでは使われないが getConfig() の評価に必要
+bunx dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  st-tidb-proxy \
+  --require-approval never
+```
+
+ecspresso CLI のインストール（tidb-proxy の Task Definition / ECS Service を管理するため、初回のみ）。
+
+```bash
+brew install kayac/tap/ecspresso
+ecspresso version
+```
+
+tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめた `scripts/deploy-tidb-proxy.sh` を実行する。`IMAGE_TAG` は git short SHA が自動で使われる（環境変数で上書き可）。
+
+```bash
+scripts/deploy-tidb-proxy.sh
+```
+
+tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
+
+```bash
+aws ecs describe-services \
+  --cluster tidb-proxy \
+  --services tidb-proxy \
+  --query "services[0].{Status:status, Running:runningCount, Desired:desiredCount, Events:events[0:3]}"
+
+aws logs tail /ecs/tidb-proxy --follow --since 5m
 ```
 
 メインスタックのデプロイ

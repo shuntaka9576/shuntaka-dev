@@ -14,9 +14,6 @@ const lambdaEnvSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().nonempty(),
   CLOUDINARY_API_KEY: z.string().nonempty(),
   CLOUDINARY_API_SECRET_KEY_NAME: z.string().nonempty(),
-  TS_OAUTH_CLIENT_ID_KEY_NAME: z.string().nonempty(),
-  TS_OAUTH_CLIENT_SECRET_KEY_NAME: z.string().nonempty(),
-  TS_TAILNET_SUFFIX_KEY_NAME: z.string().nonempty(),
 });
 
 const stageName: {
@@ -69,10 +66,10 @@ interface AppParameter {
       clusterEndpoint: string;
       clusterArn: string;
     };
-    tailscale: {
-      oauthClientIdName: string;
-      oauthClientSecretName: string;
-      tailnetSuffixName: string;
+    proxy: {
+      vpcId: string;
+      privateSubnetId1: string;
+      sgId: string;
     };
   };
   lambda: {
@@ -83,9 +80,6 @@ interface AppParameter {
       cloudinaryCloudName: string;
       cloudinaryApiKey: string;
       cloudinaryApiSecretKeyName: string;
-      tsOauthClientIdName: string;
-      tsOauthClientSecretName: string;
-      tsTailnetSuffixName: string;
     };
   };
 }
@@ -115,9 +109,6 @@ const getLambdaEnvVars = () => {
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET_KEY_NAME: process.env.CLOUDINARY_API_SECRET_KEY_NAME,
-    TS_OAUTH_CLIENT_ID_KEY_NAME: process.env.TS_OAUTH_CLIENT_ID_KEY_NAME,
-    TS_OAUTH_CLIENT_SECRET_KEY_NAME: process.env.TS_OAUTH_CLIENT_SECRET_KEY_NAME,
-    TS_TAILNET_SUFFIX_KEY_NAME: process.env.TS_TAILNET_SUFFIX_KEY_NAME,
   });
 };
 
@@ -146,6 +137,70 @@ const stageConfig: {
       api: 'api.shuntaka.dev',
     },
   },
+};
+
+// tidb-proxy stack は dev / prd 共用のため stage 非依存。SSM Parameter Store
+// の path は task 文書 (docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md)
+// に揃えて `/tidb-proxy/...` 名前空間で扱う。
+export interface ProxyParameter {
+  projectName: string;
+  vpc: {
+    cidr: string;
+  };
+  ssm: {
+    vpc: {
+      vpcId: string;
+      publicSubnetId1: string;
+      privateSubnetId1: string;
+    };
+    proxy: {
+      clusterName: string;
+      ecrRepositoryUri: string;
+      taskRole: string;
+      taskExecRole: string;
+      sgId: string;
+      logGroupName: string;
+      cloudMapNamespaceId: string;
+      cloudMapServiceArn: string;
+      serviceName: string;
+    };
+    tailscale: {
+      // ecspresso task def の secrets[].valueFrom から runtime fetch される。
+      // 値の格納 (put-parameter) は手動運用 (90 日 rotation)。
+      proxyAuthKey: string;
+    };
+  };
+}
+
+export const getProxyConfig = (): ProxyParameter => {
+  const projectName = 'tidb-proxy';
+  return {
+    projectName,
+    vpc: {
+      cidr: '10.50.0.0/16',
+    },
+    ssm: {
+      vpc: {
+        vpcId: `/${projectName}/vpc/id`,
+        publicSubnetId1: `/${projectName}/vpc/public-subnet-id-1`,
+        privateSubnetId1: `/${projectName}/vpc/private-subnet-id-1`,
+      },
+      proxy: {
+        clusterName: `/${projectName}/proxy/cluster-name`,
+        ecrRepositoryUri: `/${projectName}/proxy/ecr-repository-uri`,
+        taskRole: `/${projectName}/proxy/task-role`,
+        taskExecRole: `/${projectName}/proxy/task-exec-role`,
+        sgId: `/${projectName}/proxy/sg-id`,
+        logGroupName: `/${projectName}/proxy/log-group-name`,
+        cloudMapNamespaceId: `/${projectName}/proxy/cloud-map-namespace-id`,
+        cloudMapServiceArn: `/${projectName}/proxy/cloud-map-service-arn`,
+        serviceName: `/${projectName}/proxy/service-name`,
+      },
+      tailscale: {
+        proxyAuthKey: '/shared/shuntaka/tailscale/proxy-auth-key',
+      },
+    },
+  };
 };
 
 export const getConfig = (stageName: string): AppParameter => {
@@ -179,10 +234,10 @@ export const getConfig = (stageName: string): AppParameter => {
         clusterEndpoint: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-endpoint`,
         clusterArn: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-arn`,
       },
-      tailscale: {
-        oauthClientIdName: `/${config.stageName.long}/${config.projectName.long}/tailscale/oauth-client-id`,
-        oauthClientSecretName: `/${config.stageName.long}/${config.projectName.long}/tailscale/oauth-client-secret`,
-        tailnetSuffixName: `/${config.stageName.long}/${config.projectName.long}/tailscale/tailnet-suffix`,
+      proxy: {
+        vpcId: '/tidb-proxy/vpc/id',
+        privateSubnetId1: '/tidb-proxy/vpc/private-subnet-id-1',
+        sgId: '/tidb-proxy/proxy/sg-id',
       },
     },
     lambda: {
@@ -193,9 +248,6 @@ export const getConfig = (stageName: string): AppParameter => {
         cloudinaryCloudName: lambdaEnvVars.CLOUDINARY_CLOUD_NAME,
         cloudinaryApiKey: lambdaEnvVars.CLOUDINARY_API_KEY,
         cloudinaryApiSecretKeyName: lambdaEnvVars.CLOUDINARY_API_SECRET_KEY_NAME,
-        tsOauthClientIdName: lambdaEnvVars.TS_OAUTH_CLIENT_ID_KEY_NAME,
-        tsOauthClientSecretName: lambdaEnvVars.TS_OAUTH_CLIENT_SECRET_KEY_NAME,
-        tsTailnetSuffixName: lambdaEnvVars.TS_TAILNET_SUFFIX_KEY_NAME,
       },
     },
   };

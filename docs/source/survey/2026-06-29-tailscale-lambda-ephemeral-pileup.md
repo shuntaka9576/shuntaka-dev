@@ -9,6 +9,7 @@
   - [Tailscale Pricing v4 (April 2026)](https://tailscale.com/blog/pricing-v4)
   - [Tailscale pricing](https://tailscale.com/pricing)
   - [Free pricing plans and discounts · Tailscale Docs](https://tailscale.com/docs/account/manage-plans/free-plans-discounts)
+- 後続作業: [blog-api: Lambda + tsnet を VPC + Fargate Proxy 構成に移行](../tasks/2026-06-29-blog-api-tidb-proxy.md)（本調査の結論として、Lambda を Tailscale ノードにしない設計に切り替える）
 
 ## 観測した事象
 

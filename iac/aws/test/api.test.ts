@@ -52,6 +52,11 @@ describe('MainStack', () => {
           clusterEndpoint: '/test/dsql/cluster-endpoint',
           clusterArn: '/test/dsql/cluster-arn',
         },
+        proxy: {
+          vpcId: '/test/tidb-proxy/vpc/id',
+          privateSubnetId1: '/test/tidb-proxy/vpc/private-subnet-id-1',
+          sgId: '/test/tidb-proxy/proxy/sg-id',
+        },
       },
       lambda: {
         blogApi: {
@@ -61,9 +66,6 @@ describe('MainStack', () => {
           cloudinaryCloudName: 'test-cloud',
           cloudinaryApiKey: 'test-api-key',
           cloudinaryApiSecretKeyName: '/test/cloudinary-secret',
-          tsOauthClientIdName: '/test/tailscale/oauth-client-id',
-          tsOauthClientSecretName: '/test/tailscale/oauth-client-secret',
-          tsTailnetSuffixName: '/test/tailscale/tailnet-suffix',
         },
       },
       env: {

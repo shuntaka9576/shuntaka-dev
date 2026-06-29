@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { MainStack } from '../lib/api/main-stack.js';
-import { getConfig } from '../lib/config.js';
+import { getConfig, getProxyConfig } from '../lib/config.js';
 import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
@@ -10,7 +10,9 @@ import { applyNag } from '../lib/nag.js';
 import {
   applyDeployRoleSuppressions,
   applyMainStackSuppressions,
+  applyTidbProxySuppressions,
 } from '../lib/nag-suppressions.js';
+import { TidbProxyStack } from '../lib/proxy/tidb-proxy-stack.js';
 
 const REGIONS = {
   TOKYO: 'ap-northeast-1',
@@ -91,6 +93,21 @@ const deployRoleStack = new DeployRoleStack(
 
 deployRoleStack.addDependency(oidcProviderStack);
 
+// tidb-proxy stack は dev / prd 共用なので stageName prefix を付けない (OidcProviderStack と同じ流儀)。
+const proxyConfig = getProxyConfig();
+const tidbProxyStack = new TidbProxyStack(
+  app,
+  `${config.projectName.short}-${proxyConfig.projectName}`,
+  {
+    proxyConfig,
+    env: {
+      account: config.cdkEnv.account,
+      region: REGIONS.TOKYO,
+    },
+  },
+);
+
 applyNag(app);
 applyMainStackSuppressions(mainStack);
 applyDeployRoleSuppressions(deployRoleStack);
+applyTidbProxySuppressions(tidbProxyStack);

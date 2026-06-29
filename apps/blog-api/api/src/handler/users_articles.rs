@@ -75,15 +75,11 @@ pub async fn get_users_articles(
         .await
         .map_err(|e| AppError::internal("Failed to find articles", e))?;
 
-    // Get Cloudinary config and create client
     let config = registry.webhook_config();
-    let api_secret = registry
-        .ssm_client()
-        .get_parameter(&config.cloudinary_api_secret_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
-
-    let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
+    let cloudinary = CloudinaryClientImpl::new(
+        config.cloudinary_cloud_name.clone(),
+        config.cloudinary_api_secret.clone(),
+    );
 
     let response = UsersArticlesResponse {
         articles: articles
@@ -142,15 +138,11 @@ pub async fn get_users_article(
         .map_err(|e| AppError::internal("Failed to find article", e))?
         .ok_or_else(|| AppError::not_found("Article not found"))?;
 
-    // Get Cloudinary config and create client
     let config = registry.webhook_config();
-    let api_secret = registry
-        .ssm_client()
-        .get_parameter(&config.cloudinary_api_secret_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
-
-    let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
+    let cloudinary = CloudinaryClientImpl::new(
+        config.cloudinary_cloud_name.clone(),
+        config.cloudinary_api_secret.clone(),
+    );
 
     let title = article.title.into_inner();
     let content = article.content.into_inner();
