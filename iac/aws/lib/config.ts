@@ -14,9 +14,6 @@ const lambdaEnvSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().nonempty(),
   CLOUDINARY_API_KEY: z.string().nonempty(),
   CLOUDINARY_API_SECRET_KEY_NAME: z.string().nonempty(),
-  TS_OAUTH_CLIENT_ID_KEY_NAME: z.string().nonempty(),
-  TS_OAUTH_CLIENT_SECRET_KEY_NAME: z.string().nonempty(),
-  TS_TAILNET_SUFFIX_KEY_NAME: z.string().nonempty(),
 });
 
 const stageName: {
@@ -69,10 +66,10 @@ interface AppParameter {
       clusterEndpoint: string;
       clusterArn: string;
     };
-    tailscale: {
-      oauthClientIdName: string;
-      oauthClientSecretName: string;
-      tailnetSuffixName: string;
+    proxy: {
+      vpcId: string;
+      privateSubnetId1: string;
+      sgId: string;
     };
   };
   lambda: {
@@ -83,9 +80,6 @@ interface AppParameter {
       cloudinaryCloudName: string;
       cloudinaryApiKey: string;
       cloudinaryApiSecretKeyName: string;
-      tsOauthClientIdName: string;
-      tsOauthClientSecretName: string;
-      tsTailnetSuffixName: string;
     };
   };
 }
@@ -115,9 +109,6 @@ const getLambdaEnvVars = () => {
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET_KEY_NAME: process.env.CLOUDINARY_API_SECRET_KEY_NAME,
-    TS_OAUTH_CLIENT_ID_KEY_NAME: process.env.TS_OAUTH_CLIENT_ID_KEY_NAME,
-    TS_OAUTH_CLIENT_SECRET_KEY_NAME: process.env.TS_OAUTH_CLIENT_SECRET_KEY_NAME,
-    TS_TAILNET_SUFFIX_KEY_NAME: process.env.TS_TAILNET_SUFFIX_KEY_NAME,
   });
 };
 
@@ -243,10 +234,10 @@ export const getConfig = (stageName: string): AppParameter => {
         clusterEndpoint: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-endpoint`,
         clusterArn: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-arn`,
       },
-      tailscale: {
-        oauthClientIdName: `/${config.stageName.long}/${config.projectName.long}/tailscale/oauth-client-id`,
-        oauthClientSecretName: `/${config.stageName.long}/${config.projectName.long}/tailscale/oauth-client-secret`,
-        tailnetSuffixName: `/${config.stageName.long}/${config.projectName.long}/tailscale/tailnet-suffix`,
+      proxy: {
+        vpcId: '/tidb-proxy/vpc/id',
+        privateSubnetId1: '/tidb-proxy/vpc/private-subnet-id-1',
+        sgId: '/tidb-proxy/proxy/sg-id',
       },
     },
     lambda: {
@@ -257,9 +248,6 @@ export const getConfig = (stageName: string): AppParameter => {
         cloudinaryCloudName: lambdaEnvVars.CLOUDINARY_CLOUD_NAME,
         cloudinaryApiKey: lambdaEnvVars.CLOUDINARY_API_KEY,
         cloudinaryApiSecretKeyName: lambdaEnvVars.CLOUDINARY_API_SECRET_KEY_NAME,
-        tsOauthClientIdName: lambdaEnvVars.TS_OAUTH_CLIENT_ID_KEY_NAME,
-        tsOauthClientSecretName: lambdaEnvVars.TS_OAUTH_CLIENT_SECRET_KEY_NAME,
-        tsTailnetSuffixName: lambdaEnvVars.TS_TAILNET_SUFFIX_KEY_NAME,
       },
     },
   };

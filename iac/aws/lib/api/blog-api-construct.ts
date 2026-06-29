@@ -8,12 +8,14 @@ import {
   RestApi,
 } from 'aws-cdk-lib/aws-apigateway';
 import type * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,6 +27,7 @@ export class BlogAPIConstruct extends Construct {
     id: string,
     props: {
       physicalPrefix: string;
+      stageName: string;
       domain: string;
       hostedZone: route53.IHostedZone;
       certificate: acm.ICertificate;
@@ -32,6 +35,11 @@ export class BlogAPIConstruct extends Construct {
       ssmParameters: {
         apiGateway: {
           apiUrl: string;
+        };
+        proxy: {
+          vpcId: string;
+          privateSubnetId1: string;
+          sgId: string;
         };
       };
       blogApiEnv: {
@@ -41,15 +49,102 @@ export class BlogAPIConstruct extends Construct {
         cloudinaryCloudName: string;
         cloudinaryApiKey: string;
         cloudinaryApiSecretKeyName: string;
-        tsOauthClientIdName: string;
-        tsOauthClientSecretName: string;
-        tsTailnetSuffixName: string;
       };
     },
   ) {
     super(scope, id);
 
-    // Docker Lambda
+    const proxyVpcId = ssm.StringParameter.valueForStringParameter(
+      this,
+      props.ssmParameters.proxy.vpcId,
+    );
+    const proxyPrivateSubnetId = ssm.StringParameter.valueForStringParameter(
+      this,
+      props.ssmParameters.proxy.privateSubnetId1,
+    );
+    const proxySgId = ssm.StringParameter.valueForStringParameter(
+      this,
+      props.ssmParameters.proxy.sgId,
+    );
+
+    const proxyVpc = ec2.Vpc.fromVpcAttributes(this, 'ImportedProxyVpc', {
+      vpcId: proxyVpcId,
+      availabilityZones: ['ap-northeast-1a'],
+      isolatedSubnetIds: [proxyPrivateSubnetId],
+    });
+    const proxyPrivateSubnet = ec2.Subnet.fromSubnetId(
+      this,
+      'ImportedProxyPrivateSubnet',
+      proxyPrivateSubnetId,
+    );
+    const proxySecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      'ImportedProxySg',
+      proxySgId,
+    );
+
+    const lambdaSg = new ec2.SecurityGroup(this, 'LambdaSg', {
+      vpc: proxyVpc,
+      securityGroupName: `lambda-sg-${props.stageName}`,
+      description: `blog-api lambda SG for ${props.stageName}`,
+      allowAllOutbound: false,
+    });
+    lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(13306), 'mysql via tidb-proxy');
+    lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(3128), 'https via tidb-proxy');
+
+    proxySecurityGroup.addIngressRule(
+      lambdaSg,
+      ec2.Port.tcp(13306),
+      `mysql from lambda-sg-${props.stageName}`,
+    );
+    proxySecurityGroup.addIngressRule(
+      lambdaSg,
+      ec2.Port.tcp(3128),
+      `https from lambda-sg-${props.stageName}`,
+    );
+
+    const proxyDnsName = 'tidb-proxy.internal';
+    const proxyHttpUrl = `http://${proxyDnsName}:3128`;
+
+    // CFN は Lambda env var に ssm-secure dynamic reference をサポートしないため、
+    // AwsCustomResource (deploy-time に Lambda が GetParameter する) 経由で取り出す。
+    const lookupSecureString = (id: string, parameterName: string): string => {
+      const lookup = new cr.AwsCustomResource(this, id, {
+        onUpdate: {
+          service: 'SSM',
+          action: 'GetParameter',
+          parameters: { Name: parameterName, WithDecryption: true },
+          physicalResourceId: cr.PhysicalResourceId.of(parameterName),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+          new iam.PolicyStatement({
+            actions: ['ssm:GetParameter'],
+            resources: [
+              `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${parameterName}`,
+            ],
+          }),
+          new iam.PolicyStatement({
+            actions: ['kms:Decrypt'],
+            resources: [`arn:aws:kms:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:alias/aws/ssm`],
+          }),
+        ]),
+      });
+      return lookup.getResponseField('Parameter.Value');
+    };
+
+    const ghAppSecretPem = lookupSecureString(
+      'GhAppSecretLookup',
+      props.blogApiEnv.githubAppSecretPemKeyName,
+    );
+    const ghWebhookSecret = lookupSecureString(
+      'GhWebhookSecretLookup',
+      props.blogApiEnv.githubWebhookSecretKeyName,
+    );
+    const cloudinaryApiSecret = lookupSecureString(
+      'CloudinaryApiSecretLookup',
+      props.blogApiEnv.cloudinaryApiSecretKeyName,
+    );
+
     const webApiLambda = new lambda.DockerImageFunction(this, 'WebApiLambda', {
       functionName: `${props.physicalPrefix}-blog-api`,
       code: lambda.DockerImageCode.fromImageAsset(path.resolve(__dirname, '../../../..')),
@@ -62,42 +157,28 @@ export class BlogAPIConstruct extends Construct {
         retention: logs.RetentionDays.TWO_WEEKS,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       }),
+      vpc: proxyVpc,
+      vpcSubnets: { subnets: [proxyPrivateSubnet] },
+      securityGroups: [lambdaSg],
       environment: {
         AWS_LWA_INVOKE_MODE: 'response_stream',
-        // tsnet-launcher が 127.0.0.1:13306 -> tidb.<TAILNET>:4000 を forward する。
-        // Rust 側はこの loopback URL を見る (TiDB の private IP は知らない)。
-        // database 名は stage 別 (blog_dev / blog_prd) を main-stack から受け取る。
-        DATABASE_URL: `mysql://root@127.0.0.1:13306/${props.databaseName}`,
+        DATABASE_URL: `mysql://root@${proxyDnsName}:13306/${props.databaseName}?ssl-mode=PREFERRED`,
+        HTTPS_PROXY: proxyHttpUrl,
+        HTTP_PROXY: proxyHttpUrl,
+        NO_PROXY: '169.254.169.254,localhost,127.0.0.1',
         GH_APP_ID: props.blogApiEnv.githubAppId,
-        GH_APP_SECRET_PEM_KEY_NAME: props.blogApiEnv.githubAppSecretPemKeyName,
-        GH_WEBHOOK_SECRET_KEY_NAME: props.blogApiEnv.githubWebhookSecretKeyName,
+        GH_APP_SECRET_PEM: ghAppSecretPem,
+        GH_WEBHOOK_SECRET: ghWebhookSecret,
         CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
-        CLOUDINARY_API_SECRET_KEY_NAME: props.blogApiEnv.cloudinaryApiSecretKeyName,
-        // tsnet-launcher が SSM から取得する 3 つ (path 渡し、値は SSM SecureString)
-        TS_OAUTH_CLIENT_ID_KEY_NAME: props.blogApiEnv.tsOauthClientIdName,
-        TS_OAUTH_CLIENT_SECRET_KEY_NAME: props.blogApiEnv.tsOauthClientSecretName,
-        TS_TAILNET_SUFFIX_KEY_NAME: props.blogApiEnv.tsTailnetSuffixName,
+        CLOUDINARY_API_SECRET: cloudinaryApiSecret,
       },
     });
 
-    // SSM Parameter Store読み取り用IAMポリシー (GH App / Cloudinary / Tailscale OAuth)
-    webApiLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['ssm:GetParameter'],
-        resources: [
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubAppSecretPemKeyName}`,
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.githubWebhookSecretKeyName}`,
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.cloudinaryApiSecretKeyName}`,
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsOauthClientIdName}`,
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsOauthClientSecretName}`,
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.blogApiEnv.tsTailnetSuffixName}`,
-        ],
-      }),
+    webApiLambda.role?.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
     );
 
-    // REST API with custom domain
     const restApi = new RestApi(this, 'RestApi', {
       restApiName: `${props.physicalPrefix}-blog-api`,
       endpointTypes: [EndpointType.REGIONAL],
@@ -107,12 +188,10 @@ export class BlogAPIConstruct extends Construct {
       },
     });
 
-    // Lambda Integration
     const lambdaIntegration = new LambdaIntegration(webApiLambda);
     const rootMethod = restApi.root.addMethod('ANY', lambdaIntegration);
     const proxyMethod = restApi.root.addResource('{proxy+}').addMethod('ANY', lambdaIntegration);
 
-    // ストリーミング対応の設定（CloudFormationオーバーライド）
     [rootMethod, proxyMethod].forEach((method) => {
       const cfnMethod = method.node.defaultChild as CfnMethod;
       cfnMethod.addOverride('Properties.Integration.ResponseTransferMode', 'STREAM');
@@ -126,14 +205,12 @@ export class BlogAPIConstruct extends Construct {
       );
     });
 
-    // Route53 A Record
     new route53.ARecord(this, 'ApiAliasRecord', {
       zone: props.hostedZone,
       recordName: props.domain,
       target: route53.RecordTarget.fromAlias(new route53Targets.ApiGateway(restApi)),
     });
 
-    // SSM Parameters
     new ssm.StringParameter(this, 'ApiUrlParam', {
       parameterName: props.ssmParameters.apiGateway.apiUrl,
       stringValue: `https://${props.domain}`,

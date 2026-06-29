@@ -31,6 +31,11 @@ export class MainStack extends cdk.Stack {
           clusterEndpoint: string;
           clusterArn: string;
         };
+        proxy: {
+          vpcId: string;
+          privateSubnetId1: string;
+          sgId: string;
+        };
       };
       lambda: {
         blogApi: {
@@ -40,9 +45,6 @@ export class MainStack extends cdk.Stack {
           cloudinaryCloudName: string;
           cloudinaryApiKey: string;
           cloudinaryApiSecretKeyName: string;
-          tsOauthClientIdName: string;
-          tsOauthClientSecretName: string;
-          tsTailnetSuffixName: string;
         };
       };
     } & cdk.StackProps,
@@ -104,6 +106,7 @@ export class MainStack extends cdk.Stack {
     // WebApp: Lambda + API Gateway + Route53
     new BlogAPIConstruct(this, 'BlogAPI', {
       physicalPrefix,
+      stageName: props.stageName.long,
       domain: props.domain.api,
       hostedZone,
       certificate: tokyoCertificate,
@@ -111,6 +114,7 @@ export class MainStack extends cdk.Stack {
       databaseName: `blog_${props.stageName.long}`,
       ssmParameters: {
         apiGateway: props.ssmParameters.apiGateway,
+        proxy: props.ssmParameters.proxy,
       },
       blogApiEnv: props.lambda.blogApi,
     });
