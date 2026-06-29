@@ -36,7 +36,7 @@ Tailscale admin console (`https://login.tailscale.com/admin/machines`) に **`bl
 
 ## 仕組み: なぜノードが増えるのか
 
-```{figure} 2026-06-29-tailscale-lambda-ephemeral-pileup/lambda-tsnet-lifecycle.png
+```{figure} images/2026-06-29-tailscale-lambda-ephemeral-pileup/lambda-tsnet-lifecycle.png
 :alt: Lambda + tsnet のライフサイクルと admin console から見える状態遷移
 :width: 100%
 

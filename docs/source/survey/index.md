@@ -3,6 +3,8 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-06-30-tidb-article-detail-explain-plan
+2026-06-30-tidb-articles-explain-plan
 2026-06-29-tailscale-lambda-ephemeral-pileup
 2026-06-28-tidb
 2026-05-27-renovate-apm-update-ci-loop
