@@ -99,25 +99,25 @@ ACL: `tag:proxy` → `tag:k8s`（TiDB）への ingress を 1 ルールで許可�
 - ⚠ proxy 障害時に dev / prd 両方が落ちる（個人ブログかつ SPOF 受容方針なので許容）
 - ⚠ proxy のメンテ（image 更新）も両 stage に同時影響
 
-## なぜ Fargate (Spot) か
+## なぜ Fargate (on-demand) か
 
-| 観点          | Fargate Spot                            | EC2 t4g.nano + EIP          |
-| ------------- | --------------------------------------- | --------------------------- |
-| 月額          | ~$7.25                                  | ~$4.5                       |
-| IP 管理       | Cloud Map 自動更新                      | EIP で完全固定              |
-| 障害復旧      | ECS が task を自動再起動                | 自分で systemd / ASG を設定 |
-| OS パッチ管理 | 不要 (managed image)                    | apt-get upgrade 等の運用    |
-| Spot 中断頻度 | 2 分警告ありで稀に中断 (月 1〜4 回程度) | なし                        |
+| 観点          | Fargate on-demand        | Fargate Spot                                                   | EC2 t4g.nano + EIP          |
+| ------------- | ------------------------ | -------------------------------------------------------------- | --------------------------- |
+| 月額          | ~$12.1                   | ~$7.4                                                          | ~$4.5                       |
+| IP 管理       | Cloud Map 自動更新       | Cloud Map 自動更新                                             | EIP で完全固定              |
+| 障害復旧      | ECS が task を自動再起動 | ECS が task を自動再起動 (capacity 枯渇時は別 AZ 待ちで詰まる) | 自分で systemd / ASG を設定 |
+| OS パッチ管理 | 不要 (managed image)     | 不要 (managed image)                                           | apt-get upgrade 等の運用    |
+| 中断頻度      | なし                     | 2 分警告ありで稀に中断 + capacity 枯渇で再配置不可             | なし                        |
 
-差額 $2.75/月で **systemd / AMI / EIP attach script の運用が全部不要**になるなら割が良い。SPOF を許容する前提なので Spot で十分。
+検証中に Spot capacity 枯渇 (`Capacity is unavailable at this time. Please try again later or in a different availability zone.`) で task が数十分置き直せない事象が発生。1 task しか動かさない構成では Spot 障害時に proxy ごと止まり dev / prd 両 stage が同時停止するため、月 $5 増えても on-demand を採用。SPOF はそのまま許容。
 
 ## コスト試算
 
-**dev / prd 共用 1 proxy 前提**で計算（infra 全体で 1 個）。
+**dev / prd 共用 1 proxy 前提**で計算（infra 全体で 1 個）。当初は Fargate Spot を想定していたが、Spot は ap-northeast-1a で稀に capacity 枯渇が起きて task 再起動が長時間止まる事象が発生したため、1 task しかない用途では割が合わないと判断して **on-demand (FARGATE) base=1 構成に変更**。差額は月 $5 程度。
 
 | 要素                                         | 月額 (USD)    |
 | -------------------------------------------- | ------------- |
-| Fargate Spot 0.25 vCPU / 0.5 GB (ARM)        | ~$3.0         |
+| Fargate 0.25 vCPU / 0.5 GB (ARM, on-demand)  | ~$7.7         |
 | Public IPv4 attached ($0.005/h × 730h)       | $3.65         |
 | AWS Cloud Map private namespace              | $0.50         |
 | AWS Cloud Map registered resource ($0.10/月) | $0.10         |
@@ -127,9 +127,9 @@ ACL: `tag:proxy` → `tag:k8s`（TiDB）への ingress を 1 ルールで許可�
 | VPC Endpoint                                 | $0 (使わない) |
 | ECR storage (image 最新 1 件のみ保存、共用)  | ~$0.05        |
 | データ転送 outbound                          | 数十円程度    |
-| **合計 (dev + prd 共用)**                    | **~$7.4**     |
+| **合計 (dev + prd 共用)**                    | **~$12.1**    |
 
-Tailscale Premium ($18/user/月) でゴリ押しするより遥かに安く済む。
+Tailscale Premium ($18/user/月) でゴリ押しするより安く済む。
 
 ## IaC 構成: CDK は infra、ecspresso は task / service
 
