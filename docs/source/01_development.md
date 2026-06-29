@@ -259,27 +259,10 @@ brew install kayac/tap/ecspresso
 ecspresso version
 ```
 
-tidb-proxy コンテナ image を ECR に push してから、ecspresso で ECS Service を起動する。`IMAGE_TAG` には git short SHA を渡し、再現可能なタグ付けにする。コマンドは repo root から実行する前提。
+tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめた `scripts/deploy-tidb-proxy.sh` を実行する。`IMAGE_TAG` は git short SHA が自動で使われる（環境変数で上書き可）。
 
 ```bash
-cd "$(git rev-parse --show-toplevel)"
-
-ECR_URI=$(aws ssm get-parameter \
-  --name /tidb-proxy/proxy/ecr-repository-uri \
-  --query "Parameter.Value" --output text)
-IMAGE_TAG=$(git rev-parse --short HEAD)
-
-aws ecr get-login-password --region ap-northeast-1 \
-  | docker login --username AWS --password-stdin "${ECR_URI%/*}"
-
-docker buildx build \
-  --platform linux/arm64 \
-  -t "${ECR_URI}:${IMAGE_TAG}" \
-  --push \
-  apps/tidb-proxy
-
-IMAGE_TAG="${IMAGE_TAG}" ecspresso deploy \
-  --config iac/aws/ecspresso/tidb-proxy/ecspresso.jsonnet
+scripts/deploy-tidb-proxy.sh
 ```
 
 tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。

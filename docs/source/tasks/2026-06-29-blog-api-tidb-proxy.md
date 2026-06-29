@@ -649,37 +649,73 @@ iac/aws/ecspresso/tidb-proxy/
 
 image-tag.jsonnet は `IMAGE_TAG` 環境変数から読む。CI/CD では git SHA を渡す想定。
 
+`ecspresso.jsonnet` 本体には `{{ ssm }}` テンプレート関数を使えない（task def / service def の前段で評価されるため）。`cluster` と `service` フィールドは `tidb-proxy` をリテラルで持つ。
+
+ECS Service の `enableExecuteCommand: true` を活かすため、`tidb-proxy-task` ロールに `ssmmessages:CreateControlChannel` / `CreateDataChannel` / `OpenControlChannel` / `OpenDataChannel` を付与する。ECS Exec の managed agent が SSM Session Manager との control channel を張るために必要。
+
+#### Fargate awsvpc での内部疎通検証
+
+VPC 内別ホスト（Lambda 等）がまだ無い段階での dataplane 検証は ECS Exec で proxy task 自体に入って行う。
+
+```bash
+TASK_ARN=$(aws ecs list-tasks --cluster tidb-proxy --service-name tidb-proxy --query "taskArns[0]" --output text)
+aws ecs execute-command --cluster tidb-proxy --task "$TASK_ARN" --container tidb-proxy --command "/bin/sh" --interactive
+```
+
+container 内で必要パッケージを入れる（image は alpine + 最小構成）。
+
+```sh
+apk add --no-cache curl mysql-client
+```
+
+forwarder (`localhost:13306`) は同 container の loopback で動くのでそのまま叩ける。
+
+```sh
+mysql -h localhost -P 13306 -u <user> -p <database> -e "SELECT VERSION();"
+```
+
+squid (`localhost:3128`) は `squid.conf` の `localnet` ACL に 127.0.0.0/8 を含めていないので localhost からは 403 になる。VPC CIDR (10.0.0.0/8) 内 src でないと CONNECT が allow されない。Fargate awsvpc では `eth0` が link-local (169.254.x.x) の Pause container 用 IF、本物の VPC ENI は別 IF なので、IP は default route から取る。
+
+```sh
+EXT_IP=$(ip -4 route get 1.1.1.1 | awk '{print $7; exit}')
+curl -sS -x "http://${EXT_IP}:3128" https://api.github.com/zen
+```
+
+Lambda 側からの実利用 (タスク 4 以降) は private subnet の VPC IP (10.50.1.x) が src になるので、ACL を変えずに通る。
+
 #### チェックリスト
 
 - [x] `iac/aws/ecspresso/tidb-proxy/` 配下に 5 ファイル作成（IaC 構成セクション参照）
-- [ ] 初回 image を build & push (`IMAGE_TAG=$(git rev-parse --short HEAD)`)
-- [ ] `ecspresso deploy --config ecspresso.jsonnet` で初回 task 起動
-- [ ] Fargate task が Tailnet に join できることを admin console で確認
-- [ ] VPC 内の test 用 ENI (or 一時 EC2) から `mysql -h tidb-proxy.internal -P 13306 -u root` で TiDB 接続成功
-- [ ] 同所から `curl -x http://tidb-proxy.internal:3128 https://api.github.com/zen` 成功
+- [x] 初回 image を build & push (`IMAGE_TAG=$(git rev-parse --short HEAD)`)
+- [x] `ecspresso deploy --config ecspresso.jsonnet` で初回 task 起動
+- [x] Fargate task が Tailnet に join できることを admin console で確認
+- [x] ECS Exec で proxy container に入って `mysql -h localhost -P 13306` で TiDB 接続成功
+- [x] 同 container から `curl -x http://${EXT_IP}:3128 https://api.github.com/zen` で CONNECT 200 + TLS handshake 成功
 - [ ] ECR lifecycle が効いて、複数回 push しても最新 1 image のみ残ることを確認
 
 ### タスク 3: image 更新フローを Makefile / scripts に整備
 
 #### 設計
 
-開発者が「アプリ更新 → image push → ecspresso deploy」を 1 コマンドで実行できるようにしておく:
+開発者が「アプリ更新 → image push → ecspresso deploy」を 1 コマンドで実行できるように `scripts/deploy-tidb-proxy.sh` を置く。`docker buildx build --push` で build + push を 1 ステップにまとめ、その後 `ecspresso deploy` を叩く。
 
-```makefile
-# Makefile or scripts/deploy-proxy.sh
-deploy-proxy:
-	IMAGE_TAG=$$(git rev-parse --short HEAD); \
-	docker buildx build --platform linux/arm64 -t $$ECR_URI:$$IMAGE_TAG apps/tidb-proxy/; \
-	docker push $$ECR_URI:$$IMAGE_TAG; \
-	IMAGE_TAG=$$IMAGE_TAG ecspresso deploy --config iac/aws/ecspresso/tidb-proxy/ecspresso.jsonnet
+```bash
+scripts/deploy-tidb-proxy.sh
 ```
 
-将来 GitHub Actions 化したい場合も同じスクリプトを呼ぶだけで済む形にしておく。
+主要点:
+
+- `IMAGE_TAG` は環境変数で渡せるが、未指定なら git short SHA を自動採用
+- `AWS_REGION` も同様（default `ap-northeast-1`）
+- `ECR_URI` は SSM Parameter Store (`/tidb-proxy/proxy/ecr-repository-uri`) から実行時取得
+- `set -euo pipefail` で異常時は即 abort
+
+将来 GitHub Actions 化する際は同じスクリプトを呼べばよい。
 
 #### チェックリスト
 
-- [ ] `Makefile` or `scripts/deploy-proxy.sh` で build + push + ecspresso deploy を 1 コマンド化
-- [ ] README or `docs/source/01_development.md` に運用手順を追記
+- [x] `scripts/deploy-tidb-proxy.sh` で build + push + ecspresso deploy を 1 コマンド化
+- [x] `docs/source/01_development.md` に運用手順を反映
 
 ### タスク 4: dev Lambda を VPC 化 + HTTPS_PROXY 設定（先に dev で dual-run）
 
