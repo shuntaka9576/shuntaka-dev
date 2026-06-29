@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG GO_VERSION=1.26
-ARG ALPINE_VERSION=3.21
+ARG ALPINE_VERSION=3.24
 
 # ---- Go build (tsnet forwarder) ----
 # BUILDPLATFORM でホスト側 Go ツールチェーンを使い、TARGETARCH で Fargate (ARM64)
