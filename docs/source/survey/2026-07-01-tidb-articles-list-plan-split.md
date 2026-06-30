@@ -79,14 +79,14 @@ TopN_15             10.00    47777.51   10       root                       blog
 
 生の `time` だけ並べると **B (1.2ms) < A (1.24ms)** で B のほうが微妙に速い。が、これに引っ張られて「opt の選択が正しい」と判断しないこと。
 
-| 観点                           | プラン A (OFFSET 10)        | プラン B (OFFSET 30)                    |
-| ------------------------------ | --------------------------- | --------------------------------------- |
-| 合計時間                       | 1.24ms                      | 1.2ms                                   |
-| `total_process_keys_size`      | 82,747 B                    | **862,833 B（約 10 倍）**               |
-| scan 段 actRows                | 20（Limit pushdown 後）     | **131（テーブル全件）**                 |
-| 増え方                         | OFFSET に線形（offset+10）  | **テーブルサイズに線形**                |
-| block cache フットプリント     | 小（content 込み 10 行）    | 大（content 込み 131 行を毎回）         |
-| estCost（opt 自身の見積もり）  | 24,255                      | 47,777                                  |
+| 観点                          | プラン A (OFFSET 10)       | プラン B (OFFSET 30)            |
+| ----------------------------- | -------------------------- | ------------------------------- |
+| 合計時間                      | 1.24ms                     | 1.2ms                           |
+| `total_process_keys_size`     | 82,747 B                   | **862,833 B（約 10 倍）**       |
+| scan 段 actRows               | 20（Limit pushdown 後）    | **131（テーブル全件）**         |
+| 増え方                        | OFFSET に線形（offset+10） | **テーブルサイズに線形**        |
+| block cache フットプリント    | 小（content 込み 10 行）   | 大（content 込み 131 行を毎回） |
+| estCost（opt 自身の見積もり） | 24,255                     | 47,777                          |
 
 - **1.2ms vs 1.24ms は 40µs の誤差**。TiKV の RPC が 1 往復しただけで吸収される範囲で、再現性のある優劣ではない
 - B は TiKV → TiDB の転送量が約 10 倍。今は速くても **block cache を毎クエリで掃いている**状態で、他クエリの cache hit ratio に副作用を出している可能性がある
@@ -99,11 +99,11 @@ TopN_15             10.00    47777.51   10       root                       blog
 
 opt の cost 計算を 2 プランで比較すると、
 
-| 観点                       | プラン A (IndexLookUp)              | プラン B (TableFullScan)        |
-| -------------------------- | ----------------------------------- | ------------------------------- |
-| 必要な行数（Limit 込み）   | offset + count                      | テーブル全件 - Selection 適用前 |
-| OFFSET 10 のとき           | 20 行のみ IndexRange + 10 行 RowID  | 131 行フルスキャン              |
-| OFFSET 30 のとき           | 40 行 IndexRange + 10 行 RowID      | 131 行フルスキャン（不変）      |
+| 観点                         | プラン A (IndexLookUp)                     | プラン B (TableFullScan)        |
+| ---------------------------- | ------------------------------------------ | ------------------------------- |
+| 必要な行数（Limit 込み）     | offset + count                             | テーブル全件 - Selection 適用前 |
+| OFFSET 10 のとき             | 20 行のみ IndexRange + 10 行 RowID         | 131 行フルスキャン              |
+| OFFSET 30 のとき             | 40 行 IndexRange + 10 行 RowID             | 131 行フルスキャン（不変）      |
 | OFFSET 50 / 100 / 500 のとき | 60 / 110 / 510 行 IndexRange + 10 行 RowID | 131 行フルスキャン（不変）      |
 
 プラン A の `TableRowIDScan` 段は OFFSET に関係なく LIMIT 後の 10 行で済むが、`IndexRangeScan + Limit (offset+count)` 段が OFFSET と共に線形に増える。一方プラン B の `TableFullScan` は **テーブルサイズで固定**（articles が約 131 行）。
@@ -159,20 +159,20 @@ LIMIT 10 OFFSET 0;
 
 各 OFFSET で「root operator が `IndexLookUp` か `TopN` か」を記録し、表にする。
 
-| OFFSET | env | root operator     | actRows (TableScan/RowID) | total_process_keys_size | time |
-| ------ | --- | ----------------- | -------------------------- | ----------------------- | ---- |
-| 0      | dev | **IndexLookUp**   | 10                         | 83,220 B                | 1.56ms |
-| 10     | dev | **IndexLookUp**   | 10                         | 80,694 B                | 1.6ms  |
-| 10     | prd | IndexLookUp       | 10                         | 82,747 B                | 1.24ms |
-| **20** | dev | **TopN+FullScan** | **118**                    | **768,251 B**           | **1.48ms** |
-| 30     | dev | TopN+FullScan     | 118                        | 768,251 B               | 1.04ms |
-| 30     | prd | TopN+FullScan     | 131                        | 862,833 B               | 1.2ms  |
-| 40     | dev | TopN+FullScan     | 118                        | 768,251 B               | 1.14ms |
-| **50** | dev | **IndexLookUp**   | 0 (range exhausted at 37)  | 8,954 B                 | 1.11ms |
-| 80     | dev | IndexLookUp       | 0 (range exhausted at 37)  | 8,954 B                 | 730µs |
-| 100    | dev | IndexLookUp       | 0 (range exhausted at 37)  | 8,954 B                 | 716µs |
-| 200    | dev | IndexLookUp       | 0 (range exhausted at 37)  | 8,954 B                 | 706µs |
-| 500    | dev | IndexLookUp       | 0 (range exhausted at 37)  | 8,954 B                 | 970µs |
+| OFFSET | env | root operator     | actRows (TableScan/RowID) | total_process_keys_size | time       |
+| ------ | --- | ----------------- | ------------------------- | ----------------------- | ---------- |
+| 0      | dev | **IndexLookUp**   | 10                        | 83,220 B                | 1.56ms     |
+| 10     | dev | **IndexLookUp**   | 10                        | 80,694 B                | 1.6ms      |
+| 10     | prd | IndexLookUp       | 10                        | 82,747 B                | 1.24ms     |
+| **20** | dev | **TopN+FullScan** | **118**                   | **768,251 B**           | **1.48ms** |
+| 30     | dev | TopN+FullScan     | 118                       | 768,251 B               | 1.04ms     |
+| 30     | prd | TopN+FullScan     | 131                       | 862,833 B               | 1.2ms      |
+| 40     | dev | TopN+FullScan     | 118                       | 768,251 B               | 1.14ms     |
+| **50** | dev | **IndexLookUp**   | 0 (range exhausted at 37) | 8,954 B                 | 1.11ms     |
+| 80     | dev | IndexLookUp       | 0 (range exhausted at 37) | 8,954 B                 | 730µs      |
+| 100    | dev | IndexLookUp       | 0 (range exhausted at 37) | 8,954 B                 | 716µs      |
+| 200    | dev | IndexLookUp       | 0 (range exhausted at 37) | 8,954 B                 | 706µs      |
+| 500    | dev | IndexLookUp       | 0 (range exhausted at 37) | 8,954 B                 | 970µs      |
 
 `offset+count > 推定行数 (47.16)` を超えた瞬間に A に戻り、それ以降は **OFFSET をどれだけ伸ばしても A のまま**。仮説通り「IndexRange が早期に枯渇すると opt は IndexLookUp が最安と判定する」が完全に検証された。
 
@@ -184,11 +184,11 @@ LIMIT 10 OFFSET 0;
 
 opt の判断構造の仮説:
 
-| `offset + count` の範囲           | プラン | opt の見立て                                                                |
-| --------------------------------- | ------ | --------------------------------------------------------------------------- |
-| 推定行数の半分以下 (≤ ~20)        | A      | 少数の IndexRange + ランダム RowID 引きが最安                               |
-| 推定行数の半分〜推定行数 (~20〜47)| **B**  | ランダム I/O の累積コストが TableFullScan のシーケンシャル I/O を上回ると判定 |
-| 推定行数を超える (> ~47)          | A      | IndexRange が途中で枯渇 (`TableRowIDScan` actRows = 0) と分かり、再び A が最安 |
+| `offset + count` の範囲            | プラン | opt の見立て                                                                   |
+| ---------------------------------- | ------ | ------------------------------------------------------------------------------ |
+| 推定行数の半分以下 (≤ ~20)         | A      | 少数の IndexRange + ランダム RowID 引きが最安                                  |
+| 推定行数の半分〜推定行数 (~20〜47) | **B**  | ランダム I/O の累積コストが TableFullScan のシーケンシャル I/O を上回ると判定  |
+| 推定行数を超える (> ~47)           | A      | IndexRange が途中で枯渇 (`TableRowIDScan` actRows = 0) と分かり、再び A が最安 |
 
 ここでの「推定行数」は `Selection_14` の estRows = 47.16（`status='published' AND type='tech' AND user_id=...` の絞り込み後の推定）。実 actual は 37。
 
