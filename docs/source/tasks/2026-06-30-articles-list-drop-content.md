@@ -513,6 +513,120 @@ Q2 の fanout が **4 分の 1**。Q1 はページネーションリンクの pr
 
 ---
 
+## Phase 4: JOIN 分離 + 複合インデックスに `article_id` を追加 + ORDER BY 安定化
+
+### 動機
+
+Phase 1 / 2 / 3 を経た時点で一覧クエリ (LIMIT 10) の `EXPLAIN ANALYZE` が以下の構造になっていた:
+
+```
+TopN_15 (root)                ← Sort + Limit fused, keep order:false
+└─IndexHashJoin_26            ← users (1 件) ⋈ articles (37 件)
+  ├─Point_Get (uq_users_name)
+  └─IndexLookUp
+    ├─IndexRangeScan_21 (idx_articles_user_status_type_published_at, keep order:false)
+    └─TableRowIDScan_22       ← 37 行 (= Limit 後の 10 行ではなく Sort 前の 37 行) を読み出している
+```
+
+問題点:
+
+1. `keep order:false` で取っているため、TiDB 側で `TopN` (= Sort + Limit) を後付けする必要があり、**`TableRowIDScan` で 37 行ぶん読んでから 10 行に絞っている**。理想は IndexRangeScan の段で 10 行に絞ってから TableRowIDScan に渡す形 (Limit pushdown)。
+2. `IndexHashJoin` が users との JOIN のために 187.9 KB のメモリを消費し、Point_Get の往復で 945µs かかっている。`u.name` から `user_id` を確定する処理は完全に独立しているので **JOIN は構造的に不要**。
+3. `ORDER BY published_at DESC` 単独では `published_at` が同値の記事が出た時に順序が不安定。Tiebreaker として `article_id DESC` を足すと、インデックス列の自然順と一致するため `keep order:true, desc` 経路が取れる。
+
+### 変更内容
+
+#### 4-A. 新インデックス: `article_id` を末尾に追加
+
+```sql
+ALTER TABLE articles
+  ADD INDEX idx_articles_user_status_type_published_at_id
+    (user_id, status, `type`, published_at, article_id);
+ALTER TABLE articles DROP INDEX idx_articles_user_status_type_published_at;
+```
+
+旧インデックス `(user_id, status, type, published_at)` は新インデックスの完全な prefix なので 100% redundant。Phase 2 と同じく ADD と同じ deploy 単位で DROP する。
+
+#### 4-B. クエリ修正 (`apps/blog-api/adapter/src/repository/users_articles.rs`)
+
+- 一覧クエリの JOIN を外し、`a.user_id = (SELECT user_id FROM users WHERE name = ?)` に変更
+- `ORDER BY a.published_at DESC` → `ORDER BY a.published_at DESC, a.article_id DESC` (安定化)
+- COUNT クエリも同じ subquery 化
+
+ヒント (`/*+ ORDER_INDEX(...) */`) は **不要**。dev 計測で ヒント無しでも opt が新インデックスを `keep order:true, desc` で選ぶことを確認済 (B-2 1.75ms vs B-4 ヒント付き 1.65ms で誤差レベル)。
+
+### 期待プラン (実測通り)
+
+```
+IndexLookUp
+├─Limit (cop[tikv], embedded)            ← Limit が TiKV 側に push down
+│ └─IndexRangeScan
+│     idx_articles_user_status_type_published_at_id
+│     range: [user_id=?, status='published', type=?]
+│     keep order:true, desc               ← published_at, article_id の自然順を逆走査
+└─TableRowIDScan (10 行 ← Sort 前の 37 行ではなく LIMIT 後の 10 行)
+```
+
+### 計測結果 (dev, 2026-06-30)
+
+#### 一覧クエリ (LIMIT 10 OFFSET 0)
+
+| 観点                        | Baseline (Phase 3 まで) | **Phase 4**        | 改善     |
+| --------------------------- | ----------------------- | ------------------ | -------- |
+| 合計時間                    | 2.75ms                  | **1.75ms**         | **-36%** |
+| `keep order`                | `false`                 | **`true, desc`**   | ✅       |
+| `TableRowIDScan` actRows    | 37                      | **10**             | **-73%** |
+| `TableRowIDScan` 処理サイズ | 355,476 B               | **83,220 B**       | **-77%** |
+| `TableRowIDScan` time       | 1.08ms                  | **457µs**          | -58%     |
+| `TopN_15` (Sort + Limit)    | 18.4 KB                 | **消滅**           | ✅       |
+| `IndexHashJoin` メモリ      | 187.9 KB                | **消滅**           | ✅       |
+| `Limit` pushdown            | なし                    | **TiKV 側に push** | ✅       |
+| 合計メモリ                  | 約 206 KB               | **28.6 KB**        | **-86%** |
+
+#### COUNT クエリ
+
+| 観点                   | Baseline | **Phase 4** | 改善     |
+| ---------------------- | -------- | ----------- | -------- |
+| 合計時間               | 1.67ms   | **892.8µs** | **-47%** |
+| `IndexHashJoin` メモリ | 82.0 KB  | **消滅**    | ✅       |
+| `TableRowIDScan`       | なし     | **なし**    | 同等     |
+
+### 生 `EXPLAIN ANALYZE`
+
+完全な SQL とログ全文は [`survey/2026-06-30-articles-list-join-elim.sql`](../survey/2026-06-30-articles-list-join-elim.sql) を参照。
+
+主要な抜粋 (Phase 4 適用後の一覧クエリ):
+
+```
+IndexLookUp_33               actRows:10  time:1.75ms  memory:28.6 KB  limit embedded(offset:0, count:10)
+├─Limit_32 (cop[tikv])       actRows:10  time:1.16ms  offset:0, count:10
+│ └─IndexRangeScan_30        actRows:10  table:a, index:idx_articles_user_status_type_published_at_id(user_id, status, type, published_at, article_id)
+│                                        range:["<uuid>" "published" "tech","<uuid>" "published" "tech"], keep order:true, desc
+└─TableRowIDScan_31 (Probe)  actRows:10  time:457µs   keep order:false  total_process_keys_size: 83220
+```
+
+### Phase 4 チェックリスト
+
+- [x] dev TiDB で baseline EXPLAIN ANALYZE 取得 (A-1 / A-2)
+- [x] 新インデックス ADD + ANALYZE
+- [x] dev TiDB で Phase 4 EXPLAIN ANALYZE 取得 (B-1 〜 B-4)
+- [x] `keep order:true, desc` がヒント無しで選ばれることを確認 (= 本番クエリにヒント不要)
+- [x] 旧インデックス DROP + ANALYZE
+- [x] DROP 後にも新クエリが同じ計画 (新インデックス + keep order:true, desc + Limit pushdown) を保つことを確認 (C-3)
+- [x] `tools/dsql-cli/dsl-tidb/schema/04_articles.sql` の末尾に Phase 4 の ALTER 差分追記
+- [x] `apps/blog-api/adapter/src/repository/users_articles.rs` を subquery + 安定化 ORDER BY に修正
+- [ ] `bun run check` 通過
+- [ ] PR 作成 + `workflow_dispatch` で dev デプロイ
+- [ ] dev デプロイ後にトップ / note タブ / RSS / sitemap が壊れていないことを確認
+- [ ] prd TiDB に対して同じ手順 (新インデックス ADD → ANALYZE → 旧 DROP → ANALYZE) を適用
+- [ ] prd デプロイ後 1 週間ほど slow query log / tidb_statement_summary を観察
+
+### Phase 4 で踏み込まないこと
+
+- **cursor pagination (keyset pagination)**: Phase 3 末尾で議論済み。記事数が数千規模まで OFFSET 方式で十分。Phase 4 で `keep order:true` + Limit pushdown が効くようになったので、深い OFFSET でも IndexRangeScan が B+Tree を順走するだけで済む構造になった。
+
+---
+
 ## キャッシュ仮説の整理
 
 「トップを叩いたら前記事のキャッシュが作られていて初回が重い」という仮説に対しての回答:

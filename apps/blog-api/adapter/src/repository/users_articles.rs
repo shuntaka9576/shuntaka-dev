@@ -142,14 +142,15 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.created_at,
                 a.updated_at
             FROM articles a
-            JOIN users u ON a.user_id = u.user_id
-            WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
-            ORDER BY a.published_at DESC
+            WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
+              AND a.status = 'published'
+              AND a.`type` = ?
+            ORDER BY a.published_at DESC, a.article_id DESC
             LIMIT ? OFFSET ?
             "#,
         )
-        .bind(article_type.as_str())
         .bind(user_name)
+        .bind(article_type.as_str())
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.db.pool())
@@ -159,12 +160,13 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             r#"
             SELECT COUNT(*)
             FROM articles a
-            JOIN users u ON a.user_id = u.user_id
-            WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
+            WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
+              AND a.status = 'published'
+              AND a.`type` = ?
             "#,
         )
-        .bind(article_type.as_str())
         .bind(user_name)
+        .bind(article_type.as_str())
         .fetch_one(&self.db.pool())
         .await?;
 
