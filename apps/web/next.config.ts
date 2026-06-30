@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
         destination: '/about',
         permanent: true,
       },
+      {
+        source: '/page/1',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/type/note/page/1',
+        destination: '/type/note',
+        permanent: true,
+      },
     ];
   },
   async headers() {

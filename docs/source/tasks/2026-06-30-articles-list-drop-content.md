@@ -328,6 +328,191 @@ Sort_10                         0.04     37       root                          
 
 ---
 
+## Phase 3: 一覧 API のページネーション + フロント prefetch fanout 削減
+
+### 動機
+
+Phase 1 / Phase 2 で Q1 自体は十分軽くなった (7.33ms → 2.63ms)。**残るボトルネックは Q1 ではなく、フロントの `next/link` viewport prefetch によって裏で叩かれる Q2 (詳細) 群** である。
+
+具体的には:
+
+- `apps/web/src/components/ArticleCard.tsx` の `<ProgressLink>` は `next/link` ラッパーで、`prefetch` 指定無し → production では viewport in 時に自動 prefetch
+- 一覧ページが 40 件の `ArticleCard` をレンダする以上、トップを開くと **40 個の `/[userName]/articles/[slug]` ルートが RSC prefetch され、各々で `getArticleBySlug` (Q2) が走る**
+- `revalidate: 30` なので Next.js キャッシュが切れるたびにまた走る
+
+Q2 自体は `uq_articles_slug` の Point_Get なので 1 回は軽いが、40 倍に増幅されると一覧 API の Q1 1 回より圧倒的に重い。`tidb_statement_summary` で Q1 だけ追うと全体像を見誤る。
+
+ページネーションして 1 ページ 10 件にすれば、**viewport に並ぶ `<Link>` は 10 個 + ページネーション数個** に減り、prefetch fanout は約 4 分の 1。`prefetch={false}` で全切りせず体感速度を維持したまま fanout を絞れる。
+
+Phase 2 の新インデックス `(user_id, status, type, published_at)` のおかげで `LIMIT/OFFSET` も `COUNT(*)` も追加コストほぼ無しで載るので、API 側の DDL は不要。
+
+### 設計判断（確定済み）
+
+| 項目                | 採用案                                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| URL 形式            | `/page/[page]` 動的ルート（searchParams ではない）                                                             |
+| 1 ページ件数        | **10 件**                                                                                                      |
+| 1 ページ目の扱い    | `/` と `/type/note` をそのまま 1 ページ目として動作させる。`/page/1` / `/type/note/page/1` は 308 リダイレクト |
+| ページネーション UI | `1 2 3 … 9 [10]` 形式。現ページ ±2 + 最初/最後 + 省略                                                          |
+| RSS                 | 最新 20 件で十分 (`perPage=20`)                                                                                |
+| sitemap             | 全件必要 (`perPage=all` または十分大きい上限)                                                                  |
+
+### Q1 SQL（変更後）
+
+```sql
+-- ページ取得
+SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
+       a.status, a.`type`, a.published_at, a.created_at, a.updated_at
+FROM articles a
+JOIN users u ON a.user_id = u.user_id
+WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
+ORDER BY a.published_at DESC
+LIMIT ? OFFSET ?;
+
+-- 総件数（ページネーション UI 用）
+SELECT COUNT(*)
+FROM articles a
+JOIN users u ON a.user_id = u.user_id
+WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?;
+```
+
+期待プラン:
+
+- ページ取得: Phase 2 の新インデックスのみで完結。`IndexRangeScan` でレンジを引いた後 `Limit` で 10 行に絞ってから `TableRowIDScan`。**TableRowIDScan の actRows = 10** で済む
+- COUNT: `IndexRangeScan` のみで完結し `TableRowIDScan` は走らない（インデックスのキーだけで件数が分かる）
+
+### API 変更
+
+#### Repository (`apps/blog-api/adapter/src/repository/users_articles.rs`)
+
+- `find_published_by_user_name_and_type` のシグネチャを以下に変更:
+  ```rust
+  pub async fn find_published_by_user_name_and_type(
+      &self,
+      name: &str,
+      article_type: &ArticleType,
+      page: u32,
+      per_page: u32,
+  ) -> Result<(Vec<ArticleSummary>, u64)>  // (articles, totalCount)
+  ```
+- `per_page` の上限は API ハンドラ側でバリデート（例: 1〜100、または `all` 相当の 500）
+- COUNT は同じ JOIN 条件で別クエリとして発行
+
+#### Handler (`apps/blog-api/api/src/handler/users_articles.rs`)
+
+- `UsersArticlesQuery` に `page` / `per_page` を追加（`Option<u32>` で default 1 / 10）
+- `UsersArticlesResponse` を以下に拡張:
+  ```rust
+  pub struct UsersArticlesResponse {
+      pub articles: Vec<ArticleSummaryResponse>,
+      pub total_count: u64,
+      pub page: u32,
+      pub per_page: u32,
+      pub total_pages: u32,
+  }
+  ```
+- `per_page` に `all` 相当（数値上限による表現で良い、例 500）を許容するか、別途 `perPage` クエリで `all` 文字列を許容するかは実装時に決める（後者の方が明示的で sitemap から使いやすい）
+- `utoipa` スキーマ更新
+
+### フロント変更 (`apps/web`)
+
+#### `src/lib/api.ts`
+
+- 戻り値型を `ArticlesPage` に変更:
+  ```ts
+  export interface ArticlesPage {
+    articles: ArticleSummary[];
+    totalCount: number;
+    page: number;
+    perPage: number;
+    totalPages: number;
+  }
+  export async function getArticlesByType(
+    userName: string,
+    type: 'tech' | 'note',
+    opts?: { page?: number; perPage?: number | 'all' },
+  ): Promise<ArticlesPage>;
+  ```
+
+#### ルート構成
+
+| URL                                | 新規/既存    | 内容                                                             |
+| ---------------------------------- | ------------ | ---------------------------------------------------------------- |
+| `/`                                | 既存         | tech 1 ページ目（`getArticlesByType(..., 'tech', { page: 1 })`） |
+| `/page/[page]`                     | **新規**     | tech 2 ページ目以降                                              |
+| `/type/note`                       | 既存         | note 1 ページ目                                                  |
+| `/type/note/page/[page]`           | **新規**     | note 2 ページ目以降                                              |
+| `/page/1` → `/`                    | リダイレクト | URL 正規化（308）                                                |
+| `/type/note/page/1` → `/type/note` | リダイレクト | URL 正規化（308）                                                |
+
+各ページに canonical (`<link rel="canonical">`) を入れて自分自身を指す。
+
+#### Pagination コンポーネント
+
+- 新規 `src/components/Pagination.tsx`:
+  ```ts
+  interface PaginationProps {
+    currentPage: number;
+    totalPages: number;
+    baseHref: string; // '/' or '/type/note'
+  }
+  ```
+- 出力: `‹ Prev   1  2 ... 8  9 [10]   Next ›`
+- リンクは `<Link>` で繋ぐ → デフォルト prefetch で隣接ページの RSC が prefetch される（ページ遷移の体感は維持）
+- Story を追加（少件数/多件数/最初ページ/最終ページ）
+
+#### RSS (`src/app/feed/route.ts`)
+
+- 全件 `getArticlesByType(USER_NAME, 'tech')` を `getArticlesByType(USER_NAME, 'tech', { perPage: 20 })` に変更
+- 一般的な RSS リーダーは最新 N 件で十分
+
+#### sitemap (`src/app/sitemap.ts`)
+
+- 全件必要なので `getArticlesByType(USER_NAME, 'tech', { perPage: 'all' })` を使う
+- `revalidate = 60` なので COUNT + 全件取得が 60 秒に 1 回。Phase 1 で content 抜きなので転送量は十分軽い
+
+### prefetch fanout の比較
+
+| 観点                         | 現状                     | Phase 3 後                                              |
+| ---------------------------- | ------------------------ | ------------------------------------------------------- |
+| トップ表示時に走る Q2 (詳細) | 最大 40                  | **10**                                                  |
+| トップ表示時に走る Q1 (一覧) | 1                        | 1 + ページネーションリンクの prefetch（隣接 ~3 ページ） |
+| Q1 自体の重さ                | Phase 1/2 適用済みで軽い | 同左（LIMIT 10 + COUNT で更に軽い）                     |
+
+Q2 の fanout が **4 分の 1**。Q1 はページネーションリンクの prefetch で数回増えるが、Phase 1/2 + LIMIT のおかげで 1 回あたり極めて軽いので無視できる。
+
+### Phase 3 チェックリスト
+
+- [ ] Repository: `find_published_by_user_name_and_type` に `page` / `per_page` を追加し、戻り値を `(Vec<ArticleSummary>, u64)` に拡張
+- [ ] Repository: COUNT 用クエリを追加（同 JOIN 条件）
+- [ ] Handler: `UsersArticlesQuery` に `page` / `perPage` を追加
+- [ ] Handler: `UsersArticlesResponse` に `totalCount` / `page` / `perPage` / `totalPages` を追加
+- [ ] Handler: `perPage=all` (または上限 500) のハンドリング決定 + 実装
+- [ ] `utoipa` スキーマ更新
+- [ ] dev TiDB で `EXPLAIN ANALYZE` を取り、`LIMIT/OFFSET` クエリが新インデックスのみで完結（`TableRowIDScan` の actRows = 10、Sort が無い）していることを確認
+- [ ] dev TiDB で COUNT クエリが `IndexRangeScan` のみで完結している（`TableRowIDScan` 不要）ことを確認
+- [ ] フロント: `lib/api.ts` の `getArticlesByType` シグネチャ更新、戻り値型を `ArticlesPage` に
+- [ ] フロント: `/page/[page]/page.tsx` 新設（tech）
+- [ ] フロント: `/type/note/page/[page]/page.tsx` 新設（note）
+- [ ] フロント: `/page/1` / `/type/note/page/1` の 308 リダイレクト（`next.config.ts` の `redirects()` に追記）
+- [ ] フロント: `<Pagination>` コンポーネント新設、Story 追加
+- [ ] フロント: 各一覧ページに `<Pagination>` 配置、canonical 設定
+- [ ] フロント: `feed/route.ts` を `perPage: 20` に変更
+- [ ] フロント: `sitemap.ts` を `perPage: 'all'` に変更
+- [ ] `bun run check` 通過
+- [ ] dev 環境で動作確認: 1 ページ目 / 中間 / 最終ページの表示、`/page/1` リダイレクト、Prev/Next、最初/最後の数字リンク
+- [ ] **prefetch 観測**: Production ビルドで Network タブを開き、Filter `_rsc` でトップ表示時の prefetch が **10 件 + 隣接ページ分** に収まっていることを確認（変更前は最大 40 件）
+- [ ] API 側のアクセスログで、トップ初回ロード時の Q2 リクエスト数が変更前後でどう変わったかを記録
+
+### Phase 3 で踏み込まないこと
+
+- **URL クエリパラメータ方式 (`?page=2`) への切り替え** — 動的ルートで確定
+- **無限スクロール / Load More UI** — ページ番号方式で確定
+- **カーソル方式 (keyset pagination) への移行** — 記事数が数千件規模になるまで OFFSET 方式で十分。Phase 2 の新インデックスのおかげで OFFSET も B+Tree を順走するだけ
+- **`<Link prefetch={false}>` への切り替え / hover-only prefetch** — ページネーションで fanout が許容範囲に収まれば不要。Phase 3 適用後に Q2 観測値を見て、それでもまだ多ければ別途検討
+
+---
+
 ## キャッシュ仮説の整理
 
 「トップを叩いたら前記事のキャッシュが作られていて初回が重い」という仮説に対しての回答:
@@ -354,4 +539,3 @@ Sort_10                         0.04     37       root                          
 
 - `content` 列の別テーブル切り出し（垂直分割）
 - 6/28 と 6/30 で実行経路が割れた件の再現確認（統計のタイミング揃え）
-- 一覧 API への pagination（現状 全件返し、件数が増えたら別途検討）
