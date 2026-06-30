@@ -28,11 +28,12 @@
 | Root Directory    | `apps/web`          |
 | Framework         | Next.js（自動検出） |
 
-| 変数名                              | 用途            | Production                 | Preview                     |
-| ----------------------------------- | --------------- | -------------------------- | --------------------------- |
-| `NEXT_PUBLIC_API_URL`               | バックエンドAPI | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
-| `NEXT_PUBLIC_SITE_URL`              | サイトURL       | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
-| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM             | `GTM-XXXXXXX`              | （空）                      |
+| 変数名                              | 用途              | Production                 | Preview                     |
+| ----------------------------------- | ----------------- | -------------------------- | --------------------------- |
+| `NEXT_PUBLIC_API_URL`               | バックエンドAPI   | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
+| `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                      |
+| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                      |
 
 ### GitHub App (Webhook)
 
