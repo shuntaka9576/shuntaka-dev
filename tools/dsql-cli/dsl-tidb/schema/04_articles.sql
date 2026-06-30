@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`articles` (
 -- TiDB クラスタ単位で有効化する場合は管理者が
 --   SET GLOBAL tidb_enable_check_constraint = ON;
 -- を実行したうえで CHECK を別途 ALTER TABLE で追加する。
+
+-- 2026-06-30
+ALTER TABLE `${SCHEMA}`.`articles`
+  ADD INDEX `idx_articles_user_status_type_published_at` (`user_id`, `status`, `type`, `published_at`);
+ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_id`;
+ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_status_published_at`;

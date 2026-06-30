@@ -5,6 +5,7 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-06-30-articles-list-drop-content
 2026-06-29-blog-api-tidb-proxy
 2026-06-26-dsql-to-tidb-migration
 ```
