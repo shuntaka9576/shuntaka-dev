@@ -5,7 +5,7 @@ use kernel::model::article::{
     Article, ArticleId, ArticleSummary, ArticleType, Content, Description, Slug, Status, Thumbnail,
     Title, UserId,
 };
-use kernel::repository::users_articles::UsersArticlesRepository;
+use kernel::repository::users_articles::{ArticleSummaryPage, UsersArticlesRepository};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -124,7 +124,9 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         &self,
         user_name: &str,
         article_type: &ArticleType,
-    ) -> Result<Vec<ArticleSummary>, anyhow::Error> {
+        offset: u64,
+        limit: u64,
+    ) -> Result<ArticleSummaryPage, anyhow::Error> {
         let rows: Vec<ArticleSummaryRow> = sqlx::query_as(
             r#"
             SELECT
@@ -143,14 +145,38 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             JOIN users u ON a.user_id = u.user_id
             WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
             ORDER BY a.published_at DESC
+            LIMIT ? OFFSET ?
             "#,
         )
         .bind(article_type.as_str())
         .bind(user_name)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.db.pool())
         .await?;
 
-        rows.into_iter().map(ArticleSummary::try_from).collect()
+        let total_count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*)
+            FROM articles a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.status = 'published' AND a.`type` = ? AND u.name = ?
+            "#,
+        )
+        .bind(article_type.as_str())
+        .bind(user_name)
+        .fetch_one(&self.db.pool())
+        .await?;
+
+        let articles: Vec<ArticleSummary> = rows
+            .into_iter()
+            .map(ArticleSummary::try_from)
+            .collect::<Result<_, _>>()?;
+
+        Ok(ArticleSummaryPage {
+            articles,
+            total_count: total_count.0 as u64,
+        })
     }
 
     async fn find_published_by_user_name_and_slug(

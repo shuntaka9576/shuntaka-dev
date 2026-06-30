@@ -40,7 +40,7 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
       {/* Type Header (tech/note/about) */}
       {showTypeHeader && (
         <nav
-          className="w-full bg-[var(--color-surface-raised)]"
+          className="sticky top-0 z-10 w-full border-b border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]"
           aria-label="カテゴリーナビゲーション"
         >
           <div className="mx-auto max-w-[var(--layout-max)] px-8 max-sm:px-4 max-sm:pt-3">
