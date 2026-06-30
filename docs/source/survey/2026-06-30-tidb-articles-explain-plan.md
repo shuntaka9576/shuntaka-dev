@@ -29,6 +29,30 @@ ORDER BY a.published_at DESC;
 `EXPLAIN ANALYZE` の処理フロー。下から上に向かって TiKV → TiDB の順に積み上がる。
 ```
 
+### 生 `EXPLAIN ANALYZE` 出力
+
+```
+id                              estRows  estCost    actRows  task       access object                                  operator info                                                                              memory    disk
+Sort_10                         41.76    41266.11   40       root                                                      blog_prd.articles.published_at:desc                                                        398.1 KB  0 Bytes
+└─IndexHashJoin_20              41.76    12322.78   40       root                                                      inner join, inner:IndexLookUp_17, outer key:users.user_id, inner key:articles.user_id     572.0 KB  N/A
+  ├─Point_Get_29(Build)         1.00     242.91     1        root       table:users, index:uq_users_name(name)
+  └─IndexLookUp_17(Probe)       41.76    302143.06  40       root                                                                                                                                                486.0 KB  N/A
+    ├─IndexRangeScan_14(Build)  130.00   34115.89   130      cop[tikv]  table:a, index:idx_articles_user_id(user_id)   range: decided by [eq(articles.user_id, users.user_id)], keep order:false
+    └─Selection_16(Probe)       41.76    80056.18   40       cop[tikv]                                                 eq(articles.status, "published"), eq(articles.type, "tech")
+      └─TableRowIDScan_15       130.00   67082.18   130      cop[tikv]  table:a                                        keep order:false
+```
+
+主要 `execution info`（一部抜粋）
+
+- `Sort_10`: time:7.33ms, loops:2
+- `IndexHashJoin_20`: time:7.08ms, inner:{total:6.29ms, concurrency:5, task:1, fetch:6.08ms, build:12.6µs, join:209.3µs}
+- `Point_Get_29`: time:717.7µs, Get:{num_rpc:2, total_time:662.7µs}, tikv_wall_time:168.1µs
+- `IndexLookUp_17`: time:6.03ms, index_task:{total_time:600.4µs}, table_task:{total_time:5.2ms, num:1, concurrency:5}
+- `IndexRangeScan_14`: time:553.9µs, cop_task:{num:1, max:516.5µs, proc_keys:130}, tikv_wall_time:208.9µs
+- `Selection_16`: time:5.1ms, cop_task:{num:1, max:4.99ms, proc_keys:130}, total_kv_read_wall_time:2ms
+
+### サマリ表
+
 | #   | Operator         | Layer | actRows | time   | 備考                                   |
 | --- | ---------------- | ----- | ------- | ------ | -------------------------------------- |
 | 1   | `Point_Get`      | TiKV  | 1       | 0.7ms  | `uq_users_name` で `users` を 1 件取得 |

@@ -30,6 +30,27 @@ WHERE a.status = 'published'
 `articles.slug` と `users.name` の 2 本の Point_Get が `HashJoin` で合流する Y 字構造。
 ```
 
+### 生 `EXPLAIN ANALYZE` 出力
+
+```
+id                     estRows  estCost   actRows  task  access object                                  operator info                                                          memory   disk
+HashJoin_9             0.68     27876.31  1        root                                                 inner join, equal:[eq(articles.user_id, users.user_id)]                33.7 KB  0 Bytes
+├─Point_Get_13(Build)  1.00     242.91    1        root  table:users, index:uq_users_name(name)
+└─Selection_12(Probe)  0.68     26010.67  1        root                                                 eq(articles.status, "published")                                       19.9 KB  N/A
+  └─Point_Get_11       1.00     25960.77  1        root  table:articles, index:uq_articles_slug(slug)
+```
+
+`arguments`: `("01f07hctzhjcwtdq4h6ew9stk8", "shuntaka")`
+
+主要 `execution info`（一部抜粋）
+
+- `HashJoin_9`: time:1.18ms, loops:2, build_hash_table:{total:804.7µs, fetch:799.9µs, build:4.83µs}, probe:{concurrency:5, total:5.01ms, max:1.02ms, probe:16.8µs, fetch and wait:4.99ms}
+- `Point_Get_13`: time:763µs, Get:{num_rpc:4, total_time:1.62ms}, total_kv_read_wall_time:270.1µs, tikv_wall_time:341µs
+- `Selection_12`: time:997.2µs, loops:2
+- `Point_Get_11`: time:967.2µs, loops:3
+
+### サマリ表
+
 | #   | Operator    | actRows | time   | 備考                                              |
 | --- | ----------- | ------- | ------ | ------------------------------------------------- |
 | 1   | `Point_Get` | 1       | 0.97ms | `uq_articles_slug` で `articles` を 1 件取得      |
