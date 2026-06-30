@@ -653,3 +653,4 @@ IndexLookUp_33               actRows:10  time:1.75ms  memory:28.6 KB  limit embe
 
 - `content` 列の別テーブル切り出し（垂直分割）
 - 6/28 と 6/30 で実行経路が割れた件の再現確認（統計のタイミング揃え）
+- **Phase 4 適用後の prd で OFFSET 値依存で TableFullScan に化けるプラン分岐**（観測: 2026-07-01）— 切り分け方針と暫定対策案は [`survey/2026-07-01-tidb-articles-list-plan-split.md`](../survey/2026-07-01-tidb-articles-list-plan-split.md) を参照
