@@ -29,3 +29,11 @@ ALTER TABLE `${SCHEMA}`.`articles`
   ADD INDEX `idx_articles_user_status_type_published_at` (`user_id`, `status`, `type`, `published_at`);
 ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_id`;
 ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_status_published_at`;
+
+-- 2026-06-30 Phase 4 (JOIN 分離 + ORDER BY 安定化 + Limit pushdown)
+-- 新インデックスは旧 idx_articles_user_status_type_published_at の完全な superset。
+-- ORDER BY published_at DESC, article_id DESC に対し keep order:true, desc が選ばれ、
+-- Limit pushdown が効くようになる (dev 計測: TableRowIDScan actRows 37 -> 10, 合計時間 2.75ms -> 1.75ms)。
+ALTER TABLE `${SCHEMA}`.`articles`
+  ADD INDEX `idx_articles_user_status_type_published_at_id` (`user_id`, `status`, `type`, `published_at`, `article_id`);
+ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_status_type_published_at`;
