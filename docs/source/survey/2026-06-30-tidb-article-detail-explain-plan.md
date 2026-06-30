@@ -51,6 +51,13 @@ HashJoin_9             0.68     27876.31  1        root                         
 
 ### サマリ表
 
+番号は **データフローの依存方向** で振っている。Probe 側の `Point_Get_11(articles)` → `Selection_12` を #1–2、Build 側の `Point_Get_13(users)` を #3、合流地点の `HashJoin_9` を #4 とした。
+
+注意点:
+
+- `EXPLAIN` テキストの並びは `HashJoin_9 → Point_Get_13(Build) → Selection_12(Probe) → Point_Get_11` の順で、本書の番号順とは一致しない
+- 「どっちが先に走るか」は EXPLAIN ANALYZE の time だけでは厳密には分からない（Build/Probe は部分的に並行する）。あくまで依存関係上の上流／下流の話
+
 | #   | Operator    | actRows | time   | 備考                                              |
 | --- | ----------- | ------- | ------ | ------------------------------------------------- |
 | 1   | `Point_Get` | 1       | 0.97ms | `uq_articles_slug` で `articles` を 1 件取得      |
