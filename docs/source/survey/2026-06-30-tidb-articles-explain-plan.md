@@ -41,7 +41,7 @@ ORDER BY a.published_at DESC;
 ## 所見
 
 - **6/28 と経路が違う理由**: 6/28 直後は統計が新鮮で「130 行しかない → フルスキャンが安い」と判断していた。今回は `idx_articles_user_id` 経由の IndexLookUp を選んでいる。どちらも結果は 40 行なので正しいが、IndexLookUp 経路では `TableRowIDScan` で 130 行全列を取りに行ってから `Selection` で 40 行に絞るため、`TableFullScan` より重い。
-- **絞り込みが遅い**: `Selection` の段で 130→40 と 3 割捨てている。`(user_id, status, type, published_at)` の複合インデックスがあれば、フィルタがインデックス側で完結し `Sort` も不要になる。
+- **絞り込みが遅い**: `Selection` の段で 130→40 と 7 割捨てている。`(user_id, status, type, published_at)` の複合インデックスがあれば、フィルタがインデックス側で完結し `Sort` も不要になる。
 - **`content` 取得の重さ**: `Sort` が 398KB のメモリを使っているのは `content`(longtext) を SELECT 句に含めているため。一覧 API は `content` を外して詳細 API に分離するのが筋。
 
 ## 次のアクション
