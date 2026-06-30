@@ -129,7 +129,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
         let rows: Vec<ArticleSummaryRow> = sqlx::query_as(
             r#"
-            SELECT
+            SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
                 a.title,
                 a.slug,
