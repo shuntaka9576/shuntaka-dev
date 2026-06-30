@@ -21,6 +21,7 @@ use utoipa::OpenApi;
     components(
         schemas(
             handler::users_articles::ArticleResponse,
+            handler::users_articles::ArticleSummaryResponse,
             handler::users_articles::UsersArticlesResponse,
             handler::webhooks::WebhookResponse,
         )

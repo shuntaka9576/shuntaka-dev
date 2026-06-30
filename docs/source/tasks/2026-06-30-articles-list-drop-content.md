@@ -53,11 +53,11 @@ KEY `idx_articles_status_published_at` (`status`, `published_at`)
 
 それぞれの当てはまり方:
 
-| インデックス                        | Q1 一覧                                                        | Q2 詳細                                  |
-| ----------------------------------- | -------------------------------------------------------------- | ---------------------------------------- |
-| `PRIMARY KEY (article_id)`          | 使われない                                                     | TableRowID 取り回しで使われる            |
-| `uq_articles_slug (slug)`           | 使われない                                                     | **Point_Get で使われる（完璧にハマる）** |
-| `idx_articles_user_id (user_id)`    | 6/30 のプランで使われた。ただし status/type は絞れない         | 使われない                               |
+| インデックス                       | Q1 一覧                                                               | Q2 詳細                                  |
+| ---------------------------------- | --------------------------------------------------------------------- | ---------------------------------------- |
+| `PRIMARY KEY (article_id)`         | 使われない                                                            | TableRowID 取り回しで使われる            |
+| `uq_articles_slug (slug)`          | 使われない                                                            | **Point_Get で使われる（完璧にハマる）** |
+| `idx_articles_user_id (user_id)`   | 6/30 のプランで使われた。ただし status/type は絞れない                | 使われない                               |
 | `idx_articles_status_published_at` | published 全件スキャンになるので opt は選ばない（実際選ばれていない） | 使われない                               |
 
 → **詳細 (Q2) は既存の `uq_articles_slug` で完璧に Point_Get できる**。インデックス追加不要。**一覧 (Q1) だけが不足している**。
@@ -81,13 +81,13 @@ KEY `idx_articles_status_published_at` (`status`, `published_at`)
 
 `getArticlesByType` を呼んでいる箇所と、その下流のフィールド利用を grep で全て当たった結果:
 
-| 呼び出し元                                            | 利用フィールド                              | `content` 利用 |
-| ----------------------------------------------------- | ------------------------------------------- | -------------- |
-| `apps/web/src/app/page.tsx` (top, tech)               | `ArticleCard` 経由                          | なし           |
-| `apps/web/src/app/type/note/page.tsx` (note)          | `ArticleCard` 経由                          | なし           |
-| `apps/web/src/app/sitemap.ts`                         | `slug`, `updatedAt`                         | なし           |
-| `apps/web/src/app/feed/route.ts`                      | `title`, `description`, `publishedAt`, `slug` | なし          |
-| `apps/web/src/components/ArticleCard.tsx`             | `slug`, `title`, `publishedAt`, `thumbnail` | なし           |
+| 呼び出し元                                   | 利用フィールド                                | `content` 利用 |
+| -------------------------------------------- | --------------------------------------------- | -------------- |
+| `apps/web/src/app/page.tsx` (top, tech)      | `ArticleCard` 経由                            | なし           |
+| `apps/web/src/app/type/note/page.tsx` (note) | `ArticleCard` 経由                            | なし           |
+| `apps/web/src/app/sitemap.ts`                | `slug`, `updatedAt`                           | なし           |
+| `apps/web/src/app/feed/route.ts`             | `title`, `description`, `publishedAt`, `slug` | なし           |
+| `apps/web/src/components/ArticleCard.tsx`    | `slug`, `title`, `publishedAt`, `thumbnail`   | なし           |
 
 `article.content` / `article.contentHtml` を読んでいるのは詳細ページ (`apps/web/src/app/[userName]/articles/[slug]/page.tsx:119`) のみで、ここは `getArticleBySlug` (= Q2) を別途叩いている。**一覧 API のレスポンスから content / contentHtml を消してもフロントは一切壊れない**。
 
@@ -170,7 +170,6 @@ KEY `idx_articles_status_published_at` (`status`, `published_at`)
 
 差分 DDL (`ALTER TABLE ADD INDEX` / `ALTER TABLE DROP INDEX`) は `tools/dsql-cli/dsl-tidb/schema/04_articles.sql` の **末尾に追記済み**（元の `CREATE TABLE` 定義は履歴として残してある）。日付コメント `-- 2026-06-30` を頭に置いてある。本番 / dev TiDB に対しては **依頼者がこの差分を手動で実行する**。Phase 2 のスコープは「複合インデックス追加」と「不要になる既存インデックスの DROP」の両方を含む。
 
-
 ### 現状のインデックスがハマっていない理由
 
 6/30 の実行プラン (`survey/2026-06-30-tidb-articles-explain-plan.md`) で観測された構造:
@@ -192,12 +191,12 @@ Sort_10 (TiDB)                ← published_at DESC を後付けで Sort
 
 #### 列順の根拠
 
-| # | 列              | 役割                       | 選定理由                                                                                                |
-| - | --------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 1 | `user_id`       | Join key (= 等価)          | `users.name` を Point_Get で 1 件に絞った後、その user_id で絞る。最も selectivity が高い              |
-| 2 | `status`        | フィルタ (= 等価)          | `'published'` で等価絞り込み                                                                            |
-| 3 | `type`          | フィルタ (= 等価)          | `'tech'` / `'note'` で等価絞り込み                                                                      |
-| 4 | `published_at`  | ソートキー                 | 等価条件の後ろに付けることで、TiDB がインデックス順序のまま読めば `Sort` が不要になる                  |
+| #   | 列             | 役割              | 選定理由                                                                                  |
+| --- | -------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| 1   | `user_id`      | Join key (= 等価) | `users.name` を Point_Get で 1 件に絞った後、その user_id で絞る。最も selectivity が高い |
+| 2   | `status`       | フィルタ (= 等価) | `'published'` で等価絞り込み                                                              |
+| 3   | `type`         | フィルタ (= 等価) | `'tech'` / `'note'` で等価絞り込み                                                        |
+| 4   | `published_at` | ソートキー        | 等価条件の後ろに付けることで、TiDB がインデックス順序のまま読めば `Sort` が不要になる     |
 
 「等価で絞る列を先に並べ、最後にレンジ／ソートキー」という MySQL / TiDB の複合インデックス設計の定石通り。
 
@@ -224,9 +223,9 @@ IndexHashJoin (or IndexJoin)
 
 新インデックスができると、現状の以下 2 つは redundant になるので **同 Phase で削除する**。
 
-| 既存インデックス                                          | redundant な理由                                                          |
-| --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `idx_articles_user_id (user_id)`                          | 新インデックスの prefix で完全代替可能                                    |
+| 既存インデックス                                          | redundant な理由                                                            |
+| --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `idx_articles_user_id (user_id)`                          | 新インデックスの prefix で完全代替可能                                      |
 | `idx_articles_status_published_at (status, published_at)` | 一覧クエリでは使われていない。アプリのクエリは Q1 / Q2 のみなので純粋に冗長 |
 
 依頼者が手動 DDL を当てる際の推奨順序:
@@ -257,17 +256,17 @@ IndexHashJoin (or IndexJoin)
 
 ベースライン（6/30、`idx_articles_user_id` 経由 + content 込み）→ Phase 2 単独 → Phase 1 検証 (SELECT から `a.content` を抜いた SQL を直接実行) の 3 段で計測:
 
-| 観点                                       | Baseline      | Phase 2 のみ | **Phase 1 + Phase 2**       |
-| ------------------------------------------ | ------------- | ------------ | --------------------------- |
-| 総時間 (Sort_10 time)                      | 7.33ms        | 7.3ms        | **2.63ms ✅ (-64%)**        |
-| Sort メモリ                                | 398 KB        | 395 KB       | **18.6 KB ✅ (-95%)**       |
-| Sort 自体の CPU（cumulative の差分）       | -             | 0.5ms        | **~30µs**                   |
-| IndexLookUp メモリ                         | 486 KB        | 440 KB       | **47.4 KB**                 |
-| IndexHashJoin メモリ                       | 572 KB        | 572 KB       | **187.9 KB**                |
-| TableRowIDScan time                        | 5.1ms         | 2.14ms       | **909µs**                   |
-| TableRowIDScan `total_process_keys_size`   | 853 KB        | 355 KB       | 355 KB（変化なし、後述）    |
-| Selection 段                               | あり (130→40) | 消滅         | 消滅                        |
-| TableRowIDScan actRows                     | 130           | 37           | 37                          |
+| 観点                                     | Baseline      | Phase 2 のみ | **Phase 1 + Phase 2**    |
+| ---------------------------------------- | ------------- | ------------ | ------------------------ |
+| 総時間 (Sort_10 time)                    | 7.33ms        | 7.3ms        | **2.63ms ✅ (-64%)**     |
+| Sort メモリ                              | 398 KB        | 395 KB       | **18.6 KB ✅ (-95%)**    |
+| Sort 自体の CPU（cumulative の差分）     | -             | 0.5ms        | **~30µs**                |
+| IndexLookUp メモリ                       | 486 KB        | 440 KB       | **47.4 KB**              |
+| IndexHashJoin メモリ                     | 572 KB        | 572 KB       | **187.9 KB**             |
+| TableRowIDScan time                      | 5.1ms         | 2.14ms       | **909µs**                |
+| TableRowIDScan `total_process_keys_size` | 853 KB        | 355 KB       | 355 KB（変化なし、後述） |
+| Selection 段                             | あり (130→40) | 消滅         | 消滅                     |
+| TableRowIDScan actRows                   | 130           | 37           | 37                       |
 
 **観察**:
 

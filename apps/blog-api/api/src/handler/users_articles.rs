@@ -43,8 +43,25 @@ pub struct ArticleResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(rename_all = "camelCase")]
+pub struct ArticleSummaryResponse {
+    pub article_id: String,
+    pub title: String,
+    pub slug: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub article_type: Option<String>,
+    pub thumbnail: Option<String>,
+    pub ogp_url: String,
+    pub published_at: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UsersArticlesResponse {
-    pub articles: Vec<ArticleResponse>,
+    pub articles: Vec<ArticleSummaryResponse>,
 }
 
 #[utoipa::path(
@@ -87,17 +104,13 @@ pub async fn get_users_articles(
             .map(|article| {
                 let slug = article.slug.into_inner();
                 let title = article.title.into_inner();
-                let content = article.content.into_inner();
-                let content_html = convert_markdown_to_html(&content);
                 let ogp_url =
                     cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
 
-                ArticleResponse {
+                ArticleSummaryResponse {
                     article_id: article.article_id.into_inner().to_string(),
                     title,
                     slug,
-                    content,
-                    content_html,
                     description: article.description.into_inner(),
                     article_type: article.article_type.map(|t| t.into_inner()),
                     thumbnail: article.thumbnail.map(|t| t.into_inner()),
