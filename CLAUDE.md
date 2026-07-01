@@ -49,7 +49,8 @@ apps/
 └── blog-api/     # Rust/Axum バックエンドAPI (SQLx, PostgreSQL/DSQL)
 
 tools/
-└── dsql-cli/     # TypeScript マイグレーションCLI (AWS DSQL対応)
+├── dsql-cli/     # TypeScript マイグレーションCLI (AWS DSQL対応)
+└── tidb-seeder/  # TiDB 用ダミーデータ TSV ジェネレータ (load.sh と組み合わせて使う)
 
 iac/
 └── aws/          # AWS CDK インフラ (TypeScript)

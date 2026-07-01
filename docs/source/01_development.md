@@ -575,3 +575,68 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
+
+### tidb-seeder
+
+TiDB の `EXPLAIN ANALYZE` の癖（opt が index vs full scan を cost 差で選び分ける挙動、統計の鮮度による plan 分岐、`total_process_keys_size` の効き方など）を確認する用途で、`users` / `tags` / `articles` / `articles_tags` のダミーデータを PG TEXT 互換 TSV として生成する。生成された TSV は既存の `dsl-tidb/load.sh` でそのまま流し込める。
+
+生成のみ実施 (500 万行、articles 合計 約 33GB、M1 Pro 4 workers / SSD で約 75 秒)
+
+```bash
+cd tools/tidb-seeder
+bun run generate \
+  --out-dir ./out \
+  --users 5 \
+  --articles-per-user 1000000 \
+  --tags 100 \
+  --content-size 6000 \
+  --workers 4 \
+  --no-concat \
+  --rows-per-part 15000
+```
+
+`--workers N` で articles / articles*tags の生成を N 個の bun 子プロセスに分散する（P-core 数と同じにするのが目安）。`--no-concat` を渡すと最後の cat による結合 (30GB × 2 の追加 I/O = 数分) をスキップし、`app.articles.part<W>*<C>.tsv`/`app.articles*tags.part<W>*<C>.tsv` のままにする。`--rows-per-part 15000`で 1 パートファイルを 15,000 行 (~90MB) ごとにローテートし、TiDB LOAD DATA が`txn-total-size-limit` (100MB) を超えないようにする。load.sh 側で part ファイルを自動検出して部分ごとに LOAD DATA するため、UX は同じ。
+
+生成 → 検証用 DB へロード
+
+Tailnet suffix を取得（Tailscale ログイン済み前提。TiDB の Tailnet ホスト `tidb.<TAILNET>` を解決するのに使う。固有名を直書きせず毎回コマンドで取り出す）
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+echo "TAILNET=$TAILNET"
+```
+
+TiDB への経路が p2p (direct) か確認する。DERP relay 経由だと 33GB の LOAD DATA が数十分〜数時間かかりうるので、direct でないなら NAT / firewall を先に対処する
+
+```bash
+tailscale ping tidb.$TAILNET
+# OK 例 (direct):
+#   pong from tidb (100.x.x.x) via 192.168.x.x:41641 in 3ms
+# NG 例 (DERP 経由):
+#   pong from tidb (100.x.x.x) via DERP(tok) in 45ms
+```
+
+`tailscale ping` は direct が張れた時点で停止する。初回は DERP → direct へ数回で切り替わるのが正常。10 パケット全部 DERP のままなら経路が張れていないので、`tailscale netcheck` で NAT / UDP 到達性を確認する。
+
+TiDB の LOAD DATA LOCAL INFILE は 1 ステートメント = 1 トランザクションで扱われ、`txn-total-size-limit`（デフォルト 100MB）を超えると `ERROR 2013 Lost connection` で落ちる。TiDB v8+ の bulk モードは LOAD DATA には効かない（詳細は [調査メモ](survey/2026-07-01-tidb-load-data-large-file.md)）。そのため seeder に `--rows-per-part 15000` を渡し、1 パートファイルを ~90MB に抑える
+
+TSV 生成 → DB 再作成 → load
+
+```bash
+# 1. TSV 生成 (1 ユーザーあたり 100 万記事 × 5 ユーザー = 500 万行 / articles 合計 約 33GB)
+cd tools/tidb-seeder
+bun run generate --out-dir ./out --users 5 --articles-per-user 1000000 --workers 4 --no-concat --rows-per-part 15000
+
+# 2. 検証用 DB を作り直す (既存がある場合)
+mysql -h tidb.$TAILNET -P 4000 -u root \
+  -e "DROP DATABASE IF EXISTS blog_test"
+
+# 3. TiDB に並列 LOAD DATA (DDL + parts を parallelism=8 の mysql2 connection で流し込む)
+bun run load --host tidb.$TAILNET --database blog_test --tsv-dir ./out --parallelism 8
+```
+
+`bun run load` は `dsl-tidb/schema/*.sql` で DDL を張り、`dsl-tidb/load/*.sql` テンプレートを parts ごとに substitute して mysql2 の LOAD DATA LOCAL INFILE をコネクションプール (`--parallelism` 個) で並列実行する。1 コネクション 1 ファイルの sequential mysql CLI (`load.sh`) と違い、8 コネクション同時に叩けるので、300+ パートでも待ち時間が 1/N 程度に縮む。`load.sh` は引き続き dsql-cli 経由の CLI 手順で残しているので、mysql コマンドだけで完結させたい場合はそちらも使える。
+
+500 万行スケールでは articles 合計で約 33GB になる。TiDB 側の region 数増加とローカルディスクの空きを事前に見積もる。scale を下げたい場合は `--articles-per-user 300000` (合計 150 万行 / 約 10GB) や `--articles-per-user 50000` (合計 25 万行 / 約 1.7GB) に落として同じ手順で回す。scale が小さければ `--no-concat` を外して単一ファイルにまとめても速度差は小さい。
+
+同じ `--seed` を渡せば内容は決定的に再現される（default `42`）。`--content-size` は 1 記事あたりの目標バイト数で、paragraph 合成が閾値を超えた時点で打ち切るため実サイズは目標をやや上回る。`--workers 1` にすると子プロセス不使用の直書き single-process 経路に切り替わる。

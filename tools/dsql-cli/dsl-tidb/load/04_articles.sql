@@ -1,4 +1,8 @@
 SET time_zone = '+00:00';
+-- 注意: LOAD DATA は TiDB の txn-total-size-limit (デフォルト 100MB) に縛られる。
+-- v8+ の `SET SESSION tidb_dml_type = 'bulk'` は INSERT/UPDATE/DELETE の SELECT 派生専用で
+-- LOAD DATA には効かない (survey/2026-07-01-tidb-load-data-large-file.md)。
+-- TiDB に流す TSV は tidb-seeder の --rows-per-part 15000 (≈90MB/ファイル) で分割する。
 
 LOAD DATA LOCAL INFILE '${TSV}'
 INTO TABLE `${SCHEMA}`.`articles`
