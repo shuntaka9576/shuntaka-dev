@@ -133,13 +133,122 @@ TiDB opt は index range scan が「1 ユーザー分 = 540k エントリ」を�
 
 ## Block cache 圧迫の可視化
 
-30GB dataset で TiKV block cache（推定 4GB 前後）を圧迫している証拠が OFFSET 500k で明確に出た:
+![TiKV block cache vs working set ratio and node memory breakdown](./images/tidb-block-cache-vs-working-set.png)
+
+30GB dataset で TiKV block cache を圧迫している証拠が OFFSET 500k で明確に出た:
 
 - 5M 行 TableFullScan で **4.02 GB を miss read**
 - read_time 1m1.2s = TiKV の rocksdb からの読み出しがほぼ全部 disk I/O
 - 一方 warm hit (OFFSET 300k) では index 部分の cache_hit_count 2093, read_count 8 と激減
 
 **キャッシュ仮説** (`docs/source/tasks/2026-06-30-articles-list-drop-content.md` のキャッシュ仮説の整理 節) の答え合わせとして、5M スケールでは **明確に効いている**ことが観測できた。垂直分割（articles_content 別テーブル）の検討価値がここで裏付けられた。
+
+### 実測（7/2 朝、LOAD DATA から一晩経過後）
+
+Grafana の node memory が LOAD DATA 前 12〜17% から load 後 34〜38% で **恒常化**しているのは block cache が populate されたためかを確認する。
+
+#### 1. TiKV block cache の設定容量
+
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root -e \
+  "SHOW CONFIG WHERE type='tikv' AND name LIKE 'storage.block-cache%'"
+```
+
+抜粋（3 pod 分あるがどれも同じ設定）:
+
+```
+| tikv | basic-tikv-0... | storage.block-cache.capacity              | 4GiB   |
+| tikv | basic-tikv-0... | storage.block-cache.high-pri-pool-ratio   | 0.8    |
+| tikv | basic-tikv-0... | storage.block-cache.low-pri-pool-ratio    | 0.2    |
+| tikv | basic-tikv-0... | storage.block-cache.strict-capacity-limit | false  |
+```
+
+**Block cache capacity: 4 GiB / pod** (デフォルトそのまま)。
+
+#### 2. TiKV pod の memory request / limit
+
+```bash
+kubectl -n tidb-cluster describe pod basic-tikv-0 | grep -B1 -A6 'Requests:\|Limits:'
+```
+
+```
+    Limits:
+      memory:  12Gi
+    Requests:
+      cpu:     500m
+      memory:  8Gi
+```
+
+Pod memory request **8 GiB**、limit **12 GiB**。block cache 4 GiB + rocksdb memtables + raft store で pod 全体は 5〜6 GiB 前後を使う想定。
+
+#### 3. K8s node のハードウェア
+
+```bash
+kubectl get nodes -o custom-columns='NAME:.metadata.name,MEMORY:.status.capacity.memory,CPU:.status.capacity.cpu'
+```
+
+```
+NAME    MEMORY       CPU
+node1   32239300Ki   16
+node2   32239288Ki   16
+node3   32239284Ki   16
+```
+
+**3 nodes × ~32 GiB × 16 vCPU**。
+
+#### 4. TiKV store 状態と leader 再均衡
+
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root -e \
+  "SELECT * FROM information_schema.tikv_store_status\G"
+```
+
+要点抜粋:
+
+```
+store_id=1  address=basic-tikv-2  leader_count=142  region_count=420
+store_id=4  address=basic-tikv-1  leader_count=136  region_count=420
+store_id=5  address=basic-tikv-0  leader_count=142  region_count=420
+version=8.1.0  uptime=86h+
+```
+
+**Leader 分布が 142 / 136 / 142 に自己修復**されている（前日 22:58 時点は 137 / 112 / 137 で 22% skew あり）。PD の `balance-leader-scheduler` が一晩で ±3% 以内に収束させたことを実測できた。
+
+### 数値まとめと解釈
+
+| 観点                                 | 値                                                     |
+| ------------------------------------ | ------------------------------------------------------ |
+| Node memory total                    | 32 GiB × 3 nodes                                       |
+| Node memory 使用率 (Grafana, 7/2 朝) | 34〜38% ≒ **11 GiB / node**                            |
+| TiKV pod memory limit                | 12 GiB / pod                                           |
+| TiKV pod memory 実消費 (推定)        | 5〜6 GiB (block cache 4 GiB + overhead)                |
+| Block cache capacity                 | **4 GiB / pod**                                        |
+| Articles dataset (per node)          | **33 GB / node** (1 replica ぶん)                      |
+| **Cache-to-working-set ratio**       | **4 GiB / 33 GB = 12%** (working set が cache の 8 倍) |
+| OFFSET 500k で miss read した量      | 4.02 GB (dataset の 12%)                               |
+
+**キーとなる観察**:
+
+1. **Cache ratio 12% は「キャッシュが populate されると 4 GB 分は温まる、残りは cold」という状態**。OFFSET 500k の TableFullScan で 4.02 GB miss read したのは、 cache に入りきらない残り 29 GB がすべて disk I/O になった直接の証拠
+2. **Node memory 35% は健全な水位**。TiKV pod request 8 GiB + 他 pod で 11 GiB、node capacity 32 GiB に対して headroom 20 GiB (65%)
+3. **恒常的に 35% なのはリークではなくキャッシュが仕事している状態**。TiKV プロセス restart or 別 dataset の read でしか evict されない
+
+### 改善オプション
+
+もし OFFSET 500k のような cold path 性能を上げたいなら:
+
+```yaml
+# tidb-cluster tc の spec で
+tikv:
+  config:
+    storage:
+      block-cache:
+        capacity: '8GiB' # 4 → 8 に。pod limit 12GiB 内に収まる
+```
+
+Block cache を 8 GiB に上げると working set 33 GiB に対して ratio 24% となり、頻繁 access 領域は cache に維持されやすくなる。ただし現在の性能で困っていなければ触らなくて OK（OFFSET 500k は USE INDEX で 824ms、実運用の Phase 3 pagination では OFFSET 深さが制限されている）。
+
+より本質的な対策は **content 列の垂直分割**。1 記事 6KB → 数百 B に縮めば per-node dataset が 33 GB → 3 GB になり cache 100% ratio が実現できる。
 
 ## OFFSET 500,000 + ヒント強制で IndexRangeScan に戻す
 
