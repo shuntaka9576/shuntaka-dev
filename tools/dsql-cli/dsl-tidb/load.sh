@@ -108,13 +108,27 @@ for f in "${LOAD_DIR}"/*.sql; do
   [[ -e "${f}" ]] || continue
   base="$(basename "${f}" .sql)"
   table="${base#*_}"
-  tsv="${TSV_ABS_DIR}/${SOURCE_SCHEMA}.${table}.tsv"
-  if [[ ! -f "${tsv}" ]]; then
-    echo "  [SKIP] ${tsv} not found" >&2
+  single="${TSV_ABS_DIR}/${SOURCE_SCHEMA}.${table}.tsv"
+
+  # tidb-seeder can leave part files (`<schema>.<table>.part<N>.tsv`) when
+  # invoked with --no-concat. Loop LOAD DATA over each part in numeric order to
+  # avoid a redundant 30GB-scale cat step. Falls back to the single file layout
+  # used by `bun run export` and default seeder runs.
+  parts=("${TSV_ABS_DIR}/${SOURCE_SCHEMA}.${table}".part*.tsv)
+  if [[ -f "${parts[0]}" ]]; then
+    # shellcheck disable=SC2207
+    parts=($(printf '%s\n' "${parts[@]}" | sort -V))
+    for p in "${parts[@]}"; do
+      echo "  load ${table} <- ${p}"
+      apply_template "${p}" "${f}"
+    done
+  elif [[ -f "${single}" ]]; then
+    echo "  load ${table} <- ${single}"
+    apply_template "${single}" "${f}"
+  else
+    echo "  [SKIP] ${single} (or part files) not found" >&2
     continue
   fi
-  echo "  load ${table} <- ${tsv}"
-  apply_template "${tsv}" "${f}"
 done
 
 echo
