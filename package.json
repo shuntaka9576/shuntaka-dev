@@ -35,7 +35,7 @@
     "prettier": "^3.9.1",
     "secretlint": "^13.0.2",
     "tsx": "^4.22.4",
-    "turbo": "^2.10.0",
+    "turbo": "^2.10.2",
     "typescript": "^6.0.3",
     "vite-plus": "^0.2.1"
   },
