@@ -1,0 +1,96 @@
+name: Benchmark CDK Express Mode
+
+# aws-cdk-cli#1689 (aws-cdk v2.1129.0) で追加された `--express` フラグの
+# デプロイ時間短縮効果を dev 環境で計測するための一時的な workflow。
+# 1 dispatch = 1 モードで、useExpress を true/false で切り替えて 2 回実行して比較する。
+# --tags BenchmarkRun=<run_id> で毎回タグ値を変えることで CFN の UPDATE を確実に走らせる。
+
+on:
+  workflow_dispatch:
+    inputs:
+      useExpress:
+        description: 'Deploy with --express flag'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions: {}
+
+concurrency:
+  group: benchmark-cdk-express-dev
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: Benchmark cdk deploy d-st-main
+    # Apple Silicon ビルド用 self-hosted runner
+    runs-on: [self-hosted, macOS, ARM64] # zizmor: ignore[self-hosted-runner]
+    timeout-minutes: 45
+    environment: dev
+    permissions:
+      id-token: write # AWS IAM Role に OIDC AssumeRole するため
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/dev-shuntaka-assume-role
+          aws-region: ap-northeast-1
+
+      - name: CDK Deploy (d-st-main) with timing
+        working-directory: iac/aws
+        env:
+          STAGE_NAME: dev
+          USE_EXPRESS: ${{ inputs.useExpress }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}
+          GH_WEBHOOK_SECRET_KEY_NAME: ${{ vars.GH_WEBHOOK_SECRET_KEY_NAME }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
+        run: |
+          set -euo pipefail
+
+          FLAGS=(--require-approval never --tags "BenchmarkRun=${RUN_ID}-${RUN_ATTEMPT}")
+          if [ "${USE_EXPRESS}" = "true" ]; then
+            FLAGS+=(--express)
+            MODE=express
+          else
+            MODE=normal
+          fi
+
+          echo "::group::cdk deploy (mode=${MODE})"
+          START=$(date +%s)
+          bunx cdk deploy d-st-main -c "stageName=${STAGE_NAME}" "${FLAGS[@]}"
+          END=$(date +%s)
+          echo "::endgroup::"
+
+          DUR=$((END - START))
+          MIN=$((DUR / 60))
+          SEC=$((DUR % 60))
+
+          {
+            echo "## CDK Express Benchmark"
+            echo ""
+            echo "| Item | Value |"
+            echo "| --- | --- |"
+            echo "| Stack | \`d-st-main\` |"
+            echo "| Mode | \`${MODE}\` |"
+            echo "| Duration | ${DUR} s (${MIN}m ${SEC}s) |"
+            echo "| Run | ${RUN_ID}-${RUN_ATTEMPT} |"
+            echo "| CDK version | \`$(bunx cdk --version)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
