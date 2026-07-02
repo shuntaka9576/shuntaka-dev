@@ -11,7 +11,7 @@ export async function GET() {
     language: 'ja',
   });
 
-  const articles = await getArticlesByType(USER_NAME, 'tech');
+  const { articles } = await getArticlesByType(USER_NAME, 'tech', { perPage: 20 });
 
   articles.forEach((article) => {
     feed.item({

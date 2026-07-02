@@ -29,7 +29,7 @@ jobs:
       id-token: write # AWS IAM Role に OIDC AssumeRole するため
       contents: read
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
 
@@ -39,12 +39,27 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ inputs.stageName }}-shuntaka-assume-role
           aws-region: ap-northeast-1
 
-      - name: CDK Deploy
+      # dev / prd 共用の shared stack。Lambda VPC 化 (タスク 4 以降) で main-stack が
+      # st-tidb-proxy の SSM 出力に依存するため、main より先にデプロイする。
+      - name: CDK Deploy (st-tidb-proxy)
+        working-directory: iac/aws
+        run: |
+          bunx cdk deploy st-tidb-proxy -c "stageName=${STAGE_NAME}" --require-approval never
+        env:
+          STAGE_NAME: ${{ inputs.stageName }}
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}
+          GH_WEBHOOK_SECRET_KEY_NAME: ${{ vars.GH_WEBHOOK_SECRET_KEY_NAME }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
+
+      - name: CDK Deploy (main)
         working-directory: iac/aws
         run: |
           case "$STAGE_NAME" in

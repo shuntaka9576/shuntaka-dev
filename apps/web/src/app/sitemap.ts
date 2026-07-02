@@ -9,12 +9,12 @@ function formatDate(date: Date): string {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [techArticles, noteArticles] = await Promise.all([
-    getArticlesByType(USER_NAME, 'tech'),
-    getArticlesByType(USER_NAME, 'note'),
+  const [techPage, notePage] = await Promise.all([
+    getArticlesByType(USER_NAME, 'tech', { perPage: 'all' }),
+    getArticlesByType(USER_NAME, 'note', { perPage: 'all' }),
   ]);
 
-  const articles = [...techArticles, ...noteArticles];
+  const articles = [...techPage.articles, ...notePage.articles];
 
   const articleUrls: MetadataRoute.Sitemap = articles.map((article) => ({
     url: `${SITE_URL}/${USER_NAME}/articles/${article.slug}`,

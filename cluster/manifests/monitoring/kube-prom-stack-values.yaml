@@ -1,0 +1,64 @@
+# kube-prometheus-stack values.yaml
+#
+# 適用:
+#   helm upgrade kube-prom-stack prometheus-community/kube-prometheus-stack \
+#     -n monitoring -f manifests/monitoring/kube-prom-stack-values.yaml
+#
+# 設計方針:
+# - Grafana 同梱の defaultDashboards (20+枚) は全部 OFF
+# - 自分が見たいダッシュボードは manifests/monitoring/dashboards/ の ConfigMap で投入
+# - sidecar が label `grafana_dashboard=1` の ConfigMap を全 namespace から拾う
+
+grafana:
+  # TODO: 外部 Secret 化 (sealed-secrets 等)
+  adminPassword: changeme
+
+  # 同梱の Kubernetes / Node Exporter 系ダッシュボード全部 OFF
+  defaultDashboardsEnabled: false
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: '1'
+      searchNamespace: ALL
+      provider:
+        allowUiUpdates: true # UI で一時編集可、ただし永続化したいなら JSON Export → コミット
+
+prometheus:
+  prometheusSpec:
+    retention: 14d
+    resources:
+      requests:
+        memory: 2Gi
+      limits:
+        memory: 4Gi
+    # PodMonitor / PrometheusRule の selector に release=kube-prom-stack を要求
+    # manifests/monitoring/podmonitors/*.yaml と prometheus-rules/tidb-rules.yaml はこの label を持っている
+    podMonitorSelector:
+      matchLabels:
+        release: kube-prom-stack
+    ruleSelector:
+      matchLabels:
+        release: kube-prom-stack
+    # ServiceMonitor は kube-prom-stack 同梱のものを拾うため selector を絞らない
+    # (デフォルト動作: chart 由来の ServiceMonitor を拾う)
+
+alertmanager:
+  alertmanagerSpec:
+    # 当面ルール無しなので最小構成
+    resources:
+      requests:
+        memory: 64Mi
+
+# node-exporter ServiceMonitor の relabeling:
+# instance ラベルを `192.168.6.11:9100` (IP:port) ではなく
+# k8s nodeName (`node1`, `node2`, `node3`) に置換する
+# これでダッシュボードの Node ドロップダウンが分かりやすくなる
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: instance
+          action: replace

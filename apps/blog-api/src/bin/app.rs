@@ -34,12 +34,12 @@ async fn bootstrap() -> Result<()> {
 
     let webhook_config = WebhookConfig {
         github_app_id: app_config.webhook.github_app_id,
-        github_app_secret_pem_key_name: app_config.webhook.github_app_secret_pem_key_name,
-        github_webhook_secret_key_name: app_config.webhook.github_webhook_secret_key_name,
+        github_app_secret_pem: app_config.webhook.github_app_secret_pem,
+        github_webhook_secret: app_config.webhook.github_webhook_secret,
         articles_dir: app_config.webhook.articles_dir,
         cloudinary_cloud_name: app_config.webhook.cloudinary_cloud_name,
         cloudinary_api_key: app_config.webhook.cloudinary_api_key,
-        cloudinary_api_secret_key_name: app_config.webhook.cloudinary_api_secret_key_name,
+        cloudinary_api_secret: app_config.webhook.cloudinary_api_secret,
         ogp_public_id: app_config.webhook.ogp_public_id,
     };
 

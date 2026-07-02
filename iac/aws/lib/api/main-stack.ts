@@ -31,6 +31,11 @@ export class MainStack extends cdk.Stack {
           clusterEndpoint: string;
           clusterArn: string;
         };
+        proxy: {
+          vpcId: string;
+          privateSubnetId1: string;
+          sgId: string;
+        };
       };
       lambda: {
         blogApi: {
@@ -101,15 +106,22 @@ export class MainStack extends cdk.Stack {
     // WebApp: Lambda + API Gateway + Route53
     new BlogAPIConstruct(this, 'BlogAPI', {
       physicalPrefix,
+      stageName: props.stageName.long,
       domain: props.domain.api,
       hostedZone,
       certificate: tokyoCertificate,
-      dsqlClusterEndpoint,
-      dsqlClusterArn,
+      // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。
+      databaseName: `blog_${props.stageName.long}`,
       ssmParameters: {
         apiGateway: props.ssmParameters.apiGateway,
+        proxy: props.ssmParameters.proxy,
       },
       blogApiEnv: props.lambda.blogApi,
     });
+    // 旧 DSQL クラスタ / endpoint は dsqlCluster 定義として上に残しているが、blog-api は
+    // Tailnet 経由で TiDB に接続するため Lambda 側から DSQL ARN は参照しない。
+    // DSQL クラスタそのものの撤去はタスク4 (iac/aws の DSQL 撤去) で実施。
+    void dsqlClusterEndpoint;
+    void dsqlClusterArn;
   }
 }

@@ -72,15 +72,8 @@ pub async fn handle_github_webhook(
             AppError::unauthorized("Missing X-Hub-Signature-256 header")
         })?;
 
-    // Get webhook secret from SSM
-    let webhook_secret = registry
-        .ssm_client()
-        .get_parameter(&config.github_webhook_secret_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get webhook secret from SSM", e))?;
-
-    // Verify signature
-    verify_signature(&webhook_secret, &body, signature).map_err(|e| {
+    // Verify signature using webhook secret embedded at deploy time.
+    verify_signature(&config.github_webhook_secret, &body, signature).map_err(|e| {
         warn!("Webhook signature verification failed: {}", e);
         AppError::unauthorized("Invalid signature")
     })?;
@@ -142,15 +135,9 @@ pub async fn handle_github_webhook(
         }));
     }
 
-    // Get private key from SSM
-    let private_key = registry
-        .ssm_client()
-        .get_parameter(&config.github_app_secret_pem_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get private key from SSM", e))?;
-
-    // Create GitHub client and get access token
-    let github_client = GitHubAppClientImpl::new(config.github_app_id.clone(), private_key);
+    // Create GitHub client using app PEM embedded at deploy time.
+    let github_client =
+        GitHubAppClientImpl::new(config.github_app_id.clone(), config.github_app_secret_pem.clone());
 
     let access_token = github_client
         .get_access_token(push_event.installation.id)

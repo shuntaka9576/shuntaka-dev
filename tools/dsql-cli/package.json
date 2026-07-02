@@ -5,13 +5,14 @@
   "scripts": {
     "migrate": "tsx src/index.ts migrate",
     "drop": "tsx src/index.ts drop",
+    "export": "bun src/index.ts export",
     "convert": "tsx src/index.ts convert"
   },
   "dependencies": {
-    "@aws-sdk/client-dsql": "^3.1071.0",
-    "@aws-sdk/dsql-signer": "^3.1071.0",
+    "@aws-sdk/client-dsql": "^3.1078.0",
+    "@aws-sdk/dsql-signer": "^3.1078.0",
     "commander": "^15.0.0",
-    "pg": "^8.21.0"
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0"
