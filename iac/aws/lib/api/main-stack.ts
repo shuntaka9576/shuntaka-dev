@@ -5,6 +5,7 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { BlogAPIConstruct } from './blog-api-construct.js';
+import { ObservabilityConstruct } from './observability-construct.js';
 
 export class MainStack extends cdk.Stack {
   constructor(
@@ -103,6 +104,10 @@ export class MainStack extends cdk.Stack {
       stringValue: dsqlClusterArn,
     });
 
+    // OTel resource の service.name。Lambda env と CloudWatch dashboard の
+    // dimension の両方で使うためここで一元的に決める。
+    const otelServiceName = `blog-api-${props.stageName.long}`;
+
     // WebApp: Lambda + API Gateway + Route53
     new BlogAPIConstruct(this, 'BlogAPI', {
       physicalPrefix,
@@ -117,6 +122,18 @@ export class MainStack extends cdk.Stack {
         proxy: props.ssmParameters.proxy,
       },
       blogApiEnv: props.lambda.blogApi,
+      observability: {
+        otelServiceName,
+      },
+    });
+
+    // Observability: CloudWatch dashboard + SELECT 1 定期プローブ
+    new ObservabilityConstruct(this, 'Observability', {
+      physicalPrefix,
+      apiDomain: props.domain.api,
+      lambdaServiceName: otelServiceName,
+      // tidb-proxy は dev / prd 共用のため service.name も stage 非依存
+      proxyServiceName: 'tidb-proxy',
     });
     // 旧 DSQL クラスタ / endpoint は dsqlCluster 定義として上に残しているが、blog-api は
     // Tailnet 経由で TiDB に接続するため Lambda 側から DSQL ARN は参照しない。

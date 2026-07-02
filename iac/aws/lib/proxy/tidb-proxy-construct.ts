@@ -131,6 +131,46 @@ export class TidbProxyConstruct extends Construct {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // ---- OTel Collector sidecar (observability) ----
+    // ecspresso task def の otel-collector が awsemf exporter で EMF ログを書く先。
+    // メトリクスは EMF から抽出されるためログ自体の保持は短くてよい。
+    const otelEmfLogGroup = new logs.LogGroup(this, 'OtelEmfLogGroup', {
+      logGroupName: '/aws/otel/blog-runtime',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // awsxray exporter 用。X-Ray API はリソースレベル制限非対応のため Resource:*。
+    this.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'xray:PutTraceSegments',
+          'xray:PutTelemetryRecords',
+          'xray:GetSamplingRules',
+          'xray:GetSamplingTargets',
+          'xray:GetSamplingStatisticsSummaries',
+        ],
+        resources: ['*'],
+      }),
+    );
+
+    // awsemf exporter 用。logGroupArn は `:*` 付きで stream も包含する。
+    this.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+          'logs:PutRetentionPolicy',
+          'logs:DescribeLogGroups',
+          'logs:DescribeLogStreams',
+        ],
+        resources: [otelEmfLogGroup.logGroupArn],
+      }),
+    );
+
     // ---- Security Group ----
     // inbound rule の追加は Lambda stack (タスク 4 / 6) 側で SecurityGroup.fromSecurityGroupId
     // で参照して `addIngressRule` する。ここでは空で作る。

@@ -288,7 +288,19 @@
     "tsoperator",
     "uefi",
     "veth",
-    "xlarge"
+    "xlarge",
+    "awsemf",
+    "awsxray",
+    "healthcheck",
+    "importstr",
+    "metricdata",
+    "metricnoop",
+    "otlpmetric",
+    "otlpmetricgrpc",
+    "otlptrace",
+    "otlptracegrpc",
+    "sdkmetric",
+    "tracenoop"
   ],
   "flagWords": [],
   "dictionaries": ["npm", "node", "typescript", "html", "css", "bash"]

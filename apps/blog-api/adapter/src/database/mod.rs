@@ -1,7 +1,12 @@
+use std::time::Instant;
+
 use anyhow::Result;
 use shared::config::DatabaseConfig;
 use sqlx::MySqlPool;
 use sqlx::mysql::MySqlPoolOptions;
+use tracing::Instrument;
+
+use crate::observability;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -29,12 +34,37 @@ impl ConnectionPool {
 pub async fn connect_database_with(cfg: &DatabaseConfig) -> Result<ConnectionPool> {
     ensure_tailnet_ready().await?;
 
-    let pool = MySqlPoolOptions::new()
+    observability::set_db_meta_from_url(&cfg.url);
+    let (peer_name, db_name) = observability::db_meta_pair();
+
+    // sqlx の connect は最初の 1 接続を同期的に確立するため、ここが Lambda cold
+    // start 時の接続確立コスト (Tailscale/forwarder 経路含む) の実測値になる。
+    let span = tracing::info_span!(
+        "db.connect",
+        otel.kind = "client",
+        db.system = "mysql",
+        db.name = db_name,
+        net.peer.name = peer_name,
+        otel.status_code = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+    );
+
+    let start = Instant::now();
+    let result = MySqlPoolOptions::new()
         .max_connections(10)
         .connect(&cfg.url)
-        .await?;
+        .instrument(span.clone())
+        .await;
+    observability::record_connection_duration(start.elapsed().as_secs_f64() * 1000.0);
 
-    Ok(ConnectionPool { pool })
+    match result {
+        Ok(pool) => Ok(ConnectionPool { pool }),
+        Err(e) => {
+            span.record("otel.status_code", "ERROR");
+            span.record("error.message", tracing::field::display(&e));
+            Err(e.into())
+        }
+    }
 }
 
 /// Tailnet への参加を保証する。

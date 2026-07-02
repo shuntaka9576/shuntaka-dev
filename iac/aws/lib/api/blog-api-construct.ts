@@ -50,6 +50,11 @@ export class BlogAPIConstruct extends Construct {
         cloudinaryApiKey: string;
         cloudinaryApiSecretKeyName: string;
       };
+      observability: {
+        // OTel resource の service.name。ObservabilityConstruct の dashboard
+        // dimension と一致させるため main-stack 側で一元的に決める。
+        otelServiceName: string;
+      };
     },
   ) {
     super(scope, id);
@@ -91,6 +96,11 @@ export class BlogAPIConstruct extends Construct {
     });
     lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(13306), 'mysql via tidb-proxy');
     lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(3128), 'https via tidb-proxy');
+    lambdaSg.addEgressRule(
+      proxySecurityGroup,
+      ec2.Port.tcp(4318),
+      'otlp http to adot collector sidecar',
+    );
 
     proxySecurityGroup.addIngressRule(
       lambdaSg,
@@ -101,6 +111,11 @@ export class BlogAPIConstruct extends Construct {
       lambdaSg,
       ec2.Port.tcp(3128),
       `https from lambda-sg-${props.stageName}`,
+    );
+    proxySecurityGroup.addIngressRule(
+      lambdaSg,
+      ec2.Port.tcp(4318),
+      `otlp from lambda-sg-${props.stageName}`,
     );
 
     const proxyDnsName = 'tidb-proxy.internal';
@@ -165,7 +180,12 @@ export class BlogAPIConstruct extends Construct {
         DATABASE_URL: `mysql://root@${proxyDnsName}:13306/${props.databaseName}?ssl-mode=PREFERRED`,
         HTTPS_PROXY: proxyHttpUrl,
         HTTP_PROXY: proxyHttpUrl,
-        NO_PROXY: '169.254.169.254,localhost,127.0.0.1',
+        // OTLP 送信は squid を経由させず collector sidecar へ直接届ける
+        NO_PROXY: `169.254.169.254,localhost,127.0.0.1,${proxyDnsName}`,
+        // tidb-proxy task 上の ADOT Collector sidecar (OTLP/HTTP)。
+        // 未設定ならアプリ側で telemetry は無効化される。
+        OTEL_EXPORTER_OTLP_ENDPOINT: `http://${proxyDnsName}:4318`,
+        OTEL_SERVICE_NAME: props.observability.otelServiceName,
         GH_APP_ID: props.blogApiEnv.githubAppId,
         GH_APP_SECRET_PEM: ghAppSecretPem,
         GH_WEBHOOK_SECRET: ghWebhookSecret,

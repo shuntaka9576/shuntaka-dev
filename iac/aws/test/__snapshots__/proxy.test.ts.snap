@@ -281,6 +281,15 @@ exports[`TidbProxyStack > snapshot 1`] = `
       },
       "Type": "AWS::SSM::Parameter",
     },
+    "ProxyOtelEmfLogGroup32531A5F": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/otel/blog-runtime",
+        "RetentionInDays": 30,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
     "ProxySecurityGroup31CCABE3": {
       "Properties": {
         "GroupDescription": "tidb-proxy Fargate task SG (inbound from lambda SGs added per stage)",
@@ -368,6 +377,34 @@ exports[`TidbProxyStack > snapshot 1`] = `
               ],
               "Effect": "Allow",
               "Resource": "*",
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+                "xray:GetSamplingStatisticsSummaries",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:PutRetentionPolicy",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ProxyOtelEmfLogGroup32531A5F",
+                  "Arn",
+                ],
+              },
             },
           ],
           "Version": "2012-10-17",

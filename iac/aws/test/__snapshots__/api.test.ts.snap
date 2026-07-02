@@ -408,6 +408,24 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::EC2::SecurityGroupIngress",
     },
+    "BlogAPIImportedProxySgfromTestMainStackBlogAPILambdaSgB55D8F2D43185846FEC5": {
+      "Properties": {
+        "Description": "otlp from lambda-sg-development",
+        "FromPort": 4318,
+        "GroupId": {
+          "Ref": "SsmParameterValuetesttidbproxyproxysgidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "BlogAPILambdaSgDB7152F1",
+            "GroupId",
+          ],
+        },
+        "ToPort": 4318,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
     "BlogAPILambdaSgDB7152F1": {
       "Properties": {
         "GroupDescription": "blog-api lambda SG for development",
@@ -451,6 +469,24 @@ exports[`MainStack > snapshot 1`] = `
         },
         "IpProtocol": "tcp",
         "ToPort": 3128,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "BlogAPILambdaSgtoTestMainStackBlogAPIImportedProxySg14796E3543186D554945": {
+      "Properties": {
+        "Description": "otlp http to adot collector sidecar",
+        "DestinationSecurityGroupId": {
+          "Ref": "SsmParameterValuetesttidbproxyproxysgidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "FromPort": 4318,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "BlogAPILambdaSgDB7152F1",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 4318,
       },
       "Type": "AWS::EC2::SecurityGroupEgress",
     },
@@ -818,7 +854,9 @@ exports[`MainStack > snapshot 1`] = `
             },
             "HTTPS_PROXY": "http://tidb-proxy.internal:3128",
             "HTTP_PROXY": "http://tidb-proxy.internal:3128",
-            "NO_PROXY": "169.254.169.254,localhost,127.0.0.1",
+            "NO_PROXY": "169.254.169.254,localhost,127.0.0.1,tidb-proxy.internal",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "http://tidb-proxy.internal:4318",
+            "OTEL_SERVICE_NAME": "blog-api-development",
           },
         },
         "FunctionName": "dev-tp-blog-api",
@@ -952,6 +990,152 @@ exports[`MainStack > snapshot 1`] = `
         },
       },
       "Type": "AWS::SSM::Parameter",
+    },
+    "ObservabilityDashboard9A1D08B3": {
+      "Properties": {
+        "DashboardBody": {
+          "Fn::Join": [
+            "",
+            [
+              "{"widgets":[{"type":"metric","width":8,"height":6,"x":0,"y":0,"properties":{"view":"timeSeries","title":"Lambda request latency","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","app.request.duration","service.name","blog-api-development",{"label":"p50","period":60,"stat":"p50"}],["BlogRuntime","app.request.duration","service.name","blog-api-development",{"label":"p95","period":60,"stat":"p95"}],["BlogRuntime","app.request.duration","service.name","blog-api-development",{"label":"p99","period":60,"stat":"p99"}]],"yAxis":{"left":{"label":"ms","min":0,"showUnits":false}}}},{"type":"metric","width":8,"height":6,"x":8,"y":0,"properties":{"view":"timeSeries","title":"DB client latency","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","db.query.duration","service.name","blog-api-development",{"label":"p50","period":60,"stat":"p50"}],["BlogRuntime","db.query.duration","service.name","blog-api-development",{"label":"p95","period":60,"stat":"p95"}],["BlogRuntime","db.query.duration","service.name","blog-api-development",{"label":"p99","period":60,"stat":"p99"}]],"yAxis":{"left":{"label":"ms","min":0,"showUnits":false}}}},{"type":"metric","width":8,"height":6,"x":16,"y":0,"properties":{"view":"timeSeries","title":"DB baseline latency (SELECT 1)","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","db.healthcheck.duration","service.name","blog-api-development",{"label":"p50","period":60,"stat":"p50"}],["BlogRuntime","db.healthcheck.duration","service.name","blog-api-development",{"label":"p95","period":60,"stat":"p95"}],["BlogRuntime","db.healthcheck.duration","service.name","blog-api-development",{"label":"p99","period":60,"stat":"p99"}]],"yAxis":{"left":{"label":"ms","min":0,"showUnits":false}}}},{"type":"metric","width":8,"height":6,"x":0,"y":6,"properties":{"view":"timeSeries","title":"DB connection latency","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","db.connection.duration","service.name","blog-api-development",{"label":"p50","period":60,"stat":"p50"}],["BlogRuntime","db.connection.duration","service.name","blog-api-development",{"label":"p95","period":60,"stat":"p95"}],["BlogRuntime","db.connection.duration","service.name","blog-api-development",{"label":"p99","period":60,"stat":"p99"}]],"yAxis":{"left":{"label":"ms","min":0,"showUnits":false}}}},{"type":"metric","width":8,"height":6,"x":8,"y":6,"properties":{"view":"timeSeries","title":"Forwarder upstream connect latency","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","proxy.upstream.connect.duration","service.name","tidb-proxy",{"label":"p50","period":60,"stat":"p50"}],["BlogRuntime","proxy.upstream.connect.duration","service.name","tidb-proxy",{"label":"p95","period":60,"stat":"p95"}],["BlogRuntime","proxy.upstream.connect.duration","service.name","tidb-proxy",{"label":"p99","period":60,"stat":"p99"}]],"yAxis":{"left":{"label":"ms","min":0,"showUnits":false}}}},{"type":"metric","width":8,"height":6,"x":16,"y":6,"properties":{"view":"timeSeries","title":"Forwarder connections","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","proxy.connection.active","service.name","tidb-proxy",{"label":"proxy.connection.active","period":60,"stat":"Maximum"}],["BlogRuntime","proxy.connection.accept.count","service.name","tidb-proxy",{"label":"proxy.connection.accept.count","period":60,"stat":"Sum"}]],"yAxis":{}}},{"type":"metric","width":8,"height":6,"x":0,"y":12,"properties":{"view":"timeSeries","title":"Forwarder errors","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","proxy.error.count","service.name","tidb-proxy",{"label":"proxy.error.count","period":60,"stat":"Sum"}],["BlogRuntime","proxy.timeout.count","service.name","tidb-proxy",{"label":"proxy.timeout.count","period":60,"stat":"Sum"}]],"yAxis":{}}},{"type":"metric","width":8,"height":6,"x":8,"y":12,"properties":{"view":"timeSeries","title":"Lambda cold starts / DB errors","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["BlogRuntime","lambda.cold_start.count","service.name","blog-api-development",{"label":"lambda.cold_start.count","period":60,"stat":"Sum"}],["BlogRuntime","db.query.error.count","service.name","blog-api-development",{"label":"db.query.error.count","period":60,"stat":"Sum"}]],"yAxis":{}}}]}",
+            ],
+          ],
+        },
+        "DashboardName": "dev-tp-observability",
+      },
+      "Type": "AWS::CloudWatch::Dashboard",
+    },
+    "ObservabilityHealthcheckConnection5AAD027E": {
+      "Properties": {
+        "AuthParameters": {
+          "ApiKeyAuthParameters": {
+            "ApiKeyName": "x-healthcheck-probe",
+            "ApiKeyValue": "scheduled-baseline-probe",
+          },
+        },
+        "AuthorizationType": "API_KEY",
+        "Description": "Dummy auth header for public /health/db probe",
+      },
+      "Type": "AWS::Events::Connection",
+    },
+    "ObservabilityHealthcheckDestinationApiDestination7D30F789": {
+      "Properties": {
+        "ConnectionArn": {
+          "Fn::GetAtt": [
+            "ObservabilityHealthcheckConnection5AAD027E",
+            "Arn",
+          ],
+        },
+        "Description": "Periodic SELECT 1 baseline probe (db.healthcheck.duration)",
+        "HttpMethod": "GET",
+        "InvocationEndpoint": "https://api.example.com/health/db",
+        "InvocationRateLimitPerSecond": 1,
+      },
+      "Type": "AWS::Events::ApiDestination",
+    },
+    "ObservabilityHealthcheckDestinationEventsRoleB00D70DE": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ObservabilityHealthcheckDestinationEventsRoleDefaultPolicy95261FCC": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "events:InvokeApiDestination",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ObservabilityHealthcheckDestinationApiDestination7D30F789",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ObservabilityHealthcheckDestinationEventsRoleDefaultPolicy95261FCC",
+        "Roles": [
+          {
+            "Ref": "ObservabilityHealthcheckDestinationEventsRoleB00D70DE",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "ObservabilityHealthcheckRule13407249": {
+      "Properties": {
+        "Name": "dev-tp-db-healthcheck-probe",
+        "ScheduleExpression": "rate(1 minute)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "ObservabilityHealthcheckDestinationApiDestination7D30F789",
+                "Arn",
+              ],
+            },
+            "Id": "Target0",
+            "RetryPolicy": {
+              "MaximumEventAgeInSeconds": 60,
+              "MaximumRetryAttempts": 0,
+            },
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "ObservabilityHealthcheckDestinationEventsRoleB00D70DE",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
   },
   "Rules": {

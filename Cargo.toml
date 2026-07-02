@@ -57,3 +57,8 @@ futures = "0.3.32"
 thiserror = "2.0.18"
 tracing = "0.1.44"
 hex = "0.4.3"
+opentelemetry = "0.32.0"
+opentelemetry_sdk = "0.32.0"
+opentelemetry-otlp = "0.32.0"
+opentelemetry-aws = { version = "0.20.0", default-features = false, features = ["trace"] }
+tracing-opentelemetry = "0.33.0"
