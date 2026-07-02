@@ -20,10 +20,10 @@ grafana:
     dashboards:
       enabled: true
       label: grafana_dashboard
-      labelValue: "1"
+      labelValue: '1'
       searchNamespace: ALL
       provider:
-        allowUiUpdates: true     # UI で一時編集可、ただし永続化したいなら JSON Export → コミット
+        allowUiUpdates: true # UI で一時編集可、ただし永続化したいなら JSON Export → コミット
 
 prometheus:
   prometheusSpec:

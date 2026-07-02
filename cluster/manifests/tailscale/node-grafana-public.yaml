@@ -4,8 +4,8 @@ metadata:
   name: node-grafana-public
   namespace: monitoring
   annotations:
-    tailscale.com/expose: "true"
-    tailscale.com/hostname: "node-grafana"
+    tailscale.com/expose: 'true'
+    tailscale.com/hostname: 'node-grafana'
 spec:
   type: LoadBalancer
   loadBalancerClass: tailscale

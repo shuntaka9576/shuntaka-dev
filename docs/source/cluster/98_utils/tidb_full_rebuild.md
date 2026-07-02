@@ -4,10 +4,10 @@
 
 ## スコープ
 
-| 区分 | 対象 |
-|---|---|
+| 区分         | 対象                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **削除する** | TiDB Operator (Helm release + 関連 CRD) / TidbCluster (PD/TiKV/TiDB Pod + PVC + PV + ノード実データ) / `tidb-admin` / `tidb-cluster` namespace / ng-monitoring Deployment + PVC / TiDB 用 PodMonitor + PrometheusRule / 自作ダッシュボード ConfigMap / **kube-prometheus-stack (Helm release + Prometheus / Grafana / Alertmanager / node-exporter / kube-state-metrics + 関連 CRDs + Grafana admin Secret + Prometheus / Grafana PVC + PV + ノード実データ)** / `monitoring` namespace / Tailscale 公開 Service (`tidb-public`, `tidb-dashboard-public`, **`node-grafana-public`**) / Tailscale Admin 上の `ts-tidb-*` / `ts-node-grafana-*` マシン |
-| **残す** | k8s クラスタ本体 / Cilium / local-path-provisioner / Tailscale Operator / `tailscale` / `kube-system` / `hubble-ui-public` Service と Hubble (Cilium 側) |
+| **残す**     | k8s クラスタ本体 / Cilium / local-path-provisioner / Tailscale Operator / `tailscale` / `kube-system` / `hubble-ui-public` Service と Hubble (Cilium 側)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 > TidbMonitor は既に廃止済み前提 (`tasks/2026-06-27-tidbmonitor-decommission.md`)。Grafana / Prometheus は kube-prom-stack に一本化、TiDB の Top SQL / Continuous Profiling は ng-monitoring 単体 Deployment で復活させる。
 >
@@ -25,19 +25,19 @@
 
 ### 構成バージョン (本手順で確認済みの組み合わせ)
 
-| レイヤ | コンポーネント | バージョン |
-|---|---|---|
-| **ノード OS** | Ubuntu | 24.04.4 LTS (kernel 6.8.0) |
-| **k8s ノード** | kubelet / kubeadm | v1.31.14 |
-| **コンテナランタイム** | containerd | 2.2.1 |
-| **手元 Mac** | kubectl client | v1.36.1 (server v1.31 と skew 内) |
-| **CNI** | Cilium (Helm) | chart 1.16.3 / app 1.16.3 |
-| **Storage** | local-path-provisioner | default StorageClass 設定 |
-| **VPN / 公開** | tailscale-operator (Helm) | chart 1.98.4 / app v1.98.4 |
-| **TiDB** | TidbCluster (`spec.version`) | v8.1.0 |
-| **TiDB Operator** | Helm + CRDs | v1.6.0 |
-| **kube-prom-stack** | Helm | chart 87.3.0 / Prometheus Operator v0.92.0 |
-| **ng-monitoring** | Pod image | pingcap/ng-monitoring:v8.1.0 |
+| レイヤ                 | コンポーネント               | バージョン                                 |
+| ---------------------- | ---------------------------- | ------------------------------------------ |
+| **ノード OS**          | Ubuntu                       | 24.04.4 LTS (kernel 6.8.0)                 |
+| **k8s ノード**         | kubelet / kubeadm            | v1.31.14                                   |
+| **コンテナランタイム** | containerd                   | 2.2.1                                      |
+| **手元 Mac**           | kubectl client               | v1.36.1 (server v1.31 と skew 内)          |
+| **CNI**                | Cilium (Helm)                | chart 1.16.3 / app 1.16.3                  |
+| **Storage**            | local-path-provisioner       | default StorageClass 設定                  |
+| **VPN / 公開**         | tailscale-operator (Helm)    | chart 1.98.4 / app v1.98.4                 |
+| **TiDB**               | TidbCluster (`spec.version`) | v8.1.0                                     |
+| **TiDB Operator**      | Helm + CRDs                  | v1.6.0                                     |
+| **kube-prom-stack**    | Helm                         | chart 87.3.0 / Prometheus Operator v0.92.0 |
+| **ng-monitoring**      | Pod image                    | pingcap/ng-monitoring:v8.1.0               |
 
 > Ubuntu / k8s / CNI / Tailscale Operator は本資料スコープ外 (残す側)。**TiDB 系と kube-prom-stack のバージョンを上げる時は本表とコマンド内のバージョン指定を同期させる**。とくに `kubectl create -f https://raw.../tidb-operator/v1.6.0/manifests/crd.yaml` と `helm install ... --version v1.6.0`、`manifests/tidb-cluster/tidb-cluster.yaml` の `spec.version: v8.1.0`、`manifests/monitoring/ng-monitoring/*.yaml` の image tag は **常に揃える**。
 
@@ -101,13 +101,13 @@ Phase B — 再構築 (依存矢印)
 
 ## 想定所要時間
 
-| フェーズ | 時間 |
-|---|---|
-| データ退避 (任意、データ量による) | 数分 〜 数十分 |
-| 全消し (Phase A、kube-prom-stack 込み) | 7-10 分 |
+| フェーズ                               | 時間                                            |
+| -------------------------------------- | ----------------------------------------------- |
+| データ退避 (任意、データ量による)      | 数分 〜 数十分                                  |
+| 全消し (Phase A、kube-prom-stack 込み) | 7-10 分                                         |
 | 再構築 (Phase B、kube-prom-stack 込み) | 12-15 分 (kube-prom-stack image pull で 2-3 分) |
-| 動作確認 (Phase C) | 3-5 分 |
-| **合計** | **22-30 分** (退避除く) |
+| 動作確認 (Phase C)                     | 3-5 分                                          |
+| **合計**                               | **22-30 分** (退避除く)                         |
 
 ---
 
@@ -547,11 +547,11 @@ pkill -f "port-forward.*grafana.*13000"
 
 Service 定義 3 つはリポジトリの `manifests/tailscale/` に置いてある。
 
-| ファイル | hostname | 公開先 |
-|---|---|---|
-| `tidb-public.yaml` | `tidb` | TiDB Server (`:4000`、Lambda などからの接続用) |
-| `tidb-dashboard-public.yaml` | `tidb-dashboard` | TiDB Dashboard (`:2379/dashboard`) |
-| `node-grafana-public.yaml` | `node-grafana` | Grafana (`:3000`、kube-prom-stack 同梱) |
+| ファイル                     | hostname         | 公開先                                         |
+| ---------------------------- | ---------------- | ---------------------------------------------- |
+| `tidb-public.yaml`           | `tidb`           | TiDB Server (`:4000`、Lambda などからの接続用) |
+| `tidb-dashboard-public.yaml` | `tidb-dashboard` | TiDB Dashboard (`:2379/dashboard`)             |
+| `node-grafana-public.yaml`   | `node-grafana`   | Grafana (`:3000`、kube-prom-stack 同梱)        |
 
 ```bash
 kubectl apply -f manifests/tailscale/
@@ -670,21 +670,21 @@ mysql -h tidb.${TAILNET} -P 4000 -u root -e "SELECT 1;" 2>&1 | grep -i denied \
 
 ## 失敗パターンと対処
 
-| 症状 | 原因 | 対処 |
-|---|---|---|
-| `kubectl delete namespace tidb-cluster` が `Terminating` で hang | 残存 finalizer (PVC や TidbCluster CR) | A-5 (Operator 削除) を先に流すと finalizer が外れる。それでもダメなら本資料 A-4 の finalizer 空 patch |
-| 新 PD Pod が `Pending` で volume node affinity conflict | A-7 (ノードディスク掃除) が漏れているノードがある | `ssh nodeN ls /opt/local-path-provisioner/` で残骸確認 → `sudo rm -rf` |
-| 新 TidbCluster の PVC が全部 `Pending` | `local-path` が default StorageClass から外れた | 前提チェック 1 の `patch storageclass` を再実行 |
-| 新 `basic-pd-0` だけ起動するが他 PD が CrashLoopBackOff | 旧 PV メタデータの掴み残し | 該当 PVC 削除 → A-6/A-7 を再実行 → re-apply |
-| `helm install tidb-operator` が `CustomResourceDefinition is invalid` | 旧 CRD バージョンが残存 | A-5 の `kubectl delete crd ...` を再実行 |
-| TiDB Dashboard で `ngm_state: "unknown"` | ng-monitoring が PD に self-register できていない | `kubectl -n tidb-cluster logs deploy/ng-monitoring` で `create pd client success` 行を確認。出ていなければ `--pd.endpoints` (configmap 内の `[pd] endpoints`) を再確認して `rollout restart` |
-| TiDB Dashboard の Top SQL タブが「No Data」 | `tidb_enable_top_sql` が OFF | B-4 の `SET GLOBAL tidb_enable_top_sql = 1` を再投入。`mysql.global_variables` は TidbCluster 再構築で初期化されるので毎回必要 |
-| TiDB Dashboard の Overview パネルで Prometheus エラー | B-5 を流していない | `pd-ctl config set metric-storage ...` を実行 |
+| 症状                                                                            | 原因                                                                                                                         | 対処                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kubectl delete namespace tidb-cluster` が `Terminating` で hang                | 残存 finalizer (PVC や TidbCluster CR)                                                                                       | A-5 (Operator 削除) を先に流すと finalizer が外れる。それでもダメなら本資料 A-4 の finalizer 空 patch                                                                                                                                 |
+| 新 PD Pod が `Pending` で volume node affinity conflict                         | A-7 (ノードディスク掃除) が漏れているノードがある                                                                            | `ssh nodeN ls /opt/local-path-provisioner/` で残骸確認 → `sudo rm -rf`                                                                                                                                                                |
+| 新 TidbCluster の PVC が全部 `Pending`                                          | `local-path` が default StorageClass から外れた                                                                              | 前提チェック 1 の `patch storageclass` を再実行                                                                                                                                                                                       |
+| 新 `basic-pd-0` だけ起動するが他 PD が CrashLoopBackOff                         | 旧 PV メタデータの掴み残し                                                                                                   | 該当 PVC 削除 → A-6/A-7 を再実行 → re-apply                                                                                                                                                                                           |
+| `helm install tidb-operator` が `CustomResourceDefinition is invalid`           | 旧 CRD バージョンが残存                                                                                                      | A-5 の `kubectl delete crd ...` を再実行                                                                                                                                                                                              |
+| TiDB Dashboard で `ngm_state: "unknown"`                                        | ng-monitoring が PD に self-register できていない                                                                            | `kubectl -n tidb-cluster logs deploy/ng-monitoring` で `create pd client success` 行を確認。出ていなければ `--pd.endpoints` (configmap 内の `[pd] endpoints`) を再確認して `rollout restart`                                          |
+| TiDB Dashboard の Top SQL タブが「No Data」                                     | `tidb_enable_top_sql` が OFF                                                                                                 | B-4 の `SET GLOBAL tidb_enable_top_sql = 1` を再投入。`mysql.global_variables` は TidbCluster 再構築で初期化されるので毎回必要                                                                                                        |
+| TiDB Dashboard の Overview パネルで Prometheus エラー                           | B-5 を流していない                                                                                                           | `pd-ctl config set metric-storage ...` を実行                                                                                                                                                                                         |
 | `kubectl apply -k manifests/monitoring/` 後 Prometheus targets に TiDB が出ない | kube-prom-stack の `podMonitorSelector` が `release: kube-prom-stack` label を要求するが、PodMonitor 側の label とミスマッチ | `manifests/monitoring/podmonitors/*.yaml` の `metadata.labels.release` と Prometheus CR の `spec.podMonitorSelector` を突き合わせ。helm values で selector を変えている場合は片方を揃える (`tidbmonitor_decommission.md` Step 2 注記) |
-| Grafana で自作ダッシュボードが見えない | sidecar が ConfigMap label を拾えていない / namespace 違い | values.yaml の `grafana.sidecar.dashboards.searchNamespace: ALL` が効いているか確認。ConfigMap 側に `label: grafana_dashboard=1` が付いているか `kubectl get cm -l grafana_dashboard=1 -A` |
-| Grafana ログインで admin パスワードが分からない | values.yaml の `changeme` を変えた / Secret が差し替わった | `kubectl -n monitoring get secret kube-prom-stack-grafana -o jsonpath='{.data.admin-password}' \| base64 -d` で取得 |
-| ブラウザで `tidb.<tailnet>.ts.net:4000` が解決できない | MagicDNS が tailnet 全体で disabled | 前提チェック 2 の `tailscale dns status` を再確認 → Admin → DNS で Enable MagicDNS。100.x IP 直叩きは通るがブラウザ / DNS 経由は通らないという症状になる |
-| `ts-tidb-*` proxy マシンが Admin に表示されない | Tailscale Operator が tagging に失敗 / OAuth client 切れ / ACL `tag:k8s` が消えた | `kubectl -n tailscale logs deploy/tailscale-operator` を確認。OAuth client は `construction_plan.md` Phase 6 の手順で再生成。ACL は前提チェック 3 で確認 |
+| Grafana で自作ダッシュボードが見えない                                          | sidecar が ConfigMap label を拾えていない / namespace 違い                                                                   | values.yaml の `grafana.sidecar.dashboards.searchNamespace: ALL` が効いているか確認。ConfigMap 側に `label: grafana_dashboard=1` が付いているか `kubectl get cm -l grafana_dashboard=1 -A`                                            |
+| Grafana ログインで admin パスワードが分からない                                 | values.yaml の `changeme` を変えた / Secret が差し替わった                                                                   | `kubectl -n monitoring get secret kube-prom-stack-grafana -o jsonpath='{.data.admin-password}' \| base64 -d` で取得                                                                                                                   |
+| ブラウザで `tidb.<tailnet>.ts.net:4000` が解決できない                          | MagicDNS が tailnet 全体で disabled                                                                                          | 前提チェック 2 の `tailscale dns status` を再確認 → Admin → DNS で Enable MagicDNS。100.x IP 直叩きは通るがブラウザ / DNS 経由は通らないという症状になる                                                                              |
+| `ts-tidb-*` proxy マシンが Admin に表示されない                                 | Tailscale Operator が tagging に失敗 / OAuth client 切れ / ACL `tag:k8s` が消えた                                            | `kubectl -n tailscale logs deploy/tailscale-operator` を確認。OAuth client は `construction_plan.md` Phase 6 の手順で再生成。ACL は前提チェック 3 で確認                                                                              |
 
 ## 参考
 

@@ -6,10 +6,10 @@ TiDB Dashboard の **Search Logs** で `Download` を押すと **TiKV だけ成�
 
 Dashboard → Cluster Info → Logs → 時間範囲指定 → Search → Download すると、Progress パネルが以下の状態になる:
 
-| コンポーネント | 結果 | 実態 |
-|---|---|---|
-| PD (`basic-pd-{0,1,2}.basic-pd-peer.tidb-cluster.svc:2379`) | `3 failed (0 B)` | ファイル無しでエラー |
-| TiDB (`basic-tidb-{0,1,2}.basic-tidb-peer.tidb-cluster.svc:4000`) | `3 failed (0 B)` | 同上 |
+| コンポーネント                                                     | 結果                | 実態                                                                                                                               |
+| ------------------------------------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| PD (`basic-pd-{0,1,2}.basic-pd-peer.tidb-cluster.svc:2379`)        | `3 failed (0 B)`    | ファイル無しでエラー                                                                                                               |
+| TiDB (`basic-tidb-{0,1,2}.basic-tidb-peer.tidb-cluster.svc:4000`)  | `3 failed (0 B)`    | 同上                                                                                                                               |
 | TiKV (`basic-tikv-{0,1,2}.basic-tikv-peer.tidb-cluster.svc:20160`) | `3 completed (0 B)` | **success 表示だが実は 0 バイト**。TiKV の diagnostics gRPC は「該当ログ無し」を success+空 で返す優しい実装なので、見た目だけ通る |
 
 ## 原因
@@ -168,7 +168,7 @@ done
 
 ## ハマりどころ
 
-- **ローリング再起動 *より前* のログは取れない**: stdout にしか書かれていない過去ログはファイル化できない。Search Logs は将来分のみ対象、と割り切る
+- **ローリング再起動 _より前_ のログは取れない**: stdout にしか書かれていない過去ログはファイル化できない。Search Logs は将来分のみ対象、と割り切る
 - **TiDB の filename は `/var/lib/tidb/...` ではない**: TiDB pod には `/var/lib/tidb` ボリュームが無い。書き込み可能なのは emptyDir で mount されている `/var/log/tidb/` (slowlog 用)
 - **PD の filename を `/var/lib/pd/...` に置くと起動拒否**: PD は `log directory shouldn't be the subdirectory of data directory` を出してそのまま落ちる (CrashLoopBackOff ループ。pod status は `Completed`→`CrashLoopBackOff` を行き来する)。`additionalVolumes` + `additionalVolumeMounts` で emptyDir を `/var/log/pd` に mount し、そこに置くのが正解
 - **`configUpdateStrategy: InPlace` のままだと反映されない**: 本リポジトリの CR は `RollingUpdate` 指定済みなので自動再起動するが、`InPlace` に変えている場合は手動で Pod 削除が必要

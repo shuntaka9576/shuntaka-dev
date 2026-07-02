@@ -5,19 +5,19 @@
   "version": 3,
   "editable": true,
   "tags": ["cluster", "pod"],
-  "time": {"from": "now-1h", "to": "now"},
+  "time": { "from": "now-1h", "to": "now" },
   "refresh": "30s",
   "templating": {
     "list": [
       {
         "name": "namespace",
         "type": "query",
-        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
         "query": "label_values(kube_pod_info, namespace)",
         "refresh": 1,
         "includeAll": true,
         "multi": true,
-        "current": {"text": "All", "value": "$__all"}
+        "current": { "text": "All", "value": "$__all" }
       }
     ]
   },
@@ -26,7 +26,7 @@
       "id": 1,
       "title": "Pod count by phase",
       "type": "stat",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (phase) (kube_pod_status_phase{namespace=~\"$namespace\"})",
@@ -34,13 +34,13 @@
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0}
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 0 }
     },
     {
       "id": 2,
       "title": "Pod count by namespace",
       "type": "bargauge",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "count by (namespace) (kube_pod_info{namespace=~\"$namespace\"})",
@@ -48,13 +48,13 @@
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0}
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 }
     },
     {
       "id": 20,
       "title": "Pod 状態一覧",
       "type": "table",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (namespace, pod, node, created_by_kind, created_by_name) (kube_pod_info{namespace=~\"$namespace\"})",
@@ -112,7 +112,7 @@
         }
       ],
       "transformations": [
-        {"id": "merge", "options": {}},
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
@@ -157,7 +157,7 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": {"_PhaseFlag": true},
+            "excludeByName": { "_PhaseFlag": true },
             "renameByName": {},
             "indexByName": {}
           }
@@ -169,127 +169,186 @@
             "align": "auto",
             "filterable": true,
             "inspect": false,
-            "cellOptions": {"type": "auto"}
+            "cellOptions": { "type": "auto" }
           }
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "Phase"},
+            "matcher": { "id": "byName", "options": "Phase" },
             "properties": [
-              {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}},
-              {"id": "mappings", "value": [
-                {"type": "value", "options": {
-                  "Running": {"color": "green", "text": "Running", "index": 0},
-                  "Pending": {"color": "yellow", "text": "Pending", "index": 1},
-                  "Failed": {"color": "red", "text": "Failed", "index": 2},
-                  "Succeeded": {"color": "blue", "text": "Succeeded", "index": 3},
-                  "Unknown": {"color": "purple", "text": "Unknown", "index": 4}
-                }}
-              ]},
-              {"id": "custom.width", "value": 110}
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "basic" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Running": {
+                        "color": "green",
+                        "text": "Running",
+                        "index": 0
+                      },
+                      "Pending": {
+                        "color": "yellow",
+                        "text": "Pending",
+                        "index": 1
+                      },
+                      "Failed": {
+                        "color": "red",
+                        "text": "Failed",
+                        "index": 2
+                      },
+                      "Succeeded": {
+                        "color": "blue",
+                        "text": "Succeeded",
+                        "index": 3
+                      },
+                      "Unknown": {
+                        "color": "purple",
+                        "text": "Unknown",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              },
+              { "id": "custom.width", "value": 110 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Ready"},
+            "matcher": { "id": "byName", "options": "Ready" },
             "properties": [
-              {"id": "custom.cellOptions", "value": {"type": "color-text"}},
-              {"id": "mappings", "value": [
-                {"type": "value", "options": {
-                  "0": {"text": "✗", "color": "red", "index": 0},
-                  "1": {"text": "✓", "color": "green", "index": 1}
-                }}
-              ]},
-              {"id": "custom.width", "value": 70},
-              {"id": "custom.align", "value": "center"}
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": { "text": "✗", "color": "red", "index": 0 },
+                      "1": { "text": "✓", "color": "green", "index": 1 }
+                    }
+                  }
+                ]
+              },
+              { "id": "custom.width", "value": 70 },
+              { "id": "custom.align", "value": "center" }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Restarts"},
+            "matcher": { "id": "byName", "options": "Restarts" },
             "properties": [
-              {"id": "unit", "value": "none"},
-              {"id": "decimals", "value": 0},
-              {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}},
-              {"id": "thresholds", "value": {"mode": "absolute", "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 1},
-                {"color": "orange", "value": 5},
-                {"color": "red", "value": 10}
-              ]}},
-              {"id": "custom.width", "value": 90}
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 0 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "orange", "value": 5 },
+                    { "color": "red", "value": 10 }
+                  ]
+                }
+              },
+              { "id": "custom.width", "value": 90 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Waiting"},
+            "matcher": { "id": "byName", "options": "Waiting" },
             "properties": [
-              {"id": "unit", "value": "none"},
-              {"id": "decimals", "value": 0},
-              {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}},
-              {"id": "thresholds", "value": {"mode": "absolute", "steps": [
-                {"color": "green", "value": null},
-                {"color": "orange", "value": 1}
-              ]}},
-              {"id": "custom.width", "value": 80}
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 0 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "basic" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "orange", "value": 1 }
+                  ]
+                }
+              },
+              { "id": "custom.width", "value": 80 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Containers"},
+            "matcher": { "id": "byName", "options": "Containers" },
             "properties": [
-              {"id": "unit", "value": "none"},
-              {"id": "decimals", "value": 0},
-              {"id": "custom.width", "value": 100}
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 0 },
+              { "id": "custom.width", "value": 100 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "CPU"},
+            "matcher": { "id": "byName", "options": "CPU" },
             "properties": [
-              {"id": "unit", "value": "none"},
-              {"id": "decimals", "value": 3},
-              {"id": "custom.cellOptions", "value": {"type": "gauge", "mode": "gradient"}},
-              {"id": "custom.width", "value": 140}
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 3 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "gauge", "mode": "gradient" }
+              },
+              { "id": "custom.width", "value": 140 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Memory"},
+            "matcher": { "id": "byName", "options": "Memory" },
             "properties": [
-              {"id": "unit", "value": "bytes"},
-              {"id": "custom.cellOptions", "value": {"type": "gauge", "mode": "gradient"}},
-              {"id": "custom.width", "value": 160}
+              { "id": "unit", "value": "bytes" },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "gauge", "mode": "gradient" }
+              },
+              { "id": "custom.width", "value": 160 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Age"},
+            "matcher": { "id": "byName", "options": "Age" },
             "properties": [
-              {"id": "unit", "value": "s"},
-              {"id": "custom.width", "value": 110}
+              { "id": "unit", "value": "s" },
+              { "id": "custom.width", "value": 110 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Namespace"},
-            "properties": [{"id": "custom.width", "value": 140}]
+            "matcher": { "id": "byName", "options": "Namespace" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
           },
           {
-            "matcher": {"id": "byName", "options": "Node"},
-            "properties": [{"id": "custom.width", "value": 100}]
+            "matcher": { "id": "byName", "options": "Node" },
+            "properties": [{ "id": "custom.width", "value": 100 }]
           },
           {
-            "matcher": {"id": "byName", "options": "Owner Kind"},
-            "properties": [{"id": "custom.width", "value": 110}]
+            "matcher": { "id": "byName", "options": "Owner Kind" },
+            "properties": [{ "id": "custom.width", "value": 110 }]
           }
         ]
       },
       "options": {
         "showHeader": true,
-        "footer": {"show": false},
+        "footer": { "show": false },
         "cellHeight": "sm",
-        "sortBy": [{"displayName": "Namespace", "desc": false}]
+        "sortBy": [{ "displayName": "Namespace", "desc": false }]
       },
-      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 6}
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 6 }
     },
     {
       "id": 3,
       "title": "Top 10 Pod CPU (cores)",
       "type": "timeseries",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "topk(10, sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!=\"\", namespace=~\"$namespace\"}[2m])))",
@@ -297,14 +356,14 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "none"}},
-      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 28}
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 28 }
     },
     {
       "id": 4,
       "title": "Top 10 Pod Memory (working set bytes)",
       "type": "timeseries",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "topk(10, sum by (namespace, pod) (container_memory_working_set_bytes{container!=\"\", namespace=~\"$namespace\"}))",
@@ -312,14 +371,14 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "bytes"}},
-      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 37}
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 37 }
     },
     {
       "id": 5,
       "title": "Pod restart count (累積)",
       "type": "table",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (namespace, pod) (kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}) > 0",
@@ -328,13 +387,13 @@
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 46}
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 46 }
     },
     {
       "id": 6,
       "title": "Pod not Ready",
       "type": "table",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "kube_pod_status_ready{condition=\"true\", namespace=~\"$namespace\"} == 0",
@@ -343,13 +402,13 @@
           "refId": "A"
         }
       ],
-      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 46}
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 46 }
     },
     {
       "id": 30,
       "title": "Exposed Services (LoadBalancer / NodePort)",
       "type": "table",
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (namespace, service, type) (kube_service_spec_type{type=~\"LoadBalancer|NodePort\", namespace=~\"$namespace\"})",
@@ -377,7 +436,7 @@
         }
       ],
       "transformations": [
-        {"id": "merge", "options": {}},
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
@@ -413,48 +472,65 @@
             "align": "auto",
             "filterable": true,
             "inspect": false,
-            "cellOptions": {"type": "auto"}
+            "cellOptions": { "type": "auto" }
           }
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "Type"},
+            "matcher": { "id": "byName", "options": "Type" },
             "properties": [
-              {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}},
-              {"id": "mappings", "value": [
-                {"type": "value", "options": {
-                  "LoadBalancer": {"color": "green", "text": "LoadBalancer", "index": 0},
-                  "NodePort": {"color": "blue", "text": "NodePort", "index": 1}
-                }}
-              ]},
-              {"id": "custom.width", "value": 130}
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "basic" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "LoadBalancer": {
+                        "color": "green",
+                        "text": "LoadBalancer",
+                        "index": 0
+                      },
+                      "NodePort": {
+                        "color": "blue",
+                        "text": "NodePort",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              { "id": "custom.width", "value": 130 }
             ]
           },
           {
-            "matcher": {"id": "byName", "options": "Namespace"},
-            "properties": [{"id": "custom.width", "value": 140}]
+            "matcher": { "id": "byName", "options": "Namespace" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
           },
           {
-            "matcher": {"id": "byName", "options": "Service"},
-            "properties": [{"id": "custom.width", "value": 220}]
+            "matcher": { "id": "byName", "options": "Service" },
+            "properties": [{ "id": "custom.width", "value": 220 }]
           },
           {
-            "matcher": {"id": "byName", "options": "ClusterIP"},
-            "properties": [{"id": "custom.width", "value": 140}]
+            "matcher": { "id": "byName", "options": "ClusterIP" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
           },
           {
-            "matcher": {"id": "byName", "options": "External IP"},
-            "properties": [{"id": "custom.width", "value": 140}]
+            "matcher": { "id": "byName", "options": "External IP" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
           }
         ]
       },
       "options": {
         "showHeader": true,
-        "footer": {"show": false},
+        "footer": { "show": false },
         "cellHeight": "sm",
-        "sortBy": [{"displayName": "Namespace", "desc": false}]
+        "sortBy": [{ "displayName": "Namespace", "desc": false }]
       },
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20}
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 }
     }
   ]
 }

@@ -4,10 +4,7 @@
   "schemaVersion": 41,
   "version": 1,
   "editable": true,
-  "tags": [
-    "cluster",
-    "node"
-  ],
+  "tags": ["cluster", "node"],
   "time": {
     "from": "now-1h",
     "to": "now"

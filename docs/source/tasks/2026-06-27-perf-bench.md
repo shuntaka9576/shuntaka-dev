@@ -6,26 +6,26 @@
 
 ## TL;DR
 
-| ワークロード | 数字 | Aurora MySQL 換算 |
-|--|--|--|
-| point-select read-only | **49k QPS, p95 4.3 ms** (threads=128) | db.r6g.2xlarge writer 相当 |
-| OLTP read-write mix | **1,140 TPS / 22.8k QPS, p95 100–300 ms** | db.r6g.2xlarge writer 相当 |
-| bulk INSERT…SELECT | **約 416k rows/sec** (100 万行 / 2.4 秒) | — |
+| ワークロード           | 数字                                      | Aurora MySQL 換算          |
+| ---------------------- | ----------------------------------------- | -------------------------- |
+| point-select read-only | **49k QPS, p95 4.3 ms** (threads=128)     | db.r6g.2xlarge writer 相当 |
+| OLTP read-write mix    | **1,140 TPS / 22.8k QPS, p95 100–300 ms** | db.r6g.2xlarge writer 相当 |
+| bulk INSERT…SELECT     | **約 416k rows/sec** (100 万行 / 2.4 秒)  | —                          |
 
 ハードウェアは余裕があるが (バックグラウンド CPU 12%)、49k QPS は計測セットアップ上の上限。真の上限を測るにはクラスタ外の bench 専用機が必要。
 
 ## 物理前提
 
-| 項目 | 値 |
-|--|--|
-| ノード | GMKtec M5 Ultra ×3 (`node1`/`node2`/`node3`) |
-| CPU | Ryzen 7 7730U 8C/16T @ 4.5GHz |
-| RAM | 32 GB DDR4 |
-| SSD | 1 TB NVMe |
-| ネットワーク | TP-Link SG3210X-M2 2.5GbE switch |
-| OS | Ubuntu Server 24.04 LTS |
-| Kubernetes | v1.31.14 (kubeadm + Cilium) |
-| TiDB | v8.1.0 (TiDB Operator v1.6.0) |
+| 項目         | 値                                           |
+| ------------ | -------------------------------------------- |
+| ノード       | GMKtec M5 Ultra ×3 (`node1`/`node2`/`node3`) |
+| CPU          | Ryzen 7 7730U 8C/16T @ 4.5GHz                |
+| RAM          | 32 GB DDR4                                   |
+| SSD          | 1 TB NVMe                                    |
+| ネットワーク | TP-Link SG3210X-M2 2.5GbE switch             |
+| OS           | Ubuntu Server 24.04 LTS                      |
+| Kubernetes   | v1.31.14 (kubeadm + Cilium)                  |
+| TiDB         | v8.1.0 (TiDB Operator v1.6.0)                |
 
 ベンチ実行時 (2026-06-27 朝) の TiDB クラスタ初期配置:
 
@@ -41,24 +41,24 @@ node1 に control-plane taint が残っていたため Pod が node2/3 にしか
 
 すべて `scripts/tidb/` 配下。
 
-| ファイル | 用途 |
-|--|--|
-| `tidb_load.sh` | `bench.load_test` に 100 万行投入 + 簡易 heavy query |
-| `tidb_qps.sh` | `mysqlslap` で point-select / UPDATE の並列スイープ |
-| `tidb_qps_push.sh` | 高並列 (256/512) で 10k QPS 突破を狙うスイープ |
-| `sysbench_run.sh` | sysbench oltp_point_select |
-| `sysbench_rw.sh` | sysbench oltp_read_write / write_only / update_index |
-| `pybench.py` | pymysql ベースの軽量 QPS 計測 (Mac から Tailscale LB に撃つ用) |
+| ファイル           | 用途                                                           |
+| ------------------ | -------------------------------------------------------------- |
+| `tidb_load.sh`     | `bench.load_test` に 100 万行投入 + 簡易 heavy query           |
+| `tidb_qps.sh`      | `mysqlslap` で point-select / UPDATE の並列スイープ            |
+| `tidb_qps_push.sh` | 高並列 (256/512) で 10k QPS 突破を狙うスイープ                 |
+| `sysbench_run.sh`  | sysbench oltp_point_select                                     |
+| `sysbench_rw.sh`   | sysbench oltp_read_write / write_only / update_index           |
+| `pybench.py`       | pymysql ベースの軽量 QPS 計測 (Mac から Tailscale LB に撃つ用) |
 
 env で `TIDB_HOST` `TIDB_PORT` `TIDB_USER` `TIDB_DB` `THREADS_LIST` `TIME` を上書き可能。
 
 ## 実行環境のバリエーション
 
-| ロケーション | 接続先 | 1M 行 INSERT…SELECT 所要 |
-|--|--|--:|
-| Mac → kubectl port-forward 経由 | `127.0.0.1:4000` | 28 秒 |
-| Mac → Tailscale LB | `tidb.<tailnet>.ts.net:4000` | (pybench で 10k QPS 頭打ち) |
-| **node1 → NodePort 直** | **`127.0.0.1:31299`** | **2.4 秒** |
+| ロケーション                    | 接続先                       |    1M 行 INSERT…SELECT 所要 |
+| ------------------------------- | ---------------------------- | --------------------------: |
+| Mac → kubectl port-forward 経由 | `127.0.0.1:4000`             |                       28 秒 |
+| Mac → Tailscale LB              | `tidb.<tailnet>.ts.net:4000` | (pybench で 10k QPS 頭打ち) |
+| **node1 → NodePort 直**         | **`127.0.0.1:31299`**        |                  **2.4 秒** |
 
 node1 から NodePort 経由が 10 倍以上速い。port-forward は Mac↔Pi の TCP proxy が直列に乗るので latency に支配される。以後の bench は基本 node1 から実行。
 
@@ -69,11 +69,11 @@ TIDB_PORT=31299 TIME=15 THREADS_LIST="64 128 256" \
   bash scripts/tidb/sysbench_run.sh
 ```
 
-| threads | QPS | p95 latency |
-|--:|--:|--:|
-| 64 | 39,562 | 3.89 ms |
+| threads |        QPS | p95 latency |
+| ------: | ---------: | ----------: |
+|      64 |     39,562 |     3.89 ms |
 | **128** | **49,193** | **4.33 ms** |
-| 256 | 44,952 | 10.65 ms |
+|     256 |     44,952 |    10.65 ms |
 
 threads=256 で QPS が下がって latency が 2 倍超になっているので頭打ち。
 
@@ -81,11 +81,11 @@ threads=256 で QPS が下がって latency が 2 倍超になっているので
 
 ベンチ中 (threads=128) の各ノード load average / sysbench プロセス:
 
-| ノード | role | load avg (1m) | コメント |
-|--|--|--:|--|
-| node1 | sysbench クライアントのみ | 0.98 / 16 | sysbench 自体 1.55 cores |
-| node2 | TiDB-0 + TiKV-0 + TiKV-1 | 4.06 / 16 | TiKV 2 個共存で偏ってる |
-| node3 | TiDB-1 + TiKV-2 + PD | 1.64 / 16 | |
+| ノード | role                      | load avg (1m) | コメント                 |
+| ------ | ------------------------- | ------------: | ------------------------ |
+| node1  | sysbench クライアントのみ |     0.98 / 16 | sysbench 自体 1.55 cores |
+| node2  | TiDB-0 + TiKV-0 + TiKV-1  |     4.06 / 16 | TiKV 2 個共存で偏ってる  |
+| node3  | TiDB-1 + TiKV-2 + PD      |     1.64 / 16 |                          |
 
 **3 ノード合計 48 cores のうち実質 5–6 cores (12%) しか使っていない**。ハードに余力ありで、49k はソフト側 (TiDB / TiKV のスケジューリング / kube-proxy 経路) の壁。
 
@@ -96,12 +96,12 @@ TIDB_PORT=31299 TIME=20 THREADS_LIST="32 64 128 256" \
   bash scripts/tidb/sysbench_rw.sh
 ```
 
-| threads | TPS | QPS | p95 |
-|--:|--:|--:|--:|
-| 32 | 651 | 13,020 | 64 ms |
-| **64** | **864** | **17,286** | 94 ms |
-| 128 | 1,010 | 20,203 | 167 ms |
-| 256 | 1,140 | 22,801 | 314 ms |
+| threads |     TPS |        QPS |    p95 |
+| ------: | ------: | ---------: | -----: |
+|      32 |     651 |     13,020 |  64 ms |
+|  **64** | **864** | **17,286** |  94 ms |
+|     128 |   1,010 |     20,203 | 167 ms |
+|     256 |   1,140 |     22,801 | 314 ms |
 
 各 transaction = 20 queries (10 SELECT + 4 UPDATE + 4 INSERT + 2 DELETE)。
 
@@ -125,10 +125,10 @@ kubectl -n tidb-cluster patch tc basic --type=merge -p '{
 TiDB-2 が node1 に着地 → 3 ノード均等配置完了。再ベンチ:
 
 | threads | QPS (TiDB=2) | QPS (TiDB=3) |
-|--:|--:|--:|
-| 128 | 49,193 | 41,012 |
-| 256 | 44,952 | 41,961 |
-| 384 | — | 42,845 |
+| ------: | -----------: | -----------: |
+|     128 |       49,193 |       41,012 |
+|     256 |       44,952 |       41,961 |
+|     384 |            — |       42,845 |
 
 **伸びるどころか下がった**。SQL 層は壁ではなかった。
 
@@ -145,10 +145,10 @@ kubectl -n tidb-cluster patch tc basic --type=merge -p '{
 TiKV-3 が node1 に新規追加。PD のリージョン balance を待ってから再ベンチ:
 
 | threads | QPS (TiKV=3) | QPS (TiKV=4 settled) |
-|--:|--:|--:|
-| 64 | 39,562 | 25,665 |
-| 128 | 49,193 | 30,940 |
-| 256 | 44,952 | 34,665 |
+| ------: | -----------: | -------------------: |
+|      64 |       39,562 |               25,665 |
+|     128 |       49,193 |               30,940 |
+|     256 |       44,952 |               34,665 |
 
 **さらに下がった**。
 
@@ -180,12 +180,12 @@ pdctl store limit        # store ごとの ops/sec 上限
 
 TiKV-3 追加後、`region_count` だけ見ると激しく偏って見える:
 
-| Store | region_count | region_size | leader_count | leader_size |
-|--|--:|--:|--:|--:|
-| TiKV-0 (node2) | 130 | 771 MB | 29 | 86 |
-| TiKV-1 (node2) | 121 | 779 MB | 37 | 141 |
-| TiKV-2 (node3) | 110 | 795 MB | 30 | 122 |
-| **TiKV-3 (node1)** | 41 | **769 MB** | 38 | **689** |
+| Store              | region_count | region_size | leader_count | leader_size |
+| ------------------ | -----------: | ----------: | -----------: | ----------: |
+| TiKV-0 (node2)     |          130 |      771 MB |           29 |          86 |
+| TiKV-1 (node2)     |          121 |      779 MB |           37 |         141 |
+| TiKV-2 (node3)     |          110 |      795 MB |           30 |         122 |
+| **TiKV-3 (node1)** |           41 |  **769 MB** |           38 |     **689** |
 
 `region_count` は **41 vs 130** で偏ってるように見えるが、`region_size` は全部 770–795 MB でほぼ均等。**count の差は「空 region と肥大 region の混在」によるもの**で、実データは均衡している。
 
@@ -199,21 +199,21 @@ TiKV-3 追加後、`region_count` だけ見ると激しく偏って見える:
 
 公開ベンチ (sysbench OLTP cached) との対比:
 
-| Aurora インスタンス | 想定 point-select QPS | 本クラスタ比 |
-|--|--:|--|
-| db.r6g.large (2 vCPU / 16GB) | 5–10k | 圧倒的に上 |
-| db.r6g.xlarge (4 vCPU / 32GB) | 15–25k | 上 |
-| **db.r6g.2xlarge (8 vCPU / 64GB)** | **40–60k** | **ほぼ同等** |
-| db.r6g.4xlarge (16 vCPU / 128GB) | 80–120k | TiDB pod を増やしてかつ別マシンから測ればここまで届きそう |
+| Aurora インスタンス                | 想定 point-select QPS | 本クラスタ比                                              |
+| ---------------------------------- | --------------------: | --------------------------------------------------------- |
+| db.r6g.large (2 vCPU / 16GB)       |                 5–10k | 圧倒的に上                                                |
+| db.r6g.xlarge (4 vCPU / 32GB)      |                15–25k | 上                                                        |
+| **db.r6g.2xlarge (8 vCPU / 64GB)** |            **40–60k** | **ほぼ同等**                                              |
+| db.r6g.4xlarge (16 vCPU / 128GB)   |               80–120k | TiDB pod を増やしてかつ別マシンから測ればここまで届きそう |
 
 OLTP read-write の方:
 
-| Aurora インスタンス | 想定 TPS | 本クラスタ比 |
-|--|--:|--|
-| db.r6g.large | 200–300 | 上 |
-| db.r6g.xlarge | 500–800 | 上 |
-| **db.r6g.2xlarge** | **1,000–1,500** | **ほぼ同等** |
-| db.r6g.4xlarge | 2,000–3,000 | 届かず |
+| Aurora インスタンス |        想定 TPS | 本クラスタ比 |
+| ------------------- | --------------: | ------------ |
+| db.r6g.large        |         200–300 | 上           |
+| db.r6g.xlarge       |         500–800 | 上           |
+| **db.r6g.2xlarge**  | **1,000–1,500** | **ほぼ同等** |
+| db.r6g.4xlarge      |     2,000–3,000 | 届かず       |
 
 **結論: read-only / OLTP どちらでも db.r6g.2xlarge writer 1 台相当**。Aurora db.r6g.2xlarge は月 $700–800、本クラスタ (GMKtec M5 Ultra ×3 ≒ 30 万円) は約 1 年で回収できる勘定。ただし Aurora は HA・自動バックアップ・ストレージ自動拡張全部込みで、手元クラスタはそれを自分で面倒見る前提。
 

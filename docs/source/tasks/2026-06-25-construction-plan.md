@@ -4,9 +4,9 @@
 
 ## ゴール再掲
 
-* 3台のMini PC(`node1` / `node2` / `node3`)でk8sクラスタを組む
-* k8s上にTiDB(PD / TiKV / TiDB)を構成する
-* Tailscale経由で外からクラスタAPI / TiDBエンドポイントに到達できる
+- 3台のMini PC(`node1` / `node2` / `node3`)でk8sクラスタを組む
+- k8s上にTiDB(PD / TiKV / TiDB)を構成する
+- Tailscale経由で外からクラスタAPI / TiDBエンドポイントに到達できる
 
 ## Phase 1: OSセットアップ
 
@@ -67,11 +67,11 @@ sudo cat /sys/firmware/acpi/tables/MSDM | tail -c 30
 
 インストーラ内では:
 
-* Secure Boot はそのまま(Ubuntu 24.04はshim経由で対応済み、無効化不要)
-* hostname を `node1` / `node2` / `node3` に設定する(Ubuntu Server は avahi-daemon を入れないので、Mac から `node1.local` で引きたい場合は別途 `sudo apt install avahi-daemon` が必要)
-* ユーザ名を `ubuntu` に設定する(後続手順の `ssh-copy-id ubuntu@<IP>` / `ssh ubuntu@nodeN` がこの前提)
-* OpenSSH server だけチェックを入れる
-* 他のSnap (microk8sなど) はインストールしない
+- Secure Boot はそのまま(Ubuntu 24.04はshim経由で対応済み、無効化不要)
+- hostname を `node1` / `node2` / `node3` に設定する(Ubuntu Server は avahi-daemon を入れないので、Mac から `node1.local` で引きたい場合は別途 `sudo apt install avahi-daemon` が必要)
+- ユーザ名を `ubuntu` に設定する(後続手順の `ssh-copy-id ubuntu@<IP>` / `ssh ubuntu@nodeN` がこの前提)
+- OpenSSH server だけチェックを入れる
+- 他のSnap (microk8sなど) はインストールしない
 
 #### 各ノードで実行: 初回ネットワーク疎通(コンソール作業)
 
@@ -373,16 +373,16 @@ stat -fc %T /sys/fs/cgroup/
 
 ### 決めたこと
 
-* ファイルシステム: **ext4 on LVM**(Ubuntu Server installer デフォルトに合わせる)
+- ファイルシステム: **ext4 on LVM**(Ubuntu Server installer デフォルトに合わせる)
   - VG: `ubuntu-vg` / LV: `ubuntu-lv` (installer 規定名)
   - installer は LV を 100GB しか切らないので、Phase 1 の step 4 で `lvextend -l +100%FREE` で残量全部 `/` に振り直す
-* パーティション: `/boot/efi` + `/`(LVM PV)。`/var/lib` 分割なし
-* 1TB SSD: 全部 `/` に。TiKV用ボリュームは local-path-provisioner が `/opt/local-path-provisioner` を切る
+- パーティション: `/boot/efi` + `/`(LVM PV)。`/var/lib` 分割なし
+- 1TB SSD: 全部 `/` に。TiKV用ボリュームは local-path-provisioner が `/opt/local-path-provisioner` を切る
 
 ### 分かっていないこと
 
-* ~~M5 UltraのBIOSでSecure Bootを切る必要があるか~~ → Ubuntu 24.04 はshim署名済みで動く。無効化不要(NVIDIAドライバ等で必要になったら無効化)
-* ~~Wake-on-LAN周りの挙動~~ → 初回は有線LAN+キーボード+ディスプレイで物理対応。後で必要になったら `ethtool -s <if> wol g` を入れる
+- ~~M5 UltraのBIOSでSecure Bootを切る必要があるか~~ → Ubuntu 24.04 はshim署名済みで動く。無効化不要(NVIDIAドライバ等で必要になったら無効化)
+- ~~Wake-on-LAN周りの挙動~~ → 初回は有線LAN+キーボード+ディスプレイで物理対応。後で必要になったら `ethtool -s <if> wol g` を入れる
 
 ## Phase 2: ネットワーク
 
@@ -405,32 +405,35 @@ AWS Lambda (Rust + tailscaled マルチプロセス) → Tailscale tailnet → S
 >
 > 同じく、図中の VLAN 10 サブネット表記は初版作成時の `192.168.10.0/24` のままだが、実環境では HGW セグメントに合わせて **`192.168.4.0/22`(ノードは `.6.11/.6.12/.6.13`)** に変更している。
 
-| VLAN | 用途 | サブネット | ノード割当 | 外部到達性 |
-|---|---|---|---|---|
-| **1** (System-VLAN) | 管理 + 外部接続 | `192.168.4.0/22` | `.6.11` / `.6.12` / `.6.13` | あり(家庭用ルータ経由) |
-| 20 | k8sクラスタ内部 | `192.168.20.0/24` | `.11` / `.12` / `.13` | なし(L2の島) |
+| VLAN                | 用途            | サブネット        | ノード割当                  | 外部到達性             |
+| ------------------- | --------------- | ----------------- | --------------------------- | ---------------------- |
+| **1** (System-VLAN) | 管理 + 外部接続 | `192.168.4.0/22`  | `.6.11` / `.6.12` / `.6.13` | あり(家庭用ルータ経由) |
+| 20                  | k8sクラスタ内部 | `192.168.20.0/24` | `.11` / `.12` / `.13`       | なし(L2の島)           |
 
 > 管理用に新規 VID (10 等) を切らず、SG3210X-M2 の VLAN 1 (System-VLAN) をそのまま管理 VLAN として使う (削除不可・既に管理 IP を持つため)。詳細な選定理由は後述「SG3210X-M2 VLAN設定」の B 案採用理由を参照。
 >
 > 管理 VLAN のサブネットは自宅 HGW (光回線終端装置) が `192.168.4.0/22` でロックされており WebUI で変更不可のため、それに合わせる。詳細は `2026-06-25_home_network_survey.md` 参照。
 
 VLAN 1 (mgmt) で流れる通信:
-* SSH (`ssh ubuntu@node1`)
-* kubectl → k8s API server (`:6443`)
-* `apt update` 等のインターネット出口
-* TiDBクライアント (`:4000`、AWSからTailscale経由で接続)
-* Tailscale Subnet Router の広告対象
+
+- SSH (`ssh ubuntu@node1`)
+- kubectl → k8s API server (`:6443`)
+- `apt update` 等のインターネット出口
+- TiDBクライアント (`:4000`、AWSからTailscale経由で接続)
+- Tailscale Subnet Router の広告対象
 
 VLAN 20 (cluster) で流れる通信:
-* kubelet ↔ kube-apiserver / kubelet 間
-* etcd レプリケーション
-* Cilium が運ぶ Pod 間通信の underlay (TiKV ↔ TiKV / PD ↔ TiKV 等もすべてここ)
+
+- kubelet ↔ kube-apiserver / kubelet 間
+- etcd レプリケーション
+- Cilium が運ぶ Pod 間通信の underlay (TiKV ↔ TiKV / PD ↔ TiKV 等もすべてここ)
 
 設計のポイント:
-* 管理 VLAN (VLAN 1) は家庭用ルータ(HGW)と同セグメント `192.168.4.0/22`(`192.168.4.1` をデフォルトゲートウェイ)
-* インターネット出口は常に管理 VLAN 経由
-* AWSからの到達は Tailscale Subnet Router(node1)経由で管理 VLAN へ届く(外部公開する TiDB の advertise IP も管理 VLAN)
-* TiKV 専用のストレージVLAN は **作らない**: TiKV を Pod として動かす以上、通信は Pod ネットワーク経由になるため、別VLANを切っても実際には使われない(`hostNetwork: true` / Multus 等で明示的に振り分けない限り)。複雑化に見合わないので2VLAN構成に絞る
+
+- 管理 VLAN (VLAN 1) は家庭用ルータ(HGW)と同セグメント `192.168.4.0/22`(`192.168.4.1` をデフォルトゲートウェイ)
+- インターネット出口は常に管理 VLAN 経由
+- AWSからの到達は Tailscale Subnet Router(node1)経由で管理 VLAN へ届く(外部公開する TiDB の advertise IP も管理 VLAN)
+- TiKV 専用のストレージVLAN は **作らない**: TiKV を Pod として動かす以上、通信は Pod ネットワーク経由になるため、別VLANを切っても実際には使われない(`hostNetwork: true` / Multus 等で明示的に振り分けない限り)。複雑化に見合わないので2VLAN構成に絞る
 
 #### SG3210X-M2 物理結線
 
@@ -444,28 +447,28 @@ VLAN 20 (cluster) で流れる通信:
 
 結線表:
 
-| ポート | 接続先 | 用途 | VLAN |
-|---|---|---|---|
-| Console | (未使用) | 緊急時シリアル CLI 専用、RJ45→RS232 変換ケーブル必須 | - |
-| Port 1 | 家庭用ルータ (HGW) | インターネット uplink | VLAN 1 untagged (= 管理 VLAN) |
-| Port 2 | node1 | クラスタノード | trunk (VLAN 1 untag + VLAN 20 tag) |
-| Port 3 | node2 | クラスタノード | trunk |
-| Port 4 | node3 | クラスタノード | trunk |
-| Port 5-8 | 未使用 | 将来の拡張用 | - |
-| SFP+ 9-10 | 未使用 | 将来 10GbE 化用 (別途 SFP+ モジュール購入) | - |
+| ポート    | 接続先             | 用途                                                 | VLAN                               |
+| --------- | ------------------ | ---------------------------------------------------- | ---------------------------------- |
+| Console   | (未使用)           | 緊急時シリアル CLI 専用、RJ45→RS232 変換ケーブル必須 | -                                  |
+| Port 1    | 家庭用ルータ (HGW) | インターネット uplink                                | VLAN 1 untagged (= 管理 VLAN)      |
+| Port 2    | node1              | クラスタノード                                       | trunk (VLAN 1 untag + VLAN 20 tag) |
+| Port 3    | node2              | クラスタノード                                       | trunk                              |
+| Port 4    | node3              | クラスタノード                                       | trunk                              |
+| Port 5-8  | 未使用             | 将来の拡張用                                         | -                                  |
+| SFP+ 9-10 | 未使用             | 将来 10GbE 化用 (別途 SFP+ モジュール購入)           | -                                  |
 
 > Console ポートは **通常の管理アクセス用ではない**(普通の LAN ケーブルでは通信不可)。Web UI / SSH 管理は Port 1-8 のどれからでも到達できる。
 
 LAN ケーブル本数: **4 本** (HGW + node1/2/3)、すべて **CAT6A** で統一(将来 10GbE 化を見据える)。
 
-| 用途 | 長さ | 本数 | 備考 |
-|---|---|---|---|
-| HGW → Port 1 | **4m** | 1 | HGW は別室/離れた場所にあるため長尺が必要 |
-| node1/2/3 → Port 2/3/4 | **40cm** | 3 | ノードはスイッチと同じ机/ラック内、最短で取り回し |
+| 用途                   | 長さ     | 本数 | 備考                                              |
+| ---------------------- | -------- | ---- | ------------------------------------------------- |
+| HGW → Port 1           | **4m**   | 1    | HGW は別室/離れた場所にあるため長尺が必要         |
+| node1/2/3 → Port 2/3/4 | **40cm** | 3    | ノードはスイッチと同じ机/ラック内、最短で取り回し |
 
-* カテゴリ: **CAT6A**(CAT5e でも 2.5GbE 動作可だが、将来 10GbE 化を見据えて統一)
-* 色分け: 4 色セットで購入し HGW / node1 / node2 / node3 を識別すると整理が楽
-* 4m 1 本 + 40cm 3 本で合計 2,000〜3,000 円程度
+- カテゴリ: **CAT6A**(CAT5e でも 2.5GbE 動作可だが、将来 10GbE 化を見据えて統一)
+- 色分け: 4 色セットで購入し HGW / node1 / node2 / node3 を識別すると整理が楽
+- 4m 1 本 + 40cm 3 本で合計 2,000〜3,000 円程度
 
 配線は **いきなり本配線 (HGW → Port 1, node1/2/3 → Port 2/3/4) でよい**。理由は次節 (初期設定) 参照。
 
@@ -509,6 +512,7 @@ LAN ケーブル本数: **4 本** (HGW + node1/2/3)、すべて **CAT6A** で統
    > ```
    >
    > 2026-06-26 の実機では `192.168.4.29` だけが `200` を返し、HGW Web UI 側のホスト名表示とも一致して SG3210X-M2 と確定できた。ノード (`84:47:09` OUI 等) や Mac / iPhone は `000` (接続拒否 / タイムアウト) になるので識別できる。
+
 2. **ブラウザでその IP にアクセス** (例: `http://192.168.4.29/`)、`admin` / `admin` でログイン → 強制パスワード変更
 3. **管理 IP を固定**: `L3 FEATURES → Interface` → VLAN 1 の行を `Edit`
    - IP Address Mode: `Static`
@@ -526,6 +530,7 @@ LAN ケーブル本数: **4 本** (HGW + node1/2/3)、すべて **CAT6A** で統
 > **A 案 (新規 VLAN 10 を管理 VLAN にする) をやめた理由**
 >
 > 「Native VLAN を機能 VLAN として使わない」というベストプラクティスに照らせば A 案の方がきれいだが、現状の管理 IP (`192.168.4.2`) は VLAN 1 (System-VLAN) の L3 Interface に紐づいているため、A 案を選ぶと以下の移行工程が必要:
+>
 > 1. VLAN 10 を新規作成
 > 2. L3 FEATURES → Interface で VLAN 10 を Add (Static `192.168.4.2/22`)。ただし VLAN 1 と同 IP は衝突するので、先に VLAN 1 の IP Mode を None に戻す
 > 3. Port 1 (HGW uplink) の Egress を VLAN 1 Untagged → VLAN 10 Untagged に切替、PVID も 1 → 10
@@ -541,12 +546,12 @@ LAN ケーブル本数: **4 本** (HGW + node1/2/3)、すべて **CAT6A** で統
 - **既存の VLAN 1 (System-VLAN) は何もしない**。デフォルトで Untagged Ports = `1/0/1-10` (全ポート untagged) になっており、これが管理 VLAN として機能する。Edit を開いて中身を確認するだけで、変更せず Cancel で閉じる。
 - 右上 `+ Add` をクリック → 出たダイアログで以下を入力。
 
-| 項目 | 値 |
-|---|---|
-| VLAN ID | `20` |
-| VLAN Name | `cluster` |
-| Untagged Ports | (何も選択しない / 入力欄も空欄) |
-| Tagged Ports | Port `2`, `3`, `4` を選択 (入力欄に `1/0/2-4` でも可) |
+| 項目           | 値                                                    |
+| -------------- | ----------------------------------------------------- |
+| VLAN ID        | `20`                                                  |
+| VLAN Name      | `cluster`                                             |
+| Untagged Ports | (何も選択しない / 入力欄も空欄)                       |
+| Tagged Ports   | Port `2`, `3`, `4` を選択 (入力欄に `1/0/2-4` でも可) |
 
 `Create` をクリックして VLAN 20 を作成。
 
@@ -797,31 +802,31 @@ sudo tailscale up --ssh
 
 ### 決めたこと
 
-* IPレンジ: **2VLAN分離**
-  - VLAN 10 (mgmt):    **`192.168.4.0/22`** ノード `.6.11/.6.12/.6.13` — 人が触る通信(SSH/kubectl/TiDBクライアント/インターネット)、HGW (`192.168.4.1`) と同セグメント
+- IPレンジ: **2VLAN分離**
+  - VLAN 10 (mgmt): **`192.168.4.0/22`** ノード `.6.11/.6.12/.6.13` — 人が触る通信(SSH/kubectl/TiDBクライアント/インターネット)、HGW (`192.168.4.1`) と同セグメント
   - VLAN 20 (cluster): **`192.168.20.0/24`** ノード `.11/.12/.13` — 機械同士の通信(kubelet/etcd/Pod間)
-* VLAN間のL3ルーティング: **しない**(各VLANはL2の島、スイッチでルーティングしない)
-* インターネット出口: **VLAN 10経由のみ**(家庭用ルータ `192.168.4.1` がNAT)
-* スイッチ管理モード: **Standalone**(Omada Controllerは入れない)
-* Tailscale Subnet Router: **node1のみ**(冗長化は問題が出てから)、**VLAN 10 (`192.168.4.0/22`) のみ広告**
-* MagicDNS: **有効**(node名はMagicDNS、VLAN別名は `/etc/hosts` で管理)
+- VLAN間のL3ルーティング: **しない**(各VLANはL2の島、スイッチでルーティングしない)
+- インターネット出口: **VLAN 10経由のみ**(家庭用ルータ `192.168.4.1` がNAT)
+- スイッチ管理モード: **Standalone**(Omada Controllerは入れない)
+- Tailscale Subnet Router: **node1のみ**(冗長化は問題が出てから)、**VLAN 10 (`192.168.4.0/22`) のみ広告**
+- MagicDNS: **有効**(node名はMagicDNS、VLAN別名は `/etc/hosts` で管理)
 
 ### 検討したが採用しなかったこと
 
-* **VLAN無し(全部 HGW セグメント `192.168.4.0/22` フラット)** — 3ノードでもTiKVのレプリケーション通信が管理通信(SSH/kubectl)を圧迫するリスクがあり、最初から分離する方針に。
-* **VLAN 10 を独自セグメント (`192.168.10.0/24` 等) にする** — HGW の WebUI がロックされていて static route を追加できないため、VLAN 10 のノードから HGW 経由でインターネットに出られなくなる。SG3210X-M2 で L3 ルーティングを組む選択肢もあるが複雑化に見合わず、HGW セグメントにそのまま乗せる方針。
-* **3VLAN構成(mgmt / cluster / storage)** — TiKVを k8s Pod として動かす以上、Pod間通信は Cilium 経由で underlay VLAN 20 を流れる。「ストレージ専用VLAN 30」を切っても `hostNetwork: true` や Multus を使わない限り実際には使われない。複雑化に見合わないので2VLANに絞る。
-* **スイッチでのVLAN間ルーティング (L2+のstatic route)** — SG3210X-M2でも可能だが、家庭用ルータがVLAN 20 への戻り経路を持たない(static route設定不可なルータ前提)ため複雑化する。VLAN 20は内部完結とし、外部到達は Tailscale Subnet Router 経由の VLAN 10 に集約。
-* **Omada Controller導入** — 1スイッチのみなので集中管理のメリットなし。WebUI直接設定で十分。
+- **VLAN無し(全部 HGW セグメント `192.168.4.0/22` フラット)** — 3ノードでもTiKVのレプリケーション通信が管理通信(SSH/kubectl)を圧迫するリスクがあり、最初から分離する方針に。
+- **VLAN 10 を独自セグメント (`192.168.10.0/24` 等) にする** — HGW の WebUI がロックされていて static route を追加できないため、VLAN 10 のノードから HGW 経由でインターネットに出られなくなる。SG3210X-M2 で L3 ルーティングを組む選択肢もあるが複雑化に見合わず、HGW セグメントにそのまま乗せる方針。
+- **3VLAN構成(mgmt / cluster / storage)** — TiKVを k8s Pod として動かす以上、Pod間通信は Cilium 経由で underlay VLAN 20 を流れる。「ストレージ専用VLAN 30」を切っても `hostNetwork: true` や Multus を使わない限り実際には使われない。複雑化に見合わないので2VLANに絞る。
+- **スイッチでのVLAN間ルーティング (L2+のstatic route)** — SG3210X-M2でも可能だが、家庭用ルータがVLAN 20 への戻り経路を持たない(static route設定不可なルータ前提)ため複雑化する。VLAN 20は内部完結とし、外部到達は Tailscale Subnet Router 経由の VLAN 10 に集約。
+- **Omada Controller導入** — 1スイッチのみなので集中管理のメリットなし。WebUI直接設定で十分。
 
 ### 分かっていないこと
 
-* GMKtec M5 Ultra の NIC で VLAN tagging (`enp1s0.20`) が安定動作するか → 実機で `ip -d link show enp1s0.20` と疎通確認
-* k8s API server の `--apiserver-advertise-address` を VLAN 10 (管理) のままにするか、kubelet の `--node-ip` で VLAN 20 (クラスタ) を明示するか
+- GMKtec M5 Ultra の NIC で VLAN tagging (`enp1s0.20`) が安定動作するか → 実機で `ip -d link show enp1s0.20` と疎通確認
+- k8s API server の `--apiserver-advertise-address` を VLAN 10 (管理) のままにするか、kubelet の `--node-ip` で VLAN 20 (クラスタ) を明示するか
   - 暫定方針: API は VLAN 10 (kubectl到達性優先)、ノード間通信は VLAN 20 を kubelet の `--node-ip` / KubeletConfiguration で指定
-* TiDB Server の advertise IP を VLAN 10 (`192.168.6.x`) にする方法 (Service / TiDB Operator のCRオプション)
-* Tailscale Subnet Router 経由で VLAN 10 への往復通信が確実に成立するか(戻り経路が node1 経由で正しく Tailscale に乗るか)
-* `kubectl` のサーバ証明書SANに Tailscale IP / MagicDNS 名を含める必要があるか(`kubeadm init --apiserver-cert-extra-sans` で対応する想定)
+- TiDB Server の advertise IP を VLAN 10 (`192.168.6.x`) にする方法 (Service / TiDB Operator のCRオプション)
+- Tailscale Subnet Router 経由で VLAN 10 への往復通信が確実に成立するか(戻り経路が node1 経由で正しく Tailscale に乗るか)
+- `kubectl` のサーバ証明書SANに Tailscale IP / MagicDNS 名を含める必要があるか(`kubeadm init --apiserver-cert-extra-sans` で対応する想定)
 
 ## Phase 3: k8sクラスタ構築
 
@@ -1076,16 +1081,16 @@ cilium hubble ui
 
 ### 決めたこと
 
-* control-plane: **1台(node1兼任)** — 3台HAはメモリ的に過剰、必要になったら昇格
-* CNI: **Cilium**(eBPF datapath を活用)
+- control-plane: **1台(node1兼任)** — 3台HAはメモリ的に過剰、必要になったら昇格
+- CNI: **Cilium**(eBPF datapath を活用)
   - **Hubble 有効** (サービスマップ + フローログ + L7 メトリクス)
   - **kube-proxy 置き換え** は TiDB 投入前に有効化を検討(任意)
-* PV戦略: **local-path-provisioner** で開始。TiKVのIO性能が足りなければOpenEBS等を検討
+- PV戦略: **local-path-provisioner** で開始。TiKVのIO性能が足りなければOpenEBS等を検討
 
 ### 分かっていないこと
 
-* TiKVが要求するディスクIO性能 (SATA SSDで足りるかNVMe必須か)
-* k8sノード自体のリソース残量 (32GB DDR4でTiKV + TiDB + PD + system 動かして余裕あるか)
+- TiKVが要求するディスクIO性能 (SATA SSDで足りるかNVMe必須か)
+- k8sノード自体のリソース残量 (32GB DDR4でTiKV + TiDB + PD + system 動かして余裕あるか)
 
 ## Phase 4: TiDB on k8s
 
@@ -1404,25 +1409,25 @@ kubectl -n tidb-cluster port-forward svc/basic-pd 2379:2379
 
 ##### 4. 主要機能の所在(初見の道標)
 
-| メニュー | 用途 |
-|---|---|
-| **Overview** | クラスタ全体の health / QPS / レイテンシ |
-| **Cluster Info → Instances** | 各 PD/TiKV/TiDB ノードの状態 |
-| **Key Visualizer** | TiKV のキーレンジ毎の read/write をヒートマップで可視化、ホットスポット検出 |
-| **SQL Statements** | 実行回数 / 平均レイテンシ / 累積実行時間のトップクエリ |
-| **Slow Queries** | スロークエリログ(`tidb_slow_log_threshold` 超過分) |
-| **Diagnose** | 自動診断レポート生成(性能劣化の根本原因推定) |
-| **Search Logs** | 全コンポーネントの構造化ログ横断検索 |
-| **Profiling** | 任意期間の CPU / heap / goroutine プロファイル取得 |
+| メニュー                     | 用途                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| **Overview**                 | クラスタ全体の health / QPS / レイテンシ                                    |
+| **Cluster Info → Instances** | 各 PD/TiKV/TiDB ノードの状態                                                |
+| **Key Visualizer**           | TiKV のキーレンジ毎の read/write をヒートマップで可視化、ホットスポット検出 |
+| **SQL Statements**           | 実行回数 / 平均レイテンシ / 累積実行時間のトップクエリ                      |
+| **Slow Queries**             | スロークエリログ(`tidb_slow_log_threshold` 超過分)                          |
+| **Diagnose**                 | 自動診断レポート生成(性能劣化の根本原因推定)                                |
+| **Search Logs**              | 全コンポーネントの構造化ログ横断検索                                        |
+| **Profiling**                | 任意期間の CPU / heap / goroutine プロファイル取得                          |
 
 > 常設公開 (Tailscale MagicDNS で `tidb-dashboard.<tailnet>.ts.net:2379/dashboard`) は Phase 6 で実施。公式: <https://docs.pingcap.com/tidb/stable/dashboard-intro>
 
 ### 決めたこと
 
-* サイジング: **PD = 1c/2Gi × 3** / **TiKV = 4c/12Gi × 3**(block-cache 4GB固定) / **TiDB = 2c/4Gi × 2**
-* Service公開: **ClusterIP + Tailscale Subnet Router** — MetalLB は入れない
-* バックアップ先: **Cloudflare R2**(S3互換、エグレス無料、TiDB BR対応)
-* 監視/管理 UI:
+- サイジング: **PD = 1c/2Gi × 3** / **TiKV = 4c/12Gi × 3**(block-cache 4GB固定) / **TiDB = 2c/4Gi × 2**
+- Service公開: **ClusterIP + Tailscale Subnet Router** — MetalLB は入れない
+- バックアップ先: **Cloudflare R2**(S3互換、エグレス無料、TiDB BR対応)
+- 監視/管理 UI:
   - **TiDB Dashboard**(PD 組み込み、`:2379/dashboard`) — クラスタ管理 / SQL 診断 / Key Visualizer
   - **Grafana**(TidbMonitor 同梱、`:3000`) — メトリクス時系列ダッシュボード
   - **Prometheus**(同梱、`:9090`) — メトリクス backend、PromQL 直接クエリ用
@@ -1430,9 +1435,9 @@ kubectl -n tidb-cluster port-forward svc/basic-pd 2379:2379
 
 ### 分かっていないこと
 
-* TiDB Operatorのcrd更新時の挙動 (バージョンアップしんどい?)
-* TiKVのコンパクション中のIOがクラスタネットワークに与える影響
-* TiDB Dashboard の root 認証以外の認証手段 (SSO/OIDC 対応はあるか)
+- TiDB Operatorのcrd更新時の挙動 (バージョンアップしんどい?)
+- TiKVのコンパクション中のIOがクラスタネットワークに与える影響
+- TiDB Dashboard の root 認証以外の認証手段 (SSO/OIDC 対応はあるか)
 
 ## Phase 4.5: ホストレベル監視 (kube-prometheus-stack)
 
@@ -1505,25 +1510,25 @@ kubectl -n monitoring port-forward --address 0.0.0.0 svc/kube-prom-stack-grafana
 
 ### 標準で入っているダッシュボード (見るべきもの)
 
-| ダッシュボード | パス | 用途 |
-|---|---|---|
-| **Node Exporter / Nodes** | `Dashboards → General` | 各ノードの CPU / Mem / Disk / Network (ホスト OS 視点、Angular ではない) |
-| **Node Exporter / USE Method / Node** | 同上 | Utilization / Saturation / Errors の USE モデル表示 |
-| **Kubernetes / Compute Resources / Namespace (Pods)** | 同上 | namespace 別の Pod 集計 (tidb-cluster / monitoring 等) |
-| **Kubernetes / Compute Resources / Pod** | 同上 | 特定 Pod の CPU/Mem 時系列 |
-| **Kubernetes / Compute Resources / Node (Pods)** | 同上 | ノード上で動いてる全 Pod の集計 |
-| **Kubernetes / Networking / Cluster** | 同上 | Cilium のフロー量 |
+| ダッシュボード                                        | パス                   | 用途                                                                     |
+| ----------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------ |
+| **Node Exporter / Nodes**                             | `Dashboards → General` | 各ノードの CPU / Mem / Disk / Network (ホスト OS 視点、Angular ではない) |
+| **Node Exporter / USE Method / Node**                 | 同上                   | Utilization / Saturation / Errors の USE モデル表示                      |
+| **Kubernetes / Compute Resources / Namespace (Pods)** | 同上                   | namespace 別の Pod 集計 (tidb-cluster / monitoring 等)                   |
+| **Kubernetes / Compute Resources / Pod**              | 同上                   | 特定 Pod の CPU/Mem 時系列                                               |
+| **Kubernetes / Compute Resources / Node (Pods)**      | 同上                   | ノード上で動いてる全 Pod の集計                                          |
+| **Kubernetes / Networking / Cluster**                 | 同上                   | Cilium のフロー量                                                        |
 
 ベンチ時に見たい「**ノード全体の CPU 使用率 vs どの Pod が食っているか**」は (Node Exporter / Nodes) と (Kubernetes / Compute Resources / Node (Pods)) を並べて見れば一目瞭然。
 
 公式 dashboard ID で追加で入れたいなら:
 
-| Grafana.com ID | 名前 | 用途 |
-|---:|---|---|
-| 1860 | Node Exporter Full | 1ノード詳細ドリルダウン用 (定番) |
-| 15172 | Node Exporter Full (cluster view) | 1860 の作者によるクラスタ俯瞰版、複数ノード横並び比較に最適 |
-| 7249 | Kubernetes Cluster (sysdig 由来) | k8s レイヤの概観 |
-| 11074 | Node Exporter for Prometheus Dashboard | 多ノード一覧 + ドリルダウン (日本人作) |
+| Grafana.com ID | 名前                                   | 用途                                                        |
+| -------------: | -------------------------------------- | ----------------------------------------------------------- |
+|           1860 | Node Exporter Full                     | 1ノード詳細ドリルダウン用 (定番)                            |
+|          15172 | Node Exporter Full (cluster view)      | 1860 の作者によるクラスタ俯瞰版、複数ノード横並び比較に最適 |
+|           7249 | Kubernetes Cluster (sysdig 由来)       | k8s レイヤの概観                                            |
+|          11074 | Node Exporter for Prometheus Dashboard | 多ノード一覧 + ドリルダウン (日本人作)                      |
 
 #### 3ノードを同時に見たい場合のダッシュボード構成
 
@@ -1557,11 +1562,11 @@ kubectl -n monitoring port-forward --address 0.0.0.0 svc/kube-prom-stack-grafana
 
 標準 (`Kubernetes / Compute Resources / Namespace (Pods)`) は namespace 単位での Pod 表示。**全 namespace 横断で Pod 一覧を見たい**場合は、追加で `Kubernetes / Views / Pods` (Grafana.com ID **15760**) をインポートする。
 
-| Grafana.com ID | 名前 | 用途 |
-|---:|---|---|
-| **15760** | Kubernetes / Views / Pods | 全 namespace 横断の Pod 一覧、`namespace` `node` `pod` を自由フィルタ |
-| 15758 | Kubernetes / Views / Namespaces | namespace 別集計の俯瞰 |
-| 15757 | Kubernetes / Views / Global | クラスタ全体俯瞰 (ノード/Pod/namespace まとめ) |
+| Grafana.com ID | 名前                            | 用途                                                                  |
+| -------------: | ------------------------------- | --------------------------------------------------------------------- |
+|      **15760** | Kubernetes / Views / Pods       | 全 namespace 横断の Pod 一覧、`namespace` `node` `pod` を自由フィルタ |
+|          15758 | Kubernetes / Views / Namespaces | namespace 別集計の俯瞰                                                |
+|          15757 | Kubernetes / Views / Global     | クラスタ全体俯瞰 (ノード/Pod/namespace まとめ)                        |
 
 15760 のインポート手順:
 
@@ -1587,30 +1592,30 @@ kubectl top pods -A --sort-by=memory
 
 ### 想定リソース消費
 
-| Pod | メモリ | 備考 |
-|---|---|---|
-| Prometheus (StatefulSet) | 2-4 GB | 14 日 retention、PVC 50GB 程度 |
-| Grafana | ~256 MB | |
-| Alertmanager | ~64 MB | アラート未設定なら遊ぶ |
-| node-exporter × 3 | 各 ~30 MB | host network、軽量 |
-| kube-state-metrics | ~64 MB | |
-| **合計** | **~3 GB** | 余裕で収まる |
+| Pod                      | メモリ    | 備考                           |
+| ------------------------ | --------- | ------------------------------ |
+| Prometheus (StatefulSet) | 2-4 GB    | 14 日 retention、PVC 50GB 程度 |
+| Grafana                  | ~256 MB   |                                |
+| Alertmanager             | ~64 MB    | アラート未設定なら遊ぶ         |
+| node-exporter × 3        | 各 ~30 MB | host network、軽量             |
+| kube-state-metrics       | ~64 MB    |                                |
+| **合計**                 | **~3 GB** | 余裕で収まる                   |
 
 メモリ収支表に追加すべき分は ~3 Gi。
 
 ### 決めたこと
 
-* ホスト/k8s レイヤ監視: **kube-prometheus-stack** で独立した Prometheus + Grafana を別建て
+- ホスト/k8s レイヤ監視: **kube-prometheus-stack** で独立した Prometheus + Grafana を別建て
   - TidbMonitor の Prometheus は TiDB 系メトリクス専用にして混ぜない (scrape 設定の競合や CR 触る面倒を避ける)
   - Grafana が 2 つになるが用途で分かれるので OK (TiDB 用 = `tidb-grafana`, ホスト用 = `node-grafana`)
-* Prometheus retention: **14 日**(クラスタ立ち上げ時の傾向把握には十分、長期は Cloudflare R2 への remote_write を後で検討)
-* Alertmanager: 入れるが **当面アラートルール無し**(必要になったら追加)
+- Prometheus retention: **14 日**(クラスタ立ち上げ時の傾向把握には十分、長期は Cloudflare R2 への remote_write を後で検討)
+- Alertmanager: 入れるが **当面アラートルール無し**(必要になったら追加)
 
 ### 分かっていないこと
 
-* node-exporter の `--collector.systemd` 系を有効化すべきか (systemd unit の状態を見たいなら)
-* Prometheus の PVC が local-path で local-bound されると、再起動でスケジュールが node 固定になる問題 → TiKV と同じ pinning 課題が出る
-* TidbMonitor の Prometheus と kube-prom-stack の Prometheus を federate するか、独立のままにするか
+- node-exporter の `--collector.systemd` 系を有効化すべきか (systemd unit の状態を見たいなら)
+- Prometheus の PVC が local-path で local-bound されると、再起動でスケジュールが node 固定になる問題 → TiKV と同じ pinning 課題が出る
+- TidbMonitor の Prometheus と kube-prom-stack の Prometheus を federate するか、独立のままにするか
 
 ## Phase 5: Tailscale経由のアクセス
 
@@ -1632,13 +1637,13 @@ sudo tailscale up \
 Tailscale Admin Console (<https://login.tailscale.com/admin/acls>) の ACL エディタで以下を投入。タグの内訳は以下。
 
 - `tag:aws-app`: Phase 6 で TiDB 接続専用に作る AWS Lambda 用。TiDB Server 公開ポート (4000) のみに絞る
-- `tag:k8s`: Phase 6 で入れる Tailscale Operator 本体 (= helm でデプロイされる tailscale-operator Pod)、および Operator が動的に立てる ts-* Proxy Pod (Grafana / TiDB Dashboard / Hubble UI 等の常設公開) の **両方** が名乗るタグ。`autogroup:member`(自分の Mac / iPhone) からこのタグに対して 80/443/3000/4000/2379 などの HTTP/MySQL ポートを許可することで、MagicDNS URL でアクセスできるようになる
+- `tag:k8s`: Phase 6 で入れる Tailscale Operator 本体 (= helm でデプロイされる tailscale-operator Pod)、および Operator が動的に立てる ts-\* Proxy Pod (Grafana / TiDB Dashboard / Hubble UI 等の常設公開) の **両方** が名乗るタグ。`autogroup:member`(自分の Mac / iPhone) からこのタグに対して 80/443/3000/4000/2379 などの HTTP/MySQL ポートを許可することで、MagicDNS URL でアクセスできるようになる
 
 ```json
 {
   "tagOwners": {
     "tag:aws-app": ["autogroup:admin"],
-    "tag:k8s":     ["autogroup:admin"]
+    "tag:k8s": ["autogroup:admin"]
   },
   "acls": [
     {
@@ -1696,13 +1701,13 @@ mysql -h 127.0.0.1 -P 4000 -u root -p
 
 ### 決めたこと
 
-* 公開方式: **Subnet Routerのみ**(`tailscale operator` は後回し、必要になったら追加)
-* MagicDNS命名: デフォルト(`node1.<tailnet>.ts.net`)。リネームしない
+- 公開方式: **Subnet Routerのみ**(`tailscale operator` は後回し、必要になったら追加)
+- MagicDNS命名: デフォルト(`node1.<tailnet>.ts.net`)。リネームしない
 
 ### 分かっていないこと
 
-* Tailscale Subnet Router経由のk8s API call のレイテンシ
-* operator 入れたときのk8s LoadBalancer Service との関係
+- Tailscale Subnet Router経由のk8s API call のレイテンシ
+- operator 入れたときのk8s LoadBalancer Service との関係
 
 ## Phase 6: AWS Lambda クライアント (Rust + tailscaled マルチプロセス) + Tailscale Operator
 
@@ -1781,7 +1786,7 @@ unset TS_OAUTH_CLIENT_ID TS_OAUTH_CLIENT_SECRET
 
 #### ACL 追加作業は不要 (Phase 5 で完了済み)
 
-ACL は Phase 5 のセクション「ACL 設定 (Tailscale Admin Console)」で `tag:aws-app` / `tag:k8s` の `tagOwners` と関連 acls をまとめて投入済みなので、Phase 6 ではこの段階での書き換えは不要。Phase 6 の Tailscale Operator が立てる Proxy Pod (ts-*) はそのまま `tag:k8s` を名乗って動く。
+ACL は Phase 5 のセクション「ACL 設定 (Tailscale Admin Console)」で `tag:aws-app` / `tag:k8s` の `tagOwners` と関連 acls をまとめて投入済みなので、Phase 6 ではこの段階での書き換えは不要。Phase 6 の Tailscale Operator が立てる Proxy Pod (ts-\*) はそのまま `tag:k8s` を名乗って動く。
 
 #### 手元の Mac で実行: MagicDNS の有効化 (Service 公開前に必須)
 
@@ -1958,23 +1963,24 @@ echo "http://hubble.${TAILNET}"
 ```
 
 > 公開後アクセス先まとめ (`<tailnet>` は `tailscale status --json` で取れる MagicDNSSuffix):
-> - **TiDB Server (MySQL)**:    `tidb.<tailnet>:4000`
-> - **TiDB Dashboard**:         `http://tidb-dashboard.<tailnet>:2379/dashboard`
-> - **TidbMonitor Grafana**:    `http://tidb-grafana.<tailnet>:3000` (TiDB/TiKV/PD メトリクス)
-> - **Node Grafana**:           `http://node-grafana.<tailnet>:3000` (ホスト OS / k8s メトリクス、Phase 4.5 由来)
-> - **Hubble UI**:              `http://hubble.<tailnet>`
+>
+> - **TiDB Server (MySQL)**: `tidb.<tailnet>:4000`
+> - **TiDB Dashboard**: `http://tidb-dashboard.<tailnet>:2379/dashboard`
+> - **TidbMonitor Grafana**: `http://tidb-grafana.<tailnet>:3000` (TiDB/TiKV/PD メトリクス)
+> - **Node Grafana**: `http://node-grafana.<tailnet>:3000` (ホスト OS / k8s メトリクス、Phase 4.5 由来)
+> - **Hubble UI**: `http://hubble.<tailnet>`
 >
 > 例: tailnet 名が `tail12abc.ts.net` なら `http://tidb-grafana.tail12abc.ts.net:3000`。
 > tailnet 名を読みやすい別名 (例: `shuntaka.ts.net`) にしたい場合は Admin → DNS → "Tailnet name" で変更可能。
 
 #### コンセプト
 
-* Lambda Container Image 形式で `tailscaled` バイナリと Rust アプリを同梱
-* entrypoint で tailscaled を **userspace-networking + SOCKS5** モードで起動
-* Rust アプリは SOCKS5 (`127.0.0.1:1055`) 経由で TiDB に接続
-* `TS_AUTHKEY` は Secrets Manager から init 時に取得
-* Tailscale ノードは **ephemeral**(Lambda 終了で tailnet から自動掃除)
-* Lambda にネイティブなサイドカー機構はないので、**同一コンテナ内マルチプロセス**で実現
+- Lambda Container Image 形式で `tailscaled` バイナリと Rust アプリを同梱
+- entrypoint で tailscaled を **userspace-networking + SOCKS5** モードで起動
+- Rust アプリは SOCKS5 (`127.0.0.1:1055`) 経由で TiDB に接続
+- `TS_AUTHKEY` は Secrets Manager から init 時に取得
+- Tailscale ノードは **ephemeral**(Lambda 終了で tailnet から自動掃除)
+- Lambda にネイティブなサイドカー機構はないので、**同一コンテナ内マルチプロセス**で実現
 
 #### Dockerfile
 
@@ -2054,11 +2060,12 @@ async fn handler() -> anyhow::Result<()> {
 #### Tailscale Auth Key 発行
 
 Tailscale Admin Console → Settings → Keys:
-* Type: Auth key
-* Reusable: ☑
-* Ephemeral: ☑
-* Tags: `tag:aws-app`
-* 期限: 90日 (定期ローテーション)
+
+- Type: Auth key
+- Reusable: ☑
+- Ephemeral: ☑
+- Tags: `tag:aws-app`
+- 期限: 90日 (定期ローテーション)
 
 発行された `tskey-...` を Secrets Manager に保存:
 
@@ -2092,34 +2099,34 @@ aws lambda create-function \
 
 #### IAM ロール (最低限)
 
-* `secretsmanager:GetSecretValue` (TS_AUTHKEY 取得、リソース ARN 指定)
-* `AWSLambdaBasicExecutionRole` (CloudWatch Logs)
+- `secretsmanager:GetSecretValue` (TS_AUTHKEY 取得、リソース ARN 指定)
+- `AWSLambdaBasicExecutionRole` (CloudWatch Logs)
 
 ### 決めたこと
 
-* 実装言語: **Rust** (パフォーマンス + 既存資産)
-* Lambda パッケージ形式: **Container Image** (zip だと tailscaled バイナリ同梱が辛い)
-* tailscaled モード: **userspace-networking + SOCKS5** (Lambda は TUN 不可)
-* プロセス分離方式: **同一コンテナ内マルチプロセス**(Lambda にサイドカー機構なし、Extensions API は次フェーズ)
-* Auth Key 種別: **ephemeral + reusable** (Lambda 終了でノード自動削除)
-* シークレット保管: **AWS Secrets Manager** (90日ローテーション、`tag:aws-app` ACL と紐付け)
-* VPC: **なし** (NAT Gateway 不要、Tailscale が AWS managed 出口で WireGuard 確立)
+- 実装言語: **Rust** (パフォーマンス + 既存資産)
+- Lambda パッケージ形式: **Container Image** (zip だと tailscaled バイナリ同梱が辛い)
+- tailscaled モード: **userspace-networking + SOCKS5** (Lambda は TUN 不可)
+- プロセス分離方式: **同一コンテナ内マルチプロセス**(Lambda にサイドカー機構なし、Extensions API は次フェーズ)
+- Auth Key 種別: **ephemeral + reusable** (Lambda 終了でノード自動削除)
+- シークレット保管: **AWS Secrets Manager** (90日ローテーション、`tag:aws-app` ACL と紐付け)
+- VPC: **なし** (NAT Gateway 不要、Tailscale が AWS managed 出口で WireGuard 確立)
 
 ### 検討したが採用しなかったこと
 
-* **Go + tsnet 直接埋め込み** — 一番シンプル(数行で済む)だが、既存 Rust 資産と運用言語を統一したいため不採用。
-* **Lambda Extensions API** — 公式のサイドカー機構だが、1関数だけではオーバーエンジニアリング。複数関数で tailscaled を再利用する段階になれば Layer 化を検討。
-* **ECS Fargate + sidecar コンテナ** — 本物の分離型サイドカーが可能だが、Lambda の使い捨て性 + 課金モデルが要件に合うので継続。常時稼働クライアントが必要になれば Fargate へ移行。
-* **Lambda in VPC + EC2 Subnet Router** — EC2 (~$3/月) + NAT Gateway (~$30/月) のランニングコストに見合うメリットなし。
+- **Go + tsnet 直接埋め込み** — 一番シンプル(数行で済む)だが、既存 Rust 資産と運用言語を統一したいため不採用。
+- **Lambda Extensions API** — 公式のサイドカー機構だが、1関数だけではオーバーエンジニアリング。複数関数で tailscaled を再利用する段階になれば Layer 化を検討。
+- **ECS Fargate + sidecar コンテナ** — 本物の分離型サイドカーが可能だが、Lambda の使い捨て性 + 課金モデルが要件に合うので継続。常時稼働クライアントが必要になれば Fargate へ移行。
+- **Lambda in VPC + EC2 Subnet Router** — EC2 (~$3/月) + NAT Gateway (~$30/月) のランニングコストに見合うメリットなし。
 
 ### 分かっていないこと
 
-* Cold start 時間 (tailscaled 初期化 + tailnet 接続の合計、目標 < 3秒)
-* SOCKS5 経由の MySQL 接続レイテンシ (port-forward 比較で何ms増えるか)
-* `mysql_async` の `socks_proxy` オプション挙動と TLS 併用可否
-* Provisioned Concurrency 必須か、On-Demand で許容できるか
-* Auth Key 期限切れ時のフェイルセーフ手段 (CloudWatch Alarm で検知する想定)
-* tailscaled プロセスが Lambda の SIGTERM をどう受けるか (15秒の grace period で綺麗に logout できるか)
+- Cold start 時間 (tailscaled 初期化 + tailnet 接続の合計、目標 < 3秒)
+- SOCKS5 経由の MySQL 接続レイテンシ (port-forward 比較で何ms増えるか)
+- `mysql_async` の `socks_proxy` オプション挙動と TLS 併用可否
+- Provisioned Concurrency 必須か、On-Demand で許容できるか
+- Auth Key 期限切れ時のフェイルセーフ手段 (CloudWatch Alarm で検知する想定)
+- tailscaled プロセスが Lambda の SIGTERM をどう受けるか (15秒の grace period で綺麗に logout できるか)
 
 ## クラスタ Pod 構成サマリ
 
@@ -2127,103 +2134,103 @@ aws lambda create-function \
 
 ### kube-system (k8s コンポーネント + Cilium)
 
-| Pod | 種別 | レプリカ | 配置 | 役割 |
-|---|---|---|---|---|
-| `kube-apiserver-node1` | static | 1 | node1 | API endpoint |
-| `kube-controller-manager-node1` | static | 1 | node1 | controller loop |
-| `kube-scheduler-node1` | static | 1 | node1 | スケジューラ |
-| `etcd-node1` | static | 1 | node1 | k8s 状態 KVS |
-| `coredns-*` | Deployment | 2 | 任意 | クラスタ内 DNS |
-| `cilium-*` | DaemonSet | 3 | 全ノード | CNI eBPF datapath |
-| `cilium-operator-*` | Deployment | 1 | 任意 | Cilium 状態管理 |
-| `hubble-relay-*` | Deployment | 1 | 任意 | フロー集約 |
-| `hubble-ui-*` | Deployment | 1 | 任意 | UI 配信 (port 8081) |
+| Pod                             | 種別       | レプリカ | 配置     | 役割                |
+| ------------------------------- | ---------- | -------- | -------- | ------------------- |
+| `kube-apiserver-node1`          | static     | 1        | node1    | API endpoint        |
+| `kube-controller-manager-node1` | static     | 1        | node1    | controller loop     |
+| `kube-scheduler-node1`          | static     | 1        | node1    | スケジューラ        |
+| `etcd-node1`                    | static     | 1        | node1    | k8s 状態 KVS        |
+| `coredns-*`                     | Deployment | 2        | 任意     | クラスタ内 DNS      |
+| `cilium-*`                      | DaemonSet  | 3        | 全ノード | CNI eBPF datapath   |
+| `cilium-operator-*`             | Deployment | 1        | 任意     | Cilium 状態管理     |
+| `hubble-relay-*`                | Deployment | 1        | 任意     | フロー集約          |
+| `hubble-ui-*`                   | Deployment | 1        | 任意     | UI 配信 (port 8081) |
 
 ### local-path-storage (PV provisioner)
 
-| Pod | 種別 | レプリカ | 配置 | 役割 |
-|---|---|---|---|---|
-| `local-path-provisioner-*` | Deployment | 1 | 任意 | hostPath PV を切り出す |
+| Pod                        | 種別       | レプリカ | 配置 | 役割                   |
+| -------------------------- | ---------- | -------- | ---- | ---------------------- |
+| `local-path-provisioner-*` | Deployment | 1        | 任意 | hostPath PV を切り出す |
 
 ### tidb-admin (TiDB Operator 本体)
 
-| Pod | 種別 | レプリカ | 配置 | 役割 |
-|---|---|---|---|---|
-| `tidb-controller-manager-*` | Deployment | 1 | 任意 | TidbCluster CR 調停 |
-| `tidb-scheduler-*` | Deployment | 1 | 任意 | TiDB-aware スケジューラ |
+| Pod                         | 種別       | レプリカ | 配置 | 役割                    |
+| --------------------------- | ---------- | -------- | ---- | ----------------------- |
+| `tidb-controller-manager-*` | Deployment | 1        | 任意 | TidbCluster CR 調停     |
+| `tidb-scheduler-*`          | Deployment | 1        | 任意 | TiDB-aware スケジューラ |
 
 ### tidb-cluster (本体)
 
-| Pod | 種別 | レプリカ | 配置 | リソース (req≒limit) | 役割 |
-|---|---|---|---|---|---|
-| `basic-pd-{0,1,2}` | StatefulSet | 3 | 各ノード 1 個 (topology spread) | 1c / 2Gi | メタデータ + Region 配置 |
-| `basic-tikv-{0,1,2}` | StatefulSet | 3 | 各ノード 1 個 (topology spread) | 4c / 12Gi (block-cache 4G) | KV ストレージ |
-| `basic-tidb-{0,1,2}` | StatefulSet | 3 | 各ノード 1 個 (topology spread) | 2c / 4Gi | SQL ゲートウェイ |
-| `basic-discovery-*` | Deployment | 1 | 任意 | 小 | クラスタメンバ発見 |
-| `basic-monitor-*` | Deployment | 1 | 任意 | 中 | Prometheus + Grafana 同居 |
+| Pod                  | 種別        | レプリカ | 配置                            | リソース (req≒limit)       | 役割                      |
+| -------------------- | ----------- | -------- | ------------------------------- | -------------------------- | ------------------------- |
+| `basic-pd-{0,1,2}`   | StatefulSet | 3        | 各ノード 1 個 (topology spread) | 1c / 2Gi                   | メタデータ + Region 配置  |
+| `basic-tikv-{0,1,2}` | StatefulSet | 3        | 各ノード 1 個 (topology spread) | 4c / 12Gi (block-cache 4G) | KV ストレージ             |
+| `basic-tidb-{0,1,2}` | StatefulSet | 3        | 各ノード 1 個 (topology spread) | 2c / 4Gi                   | SQL ゲートウェイ          |
+| `basic-discovery-*`  | Deployment  | 1        | 任意                            | 小                         | クラスタメンバ発見        |
+| `basic-monitor-*`    | Deployment  | 1        | 任意                            | 中                         | Prometheus + Grafana 同居 |
 
 ### monitoring (kube-prometheus-stack、Phase 4.5 で導入)
 
-| Pod | 種別 | レプリカ | 配置 | 役割 |
-|---|---|---|---|---|
-| `kube-prom-stack-prometheus-node-exporter-*` | DaemonSet | 3 (各ノード 1 個) | host network | OS レイヤメトリクス (CPU/Mem/Disk/Net) を `:9100/metrics` で publish |
-| `prometheus-kube-prom-stack-prometheus-0` | StatefulSet | 1 | 任意 (PV 固定で実質 pin) | メトリクス backend (retention 14 日) |
-| `alertmanager-kube-prom-stack-alertmanager-0` | StatefulSet | 1 | 任意 | アラートルーティング (当面ルール無し) |
-| `kube-prom-stack-grafana-*` | Deployment | 1 | 任意 | ダッシュボード (Node Exporter / Kubernetes 系プリインストール) |
-| `kube-prom-stack-kube-state-metrics-*` | Deployment | 1 | 任意 | k8s オブジェクト数/状態を Prometheus 形式で publish |
-| `kube-prom-stack-operator-*` | Deployment | 1 | 任意 | Prometheus Operator (CRD 調停) |
+| Pod                                           | 種別        | レプリカ          | 配置                     | 役割                                                                 |
+| --------------------------------------------- | ----------- | ----------------- | ------------------------ | -------------------------------------------------------------------- |
+| `kube-prom-stack-prometheus-node-exporter-*`  | DaemonSet   | 3 (各ノード 1 個) | host network             | OS レイヤメトリクス (CPU/Mem/Disk/Net) を `:9100/metrics` で publish |
+| `prometheus-kube-prom-stack-prometheus-0`     | StatefulSet | 1                 | 任意 (PV 固定で実質 pin) | メトリクス backend (retention 14 日)                                 |
+| `alertmanager-kube-prom-stack-alertmanager-0` | StatefulSet | 1                 | 任意                     | アラートルーティング (当面ルール無し)                                |
+| `kube-prom-stack-grafana-*`                   | Deployment  | 1                 | 任意                     | ダッシュボード (Node Exporter / Kubernetes 系プリインストール)       |
+| `kube-prom-stack-kube-state-metrics-*`        | Deployment  | 1                 | 任意                     | k8s オブジェクト数/状態を Prometheus 形式で publish                  |
+| `kube-prom-stack-operator-*`                  | Deployment  | 1                 | 任意                     | Prometheus Operator (CRD 調停)                                       |
 
 ### tailscale (Tailscale Operator + proxy 群、Phase 6 で導入)
 
-| Pod | 種別 | レプリカ | 配置 | 役割 |
-|---|---|---|---|---|
-| `operator-*` | Deployment | 1 | 任意 | Service 監視と proxy Pod 生成 |
-| `ts-tidb-public-*` | Pod | 1 | 任意 | TiDB :4000 を `tidb.ts.net` で公開 |
-| `ts-tidb-dashboard-public-*` | Pod | 1 | 任意 | Dashboard :2379 を `tidb-dashboard.ts.net` で公開 |
-| `ts-tidb-grafana-public-*` | Pod | 1 | 任意 | TidbMonitor Grafana :3000 を `tidb-grafana.ts.net` で公開 |
-| `ts-node-grafana-public-*` | Pod | 1 | 任意 | kube-prom-stack Grafana :3000 を `node-grafana.ts.net` で公開 |
-| `ts-hubble-ui-public-*` | Pod | 1 | 任意 | Hubble UI を `hubble.ts.net` で公開 |
+| Pod                          | 種別       | レプリカ | 配置 | 役割                                                          |
+| ---------------------------- | ---------- | -------- | ---- | ------------------------------------------------------------- |
+| `operator-*`                 | Deployment | 1        | 任意 | Service 監視と proxy Pod 生成                                 |
+| `ts-tidb-public-*`           | Pod        | 1        | 任意 | TiDB :4000 を `tidb.ts.net` で公開                            |
+| `ts-tidb-dashboard-public-*` | Pod        | 1        | 任意 | Dashboard :2379 を `tidb-dashboard.ts.net` で公開             |
+| `ts-tidb-grafana-public-*`   | Pod        | 1        | 任意 | TidbMonitor Grafana :3000 を `tidb-grafana.ts.net` で公開     |
+| `ts-node-grafana-public-*`   | Pod        | 1        | 任意 | kube-prom-stack Grafana :3000 を `node-grafana.ts.net` で公開 |
+| `ts-hubble-ui-public-*`      | Pod        | 1        | 任意 | Hubble UI を `hubble.ts.net` で公開                           |
 
 ### ノード別配置の想定
 
-| ノード | static (control-plane) | PD | TiKV | TiDB | その他 |
-|---|---|---|---|---|---|
-| **node1** | ✅ apiserver/cm/sched/etcd | 1 | 1 | 1 | cilium, coredns, operator 等 任意配置 (control-plane taint は Phase 3 step 6 で除去済) |
-| **node2** | - | 1 | 1 | 1 | cilium, その他任意 |
-| **node3** | - | 1 | 1 | 1 | cilium, その他任意 |
+| ノード    | static (control-plane)     | PD  | TiKV | TiDB | その他                                                                                 |
+| --------- | -------------------------- | --- | ---- | ---- | -------------------------------------------------------------------------------------- |
+| **node1** | ✅ apiserver/cm/sched/etcd | 1   | 1    | 1    | cilium, coredns, operator 等 任意配置 (control-plane taint は Phase 3 step 6 で除去済) |
+| **node2** | -                          | 1   | 1    | 1    | cilium, その他任意                                                                     |
+| **node3** | -                          | 1   | 1    | 1    | cilium, その他任意                                                                     |
 
 ### メモリ収支(ノード合計 96 GB = 32 GB × 3)
 
-| 用途 | 消費 |
-|---|---|
-| TiKV (12 Gi × 3) | 36 Gi |
-| PD (2 Gi × 3) | 6 Gi |
-| TiDB (4 Gi × 3) | 12 Gi |
-| TiDB Monitor (Grafana + Prometheus) | ~3 Gi |
-| kube-prometheus-stack (Prometheus + Grafana + Alertmanager + node-exporter ×3 + ksm) | ~3 Gi |
-| control-plane (apiserver/etcd/cm/sched) | ~4 Gi |
-| Cilium + CoreDNS + Operators 諸々 | ~6 Gi |
-| kubelet systemReserved + kubeReserved | 3 Gi × 3 = 9 Gi |
-| **小計** | **~79 Gi** |
-| **余裕** | **~17 Gi** (バッファ / 将来 Pod 追加 / 一時 spike) |
+| 用途                                                                                 | 消費                                               |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| TiKV (12 Gi × 3)                                                                     | 36 Gi                                              |
+| PD (2 Gi × 3)                                                                        | 6 Gi                                               |
+| TiDB (4 Gi × 3)                                                                      | 12 Gi                                              |
+| TiDB Monitor (Grafana + Prometheus)                                                  | ~3 Gi                                              |
+| kube-prometheus-stack (Prometheus + Grafana + Alertmanager + node-exporter ×3 + ksm) | ~3 Gi                                              |
+| control-plane (apiserver/etcd/cm/sched)                                              | ~4 Gi                                              |
+| Cilium + CoreDNS + Operators 諸々                                                    | ~6 Gi                                              |
+| kubelet systemReserved + kubeReserved                                                | 3 Gi × 3 = 9 Gi                                    |
+| **小計**                                                                             | **~79 Gi**                                         |
+| **余裕**                                                                             | **~17 Gi** (バッファ / 将来 Pod 追加 / 一時 spike) |
 
 ### 公開エンドポイント一覧(Phase 6 完了後)
 
-| エンドポイント | 用途 | プロトコル |
-|---|---|---|
-| `tidb.<tailnet>.ts.net:4000` | TiDB Server (MySQL プロトコル) | TCP |
-| `http://tidb-dashboard.<tailnet>.ts.net:2379/dashboard` | TiDB Dashboard (PD 組み込み) | HTTP |
-| `http://tidb-grafana.<tailnet>.ts.net:3000` | TidbMonitor Grafana (TiDB/TiKV/PD メトリクス) | HTTP |
-| `http://node-grafana.<tailnet>.ts.net:3000` | kube-prometheus-stack Grafana (ホスト OS / k8s メトリクス) | HTTP |
-| `http://hubble.<tailnet>.ts.net` | Hubble UI (サービスマップ + フローログ) | HTTP |
-| `https://node1.<tailnet>.ts.net:6443` | k8s API (Subnet Router 経由) | HTTPS |
-| `ssh ubuntu@node1.<tailnet>.ts.net` | ノード SSH (Tailscale SSH) | SSH |
+| エンドポイント                                          | 用途                                                       | プロトコル |
+| ------------------------------------------------------- | ---------------------------------------------------------- | ---------- |
+| `tidb.<tailnet>.ts.net:4000`                            | TiDB Server (MySQL プロトコル)                             | TCP        |
+| `http://tidb-dashboard.<tailnet>.ts.net:2379/dashboard` | TiDB Dashboard (PD 組み込み)                               | HTTP       |
+| `http://tidb-grafana.<tailnet>.ts.net:3000`             | TidbMonitor Grafana (TiDB/TiKV/PD メトリクス)              | HTTP       |
+| `http://node-grafana.<tailnet>.ts.net:3000`             | kube-prometheus-stack Grafana (ホスト OS / k8s メトリクス) | HTTP       |
+| `http://hubble.<tailnet>.ts.net`                        | Hubble UI (サービスマップ + フローログ)                    | HTTP       |
+| `https://node1.<tailnet>.ts.net:6443`                   | k8s API (Subnet Router 経由)                               | HTTPS      |
+| `ssh ubuntu@node1.<tailnet>.ts.net`                     | ノード SSH (Tailscale SSH)                                 | SSH        |
 
 ## 横断的に決めたこと
 
-* 構成管理: **手動 + docs同期**(3ノード手動が辛くなったらAnsible導入)
-* シークレット管理: **sealed-secrets**(シンプル、GitOps相性◎)
-* 監視/アラート: **TidbMonitor 同梱の Prometheus + Grafana**(Mackerelは入れない)
+- 構成管理: **手動 + docs同期**(3ノード手動が辛くなったらAnsible導入)
+- シークレット管理: **sealed-secrets**(シンプル、GitOps相性◎)
+- 監視/アラート: **TidbMonitor 同梱の Prometheus + Grafana**(Mackerelは入れない)
 
 ## 付録: TidbCluster だけ作り直す手順
 
@@ -2340,13 +2347,13 @@ mysql -h tidb.<tailnet>.ts.net -P 4000 -u root -p < dump.sql
 
 ### 想定所要時間
 
-| 段階 | 時間 |
-|---|---|
-| 既存削除 (Pod terminate 待ち含む) | 2-3 分 |
-| PVC / PV / ディスク掃除 | 30 秒 |
-| TidbCluster 再 apply → Ready | 3-4 分 |
-| 動作確認 | 1 分 |
-| **合計** | **~7-10 分** |
+| 段階                              | 時間         |
+| --------------------------------- | ------------ |
+| 既存削除 (Pod terminate 待ち含む) | 2-3 分       |
+| PVC / PV / ディスク掃除           | 30 秒        |
+| TidbCluster 再 apply → Ready      | 3-4 分       |
+| 動作確認                          | 1 分         |
+| **合計**                          | **~7-10 分** |
 
 ### 失敗パターンと対処
 
@@ -2356,5 +2363,5 @@ mysql -h tidb.<tailnet>.ts.net -P 4000 -u root -p < dump.sql
 
 ## 次のアクション候補
 
-* Phase 1の手順を `docs/source/02_os_setup.md` として書き起こす
-* node1 だけ先にUbuntu入れて、最小手順を実機で確定させる
+- Phase 1の手順を `docs/source/02_os_setup.md` として書き起こす
+- node1 だけ先にUbuntu入れて、最小手順を実機で確定させる

@@ -6,13 +6,13 @@
 
 Phase 4 + Phase 4.5 を素直に積むと、クラスタには **Grafana が 2 つ**、**Prometheus も 2 つ** 動くことになる(`tidb-grafana` と `node-grafana`)。
 
-| 観点 | 現状の痛み |
-|---|---|
-| 動線 | TiDB 系メトリクスとホスト系メトリクスで Grafana を切り替えないといけない |
+| 観点               | 現状の痛み                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| 動線               | TiDB 系メトリクスとホスト系メトリクスで Grafana を切り替えないといけない                                |
 | ダッシュボード品質 | TidbMonitor 配布の公式ダッシュボードは Angular plugin 依存パネルがあり、Grafana 11 系で一部描画されない |
-| カスタマイズ | TidbMonitor は CR 経由のため Grafana 設定 / ダッシュボードを Git で素直に管理しにくい |
-| リソース | Prometheus 2 重 scrape + 2 重 TSDB で MiniPC のメモリを無駄に喰う |
-| 統合監視 | ホスト + TiDB + 自作アプリ + ネットワーク機器をまとめて見たい時、kube-prom-stack 側に寄せた方が伸びる |
+| カスタマイズ       | TidbMonitor は CR 経由のため Grafana 設定 / ダッシュボードを Git で素直に管理しにくい                   |
+| リソース           | Prometheus 2 重 scrape + 2 重 TSDB で MiniPC のメモリを無駄に喰う                                       |
+| 統合監視           | ホスト + TiDB + 自作アプリ + ネットワーク機器をまとめて見たい時、kube-prom-stack 側に寄せた方が伸びる   |
 
 TiDB 各コンポーネントは `/metrics` を素直に公開しているので、TidbMonitor を経由しなくても kube-prom-stack の **PodMonitor で直接 scrape** すれば足りる。
 
@@ -20,15 +20,15 @@ TiDB 各コンポーネントは `/metrics` を素直に公開しているので
 
 **B 案: Prometheus も Grafana も kube-prom-stack に一本化、TidbMonitor は完全廃止**。
 
-| 要素 | 移行後 |
-|---|---|
-| TiDB メトリクス収集 | kube-prom-stack の Prometheus が PodMonitor で直接 scrape |
-| Recording / Alert rule | TidbMonitor 同梱のものから必要分を `PrometheusRule` CR に移植 |
-| ダッシュボード | 自作 JSON を `ConfigMap` + sidecar で投入 (label `grafana_dashboard=1`) |
-| 履歴メトリクス | **捨てる** |
-| NgMonitoring (Top SQL / Continuous Profiling) | 単体 Deployment 化で復活 → `2026-06-27_ng_monitoring_standalone.md` |
-| Reloader | kube-prom-stack Operator が同等の CR 監視 / 再読込を担う |
-| TiDB Dashboard (PD 組み込み) | **影響なし**。引き続き `:2379/dashboard` で利用 |
+| 要素                                          | 移行後                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------- |
+| TiDB メトリクス収集                           | kube-prom-stack の Prometheus が PodMonitor で直接 scrape               |
+| Recording / Alert rule                        | TidbMonitor 同梱のものから必要分を `PrometheusRule` CR に移植           |
+| ダッシュボード                                | 自作 JSON を `ConfigMap` + sidecar で投入 (label `grafana_dashboard=1`) |
+| 履歴メトリクス                                | **捨てる**                                                              |
+| NgMonitoring (Top SQL / Continuous Profiling) | 単体 Deployment 化で復活 → `2026-06-27_ng_monitoring_standalone.md`     |
+| Reloader                                      | kube-prom-stack Operator が同等の CR 監視 / 再読込を担う                |
+| TiDB Dashboard (PD 組み込み)                  | **影響なし**。引き続き `:2379/dashboard` で利用                         |
 
 ## 移行手順
 
@@ -72,11 +72,11 @@ kubectl -n monitoring port-forward svc/kube-prom-stack-grafana 13000:80
 
 TidbMonitor は **CR 削除だけではゴミが残る** (実機で確認済み):
 
-| 削除した時点で残るもの | 理由 |
-|---|---|
-| PVC `tidbmonitor-basic-monitor-0` | tidb-operator は PVC を自動削除しない |
-| PV `pvc-xxxx` (Released状態) | local-path provisioner の ReclaimPolicy が `Retain` |
-| ノード上のディレクトリ `/opt/local-path-provisioner/<pv>_tidb-cluster_tidbmonitor-basic-monitor-0` | PV を消しても実データは残留 |
+| 削除した時点で残るもの                                                                             | 理由                                                |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| PVC `tidbmonitor-basic-monitor-0`                                                                  | tidb-operator は PVC を自動削除しない               |
+| PV `pvc-xxxx` (Released状態)                                                                       | local-path provisioner の ReclaimPolicy が `Retain` |
+| ノード上のディレクトリ `/opt/local-path-provisioner/<pv>_tidb-cluster_tidbmonitor-basic-monitor-0` | PV を消しても実データは残留                         |
 
 完全に消すには 4 段階の掃除が必要。
 
@@ -158,11 +158,11 @@ kubectl -n tidb-cluster delete svc tidb-grafana-public
 
 Phase 4.5 をそのまま積むと Grafana には kube-prom-stack 同梱 20+ 枚 + 手動 import 分 + 自作分が並んで「どれを見ればいいか分からない」状態になる。役割で割り切る:
 
-| 対象 | どこで見るか |
-|---|---|
-| TiDB クラスタ全体 / SQL / Key Visualizer / Profile | **TiDB Dashboard** (PD 組み込み) |
-| ホスト OS / k8s リソース | **Grafana 自作 2 枚** (`cluster-nodes` / `cluster-pods`) |
-| 詳細メトリクス調査 | Grafana の Explore で PromQL 直叩き |
+| 対象                                               | どこで見るか                                             |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| TiDB クラスタ全体 / SQL / Key Visualizer / Profile | **TiDB Dashboard** (PD 組み込み)                         |
+| ホスト OS / k8s リソース                           | **Grafana 自作 2 枚** (`cluster-nodes` / `cluster-pods`) |
+| 詳細メトリクス調査                                 | Grafana の Explore で PromQL 直叩き                      |
 
 #### 全消し 4 段階
 
@@ -191,10 +191,10 @@ pkill -f "port-forward.*grafana.*13000"
 
 #### 自作 2 枚の中身
 
-| ファイル | 内容 |
-|---|---|
-| `manifests/monitoring/dashboards/cluster-nodes.json` | ホスト OS の CPU/Memory/Disk/Network/Load/Uptime を node 単位で可視化 (node template変数あり) |
-| `manifests/monitoring/dashboards/cluster-pods.json` | Pod 別 CPU/Memory トップ10、Restart 累積、Not Ready Pod、namespace 別カウント (namespace template変数あり) |
+| ファイル                                             | 内容                                                                                                       |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `manifests/monitoring/dashboards/cluster-nodes.json` | ホスト OS の CPU/Memory/Disk/Network/Load/Uptime を node 単位で可視化 (node template変数あり)              |
+| `manifests/monitoring/dashboards/cluster-pods.json`  | Pod 別 CPU/Memory トップ10、Restart 累積、Not Ready Pod、namespace 別カウント (namespace template変数あり) |
 
 #### 最終確認
 
@@ -232,14 +232,14 @@ ArgoCD / Flux を入れる時は `manifests/monitoring/` を Application とし�
 
 ## 失うものと補完方針
 
-| 失うもの | 補完 |
-|---|---|
-| 過去のメトリクス履歴 (TidbMonitor Prometheus の 14 日分) | **捨てる** |
-| NgMonitoring (Top SQL / Continuous Profiling) | 単体 Deployment 化で復活 (`manifests/monitoring/ng-monitoring/`)。手順は `2026-06-27_ng_monitoring_standalone.md` |
-| TidbMonitor 同梱の公式ダッシュボード一式 | **全削除**。TiDB は Dashboard (PD 組み込み)、ホスト/k8s は自作 `cluster-nodes` / `cluster-pods` の 2 枚に集約。Angular panel 依存も同時に消える |
-| kube-prom-stack 同梱の defaultDashboards 20+ 枚 | **全削除** (Step 7)。役割で割り切り「ダッシュボードがありすぎ問題」を根絶 |
-| Reloader (PingCAP 独自) | kube-prom-stack Operator が同等 (PodMonitor / PrometheusRule の変更検知 + Prometheus reload) |
-| ImageInitializer によるダッシュボード自動投入 | sidecar が ConfigMap を監視する仕組みで代替 |
+| 失うもの                                                 | 補完                                                                                                                                            |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 過去のメトリクス履歴 (TidbMonitor Prometheus の 14 日分) | **捨てる**                                                                                                                                      |
+| NgMonitoring (Top SQL / Continuous Profiling)            | 単体 Deployment 化で復活 (`manifests/monitoring/ng-monitoring/`)。手順は `2026-06-27_ng_monitoring_standalone.md`                               |
+| TidbMonitor 同梱の公式ダッシュボード一式                 | **全削除**。TiDB は Dashboard (PD 組み込み)、ホスト/k8s は自作 `cluster-nodes` / `cluster-pods` の 2 枚に集約。Angular panel 依存も同時に消える |
+| kube-prom-stack 同梱の defaultDashboards 20+ 枚          | **全削除** (Step 7)。役割で割り切り「ダッシュボードがありすぎ問題」を根絶                                                                       |
+| Reloader (PingCAP 独自)                                  | kube-prom-stack Operator が同等 (PodMonitor / PrometheusRule の変更検知 + Prometheus reload)                                                    |
+| ImageInitializer によるダッシュボード自動投入            | sidecar が ConfigMap を監視する仕組みで代替                                                                                                     |
 
 **失わないもの**:
 
@@ -251,18 +251,18 @@ ArgoCD / Flux を入れる時は `manifests/monitoring/` を Application とし�
 
 本資料の手順が実機で安定したら、本編に取り込んで「最初から廃止構成で組む」状態にする。具体的な差分:
 
-| 本編セクション | 統合作業 |
-|---|---|
-| Phase 4 「node1 で実行: TidbMonitor 導入」(L1265-1330) | 章ごと削除し、PodMonitor + PrometheusRule + ダッシュボード ConfigMap の節に置換 |
-| Phase 4 「決めたこと」(L1391-1400) の「TidbMonitor 同梱の Grafana / Prometheus」記述 | kube-prom-stack に一本化された旨に書き換え |
-| Phase 4.5 「動機」(L1410-1417) の TidbMonitor との比較記述 | TidbMonitor は前提から消えたため、純粋なホスト監視の動機に整理 |
-| Phase 4.5 「node1 で実行: kube-prometheus-stack 導入」の `helm install` コマンド (L1419-1432) | `helm install ... -f manifests/monitoring/kube-prom-stack-values.yaml` に置換し、`--set` ベタ書きを values.yaml に移管 |
-| Phase 4.5 「Grafana で見るダッシュボード」セクション (公式 ID 15172/11074/15760/15757/15758 等の手動 import 説明) | 章ごと削除。Grafana には自作 `cluster-nodes` / `cluster-pods` の 2 枚のみ、と書き換え |
-| Phase 4.5 「決めたこと」(L1574-1577) の `TidbMonitor の Prometheus は TiDB 系メトリクス専用にして混ぜない` 記述 | 「Prometheus / Grafana 一本化」方針に書き換え |
-| Phase 6 「Grafana (TidbMonitor 同梱)」セクション (L1844-) | 章ごと削除。`node-grafana` 一本のみ残す |
-| Phase 6 公開エンドポイント表 (L1932-1933, L2185-2186) | `tidb-grafana` 行を削除 |
-| 付録「再構築」手順 (L2195-) の TidbMonitor 削除 / 再作成ステップ | TidbMonitor 関連行を削除 |
-| 全体 Pod / リソース一覧 (L2132, L2171) | `basic-monitor-*` 行と TidbMonitor 分のメモリ計上を削除 |
+| 本編セクション                                                                                                    | 統合作業                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Phase 4 「node1 で実行: TidbMonitor 導入」(L1265-1330)                                                            | 章ごと削除し、PodMonitor + PrometheusRule + ダッシュボード ConfigMap の節に置換                                        |
+| Phase 4 「決めたこと」(L1391-1400) の「TidbMonitor 同梱の Grafana / Prometheus」記述                              | kube-prom-stack に一本化された旨に書き換え                                                                             |
+| Phase 4.5 「動機」(L1410-1417) の TidbMonitor との比較記述                                                        | TidbMonitor は前提から消えたため、純粋なホスト監視の動機に整理                                                         |
+| Phase 4.5 「node1 で実行: kube-prometheus-stack 導入」の `helm install` コマンド (L1419-1432)                     | `helm install ... -f manifests/monitoring/kube-prom-stack-values.yaml` に置換し、`--set` ベタ書きを values.yaml に移管 |
+| Phase 4.5 「Grafana で見るダッシュボード」セクション (公式 ID 15172/11074/15760/15757/15758 等の手動 import 説明) | 章ごと削除。Grafana には自作 `cluster-nodes` / `cluster-pods` の 2 枚のみ、と書き換え                                  |
+| Phase 4.5 「決めたこと」(L1574-1577) の `TidbMonitor の Prometheus は TiDB 系メトリクス専用にして混ぜない` 記述   | 「Prometheus / Grafana 一本化」方針に書き換え                                                                          |
+| Phase 6 「Grafana (TidbMonitor 同梱)」セクション (L1844-)                                                         | 章ごと削除。`node-grafana` 一本のみ残す                                                                                |
+| Phase 6 公開エンドポイント表 (L1932-1933, L2185-2186)                                                             | `tidb-grafana` 行を削除                                                                                                |
+| 付録「再構築」手順 (L2195-) の TidbMonitor 削除 / 再作成ステップ                                                  | TidbMonitor 関連行を削除                                                                                               |
+| 全体 Pod / リソース一覧 (L2132, L2171)                                                                            | `basic-monitor-*` 行と TidbMonitor 分のメモリ計上を削除                                                                |
 
 ## 関連資料
 

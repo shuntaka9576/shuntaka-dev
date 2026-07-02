@@ -4,8 +4,8 @@ metadata:
   name: tidb-dashboard-public
   namespace: tidb-cluster
   annotations:
-    tailscale.com/expose: "true"
-    tailscale.com/hostname: "tidb-dashboard"
+    tailscale.com/expose: 'true'
+    tailscale.com/hostname: 'tidb-dashboard'
 spec:
   type: LoadBalancer
   loadBalancerClass: tailscale

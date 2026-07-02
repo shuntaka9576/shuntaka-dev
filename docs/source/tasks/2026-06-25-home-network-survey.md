@@ -4,15 +4,15 @@
 
 ## TL;DR
 
-* 構築計画は **問題なく実現できる**(Tailscale 直接 P2P 確立可能、UDP 通過、コーンNAT寄り)
-* ただし HGW の WebUI が触れない & LAN セグメントが変則(`192.168.4.0/22`)のため、**VLAN 10 のサブネットを HGW 既存セグメントに合わせる必要あり**
-* 修正点は 1 箇所のみ: `VLAN 10 = 192.168.10.0/24` → `192.168.4.0/22` (ノードは `192.168.6.11-.13` あたり)
+- 構築計画は **問題なく実現できる**(Tailscale 直接 P2P 確立可能、UDP 通過、コーンNAT寄り)
+- ただし HGW の WebUI が触れない & LAN セグメントが変則(`192.168.4.0/22`)のため、**VLAN 10 のサブネットを HGW 既存セグメントに合わせる必要あり**
+- 修正点は 1 箇所のみ: `VLAN 10 = 192.168.10.0/24` → `192.168.4.0/22` (ノードは `192.168.6.11-.13` あたり)
 
 ## 調査環境
 
-* 調査対象: 自宅 Wi-Fi 配下の Mac mini (`100.71.48.83`, en1=Wi-Fi)
-* 接続方法: 外出先の MacBook から Tailscale 経由で SSH
-* 日時: 2026-06-25
+- 調査対象: 自宅 Wi-Fi 配下の Mac mini (`100.71.48.83`, en1=Wi-Fi)
+- 接続方法: 外出先の MacBook から Tailscale 経由で SSH
+- 日時: 2026-06-25
 
 ## 観測結果
 
@@ -27,13 +27,13 @@ $ ifconfig en1 | grep "inet "
     inet 192.168.4.25 netmask 0xfffffc00 broadcast 192.168.7.255
 ```
 
-| 項目 | 値 | コメント |
-|---|---|---|
-| HGW IP | `192.168.4.1` | デフォルトゲートウェイ |
-| 自分の IP | `192.168.4.25` | DHCP 割当てと思われる |
-| Netmask | `0xfffffc00` = `255.255.252.0` = **/22** | 一般的な /24 ではない |
-| LAN セグメント | `192.168.4.0/22` (192.168.4.0 - 192.168.7.255) | 1022 IP 使える |
-| DNS | `<ISP_DNS_1>`, `<ISP_DNS_2>` | ISP DNS |
+| 項目           | 値                                             | コメント               |
+| -------------- | ---------------------------------------------- | ---------------------- |
+| HGW IP         | `192.168.4.1`                                  | デフォルトゲートウェイ |
+| 自分の IP      | `192.168.4.25`                                 | DHCP 割当てと思われる  |
+| Netmask        | `0xfffffc00` = `255.255.252.0` = **/22**       | 一般的な /24 ではない  |
+| LAN セグメント | `192.168.4.0/22` (192.168.4.0 - 192.168.7.255) | 1022 IP 使える         |
+| DNS            | `<ISP_DNS_1>`, `<ISP_DNS_2>`                   | ISP DNS                |
 
 ### HGW ポート開放状況
 
@@ -61,8 +61,8 @@ $ traceroute -n -m 5 -w 2 8.8.8.8
  5  100.64.14.15    7.129 ms     ← CGN
 ```
 
-* HGW の先にキャリア内プライベート網 (`10.x`) + CGN 帯 (`100.64.x`) が見える
-* キャリアバックボーンを CGN で経由している構成
+- HGW の先にキャリア内プライベート網 (`10.x`) + CGN 帯 (`100.64.x`) が見える
+- キャリアバックボーンを CGN で経由している構成
 
 ### Tailscale netcheck (NAT 種別判定)
 
@@ -80,13 +80,13 @@ $ traceroute -n -m 5 -w 2 8.8.8.8
     - sin: 73.7ms  (Singapore)
 ```
 
-| 項目 | 値 | 評価 |
-|---|---|---|
-| UDP 通過 | ✅ | WireGuard 直接通信できる |
-| GIP 取得 | ✅ `<GLOBAL_IP>` | STUN で外側 IP が見える(NAT越え可能) |
-| MappingVariesByDestIP | ✅ false | コーン NAT 寄り、ホールパンチング成功率高い |
-| 最寄 DERP | Tokyo 9.6ms | フォールバック時もレイテンシ良好 |
-| CaptivePortal | false | 余計な認証なし |
+| 項目                  | 値               | 評価                                        |
+| --------------------- | ---------------- | ------------------------------------------- |
+| UDP 通過              | ✅               | WireGuard 直接通信できる                    |
+| GIP 取得              | ✅ `<GLOBAL_IP>` | STUN で外側 IP が見える(NAT越え可能)        |
+| MappingVariesByDestIP | ✅ false         | コーン NAT 寄り、ホールパンチング成功率高い |
+| 最寄 DERP             | Tokyo 9.6ms      | フォールバック時もレイテンシ良好            |
+| CaptivePortal         | false            | 余計な認証なし                              |
 
 CGN 帯がホップに見えた段階では「Tailscale が DERP relay に落ちる懸念」を持ったが、netcheck の結果から **直接 P2P (WireGuard) 接続が成立する** と判断できる。
 
@@ -94,13 +94,13 @@ CGN 帯がホップに見えた段階では「Tailscale が DERP relay に落ち
 
 ### ✅ 問題なく実現できる項目
 
-| プラン要件 | 実環境 | 判定 |
-|---|---|---|
-| Tailscale outbound 接続 | UDP 通る + GIP 取得 + コーン NAT | 直接 P2P で確立 |
-| AWS Lambda → tailnet → node1 | DERP フォールバックも Tokyo 9.6ms | 実用十分 |
-| SSH/kubectl を外部から | Tailscale 経由なので HGW 設定不要 | OK |
-| Subnet Router(node1) | inbound port 不要、UDP outbound だけで完結 | OK |
-| VLAN 20 (cluster 内部) | 内部完結なので外部依存なし | OK |
+| プラン要件                   | 実環境                                     | 判定            |
+| ---------------------------- | ------------------------------------------ | --------------- |
+| Tailscale outbound 接続      | UDP 通る + GIP 取得 + コーン NAT           | 直接 P2P で確立 |
+| AWS Lambda → tailnet → node1 | DERP フォールバックも Tokyo 9.6ms          | 実用十分        |
+| SSH/kubectl を外部から       | Tailscale 経由なので HGW 設定不要          | OK              |
+| Subnet Router(node1)         | inbound port 不要、UDP outbound だけで完結 | OK              |
+| VLAN 20 (cluster 内部)       | 内部完結なので外部依存なし                 | OK              |
 
 ### ⚠️ 修正が必要な項目
 
@@ -127,17 +127,17 @@ network:
     enp1s0:
       dhcp4: false
       dhcp6: false
-      addresses: [192.168.6.11/22]    # ← /24 ではなく /22
+      addresses: [192.168.6.11/22] # ← /24 ではなく /22
       routes:
         - to: default
-          via: 192.168.4.1            # ← HGW の IP
+          via: 192.168.4.1 # ← HGW の IP
       nameservers:
         addresses: [1.1.1.1, 8.8.8.8]
   vlans:
     enp1s0.20:
       id: 20
       link: enp1s0
-      addresses: [192.168.20.11/24]   # ← cluster VLAN は変更なし
+      addresses: [192.168.20.11/24] # ← cluster VLAN は変更なし
 ```
 
 #### Tailscale Subnet Router の広告レンジ
@@ -154,9 +154,9 @@ ACL も同様に `192.168.4.0/22` に書き換える。
 
 ### ⚠️ 妥協する箇所(将来の宿題)
 
-* **HGW WebUI が触れない**: DHCP 配布範囲を狭められないので、ノード IP は「使われていなさそうな .6.x」を当てずっぽうで選び、`arp -a` で衝突確認しながら投入
-* **CPE 機種不明**: 「自分光」が具体的にどのキャリアの何という CPE か特定できれば、代替管理 UI (telnet/SNMP/Web alt-port) があるかも調べられる
-* **CGN 経由 + Tailscale**: 普段は直接 P2P で問題ないが、対向の NAT 種別次第で DERP に落ちる可能性。落ちても Tokyo 9.6ms なので致命的ではない
+- **HGW WebUI が触れない**: DHCP 配布範囲を狭められないので、ノード IP は「使われていなさそうな .6.x」を当てずっぽうで選び、`arp -a` で衝突確認しながら投入
+- **CPE 機種不明**: 「自分光」が具体的にどのキャリアの何という CPE か特定できれば、代替管理 UI (telnet/SNMP/Web alt-port) があるかも調べられる
+- **CGN 経由 + Tailscale**: 普段は直接 P2P で問題ないが、対向の NAT 種別次第で DERP に落ちる可能性。落ちても Tokyo 9.6ms なので致命的ではない
 
 ## 次のアクション
 

@@ -33,11 +33,11 @@ manifests/monitoring/
 
 ## ダッシュボード方針
 
-| 対象 | どこで見るか |
-|---|---|
-| TiDB クラスタ全体 / SQL分析 / Key Visualizer / プロファイル | **TiDB Dashboard** (PD 組み込み, `:2379/dashboard`) |
-| ホスト OS / k8s リソース | **Grafana** (`cluster-nodes` / `cluster-pods` の自作 2 枚) |
-| 詳細メトリクス調査 | Grafana の Explore で PromQL 直叩き |
+| 対象                                                        | どこで見るか                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| TiDB クラスタ全体 / SQL分析 / Key Visualizer / プロファイル | **TiDB Dashboard** (PD 組み込み, `:2379/dashboard`)        |
+| ホスト OS / k8s リソース                                    | **Grafana** (`cluster-nodes` / `cluster-pods` の自作 2 枚) |
+| 詳細メトリクス調査                                          | Grafana の Explore で PromQL 直叩き                        |
 
 kube-prom-stack 同梱のデフォルトダッシュボード20+枚は `defaultDashboardsEnabled: false` で全 OFF。必要になったら ConfigMap で 1 枚ずつ追加する運用。
 

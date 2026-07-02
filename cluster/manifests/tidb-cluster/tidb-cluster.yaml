@@ -15,9 +15,9 @@ spec:
     baseImage: pingcap/pd
     replicas: 3
     requests:
-      cpu: "100m"
-      memory: "1Gi"
-      storage: "10Gi"
+      cpu: '100m'
+      memory: '1Gi'
+      storage: '10Gi'
     storageClassName: local-path
     config: |
       [dashboard]
@@ -40,11 +40,11 @@ spec:
     baseImage: pingcap/tikv
     replicas: 3
     requests:
-      cpu: "500m"
-      memory: "8Gi"
-      storage: "100Gi"
+      cpu: '500m'
+      memory: '8Gi'
+      storage: '100Gi'
     limits:
-      memory: "12Gi"
+      memory: '12Gi'
     storageClassName: local-path
     config: |
       [storage.block-cache]
@@ -67,8 +67,8 @@ spec:
     baseImage: pingcap/tidb
     replicas: 3
     requests:
-      cpu: "500m"
-      memory: "2Gi"
+      cpu: '500m'
+      memory: '2Gi'
     service:
       type: ClusterIP
     config: |
