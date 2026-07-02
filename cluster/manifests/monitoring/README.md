@@ -2,8 +2,8 @@
 
 kube-prometheus-stack に TiDB クラスタを統合監視させるためのマニフェスト群。
 
-詳細な背景・移行手順・設計判断は `docs/source/99_memo/2026-06-27_tidbmonitor_decommission.md` を参照。
-NgMonitoring (Top SQL / Continuous Profiling) の単体 Deployment 化は `docs/source/99_memo/2026-06-27_ng_monitoring_standalone.md` を参照。
+詳細な背景・移行手順・設計判断は `docs/source/tasks/2026-06-27-tidbmonitor-decommission.md` を参照。
+NgMonitoring (Top SQL / Continuous Profiling) の単体 Deployment 化は `docs/source/tasks/2026-06-27-ng-monitoring-standalone.md` を参照。
 
 ## 構成
 
