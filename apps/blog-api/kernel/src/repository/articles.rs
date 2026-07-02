@@ -9,6 +9,8 @@ pub struct UpsertArticleInput {
     pub slug: Slug,
     pub title: String,
     pub content: String,
+    /// 事前生成した変換済みHTML。Some なら保存し、None なら既存値を維持する
+    pub content_html: Option<String>,
     pub description: Option<String>,
     pub thumbnail: Option<String>,
     pub article_type: String,

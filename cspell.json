@@ -161,6 +161,7 @@
     "netmap",
     "nxdomain",
     "preauthorized",
+    "pregeneration",
     "tailnet",
     "tailscaled",
     "timestamptz",

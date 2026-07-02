@@ -67,6 +67,7 @@ dependencies = [
  "registry",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
  "utoipa",
  "utoipa-swagger-ui",
