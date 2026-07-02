@@ -1111,7 +1111,7 @@ exports[`MainStack > snapshot 1`] = `
     "ObservabilityHealthcheckRule13407249": {
       "Properties": {
         "Name": "dev-tp-db-healthcheck-probe",
-        "ScheduleExpression": "rate(1 minute)",
+        "ScheduleExpression": "rate(5 minutes)",
         "State": "ENABLED",
         "Targets": [
           {

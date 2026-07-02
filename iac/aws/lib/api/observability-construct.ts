@@ -16,8 +16,9 @@ const SERVICE_NAME_DIMENSION = 'service.name';
 // - SELECT 1 が速く db.query.duration だけ遅い       -> SQL/TiDB/TiKV 側 or 結果転送
 // - db.query.duration 高 & TiDB statement duration 低 -> ネットワーク/proxy 側
 //
-// SELECT 1 ベースラインは EventBridge API Destination が /health/db を毎分叩いて
-// 供給する (Lambda を 1 台 warm に保つ副作用があることに注意)。
+// SELECT 1 ベースラインは EventBridge API Destination が /health/db を 5 分毎に
+// 叩いて供給する。毎分にすると Lambda が常時 warm に保たれて cold start が
+// 観測できなくなるため、cold start 込みの実態が見える間隔にしている。
 export class ObservabilityConstruct extends Construct {
   constructor(
     scope: Construct,
@@ -31,7 +32,7 @@ export class ObservabilityConstruct extends Construct {
   ) {
     super(scope, id);
 
-    // ---- db.healthcheck.duration の定期供給 (毎分 SELECT 1) ----
+    // ---- db.healthcheck.duration の定期供給 (5 分毎の SELECT 1) ----
     // /health/db は公開エンドポイントのため認証は不要だが、EventBridge Connection
     // は auth 設定が必須なのでダミーヘッダーを渡す。
     const healthcheckConnection = new events.Connection(this, 'HealthcheckConnection', {
@@ -52,7 +53,7 @@ export class ObservabilityConstruct extends Construct {
 
     new events.Rule(this, 'HealthcheckRule', {
       ruleName: `${props.physicalPrefix}-db-healthcheck-probe`,
-      schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
+      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
       targets: [
         new targets.ApiDestination(healthcheckDestination, {
           retryAttempts: 0,
