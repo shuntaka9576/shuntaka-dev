@@ -128,6 +128,8 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         offset: u64,
         limit: u64,
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
+        let pool = self.db.pool();
+
         let list_sql = r#"
             SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
@@ -148,18 +150,17 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             ORDER BY a.published_at DESC, a.article_id DESC
             LIMIT ? OFFSET ?
             "#;
-        let rows: Vec<ArticleSummaryRow> = observe_query(
+        let rows_future = observe_query(
             "article_list",
             list_sql,
-            sqlx::query_as(list_sql)
+            sqlx::query_as::<_, ArticleSummaryRow>(list_sql)
                 .bind(user_name)
                 .bind(article_type.as_str())
                 .bind(limit)
                 .bind(offset)
-                .fetch_all(&self.db.pool()),
+                .fetch_all(&pool),
             |rows| Some(rows.len() as i64),
-        )
-        .await?;
+        );
 
         let count_sql = r#"
             SELECT COUNT(*)
@@ -168,16 +169,18 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
               AND a.status = 'published'
               AND a.`type` = ?
             "#;
-        let total_count: (i64,) = observe_query(
+        let count_future = observe_query(
             "article_list_count",
             count_sql,
-            sqlx::query_as(count_sql)
+            sqlx::query_as::<_, (i64,)>(count_sql)
                 .bind(user_name)
                 .bind(article_type.as_str())
-                .fetch_one(&self.db.pool()),
+                .fetch_one(&pool),
             |_| Some(1),
-        )
-        .await?;
+        );
+
+        // DB が Tailscale 越しで RTT が大きいため、一覧と件数を並列に投げる
+        let (rows, total_count) = tokio::try_join!(rows_future, count_future)?;
 
         let articles: Vec<ArticleSummary> = rows
             .into_iter()

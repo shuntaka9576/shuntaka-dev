@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
+    http::{header, HeaderName, HeaderValue},
     Json,
 };
 use infrastructure::cloudinary::client::{CloudinaryClient, CloudinaryClientImpl};
@@ -13,6 +14,12 @@ use crate::error::AppError;
 
 const DEFAULT_PER_PAGE: u32 = 10;
 const MAX_PER_PAGE: u32 = 500;
+
+// 公開済み記事しか返さない API のため、CDN / ブラウザ双方でキャッシュを許可する
+const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
+    header::CACHE_CONTROL,
+    HeaderValue::from_static("public, max-age=60, stale-while-revalidate=300"),
+);
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesQuery {
@@ -94,7 +101,7 @@ pub async fn get_users_articles(
     State(registry): State<AppRegistry>,
     Path(name): Path<String>,
     Query(query): Query<UsersArticlesQuery>,
-) -> Result<Json<UsersArticlesResponse>, AppError> {
+) -> Result<([(HeaderName, HeaderValue); 1], Json<UsersArticlesResponse>), AppError> {
     let article_type = ArticleType::new(query.article_type)
         .map_err(|_| AppError::bad_request("Invalid article type"))?;
 
@@ -152,7 +159,7 @@ pub async fn get_users_articles(
         total_pages,
     };
 
-    Ok(Json(response))
+    Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
 }
 
 fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
@@ -191,7 +198,7 @@ fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
 pub async fn get_users_article(
     State(registry): State<AppRegistry>,
     Path(path): Path<ArticlePath>,
-) -> Result<Json<ArticleResponse>, AppError> {
+) -> Result<([(HeaderName, HeaderValue); 1], Json<ArticleResponse>), AppError> {
     let article = registry
         .users_articles_repository()
         .find_published_by_user_name_and_slug(&path.name, &path.slug)
@@ -225,5 +232,5 @@ pub async fn get_users_article(
         updated_at: article.updated_at.map(|d| d.to_rfc3339()),
     };
 
-    Ok(Json(response))
+    Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
 }
