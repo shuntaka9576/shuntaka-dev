@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ng-monitoring
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ng-monitoring
+  ports:
+    - name: server
+      port: 12020
+      targetPort: server
+      protocol: TCP
