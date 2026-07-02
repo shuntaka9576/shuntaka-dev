@@ -124,6 +124,10 @@ CloudWatch コンソール (ap-northeast-1) → Settings で OpenTelemetry (OTLP
 
 task role への X-Ray 書き込み + `cloudwatch:PutMetricData` 付与。
 
+**GitHub Actions (推奨)**: Deploy workflow を workflow_dispatch で実行し、`stack=st-tidb-proxy` を選択する（`stageName` はどちらでもよい。proxy スタックは stage 共用）。
+
+ローカルから実行する場合:
+
 ```bash
 cd iac/aws
 export STAGE_NAME=prd  # proxy スタックは stage 共用だが getConfig() の実行に必要
@@ -144,6 +148,10 @@ scripts/deploy-tidb-proxy.sh
 ### 4. main スタックのデプロイ（dev / prd）
 
 Lambda 環境変数 (`OTEL_*`, `NO_PROXY`) / SG 4318 / ダッシュボード / ヘルスチェックプローブ。
+
+**GitHub Actions (推奨)**: Deploy workflow を workflow_dispatch で `stack=main` を選択し、`stageName=dev` と `stageName=prd` でそれぞれ実行する（`stack=all` なら 2 と 4 をまとめて実行できる）。
+
+ローカルから実行する場合:
 
 ```bash
 cd iac/aws

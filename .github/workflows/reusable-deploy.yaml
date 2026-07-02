@@ -6,6 +6,11 @@ on:
       stageName:
         required: true
         type: string
+      # デプロイ対象スタック: all | st-tidb-proxy | main
+      stack:
+        required: false
+        type: string
+        default: 'all'
     secrets:
       AWS_ACCOUNT_ID:
         required: true
@@ -47,6 +52,7 @@ jobs:
       # dev / prd 共用の shared stack。Lambda VPC 化 (タスク 4 以降) で main-stack が
       # st-tidb-proxy の SSM 出力に依存するため、main より先にデプロイする。
       - name: CDK Deploy (st-tidb-proxy)
+        if: inputs.stack == 'all' || inputs.stack == 'st-tidb-proxy'
         working-directory: iac/aws
         run: |
           bunx cdk deploy st-tidb-proxy -c "stageName=${STAGE_NAME}" --require-approval never
@@ -60,6 +66,7 @@ jobs:
           CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
 
       - name: CDK Deploy (main)
+        if: inputs.stack == 'all' || inputs.stack == 'main'
         working-directory: iac/aws
         run: |
           case "$STAGE_NAME" in
