@@ -3,6 +3,7 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-07-02-next-viewport-prefetch-burst
 2026-07-01-tidb-articles-offset-plan-verify-5m
 2026-07-01-tidb-load-data-large-file
 2026-07-01-tidb-articles-list-plan-split
