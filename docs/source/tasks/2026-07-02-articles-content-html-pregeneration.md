@@ -6,18 +6,24 @@
 
 ## 起票理由
 
-記事詳細 API (`GET /users/{name}/articles/{slug}`) が毎リクエストで `convert_markdown_to_html` を実行していた。この変換は CPU コストだけでなく、記事内の裸 URL ごとに ureq の**同期 HTTP フェッチ**が走る（OGP リンクカード、GitHub 埋め込み。各タイムアウト 5 秒・直列）。同期クライアントを async ハンドラ内で直接呼んでいたため tokio ワーカーもブロックしていた。
+記事詳細 API (`GET /users/{name}/articles/{slug}`) が毎リクエストで `convert_markdown_to_html` を実行していた。この変換は CPU コストだけでなく、記事内の裸 URL ごとに ureq の同期 HTTP フェッチが走る（OGP リンクカード、GitHub 埋め込み。各タイムアウト 5 秒・直列）。同期クライアントを async ハンドラ内で直接呼んでいたため tokio ワーカーもブロックしていた。
 
 記事の内容が変わる契機は GitHub webhook (push) のみなので、upsert 時に HTML を生成して `articles.content_html` に保存し、GET は読むだけにする。
 
 ## 変更内容
 
-| レイヤー                                       | 変更                                                                                                                                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| スキーマ                                       | `articles` に `content_html LONGTEXT NULL` を追加（`tools/dsql-cli/dsl-tidb/schema/04_articles.sql` 末尾に `-- 2026-07-02` コメント付きで ALTER を追記）                 |
-| webhook (`api/src/handler/webhooks.rs`)        | upsert 前に既存記事を取得し、`content` が変わった場合と `content_html` が NULL の場合のみ `spawn_blocking` で HTML を生成して渡す。それ以外は `None` で既存値を維持      |
-| upsert (`adapter/src/repository/articles.rs`)  | `UPDATE ... SET content_html = COALESCE(?, content_html)`。`content_html` が渡された場合は他フィールド未変更でも NoChange とせず UPDATE する（埋め戻しを成立させるため） |
-| 詳細 GET (`api/src/handler/users_articles.rs`) | 保存済み `content_html` をそのまま返す。NULL の旧レコードのみ `spawn_blocking` でオンザフライ変換にフォールバック                                                        |
+| レイヤー                                       | 変更                                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| スキーマ                                       | `articles` に `content_html LONGTEXT NULL` を追加（`tools/dsql-cli/dsl-tidb/schema/04_articles.sql` 末尾に `-- 2026-07-02` コメント付きで ALTER を追記）      |
+| webhook (`api/src/handler/webhooks.rs`)        | upsert 前に既存記事を取得し、`content` が変わった場合と新規作成時のみ `spawn_blocking` で HTML を生成して渡す。それ以外は `None` で既存値を維持               |
+| upsert (`adapter/src/repository/articles.rs`)  | `UPDATE ... SET content_html = COALESCE(?, content_html)`。`None` の場合は既存値を保持する                                                                    |
+| 詳細 GET (`api/src/handler/users_articles.rs`) | 保存済み `content_html` をそのまま返す。NULL の旧レコードのみ `spawn_blocking` でオンザフライ変換にフォールバック                                             |
+| markdown crate (`apps/blog-api/markdown`)      | 外部フェッチを `ResourceFetcher` トレイトに抽象化し wasm 化（native は ureq + onig、wasm32 は事前フェッチ注入 + fancy-regex）。バッチと変換ロジックを共有する |
+| バッチ (`tools/content-html-backfill`)         | 既存レコードの埋め戻し用 TS バッチ。markdown crate の wasm を呼び、`content_html` カラムだけを UPDATE する（`updated_at` は変更しない）                       |
+
+## 埋め戻しに webhook 再実行を使わない理由
+
+webhook の upsert は `UPDATE ... SET updated_at = now` を含むため、埋め戻し目的で再実行すると内容が変わっていない全記事の `updated_at` が埋め戻し日時に化ける。`content_html` だけを UPDATE する専用バッチを使う（`updated_at` は `ON UPDATE CURRENT_TIMESTAMP` を付けていないので素の UPDATE では変化しない）。
 
 ## 本番 / dev への適用手順
 
@@ -34,15 +40,15 @@ ALTER TABLE `blog_dev`.`articles`
 
 DDL 適用後に新バイナリをデプロイする（旧バイナリは `content_html` を SELECT しないため順序は DDL → デプロイ）。
 
-### 3. 既存レコードの埋め戻し
-
-記事リポジトリの main ブランチに空 push して webhook を再実行するだけでよい。
+### 3. 既存レコードの埋め戻し（content-html-backfill）
 
 ```bash
-git commit --allow-empty -m "chore: trigger content_html backfill" && git push origin main
+cd tools/content-html-backfill
+bun run build:wasm
+bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 ```
 
-upsert は `content_html IS NULL` の記事を内容未変更でも「要生成」と判定して UPDATE するため、1 回の webhook 実行で全記事が埋まる。埋め戻し完了は以下で確認できる。
+使い方の詳細は [content-html-backfill](../01_development.md#content-html-backfill) を参照。埋め戻し完了は以下で確認できる。
 
 ```sql
 SELECT COUNT(*) FROM `blog_dev`.`articles` WHERE `content_html` IS NULL;
@@ -53,4 +59,5 @@ SELECT COUNT(*) FROM `blog_dev`.`articles` WHERE `content_html` IS NULL;
 ## 補足
 
 - 変換は記事ごとに `tokio::task::spawn_blocking` で実行するため、webhook 処理・フォールバック GET とも tokio ワーカーをブロックしない
-- OGP リンクカードの内容は変換時点のスナップショットになる（従来はリクエストごとに再フェッチしていた）。リンク先の OGP が変わった場合は記事を再 push すれば更新される
+- OGP リンクカードの内容は変換時点のスナップショットになる（従来はリクエストごとに再フェッチしていた）。リンク先の OGP が変わった場合は記事を再 push するか `bun run backfill -- --all` で再生成する
+- wasm 版の syntect は onig（C 依存）が使えないため fancy-regex エンジンを使う。comrak が wasm32 で採用しているのと同じ構成で、ハイライト結果は実用上同一

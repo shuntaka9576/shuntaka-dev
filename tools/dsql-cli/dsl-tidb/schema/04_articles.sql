@@ -40,9 +40,10 @@ ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_status_type_pub
 
 -- 2026-07-02 content_html 事前生成
 -- 記事詳細 API が毎リクエストで Markdown→HTML 変換（OGP リンクカード等の同期 HTTP フェッチ込み）
--- していたのをやめ、GitHub webhook の upsert 時に変換して保存する。
+-- していたのをやめ、GitHub webhook の upsert 時（content 変更時・新規作成時）に変換して保存する。
 -- 既存レコードは NULL のまま（GET は NULL 時のみオンザフライ変換にフォールバック）。
--- 埋め戻しは記事リポジトリの main への push（webhook 再実行）で行う。
--- upsert は content_html が NULL の記事を内容未変更でも再変換して UPDATE する。
+-- 埋め戻しは tools/content-html-backfill で content_html カラムだけを UPDATE する
+-- （updated_at には ON UPDATE が無いので値が保持される。webhook 再実行での埋め戻しは
+--   upsert が updated_at を更新してしまうため使わない）。
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `content_html` LONGTEXT NULL AFTER `content`;

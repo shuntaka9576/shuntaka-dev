@@ -241,8 +241,10 @@ pub async fn handle_github_webhook(
                 // Extract slug from filename
                 let slug = file_content.name.trim_end_matches(".md").to_string();
 
-                // content が変わった場合と content_html 未生成（旧レコード埋め戻し）の場合のみ
-                // HTML を再生成する。それ以外は None を渡して既存の content_html を維持する
+                // content が変わった場合と新規作成時のみ HTML を再生成する。
+                // それ以外は None を渡して既存の content_html を維持する。
+                // 既存レコードの埋め戻しは tools/content-html-backfill で行う
+                // （webhook 経由だと UPDATE で updated_at が更新されてしまうため）
                 let existing = match registry
                     .articles_repository()
                     .find_by_user_id_and_slug(&user_id, &slug)
@@ -260,9 +262,7 @@ pub async fn handle_github_webhook(
                 };
 
                 let needs_html = match &existing {
-                    Some(article) => {
-                        article.content.as_str() != content || article.content_html.is_none()
-                    }
+                    Some(article) => article.content.as_str() != content,
                     None => true,
                 };
 
