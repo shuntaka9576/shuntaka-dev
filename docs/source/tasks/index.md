@@ -10,6 +10,7 @@
 2026-06-28-tidb-dashboard-search-logs
 2026-06-27-ng-monitoring-standalone
 2026-06-27-perf-bench
+2026-06-27-tidb-full-rebuild
 2026-06-27-tidbmonitor-decommission
 2026-06-26-dsql-to-tidb-migration
 2026-06-25-construction-plan
