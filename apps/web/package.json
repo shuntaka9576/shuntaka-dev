@@ -33,6 +33,6 @@
     "@types/rss": "^0.0.32",
     "storybook": "^10.4.6",
     "tailwindcss": "^4.3.2",
-    "vite": "^8.1.2"
+    "vite": "^8.1.3"
   }
 }
