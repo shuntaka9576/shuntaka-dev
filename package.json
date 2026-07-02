@@ -34,7 +34,7 @@
     "lefthook": "^2.1.9",
     "prettier": "^3.9.4",
     "secretlint": "^13.0.2",
-    "tsx": "^4.22.4",
+    "tsx": "^4.22.5",
     "turbo": "^2.10.2",
     "typescript": "^6.0.3",
     "vite-plus": "^0.2.2"
