@@ -3515,6 +3515,7 @@ dependencies = [
  "opentelemetry-aws",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "uuid",
 ]
 
 [[package]]

@@ -4,10 +4,84 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 
-// ADOT Collector (iac/aws/ecspresso/tidb-proxy/otel-config.yaml) の awsemf
-// exporter が出力する CloudWatch namespace / dimension と一致させること。
-const METRIC_NAMESPACE = 'BlogRuntime';
-const SERVICE_NAME_DIMENSION = 'service.name';
+// メトリクスは CloudWatch OTel Metrics (OTLP ネイティブ取り込み) に格納され、
+// PromQL で参照する。ADOT Collector (iac/aws/ecspresso/tidb-proxy/otel-config.yaml)
+// の otlphttp/cloudwatch exporter の送信先と対応する。
+//
+// PromQL 上の見え方:
+// - ドット入りメトリクス名は {"db.query.duration_bucket", ...} の引用構文で参照
+// - OTLP histogram は <name>_bucket 系列 + le ラベルになり histogram_quantile が使える
+// - resource 属性は "@resource.service.name" 等のラベルとして付与される
+//
+// 注意: cumulative temporality のため、1 サンプルしか持たない系列 (一度だけ
+// invoke されて消えた Lambda インスタンス等) は rate() に反映されない。
+// リクエスト単位の悉皆データは X-Ray トレース側で確認する。
+
+interface PromqlQuery {
+  id: string;
+  query: string;
+  label?: string;
+}
+
+// CDK L2 (GraphWidget) は Classic メトリクス専用のため、dashboard body の
+// `type: chart` ウィジェット (PromQL 対応) を直接出力する薄いラッパー。
+class PromqlChartWidget extends cloudwatch.ConcreteWidget {
+  private readonly title: string;
+  private readonly queries: PromqlQuery[];
+
+  constructor(props: { title: string; queries: PromqlQuery[]; width?: number; height?: number }) {
+    super(props.width ?? 8, props.height ?? 6);
+    this.title = props.title;
+    this.queries = props.queries;
+  }
+
+  toJson(): Record<string, unknown>[] {
+    return [
+      {
+        type: 'chart',
+        x: this.x,
+        y: this.y,
+        width: this.width,
+        height: this.height,
+        properties: {
+          view: 'line',
+          title: this.title,
+          region: cdk.Aws.REGION,
+          data: {
+            queries: this.queries.map((q) => ({
+              id: q.id,
+              type: 'cloudwatch-metrics',
+              language: 'PromQL',
+              query: q.query,
+              ...(q.label ? { label: q.label } : {}),
+            })),
+          },
+        },
+      },
+    ];
+  }
+}
+
+const serviceMatcher = (serviceName: string): string => `"@resource.service.name"="${serviceName}"`;
+
+// histogram の p50/p95/p99。rate window は SELECT 1 プローブ間隔 (5 分) でも
+// 2 サンプル以上入るよう 15m にしている。
+const latencyQuantiles = (metricName: string, serviceName: string): PromqlQuery[] =>
+  [
+    { quantile: '0.5', label: 'p50' },
+    { quantile: '0.95', label: 'p95' },
+    { quantile: '0.99', label: 'p99' },
+  ].map(({ quantile, label }) => ({
+    id: label,
+    label,
+    query: `histogram_quantile(${quantile}, sum by (le) (rate({"${metricName}_bucket", ${serviceMatcher(serviceName)}}[15m])))`,
+  }));
+
+const counterIncrease = (id: string, metricName: string, serviceName: string): PromqlQuery => ({
+  id,
+  label: `${metricName} (15m)`,
+  query: `sum(increase({"${metricName}", ${serviceMatcher(serviceName)}}[15m]))`,
+});
 
 // Lambda -> forwarder -> TiDB のボトルネック切り分け用ダッシュボード。
 //
@@ -62,96 +136,62 @@ export class ObservabilityConstruct extends Construct {
       ],
     });
 
-    // ---- CloudWatch Dashboard ----
-    const percentiles = (metricName: string, serviceName: string): cloudwatch.IMetric[] =>
-      ['p50', 'p95', 'p99'].map(
-        (stat) =>
-          new cloudwatch.Metric({
-            namespace: METRIC_NAMESPACE,
-            metricName,
-            dimensionsMap: { [SERVICE_NAME_DIMENSION]: serviceName },
-            statistic: stat,
-            label: stat,
-            period: cdk.Duration.minutes(1),
-          }),
-      );
-
-    const sum = (metricName: string, serviceName: string): cloudwatch.IMetric =>
-      new cloudwatch.Metric({
-        namespace: METRIC_NAMESPACE,
-        metricName,
-        dimensionsMap: { [SERVICE_NAME_DIMENSION]: serviceName },
-        statistic: 'Sum',
-        label: metricName,
-        period: cdk.Duration.minutes(1),
-      });
-
-    const latencyWidget = (title: string, metricName: string, serviceName: string) =>
-      new cloudwatch.GraphWidget({
-        title,
-        left: percentiles(metricName, serviceName),
-        leftYAxis: { label: 'ms', min: 0, showUnits: false },
-        width: 8,
-        height: 6,
-      });
-
+    // ---- CloudWatch Dashboard (PromQL / OTel Metrics) ----
     const dashboard = new cloudwatch.Dashboard(this, 'Dashboard', {
       dashboardName: `${props.physicalPrefix}-observability`,
     });
 
     dashboard.addWidgets(
-      latencyWidget('Lambda request latency', 'app.request.duration', props.lambdaServiceName),
-      latencyWidget('DB client latency', 'db.query.duration', props.lambdaServiceName),
-      latencyWidget(
-        'DB baseline latency (SELECT 1)',
-        'db.healthcheck.duration',
-        props.lambdaServiceName,
-      ),
+      new PromqlChartWidget({
+        title: 'Lambda request latency',
+        queries: latencyQuantiles('app.request.duration', props.lambdaServiceName),
+      }),
+      new PromqlChartWidget({
+        title: 'DB client latency',
+        queries: latencyQuantiles('db.query.duration', props.lambdaServiceName),
+      }),
+      new PromqlChartWidget({
+        title: 'DB baseline latency (SELECT 1)',
+        queries: latencyQuantiles('db.healthcheck.duration', props.lambdaServiceName),
+      }),
     );
 
     dashboard.addWidgets(
-      latencyWidget('DB connection latency', 'db.connection.duration', props.lambdaServiceName),
-      latencyWidget(
-        'Forwarder upstream connect latency',
-        'proxy.upstream.connect.duration',
-        props.proxyServiceName,
-      ),
-      new cloudwatch.GraphWidget({
+      new PromqlChartWidget({
+        title: 'DB connection latency',
+        queries: latencyQuantiles('db.connection.duration', props.lambdaServiceName),
+      }),
+      new PromqlChartWidget({
+        title: 'Forwarder upstream connect latency',
+        queries: latencyQuantiles('proxy.upstream.connect.duration', props.proxyServiceName),
+      }),
+      new PromqlChartWidget({
         title: 'Forwarder connections',
-        left: [
-          new cloudwatch.Metric({
-            namespace: METRIC_NAMESPACE,
-            metricName: 'proxy.connection.active',
-            dimensionsMap: { [SERVICE_NAME_DIMENSION]: props.proxyServiceName },
-            statistic: 'Maximum',
+        queries: [
+          {
+            id: 'active',
             label: 'proxy.connection.active',
-            period: cdk.Duration.minutes(1),
-          }),
-          sum('proxy.connection.accept.count', props.proxyServiceName),
+            query: `sum({"proxy.connection.active", ${serviceMatcher(props.proxyServiceName)}})`,
+          },
+          counterIncrease('accepts', 'proxy.connection.accept.count', props.proxyServiceName),
         ],
-        width: 8,
-        height: 6,
       }),
     );
 
     dashboard.addWidgets(
-      new cloudwatch.GraphWidget({
+      new PromqlChartWidget({
         title: 'Forwarder errors',
-        left: [
-          sum('proxy.error.count', props.proxyServiceName),
-          sum('proxy.timeout.count', props.proxyServiceName),
+        queries: [
+          counterIncrease('errors', 'proxy.error.count', props.proxyServiceName),
+          counterIncrease('timeouts', 'proxy.timeout.count', props.proxyServiceName),
         ],
-        width: 8,
-        height: 6,
       }),
-      new cloudwatch.GraphWidget({
+      new PromqlChartWidget({
         title: 'Lambda cold starts / DB errors',
-        left: [
-          sum('lambda.cold_start.count', props.lambdaServiceName),
-          sum('db.query.error.count', props.lambdaServiceName),
+        queries: [
+          counterIncrease('coldstarts', 'lambda.cold_start.count', props.lambdaServiceName),
+          counterIncrease('dberrors', 'db.query.error.count', props.lambdaServiceName),
         ],
-        width: 8,
-        height: 6,
       }),
     );
   }

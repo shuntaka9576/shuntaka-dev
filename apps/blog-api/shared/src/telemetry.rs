@@ -1,10 +1,16 @@
 //! OpenTelemetry SDK の初期化とライフサイクル管理。
 //!
 //! Lambda -> tidb-proxy (ECS) 上の ADOT Collector sidecar へ OTLP/HTTP で
-//! traces / metrics を送る。Collector 側で X-Ray / CloudWatch EMF に変換する。
+//! traces / metrics を送る。Collector 側で traces は X-Ray へ、metrics は
+//! CloudWatch OTel Metrics (OTLP ネイティブ) へ export する。
 //!
 //! - `OTEL_EXPORTER_OTLP_ENDPOINT` 未設定時は完全に無効化 (ローカル開発を壊さない)
 //! - trace ID は awsxray exporter が受理できるよう X-Ray 互換 ID generator を使う
+//! - metrics は PromQL の `rate()` / `histogram_quantile()` 前提の cumulative
+//!   temporality (SDK デフォルト) で送る
+//! - Lambda は同一ラベルのサンドボックスが並行に存在し得るため、
+//!   `service.instance.id` でプロセスごとに系列を分離する (これが無いと複数
+//!   プロセスの cumulative 値が混ざって rate() が壊れる)
 //! - Lambda は invoke 間で freeze されるため、batch processor / periodic reader の
 //!   バックグラウンド export だけに頼らず、リクエスト処理後に `flush()` を呼んで
 //!   ベストエフォートで送り切る
@@ -12,11 +18,11 @@
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use opentelemetry::global;
+use opentelemetry::{KeyValue, global};
 use opentelemetry_aws::trace::XrayIdGenerator;
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::Resource;
-use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
+use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::{SdkTracer, SdkTracerProvider};
 
 static PROVIDERS: OnceLock<(SdkTracerProvider, SdkMeterProvider)> = OnceLock::new();
@@ -38,7 +44,13 @@ pub fn init_telemetry() -> Option<Telemetry> {
 
     let service_name =
         std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "blog-api".to_string());
-    let resource = Resource::builder().with_service_name(service_name).build();
+    let resource = Resource::builder()
+        .with_service_name(service_name)
+        .with_attribute(KeyValue::new(
+            "service.instance.id",
+            uuid::Uuid::new_v4().to_string(),
+        ))
+        .build();
 
     let span_exporter = match opentelemetry_otlp::SpanExporter::builder()
         .with_http()
@@ -53,12 +65,12 @@ pub fn init_telemetry() -> Option<Telemetry> {
         }
     };
 
-    // awsemf exporter は delta temporality の方が扱いが単純なため delta を指定する。
+    // temporality はデフォルトの cumulative。CloudWatch OTel Metrics を PromQL
+    // (rate / histogram_quantile) で読む前提のため Prometheus 同様 cumulative が正。
     let metric_exporter = match opentelemetry_otlp::MetricExporter::builder()
         .with_http()
         .with_protocol(Protocol::HttpBinary)
         .with_endpoint(format!("{base}/v1/metrics"))
-        .with_temporality(Temporality::Delta)
         .build()
     {
         Ok(exporter) => exporter,

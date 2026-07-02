@@ -300,7 +300,13 @@
     "otlptrace",
     "otlptracegrpc",
     "sdkmetric",
-    "tracenoop"
+    "tracenoop",
+    "coldstarts",
+    "cryptorand",
+    "dberrors",
+    "otlphttp",
+    "sigv4auth",
+    "promql"
   ],
   "flagWords": [],
   "dictionaries": ["npm", "node", "typescript", "html", "css", "bash"]

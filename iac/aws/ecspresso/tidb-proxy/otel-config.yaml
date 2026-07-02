@@ -5,9 +5,17 @@
 #
 # 受信: Lambda (blog-api) から VPC 越しに http://tidb-proxy.internal:4318 (OTLP/HTTP)、
 #       同一 task 内の forwarder から http://localhost:4317 (OTLP/gRPC)。
-# 送信: traces -> X-Ray / metrics -> CloudWatch EMF (namespace: BlogRuntime)。
+# 送信: traces  -> X-Ray (awsxray exporter)
+#       metrics -> CloudWatch OTel Metrics (OTLP ネイティブエンドポイント)。
+#                  GB ベース課金で PromQL / Query Studio から参照する。
+#                  Classic (EMF) と違い dimension 制御が不要なため
+#                  metric_declarations は持たない。
 extensions:
   health_check:
+  # CloudWatch OTLP エンドポイントは sigv4 認証必須。service 名は "monitoring"。
+  sigv4auth:
+    region: ap-northeast-1
+    service: monitoring
 
 receivers:
   otlp:
@@ -19,6 +27,11 @@ receivers:
 
 processors:
   batch:
+  # CloudWatch OTLP metrics エンドポイントは 1 リクエスト最大 1,000 datapoint /
+  # 1MB 制限があるため、metrics だけバッチサイズを抑える
+  batch/metrics:
+    send_batch_size: 500
+    send_batch_max_size: 800
 
 exporters:
   awsxray:
@@ -33,43 +46,14 @@ exporters:
       - error.type
       - peer.service
       - external.operation
-  awsemf:
-    region: ap-northeast-1
-    namespace: BlogRuntime
-    log_group_name: /aws/otel/blog-runtime
-    # metric_declarations で dimension セットを固定するため rollup は不要
-    dimension_rollup_option: NoDimensionRollup
-    resource_to_telemetry_conversion:
-      enabled: true
-    # CloudWatch dashboard (iac/aws/lib/api/observability-construct.ts) が参照する
-    # dimension セットと一致させること
-    metric_declarations:
-      - dimensions: [[service.name], [service.name, app.route]]
-        metric_name_selectors:
-          - "^app\\.request\\.duration$"
-      - dimensions: [[service.name], [service.name, db.query_type]]
-        metric_name_selectors:
-          - "^db\\.query\\.duration$"
-          - "^db\\.query\\.error\\.count$"
-      - dimensions: [[service.name]]
-        metric_name_selectors:
-          - "^db\\.healthcheck\\.duration$"
-          - "^db\\.connection\\.duration$"
-          - "^lambda\\.cold_start\\.count$"
-      - dimensions: [[service.name], [service.name, error.type]]
-        metric_name_selectors:
-          - "^proxy\\.error\\.count$"
-      - dimensions: [[service.name]]
-        metric_name_selectors:
-          - "^proxy\\.connection\\.active$"
-          - "^proxy\\.connection\\.accept\\.count$"
-          - "^proxy\\.connection\\.duration$"
-          - "^proxy\\.upstream\\.connect\\.duration$"
-          - "^proxy\\.bytes\\.(in|out)$"
-          - "^proxy\\.timeout\\.count$"
+  otlphttp/cloudwatch:
+    metrics_endpoint: https://monitoring.ap-northeast-1.amazonaws.com/v1/metrics
+    compression: gzip
+    auth:
+      authenticator: sigv4auth
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, sigv4auth]
   pipelines:
     traces:
       receivers: [otlp]
@@ -77,5 +61,5 @@ service:
       exporters: [awsxray]
     metrics:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [awsemf]
+      processors: [batch/metrics]
+      exporters: [otlphttp/cloudwatch]

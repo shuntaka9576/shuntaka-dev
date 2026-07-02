@@ -1,7 +1,8 @@
 // OpenTelemetry 計装のセットアップ。
 //
 // 同一 Fargate task 内の ADOT Collector sidecar (localhost:4317) へ OTLP/gRPC で
-// traces / metrics を送る。Collector 側で X-Ray / CloudWatch EMF に変換する。
+// traces / metrics を送る。Collector 側で traces は X-Ray へ、metrics は
+// CloudWatch OTel Metrics (OTLP ネイティブ) へ export する。
 //
 // OTEL_EXPORTER_OTLP_ENDPOINT 未設定時は noop provider にフォールバックし、
 // 計装コードはそのまま (コストほぼゼロで) 動く。ローカル実行を壊さないため。
@@ -9,6 +10,8 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -25,7 +28,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -73,10 +75,15 @@ func setupTelemetry(ctx context.Context, upstreamName string) (*telemetry, error
 	}
 
 	serviceName := getenv(envOtelServiceName, defaultOtelServiceName)
+	// デプロイのローリング中は同一 service.name の task が並行するため、
+	// service.instance.id でプロセスごとに cumulative 系列を分離する。
 	res, err := resource.New(ctx,
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(attribute.String("service.name", serviceName)),
+		resource.WithAttributes(
+			attribute.String("service.name", serviceName),
+			attribute.String("service.instance.id", newInstanceID()),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("otel resource: %w", err)
@@ -93,10 +100,9 @@ func setupTelemetry(ctx context.Context, upstreamName string) (*telemetry, error
 		sdktrace.WithIDGenerator(xray.NewIDGenerator()),
 	)
 
-	// awsemf exporter は delta temporality の方が扱いが単純なため delta を指定する。
-	metricExporter, err := otlpmetricgrpc.New(ctx,
-		otlpmetricgrpc.WithTemporalitySelector(deltaTemporality),
-	)
+	// temporality はデフォルトの cumulative。CloudWatch OTel Metrics を PromQL
+	// (rate / histogram_quantile) で読む前提のため Prometheus 同様 cumulative が正。
+	metricExporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("otlp metric exporter: %w", err)
 	}
@@ -188,14 +194,11 @@ func (t *telemetry) initInstruments(meter metric.Meter) error {
 	return errors.Join(errs...)
 }
 
-// deltaTemporality は counter / histogram を delta で export する selector。
-func deltaTemporality(kind sdkmetric.InstrumentKind) metricdata.Temporality {
-	switch kind {
-	case sdkmetric.InstrumentKindCounter,
-		sdkmetric.InstrumentKindHistogram,
-		sdkmetric.InstrumentKindObservableCounter:
-		return metricdata.DeltaTemporality
-	default:
-		return metricdata.CumulativeTemporality
+// newInstanceID はプロセス単位の識別子 (128bit hex) を返す。
+func newInstanceID() string {
+	b := make([]byte, 16)
+	if _, err := cryptorand.Read(b); err != nil {
+		return fmt.Sprintf("pid-%d-%d", os.Getpid(), time.Now().UnixNano())
 	}
+	return hex.EncodeToString(b)
 }
