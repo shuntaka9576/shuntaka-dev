@@ -676,3 +676,9 @@ bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 ```
 
 全記事を再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、変換結果のサイズ確認だけなら `--dry-run` を付ける。リンクカード・GitHub 埋め込みの外部フェッチは記事ごとに URL を列挙してから並列 fetch し、失敗した URL は変換せず元のまま残す（API 側と同じフォールバック挙動）。
+
+wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` でも実行される）
+
+```bash
+bun run test
+```

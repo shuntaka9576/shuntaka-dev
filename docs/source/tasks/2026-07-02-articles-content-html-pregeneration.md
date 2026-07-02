@@ -61,3 +61,4 @@ SELECT COUNT(*) FROM `blog_dev`.`articles` WHERE `content_html` IS NULL;
 - 変換は記事ごとに `tokio::task::spawn_blocking` で実行するため、webhook 処理・フォールバック GET とも tokio ワーカーをブロックしない
 - OGP リンクカードの内容は変換時点のスナップショットになる（従来はリクエストごとに再フェッチしていた）。リンク先の OGP が変わった場合は記事を再 push するか `bun run backfill -- --all` で再生成する
 - wasm 版の syntect は onig（C 依存）が使えないため fancy-regex エンジンを使う。comrak が wasm32 で採用しているのと同じ構成で、ハイライト結果は実用上同一
+- テストは2層。2パス変換 API（URL 収集・リソース注入・フォールバック）は markdown crate のユニットテスト（native）、wasm バイナリ + JS グルーの実物は `tools/content-html-backfill` の `bun run test`（dev ビルド → bun test、CI の `turbo test` でも実行）で検証する
