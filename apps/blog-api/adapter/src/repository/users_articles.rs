@@ -127,7 +127,9 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         offset: u64,
         limit: u64,
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
-        let rows: Vec<ArticleSummaryRow> = sqlx::query_as(
+        let pool = self.db.pool();
+
+        let rows_future = sqlx::query_as::<_, ArticleSummaryRow>(
             r#"
             SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
@@ -153,10 +155,9 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         .bind(article_type.as_str())
         .bind(limit)
         .bind(offset)
-        .fetch_all(&self.db.pool())
-        .await?;
+        .fetch_all(&pool);
 
-        let total_count: (i64,) = sqlx::query_as(
+        let count_future = sqlx::query_as::<_, (i64,)>(
             r#"
             SELECT COUNT(*)
             FROM articles a
@@ -167,8 +168,10 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         )
         .bind(user_name)
         .bind(article_type.as_str())
-        .fetch_one(&self.db.pool())
-        .await?;
+        .fetch_one(&pool);
+
+        // DB が Tailscale 越しで RTT が大きいため、一覧と件数を並列に投げる
+        let (rows, total_count) = tokio::try_join!(rows_future, count_future)?;
 
         let articles: Vec<ArticleSummary> = rows
             .into_iter()

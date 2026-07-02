@@ -10,6 +10,7 @@ use anyhow::{Error, Result};
 use axum::Router;
 use shared::config::AppConfig;
 use tokio::net::TcpListener;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -61,6 +62,8 @@ async fn bootstrap() -> Result<()> {
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
         .layer(cors)
+        // syntect がインライン style を吐くため content_html が大きく、gzip の効果が高い
+        .layer(CompressionLayer::new())
         .with_state(registry);
 
     let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), app_config.server.port);

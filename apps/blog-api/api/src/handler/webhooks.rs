@@ -12,6 +12,7 @@ use kernel::model::frontmatter::ArticleFrontmatter;
 use kernel::repository::articles::UpsertArticleInput;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
 
@@ -37,8 +38,10 @@ struct ArticleProcessError {
 }
 
 fn extract_branch_name(git_ref: &str) -> Option<String> {
-    let re = regex::Regex::new(r"^refs/heads/(.+)$").ok()?;
-    re.captures(git_ref)
+    static BRANCH_NAME_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"^refs/heads/(.+)$").unwrap());
+    BRANCH_NAME_RE
+        .captures(git_ref)
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str().to_string())
 }
