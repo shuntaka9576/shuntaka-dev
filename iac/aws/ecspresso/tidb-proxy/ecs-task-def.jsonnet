@@ -4,8 +4,7 @@ local ssmParams = import 'ssm-params.jsonnet';
 {
   family: 'tidb-proxy',
   cpu: '256',
-  // otel-collector sidecar (RSS ~100-200MB) 追加に伴い 512 -> 1024
-  memory: '1024',
+  memory: '512',
   networkMode: 'awsvpc',
   requiresCompatibilities: ['FARGATE'],
   runtimePlatform: {
