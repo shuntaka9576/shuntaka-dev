@@ -2,52 +2,6 @@
 
 exports[`MainStack > snapshot 1`] = `
 {
-  "Metadata": {
-    "cdk_nag": {
-      "rules_to_suppress": [
-        {
-          "applies_to": [
-            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
-            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-          ],
-          "id": "AwsSolutions-IAM4",
-          "is_reason_encoded": true,
-          "reason": "VE9ETyjliKVQUik6IExhbWJkYSDlrp/ooYzjg63jg7zjg6vjgaggQVBJIEdhdGV3YXkgQ2xvdWRXYXRjaFJvbGUg44GMIENESyDml6LlrprjgafliKnnlKjjgZnjgosgQVdTIOeuoeeQhuODneODquOCt+ODvOOCkuOCq+OCueOCv+ODnuODvOeuoeeQhuODneODquOCt+ODvOOBq+e9ruOBjeaPm+OBiOOCi+OAgkFXU0xhbWJkYVZQQ0FjY2Vzc0V4ZWN1dGlvblJvbGUg44GvIFZQQyDlhoUgTGFtYmRhIOOBriBFTkkg566h55CG44Gr5b+F6KaB44Gq5pyA5bCP5qip6ZmQ44K744OD44OI44GnIEFXUyDlhazlvI/jga7jg5njgrnjg4jjg5fjg6njgq/jg4bjgqPjgrnjga7jgZ/jgoHoqLHlrrnjgII=",
-        },
-        {
-          "id": "AwsSolutions-APIG1",
-          "is_reason_encoded": true,
-          "reason": "VE9ETyjliKVQUik6IEFQSSBHYXRld2F5IOOCueODhuODvOOCuOOBruOCouOCr+OCu+OCueODreOCsOOCkiBDbG91ZFdhdGNoIExvZ3Mg44Gr5Ye65Yqb44GZ44KL6Kit5a6a44KS6L+95Yqg44GZ44KL44CC",
-        },
-        {
-          "id": "AwsSolutions-APIG2",
-          "is_reason_encoded": true,
-          "reason": "VE9ETyjliKVQUik6IEFQSSBHYXRld2F5IOOBruODquOCr+OCqOOCueODiOaknOiovCAoUmVxdWVzdFZhbGlkYXRvciArIE1vZGVsKSDjgpIgT3BlbkFQSSDmlbTlgpnjgajjgrvjg4Pjg4jjgafov73liqDjgZnjgovjgII=",
-        },
-        {
-          "id": "AwsSolutions-APIG4",
-          "is_reason_encoded": true,
-          "reason": "QVBJIEdhdGV3YXkg44GvIHtwcm94eSt9IEFOWSDjgaflhajjg6rjgq/jgqjjgrnjg4jjgpIgTGFtYmRhIOOBq+ODkeOCueOCueODq+ODvOOBmeOCi+ani+aIkOOBruOBn+OCgSBNZXRob2Qg5Y2Y5L2N44Gu44Kq44O844K944Op44Kk44K244O844Gv6Kit5a6a44GX44Gq44GE44CC5pu444GN6L6844G/57O7IChQT1NUIC93ZWJob29rcy9naXRodWIpIOOBryBMYW1iZGEg5YG044GnIFgtSHViLVNpZ25hdHVyZS0yNTYg44GuIEhNQUMg5qSc6Ki844KS5a6f6KOF5riI44G/44CC6Kqt44G/5Y+W44KK57O7IChHRVQgL3VzZXJzLy4uLi9hcnRpY2xlcyDnrYkpIOOBr+aEj+Wbs+eahOOBq+acquiqjeiovOOBriBwdWJsaWMg44Ko44Oz44OJ44Od44Kk44Oz44OI44CC",
-        },
-        {
-          "id": "AwsSolutions-APIG3",
-          "is_reason_encoded": true,
-          "reason": "VE9ETyjliKVQUik6IEFQSSBHYXRld2F5IOOCueODhuODvOOCuOOBqyBXQUZ2MiBXZWJBQ0wg44KSIGFzc29jaWF0ZSDjgZnjgovjgII=",
-        },
-        {
-          "id": "AwsSolutions-APIG6",
-          "is_reason_encoded": true,
-          "reason": "VE9ETyjliKVQUik6IEFQSSBHYXRld2F5IOWFqCBNZXRob2Qg44GuIENsb3VkV2F0Y2ggTG9ncyDlh7rlipsgKGRlcGxveU9wdGlvbnMubG9nZ2luZ0xldmVsKSDjgpLov73liqDjgZnjgovjgII=",
-        },
-        {
-          "id": "AwsSolutions-COG4",
-          "is_reason_encoded": true,
-          "reason": "Q29nbml0byBVc2VyIFBvb2wg44Gr44KI44KL6KqN6Ki85Z+655uk44KS5oyB44Gf44Gq44GE44OX44Ot44K444Kn44Kv44OI44Gu44Gf44KB5LiN6YGp5ZCI44CC6KqN6Ki844GM5b+F6KaB44Gq5pu444GN6L6844G/57O744GvIEdpdEh1YiBXZWJob29rIChITUFDIOaknOiovCkg44Gu44G/44Gn44CB44Gd44KM5Lul5aSW44GvIHB1YmxpYyByZWFk44CC",
-        },
-      ],
-    },
-  },
   "Outputs": {
     "BlogAPIRestApiEndpoint9DCAF3F6": {
       "Value": {
@@ -830,17 +784,6 @@ exports[`MainStack > snapshot 1`] = `
       "DependsOn": [
         "BlogAPIWebApiLambdaServiceRole5C77D6FD",
       ],
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "AwsSolutions-L1",
-              "is_reason_encoded": true,
-              "reason": "44OG44K544OI55So44GrIERvY2tlckltYWdlRnVuY3Rpb24g44KS44Oi44OD44Kv44GX44GmIE5vZGUuanMg44Op44Oz44K/44Kk44Og6Zai5pWw44Gr5beu44GX5pu/44GI44Gm44GE44KL44CC5pys55Wq44GvIERvY2tlciDjgqTjg6Hjg7zjgrjjga7jgZ/jgoHpnZ7oqbLlvZPjgII=",
-            },
-          ],
-        },
-      },
       "Properties": {
         "Architectures": [
           "arm64",

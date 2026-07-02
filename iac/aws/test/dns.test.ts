@@ -1,15 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
-import { Annotations, Match, Template } from 'aws-cdk-lib/assertions';
+import { Template } from 'aws-cdk-lib/assertions';
+import { AwsSolutionsChecks } from 'cdk-nag';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
 import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
-import { applyNag } from '../lib/nag.js';
 
 const expectNoNagErrors = (stack: cdk.Stack): void => {
-  const errors = Annotations.fromStack(stack).findError(
-    '*',
-    Match.stringLikeRegexp('AwsSolutions-.*'),
-  );
-  expect(errors).toEqual([]);
+  const report = new AwsSolutionsChecks(undefined, { verbose: true }).validateScope(stack);
+  expect(report.violations).toEqual([]);
 };
 
 describe('GlobalDnsStack', () => {
@@ -24,7 +21,6 @@ describe('GlobalDnsStack', () => {
       },
     });
 
-    applyNag(stack);
     expectNoNagErrors(stack);
 
     const template = Template.fromStack(stack);
@@ -45,7 +41,6 @@ describe('TokyoCertificateStack', () => {
       },
     });
 
-    applyNag(stack);
     expectNoNagErrors(stack);
 
     const template = Template.fromStack(stack);

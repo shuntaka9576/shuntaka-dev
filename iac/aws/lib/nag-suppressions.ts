@@ -1,39 +1,49 @@
 import type * as cdk from 'aws-cdk-lib';
-import { NagSuppressions } from 'cdk-nag';
+import { Validations } from 'aws-cdk-lib';
+
+interface NagAcknowledgment {
+  id: string;
+  reason: string;
+}
+
+// Validations.of().acknowledge() は id 中の '::' を prefix 区切りとして解釈し、
+// '::' を2回以上含む id (AwsSolutions-IAM4 の Policy ARN finding 等) を
+// InvalidValidationId で拒否するため、cdk-nag が読むメタデータキーへ直接記録する。
+const acknowledgeRules = (stack: cdk.Stack, rules: NagAcknowledgment[]): void => {
+  for (const rule of rules) {
+    stack.node.addMetadata(Validations.ACKNOWLEDGED_RULES_METADATA_KEY, {
+      [rule.id]: rule.reason,
+    });
+  }
+};
 
 export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
-  NagSuppressions.addStackSuppressions(stack, [
-    {
-      id: 'AwsSolutions-IAM4',
-      reason:
-        'TODO(別PR): デプロイロールの AWS 管理ポリシー (CloudFormationFullAccess / IAMFullAccess / S3FullAccess) を Permissions Boundary + カスタマー管理ポリシーへ置き換える。',
-      appliesTo: [
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/AWSCloudFormationFullAccess',
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/IAMFullAccess',
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/AmazonS3FullAccess',
-      ],
-    },
-    {
-      id: 'AwsSolutions-IAM5',
-      reason:
-        'TODO(別PR): デプロイロールのインライン IAM ステートメントの wildcard アクション / リソースをスコープ縮小する。',
-      appliesTo: [
-        'Action::lambda:*',
-        'Action::apigateway:*',
-        'Action::route53:*',
-        'Action::acm:*',
-        'Action::logs:*',
-        'Action::ec2:*',
-        'Action::ecs:*',
-        'Action::servicediscovery:*',
-        'Resource::*',
-      ],
-    },
+  const iam4Reason =
+    'TODO(別PR): デプロイロールの AWS 管理ポリシー (CloudFormationFullAccess / IAMFullAccess / S3FullAccess) を Permissions Boundary + カスタマー管理ポリシーへ置き換える。';
+  const iam5Reason =
+    'TODO(別PR): デプロイロールのインライン IAM ステートメントの wildcard アクション / リソースをスコープ縮小する。';
+  acknowledgeRules(stack, [
+    ...[
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/AWSCloudFormationFullAccess',
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/IAMFullAccess',
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/AmazonS3FullAccess',
+    ].map((finding) => ({ id: `AwsSolutions-IAM4[${finding}]`, reason: iam4Reason })),
+    ...[
+      'Action::lambda:*',
+      'Action::apigateway:*',
+      'Action::route53:*',
+      'Action::acm:*',
+      'Action::logs:*',
+      'Action::ec2:*',
+      'Action::ecs:*',
+      'Action::servicediscovery:*',
+      'Resource::*',
+    ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
 };
 
 export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
-  NagSuppressions.addStackSuppressions(stack, [
+  acknowledgeRules(stack, [
     {
       id: 'AwsSolutions-VPC7',
       reason:
@@ -50,34 +60,27 @@ export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
         'private ECR repository で IAM role による認証ベースの pull のため、resource-based policy で別途プリンシパル制限する必要はない。',
     },
     {
-      id: 'AwsSolutions-IAM4',
+      id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy]',
       reason:
         'ECS task ExecutionRole の AmazonECSTaskExecutionRolePolicy は ECR pull / CloudWatch Logs 書き込みの最小権限セットで、AWS 公式のベストプラクティス通り。カスタマー管理ポリシー化は無理に行わない。',
-      appliesTo: [
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
-      ],
     },
     {
-      id: 'AwsSolutions-IAM5',
+      id: 'AwsSolutions-IAM5[Resource::*]',
       reason:
         'ECS UpdateTaskProtection は対象 task が deploy 時に動的に決まるためリソース ARN を事前に絞れない。kms:Decrypt は SSM SecureString 復号用で default KMS key (alias/aws/ssm) のみに限定済み。',
-      appliesTo: ['Resource::*'],
     },
   ]);
 };
 
 export const applyMainStackSuppressions = (stack: cdk.Stack): void => {
-  NagSuppressions.addStackSuppressions(stack, [
-    {
-      id: 'AwsSolutions-IAM4',
-      reason:
-        'TODO(別PR): Lambda 実行ロールと API Gateway CloudWatchRole が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。',
-      appliesTo: [
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs',
-        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
-      ],
-    },
+  const iam4Reason =
+    'TODO(別PR): Lambda 実行ロールと API Gateway CloudWatchRole が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。';
+  acknowledgeRules(stack, [
+    ...[
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs',
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
+    ].map((finding) => ({ id: `AwsSolutions-IAM4[${finding}]`, reason: iam4Reason })),
     {
       id: 'AwsSolutions-APIG1',
       reason:
