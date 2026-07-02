@@ -1,0 +1,16 @@
+{
+  "name": "tidb-seeder",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx src/index.ts generate",
+    "load": "tsx src/index.ts load",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0"
+  }
+}

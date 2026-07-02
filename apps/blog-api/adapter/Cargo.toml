@@ -10,6 +10,5 @@ async-trait.workspace = true
 derive-new.workspace = true
 anyhow.workspace = true
 sqlx.workspace = true
-aurora-dsql-sqlx-connector.workspace = true
 chrono.workspace = true
 uuid.workspace = true

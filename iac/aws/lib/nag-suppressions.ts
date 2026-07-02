@@ -23,8 +23,45 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
         'Action::route53:*',
         'Action::acm:*',
         'Action::logs:*',
+        'Action::ec2:*',
+        'Action::ecs:*',
+        'Action::servicediscovery:*',
         'Resource::*',
       ],
+    },
+  ]);
+};
+
+export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
+  NagSuppressions.addStackSuppressions(stack, [
+    {
+      id: 'AwsSolutions-VPC7',
+      reason:
+        '個人ブログ用途で VPC Flow Logs (CloudWatch / S3) を恒常的に保持しない方針。proxy SG inbound は lambda-sg からの 2 ポートのみで、調査が必要な場合は手動で flow logs を有効化する。',
+    },
+    {
+      id: 'AwsSolutions-ECS4',
+      reason:
+        'Container Insights の月コスト (~$1〜) を避けるため OFF。1 task 運用かつ awslogs driver で CloudWatch Logs に container ログを流すので、必要時にそこから調査する。',
+    },
+    {
+      id: 'AwsSolutions-ECR1',
+      reason:
+        'private ECR repository で IAM role による認証ベースの pull のため、resource-based policy で別途プリンシパル制限する必要はない。',
+    },
+    {
+      id: 'AwsSolutions-IAM4',
+      reason:
+        'ECS task ExecutionRole の AmazonECSTaskExecutionRolePolicy は ECR pull / CloudWatch Logs 書き込みの最小権限セットで、AWS 公式のベストプラクティス通り。カスタマー管理ポリシー化は無理に行わない。',
+      appliesTo: [
+        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
+      ],
+    },
+    {
+      id: 'AwsSolutions-IAM5',
+      reason:
+        'ECS UpdateTaskProtection は対象 task が deploy 時に動的に決まるためリソース ARN を事前に絞れない。kms:Decrypt は SSM SecureString 復号用で default KMS key (alias/aws/ssm) のみに限定済み。',
+      appliesTo: ['Resource::*'],
     },
   ]);
 };
@@ -34,10 +71,11 @@ export const applyMainStackSuppressions = (stack: cdk.Stack): void => {
     {
       id: 'AwsSolutions-IAM4',
       reason:
-        'TODO(別PR): Lambda 実行ロールと API Gateway CloudWatchRole が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。',
+        'TODO(別PR): Lambda 実行ロールと API Gateway CloudWatchRole が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。',
       appliesTo: [
         'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
         'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs',
+        'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
       ],
     },
     {

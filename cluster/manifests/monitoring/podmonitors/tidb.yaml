@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tidb-tidb
+  labels:
+    release: kube-prom-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - tidb-cluster
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: basic
+      app.kubernetes.io/component: tidb
+  podMetricsEndpoints:
+    - port: status
+      path: /metrics
+      interval: 15s

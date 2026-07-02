@@ -51,6 +51,8 @@ export class DeployRoleStack extends cdk.Stack {
               actions: [
                 'ssm:GetParameter',
                 'ssm:PutParameter',
+                'ssm:DeleteParameter',
+                'ssm:DescribeParameters',
                 'lambda:*',
                 'apigateway:*',
                 'ecr:GetDownloadUrlForLayer',
@@ -66,9 +68,21 @@ export class DeployRoleStack extends cdk.Stack {
                 'ecr:CreateRepository',
                 'ecr:DeleteRepository',
                 'ecr:SetRepositoryPolicy',
+                'ecr:PutLifecyclePolicy',
+                'ecr:GetLifecyclePolicy',
+                'ecr:DeleteLifecyclePolicy',
+                'ecr:TagResource',
+                'ecr:UntagResource',
                 'logs:*',
                 'route53:*',
                 'acm:*',
+                // tidb-proxy stack (VPC + ECS + Cloud Map) のため。
+                // 全 wildcard で広めに開けているのは既存の lambda:* / apigateway:*
+                // と同じ流儀。本来は action / resource を絞るべきで、TODO は
+                // applyDeployRoleSuppressions の AwsSolutions-IAM5 にぶら下げる。
+                'ec2:*',
+                'ecs:*',
+                'servicediscovery:*',
               ],
               resources: ['*'],
             }),

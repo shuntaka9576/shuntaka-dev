@@ -9,6 +9,23 @@
 
 ![image](assets/architecture.drawio.png)
 
+### 必要機材
+
+自作MiniPCクラスタ (k8s + TiDB + Tailscale) を構成する機材。
+
+#### 物理機材
+
+| 区分           | 名称                                                       | 数量 | 用途                       | 備考                                                   |
+| -------------- | ---------------------------------------------------------- | ---: | -------------------------- | ------------------------------------------------------ |
+| Mini PC        | GMKtec M5 Ultra Ryzen 7 7730U / 32GB DDR4 / 1TB SSD        |  3台 | TiDBクラスタ用の物理ノード | `node1` / `node2` / `node3` として利用                 |
+| Network Switch | TP-Link Omada SG3210X-M2 8ポート 2.5GbE L2+ Managed Switch |  1台 | クラスタ用ネットワーク     | 最初は管理機能を使わず、通常の2.5GbEスイッチとして利用 |
+
+#### ソフトウェア
+
+| 区分 | 名称                    |  数量 | 用途                        | 備考                                   |
+| ---- | ----------------------- | ----: | --------------------------- | -------------------------------------- |
+| OS   | Ubuntu Server 24.04 LTS | 3台分 | Mini PCにインストールするOS | まずはベアメタル構成でTiDBを動かす想定 |
+
 ## 初回構築
 
 ### Vercel
@@ -28,11 +45,12 @@
 | Root Directory    | `apps/web`          |
 | Framework         | Next.js（自動検出） |
 
-| 変数名                              | 用途            | Production                 | Preview                     |
-| ----------------------------------- | --------------- | -------------------------- | --------------------------- |
-| `NEXT_PUBLIC_API_URL`               | バックエンドAPI | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
-| `NEXT_PUBLIC_SITE_URL`              | サイトURL       | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
-| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM             | `GTM-XXXXXXX`              | （空）                      |
+| 変数名                              | 用途              | Production                 | Preview                     |
+| ----------------------------------- | ----------------- | -------------------------- | --------------------------- |
+| `NEXT_PUBLIC_API_URL`               | バックエンドAPI   | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
+| `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                      |
+| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                      |
 
 ### GitHub App (Webhook)
 
@@ -91,6 +109,27 @@ aws ssm put-parameter \
   --name "/${STAGE_NAME}/shuntaka/cloudinary/api-secret" \
   --type "SecureString" \
   --value "your-api-secret"
+```
+
+Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は `docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md` の「事前準備」を参照。
+
+```bash
+export TS_PROXY_AUTHKEY=""  # tskey-auth-... を貼り付け
+export TS_TAILNET_SUFFIX=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/proxy-auth-key" \
+  --type "SecureString" \
+  --value "$TS_PROXY_AUTHKEY" \
+  --overwrite
+
+aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/tailnet-suffix" \
+  --type "String" \
+  --value "$TS_TAILNET_SUFFIX" \
+  --overwrite
+
+unset TS_PROXY_AUTHKEY TS_TAILNET_SUFFIX
 ```
 
 OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
@@ -180,6 +219,41 @@ usersテーブルにinstallation_idを登録。GitHub Appをリポジトリに�
 UPDATE app.users
 SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
+```
+
+tidb-proxy スタックのデプロイ（dev / prd 共用、初回のみ）。VPC / ECS Cluster / ECR / IAM / LogGroup / SG / Cloud Map / SSM パラメータを作成する。Task Definition と ECS Service は ecspresso 側で扱う。
+
+```bash
+export STAGE_NAME=""
+# stageName はこのスタックでは使われないが getConfig() の評価に必要
+bunx dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  st-tidb-proxy \
+  --require-approval never
+```
+
+ecspresso CLI のインストール（tidb-proxy の Task Definition / ECS Service を管理するため、初回のみ）。
+
+```bash
+brew install kayac/tap/ecspresso
+ecspresso version
+```
+
+tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめた `scripts/deploy-tidb-proxy.sh` を実行する。`IMAGE_TAG` は git short SHA が自動で使われる（環境変数で上書き可）。
+
+```bash
+scripts/deploy-tidb-proxy.sh
+```
+
+tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
+
+```bash
+aws ecs describe-services \
+  --cluster tidb-proxy \
+  --services tidb-proxy \
+  --query "services[0].{Status:status, Running:runningCount, Desired:desiredCount, Events:events[0:3]}"
+
+aws logs tail /ecs/tidb-proxy --follow --since 5m
 ```
 
 メインスタックのデプロイ
@@ -518,3 +592,68 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
+
+### tidb-seeder
+
+TiDB の `EXPLAIN ANALYZE` の癖（opt が index vs full scan を cost 差で選び分ける挙動、統計の鮮度による plan 分岐、`total_process_keys_size` の効き方など）を確認する用途で、`users` / `tags` / `articles` / `articles_tags` のダミーデータを PG TEXT 互換 TSV として生成する。生成された TSV は既存の `dsl-tidb/load.sh` でそのまま流し込める。
+
+生成のみ実施 (500 万行、articles 合計 約 33GB、M1 Pro 4 workers / SSD で約 75 秒)
+
+```bash
+cd tools/tidb-seeder
+bun run generate \
+  --out-dir ./out \
+  --users 5 \
+  --articles-per-user 1000000 \
+  --tags 100 \
+  --content-size 6000 \
+  --workers 4 \
+  --no-concat \
+  --rows-per-part 15000
+```
+
+`--workers N` で articles / articles*tags の生成を N 個の bun 子プロセスに分散する（P-core 数と同じにするのが目安）。`--no-concat` を渡すと最後の cat による結合 (30GB × 2 の追加 I/O = 数分) をスキップし、`app.articles.part<W>*<C>.tsv`/`app.articles*tags.part<W>*<C>.tsv` のままにする。`--rows-per-part 15000`で 1 パートファイルを 15,000 行 (~90MB) ごとにローテートし、TiDB LOAD DATA が`txn-total-size-limit` (100MB) を超えないようにする。load.sh 側で part ファイルを自動検出して部分ごとに LOAD DATA するため、UX は同じ。
+
+生成 → 検証用 DB へロード
+
+Tailnet suffix を取得（Tailscale ログイン済み前提。TiDB の Tailnet ホスト `tidb.<TAILNET>` を解決するのに使う。固有名を直書きせず毎回コマンドで取り出す）
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+echo "TAILNET=$TAILNET"
+```
+
+TiDB への経路が p2p (direct) か確認する。DERP relay 経由だと 33GB の LOAD DATA が数十分〜数時間かかりうるので、direct でないなら NAT / firewall を先に対処する
+
+```bash
+tailscale ping tidb.$TAILNET
+# OK 例 (direct):
+#   pong from tidb (100.x.x.x) via 192.168.x.x:41641 in 3ms
+# NG 例 (DERP 経由):
+#   pong from tidb (100.x.x.x) via DERP(tok) in 45ms
+```
+
+`tailscale ping` は direct が張れた時点で停止する。初回は DERP → direct へ数回で切り替わるのが正常。10 パケット全部 DERP のままなら経路が張れていないので、`tailscale netcheck` で NAT / UDP 到達性を確認する。
+
+TiDB の LOAD DATA LOCAL INFILE は 1 ステートメント = 1 トランザクションで扱われ、`txn-total-size-limit`（デフォルト 100MB）を超えると `ERROR 2013 Lost connection` で落ちる。TiDB v8+ の bulk モードは LOAD DATA には効かない（詳細は [調査メモ](survey/2026-07-01-tidb-load-data-large-file.md)）。そのため seeder に `--rows-per-part 15000` を渡し、1 パートファイルを ~90MB に抑える
+
+TSV 生成 → DB 再作成 → load
+
+```bash
+# 1. TSV 生成 (1 ユーザーあたり 100 万記事 × 5 ユーザー = 500 万行 / articles 合計 約 33GB)
+cd tools/tidb-seeder
+bun run generate --out-dir ./out --users 5 --articles-per-user 1000000 --workers 4 --no-concat --rows-per-part 15000
+
+# 2. 検証用 DB を作り直す (既存がある場合)
+mysql -h tidb.$TAILNET -P 4000 -u root \
+  -e "DROP DATABASE IF EXISTS blog_test"
+
+# 3. TiDB に並列 LOAD DATA (DDL + parts を parallelism=8 の mysql2 connection で流し込む)
+bun run load --host tidb.$TAILNET --database blog_test --tsv-dir ./out --parallelism 8
+```
+
+`bun run load` は `dsl-tidb/schema/*.sql` で DDL を張り、`dsl-tidb/load/*.sql` テンプレートを parts ごとに substitute して mysql2 の LOAD DATA LOCAL INFILE をコネクションプール (`--parallelism` 個) で並列実行する。1 コネクション 1 ファイルの sequential mysql CLI (`load.sh`) と違い、8 コネクション同時に叩けるので、300+ パートでも待ち時間が 1/N 程度に縮む。`load.sh` は引き続き dsql-cli 経由の CLI 手順で残しているので、mysql コマンドだけで完結させたい場合はそちらも使える。
+
+500 万行スケールでは articles 合計で約 33GB になる。TiDB 側の region 数増加とローカルディスクの空きを事前に見積もる。scale を下げたい場合は `--articles-per-user 300000` (合計 150 万行 / 約 10GB) や `--articles-per-user 50000` (合計 25 万行 / 約 1.7GB) に落として同じ手順で回す。scale が小さければ `--no-concat` を外して単一ファイルにまとめても速度差は小さい。
+
+同じ `--seed` を渡せば内容は決定的に再現される（default `42`）。`--content-size` は 1 記事あたりの目標バイト数で、paragraph 合成が閾値を超えた時点で打ち切るため実サイズは目標をやや上回る。`--workers 1` にすると子プロセス不使用の直書き single-process 経路に切り替わる。

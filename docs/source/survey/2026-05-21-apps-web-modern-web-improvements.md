@@ -30,7 +30,7 @@
 
 CSS の `color-scheme: light dark` を宣言すると、**ブラウザがネイティブ UI（スクロールバー・フォーム部品・ページ初期背景）をテーマに追従させてくれる**ようになる。宣言しないと、ページ本体は暗くなってもスクロールバーは白いまま、初期描画では一瞬白背景がチラつく。
 
-![color-scheme なし / あり の見た目比較](./2026-05-21-apps-web-modern-web-improvements/color-scheme-comparison.png)
+![color-scheme なし / あり の見た目比較](./images/2026-05-21-apps-web-modern-web-improvements/color-scheme-comparison.png)
 
 - **左 (`color-scheme: なし`)**: ページ本体は暗いのに、右側のスクロールバーが白いライト基調のまま。ページ上部にも一瞬白フラッシュが見える
 - **右 (`color-scheme: light dark`)**: スクロールバーも暗くなり、フラッシュも消える
@@ -53,7 +53,7 @@ CSS の `color-scheme: light dark` を宣言すると、**ブラウザがネイ�
 | 10ms | HTML をパースして最初のフレームを描画                      |
 | 30ms | CSS を解釈して `body { background: ... }` などが適用される |
 
-![ロード時系列の比較](./2026-05-21-apps-web-modern-web-improvements/color-scheme-timeline.png)
+![ロード時系列の比較](./images/2026-05-21-apps-web-modern-web-improvements/color-scheme-timeline.png)
 
 **宣言なしのとき（上段）**: ブラウザは「このページがダーク対応か」分からないので、初期値として **白い canvas** + **ライトテーマのスクロールバー** で描画を始める。10ms 地点で白フラッシュ、30ms で `body` の暗い背景が当たってもスクロールバーは白いまま。
 
@@ -88,7 +88,7 @@ CSS 内の `color-scheme` は **CSS が parse され終わってから**効く�
 **現状の問題**
 `ArticleCard.tsx:38` で全カード一律 `loading="lazy"`。リスト先頭のサムネは above-the-fold で LCP 候補だが、ガイドは「LCP 画像に lazy を付けるな／`fetchpriority="high"` を 1〜2 枚に絞れ」と明記。
 
-![ArticleCard LCP 最適化の Before / After](./2026-05-21-apps-web-modern-web-improvements/lcp-article-card-comparison.png)
+![ArticleCard LCP 最適化の Before / After](./images/2026-05-21-apps-web-modern-web-improvements/lcp-article-card-comparison.png)
 
 - **左 (Before)**: 全カードのサムネに `loading="lazy"`。above-the-fold にある先頭サムネ＝LCP 候補も lazy なので、ブラウザは「これは後回しで良い」と解釈してダウンロード優先度を下げる → LCP が遅くなる
 - **右 (After)**: 先頭 1〜2 枚だけ `priority`（内部的に `fetchpriority="high"` ＋非 lazy）にし、3 枚目以降は lazy のまま。LCP 候補だけが優先ダウンロードされる

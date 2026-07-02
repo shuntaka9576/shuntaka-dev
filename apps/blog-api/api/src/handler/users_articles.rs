@@ -11,10 +11,16 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::error::AppError;
 
+const DEFAULT_PER_PAGE: u32 = 10;
+const MAX_PER_PAGE: u32 = 500;
+
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesQuery {
     #[serde(rename = "type")]
     pub article_type: String,
+    pub page: Option<u32>,
+    #[serde(rename = "perPage")]
+    pub per_page: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,8 +49,31 @@ pub struct ArticleResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(rename_all = "camelCase")]
+pub struct ArticleSummaryResponse {
+    pub article_id: String,
+    pub title: String,
+    pub slug: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub article_type: Option<String>,
+    pub thumbnail: Option<String>,
+    pub ogp_url: String,
+    pub published_at: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(rename_all = "camelCase")]
 pub struct UsersArticlesResponse {
-    pub articles: Vec<ArticleResponse>,
+    pub articles: Vec<ArticleSummaryResponse>,
+    pub total_count: u64,
+    pub page: u32,
+    pub per_page: u32,
+    pub total_pages: u32,
 }
 
 #[utoipa::path(
@@ -69,39 +98,44 @@ pub async fn get_users_articles(
     let article_type = ArticleType::new(query.article_type)
         .map_err(|_| AppError::bad_request("Invalid article type"))?;
 
-    let articles = registry
+    let page = query.page.unwrap_or(1).max(1);
+    let per_page = parse_per_page(query.per_page.as_deref())?;
+
+    let offset = (u64::from(page) - 1) * u64::from(per_page);
+    let limit = u64::from(per_page);
+
+    let result = registry
         .users_articles_repository()
-        .find_published_by_user_name_and_type(&name, &article_type)
+        .find_published_by_user_name_and_type(&name, &article_type, offset, limit)
         .await
         .map_err(|e| AppError::internal("Failed to find articles", e))?;
 
-    // Get Cloudinary config and create client
     let config = registry.webhook_config();
-    let api_secret = registry
-        .ssm_client()
-        .get_parameter(&config.cloudinary_api_secret_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
+    let cloudinary = CloudinaryClientImpl::new(
+        config.cloudinary_cloud_name.clone(),
+        config.cloudinary_api_secret.clone(),
+    );
 
-    let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
+    let total_pages = if result.total_count == 0 {
+        0
+    } else {
+        result.total_count.div_ceil(u64::from(per_page)) as u32
+    };
 
     let response = UsersArticlesResponse {
-        articles: articles
+        articles: result
+            .articles
             .into_iter()
             .map(|article| {
                 let slug = article.slug.into_inner();
                 let title = article.title.into_inner();
-                let content = article.content.into_inner();
-                let content_html = convert_markdown_to_html(&content);
                 let ogp_url =
                     cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
 
-                ArticleResponse {
+                ArticleSummaryResponse {
                     article_id: article.article_id.into_inner().to_string(),
                     title,
                     slug,
-                    content,
-                    content_html,
                     description: article.description.into_inner(),
                     article_type: article.article_type.map(|t| t.into_inner()),
                     thumbnail: article.thumbnail.map(|t| t.into_inner()),
@@ -112,9 +146,32 @@ pub async fn get_users_articles(
                 }
             })
             .collect(),
+        total_count: result.total_count,
+        page,
+        per_page,
+        total_pages,
     };
 
     Ok(Json(response))
+}
+
+fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
+    let Some(value) = raw else {
+        return Ok(DEFAULT_PER_PAGE);
+    };
+    if value.eq_ignore_ascii_case("all") {
+        return Ok(MAX_PER_PAGE);
+    }
+    let parsed: u32 = value
+        .parse()
+        .map_err(|_| AppError::bad_request("Invalid perPage value"))?;
+    if parsed == 0 {
+        return Err(AppError::bad_request("perPage must be >= 1"));
+    }
+    if parsed > MAX_PER_PAGE {
+        return Err(AppError::bad_request("perPage exceeds maximum"));
+    }
+    Ok(parsed)
 }
 
 #[utoipa::path(
@@ -142,15 +199,11 @@ pub async fn get_users_article(
         .map_err(|e| AppError::internal("Failed to find article", e))?
         .ok_or_else(|| AppError::not_found("Article not found"))?;
 
-    // Get Cloudinary config and create client
     let config = registry.webhook_config();
-    let api_secret = registry
-        .ssm_client()
-        .get_parameter(&config.cloudinary_api_secret_key_name, true)
-        .await
-        .map_err(|e| AppError::internal("Failed to get Cloudinary API secret from SSM", e))?;
-
-    let cloudinary = CloudinaryClientImpl::new(config.cloudinary_cloud_name.clone(), api_secret);
+    let cloudinary = CloudinaryClientImpl::new(
+        config.cloudinary_cloud_name.clone(),
+        config.cloudinary_api_secret.clone(),
+    );
 
     let title = article.title.into_inner();
     let content = article.content.into_inner();

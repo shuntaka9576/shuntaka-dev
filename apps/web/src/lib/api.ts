@@ -13,8 +13,30 @@ export interface Article {
   updatedAt: string | null;
 }
 
-export interface ArticlesResponse {
-  articles: Article[];
+export interface ArticleSummary {
+  articleId: string;
+  title: string;
+  slug: string;
+  description: string;
+  type: string | null;
+  thumbnail: string | null;
+  ogpUrl: string;
+  publishedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ArticlesPage {
+  articles: ArticleSummary[];
+  totalCount: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
+export interface ArticlesQueryOptions {
+  page?: number;
+  perPage?: number | 'all';
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -22,8 +44,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 export async function getArticlesByType(
   userName: string,
   type: 'tech' | 'note',
-): Promise<Article[]> {
-  const res = await fetch(`${API_BASE_URL}/users/${userName}/articles?type=${type}`, {
+  opts: ArticlesQueryOptions = {},
+): Promise<ArticlesPage> {
+  const params = new URLSearchParams({ type });
+  if (opts.page !== undefined) {
+    params.set('page', String(opts.page));
+  }
+  if (opts.perPage !== undefined) {
+    params.set('perPage', String(opts.perPage));
+  }
+
+  const res = await fetch(`${API_BASE_URL}/users/${userName}/articles?${params.toString()}`, {
     next: { revalidate: 30 },
   });
 
@@ -31,8 +62,7 @@ export async function getArticlesByType(
     throw new Error(`Failed to fetch articles: ${res.status}`);
   }
 
-  const data: ArticlesResponse = await res.json();
-  return data.articles;
+  return res.json();
 }
 
 export async function getArticleBySlug(userName: string, slug: string): Promise<Article | null> {

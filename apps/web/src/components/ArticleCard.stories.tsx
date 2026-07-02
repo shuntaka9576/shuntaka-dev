@@ -1,12 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { Article } from '@/lib/api';
+import type { ArticleSummary } from '@/lib/api';
 import { ArticleCard } from './ArticleCard';
 
-const baseArticle: Article = {
+const baseArticle: ArticleSummary = {
   articleId: '01HX2YE5PG9N3CK1S3FZ6T2WJK',
   title: 'shuntaka.dev のデザインシステムを skill 化した',
   slug: 'design-system-as-skill',
-  content: '',
   description: '',
   type: 'tech',
   thumbnail: 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png',

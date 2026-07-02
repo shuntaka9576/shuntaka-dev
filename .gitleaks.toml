@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "CDK が生成する Lambda asset の S3 key (hex 64 + .zip) は generic-api-key の高エントロピーパターンに引っかかるが、ハッシュ値で機密性なし。snapshot test の確定値として committed されている。"
+regexes = ['''"S3Key":\s*"[0-9a-f]{64}\.zip"''']
+paths = ['''iac/aws/test/__snapshots__/.*\.snap''']

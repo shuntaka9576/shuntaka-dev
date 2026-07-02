@@ -13,5 +13,6 @@
 incidents/index
 refactors/index
 survey/index
+tasks/index
 99_memo
 ```

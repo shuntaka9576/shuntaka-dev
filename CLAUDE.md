@@ -49,10 +49,13 @@ apps/
 └── blog-api/     # Rust/Axum バックエンドAPI (SQLx, PostgreSQL/DSQL)
 
 tools/
-└── dsql-cli/     # TypeScript マイグレーションCLI (AWS DSQL対応)
+├── dsql-cli/     # TypeScript マイグレーションCLI (AWS DSQL対応)
+└── tidb-seeder/  # TiDB 用ダミーデータ TSV ジェネレータ (load.sh と組み合わせて使う)
 
 iac/
 └── aws/          # AWS CDK インフラ (TypeScript)
+
+cluster/          # 自作MiniPCクラスタ (k8s + TiDB + Tailscale) の manifests / scripts
 
 docs/             # Sphinx ドキュメント (Python/uv)
 ```
@@ -62,6 +65,21 @@ docs/             # Sphinx ドキュメント (Python/uv)
 環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_development.md` を参照。
 
 apps/web の作業時は `apps/web/CLAUDE.md` を参照（workspace 専用ガイド + ブランド仕様 `apps/web/DESIGN.md`）。
+
+## Cluster Operations
+
+`cluster/` 配下で自作MiniPCクラスタ (k8s + TiDB + Tailscale) の Kubernetes マニフェストと運用スクリプトを管理する。
+
+### ルール: 必ず再現可能な手順を作ること
+
+クラスタに対してコマンドを実行した場合は `docs/source/tasks/` 配下の手順書に同期する。トラブルシュートをした場合は、解決時に内省し必要最小限のコマンドを同期すること。
+
+### 参照先
+
+- 物理機材・ソフトウェア構成: `docs/source/01_development.md` の「構成 > 必要機材」
+- 全消し→再構築手順: `docs/source/tasks/2026-06-27-tidb-full-rebuild.md`
+- 構築時の作業記録: `docs/source/tasks/`（2026-06-25〜2026-06-28 のクラスタ関連エントリ）
+- 実体: `cluster/manifests/`, `cluster/scripts/`
 
 ## Commands
 

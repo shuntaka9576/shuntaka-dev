@@ -1,10 +1,10 @@
 import Image from 'next/image';
 import { memo } from 'react';
-import type { Article } from '@/lib/api';
+import type { ArticleSummary } from '@/lib/api';
 import { ProgressLink } from './ProgressLink';
 
 interface ArticleCardProps {
-  article: Article;
+  article: ArticleSummary;
   userName: string;
   priority?: boolean;
 }

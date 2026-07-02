@@ -241,6 +241,53 @@ impl Status {
     }
 }
 
+// 一覧用のサマリモデル（content を持たない）
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArticleSummary {
+    pub article_id: ArticleId,
+    pub title: Title,
+    pub slug: Slug,
+    pub user_id: UserId,
+    pub thumbnail: Option<Thumbnail>,
+    pub description: Description,
+    pub status: Status,
+    pub article_type: Option<ArticleType>,
+    pub published_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+impl ArticleSummary {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        article_id: ArticleId,
+        title: Title,
+        slug: Slug,
+        user_id: UserId,
+        thumbnail: Option<Thumbnail>,
+        description: Description,
+        status: Status,
+        article_type: Option<ArticleType>,
+        published_at: Option<DateTime<Utc>>,
+        created_at: Option<DateTime<Utc>>,
+        updated_at: Option<DateTime<Utc>>,
+    ) -> Self {
+        Self {
+            article_id,
+            title,
+            slug,
+            user_id,
+            thumbnail,
+            description,
+            status,
+            article_type,
+            published_at,
+            created_at,
+            updated_at,
+        }
+    }
+}
+
 // Article構造体の完全実装
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Article {

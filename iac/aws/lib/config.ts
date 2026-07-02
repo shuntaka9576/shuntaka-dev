@@ -66,6 +66,11 @@ interface AppParameter {
       clusterEndpoint: string;
       clusterArn: string;
     };
+    proxy: {
+      vpcId: string;
+      privateSubnetId1: string;
+      sgId: string;
+    };
   };
   lambda: {
     blogApi: {
@@ -134,6 +139,70 @@ const stageConfig: {
   },
 };
 
+// tidb-proxy stack は dev / prd 共用のため stage 非依存。SSM Parameter Store
+// の path は task 文書 (docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md)
+// に揃えて `/tidb-proxy/...` 名前空間で扱う。
+export interface ProxyParameter {
+  projectName: string;
+  vpc: {
+    cidr: string;
+  };
+  ssm: {
+    vpc: {
+      vpcId: string;
+      publicSubnetId1: string;
+      privateSubnetId1: string;
+    };
+    proxy: {
+      clusterName: string;
+      ecrRepositoryUri: string;
+      taskRole: string;
+      taskExecRole: string;
+      sgId: string;
+      logGroupName: string;
+      cloudMapNamespaceId: string;
+      cloudMapServiceArn: string;
+      serviceName: string;
+    };
+    tailscale: {
+      // ecspresso task def の secrets[].valueFrom から runtime fetch される。
+      // 値の格納 (put-parameter) は手動運用 (90 日 rotation)。
+      proxyAuthKey: string;
+    };
+  };
+}
+
+export const getProxyConfig = (): ProxyParameter => {
+  const projectName = 'tidb-proxy';
+  return {
+    projectName,
+    vpc: {
+      cidr: '10.50.0.0/16',
+    },
+    ssm: {
+      vpc: {
+        vpcId: `/${projectName}/vpc/id`,
+        publicSubnetId1: `/${projectName}/vpc/public-subnet-id-1`,
+        privateSubnetId1: `/${projectName}/vpc/private-subnet-id-1`,
+      },
+      proxy: {
+        clusterName: `/${projectName}/proxy/cluster-name`,
+        ecrRepositoryUri: `/${projectName}/proxy/ecr-repository-uri`,
+        taskRole: `/${projectName}/proxy/task-role`,
+        taskExecRole: `/${projectName}/proxy/task-exec-role`,
+        sgId: `/${projectName}/proxy/sg-id`,
+        logGroupName: `/${projectName}/proxy/log-group-name`,
+        cloudMapNamespaceId: `/${projectName}/proxy/cloud-map-namespace-id`,
+        cloudMapServiceArn: `/${projectName}/proxy/cloud-map-service-arn`,
+        serviceName: `/${projectName}/proxy/service-name`,
+      },
+      tailscale: {
+        proxyAuthKey: '/shared/shuntaka/tailscale/proxy-auth-key',
+      },
+    },
+  };
+};
+
 export const getConfig = (stageName: string): AppParameter => {
   if (!isEnv(stageName)) {
     throw new Error(`Not found environment key: ${stageName}`);
@@ -164,6 +233,11 @@ export const getConfig = (stageName: string): AppParameter => {
       dsql: {
         clusterEndpoint: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-endpoint`,
         clusterArn: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-arn`,
+      },
+      proxy: {
+        vpcId: '/tidb-proxy/vpc/id',
+        privateSubnetId1: '/tidb-proxy/vpc/private-subnet-id-1',
+        sgId: '/tidb-proxy/proxy/sg-id',
       },
     },
     lambda: {

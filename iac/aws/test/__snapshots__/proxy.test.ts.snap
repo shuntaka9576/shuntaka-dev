@@ -1,0 +1,645 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TidbProxyStack > snapshot 1`] = `
+{
+  "Metadata": {
+    "cdk_nag": {
+      "rules_to_suppress": [
+        {
+          "id": "AwsSolutions-VPC7",
+          "is_reason_encoded": true,
+          "reason": "5YCL5Lq644OW44Ot44Kw55So6YCU44GnIFZQQyBGbG93IExvZ3MgKENsb3VkV2F0Y2ggLyBTMykg44KS5oGS5bi455qE44Gr5L+d5oyB44GX44Gq44GE5pa56Yed44CCcHJveHkgU0cgaW5ib3VuZCDjga8gbGFtYmRhLXNnIOOBi+OCieOBriAyIOODneODvOODiOOBruOBv+OBp+OAgeiqv+afu+OBjOW/heimgeOBquWgtOWQiOOBr+aJi+WLleOBpyBmbG93IGxvZ3Mg44KS5pyJ5Yq55YyW44GZ44KL44CC",
+        },
+        {
+          "id": "AwsSolutions-ECS4",
+          "is_reason_encoded": true,
+          "reason": "Q29udGFpbmVyIEluc2lnaHRzIOOBruaciOOCs+OCueODiCAofiQx44CcKSDjgpLpgb/jgZHjgovjgZ/jgoEgT0ZG44CCMSB0YXNrIOmBi+eUqOOBi+OBpCBhd3Nsb2dzIGRyaXZlciDjgacgQ2xvdWRXYXRjaCBMb2dzIOOBqyBjb250YWluZXIg44Ot44Kw44KS5rWB44GZ44Gu44Gn44CB5b+F6KaB5pmC44Gr44Gd44GT44GL44KJ6Kq/5p+744GZ44KL44CC",
+        },
+        {
+          "id": "AwsSolutions-ECR1",
+          "is_reason_encoded": true,
+          "reason": "cHJpdmF0ZSBFQ1IgcmVwb3NpdG9yeSDjgacgSUFNIHJvbGUg44Gr44KI44KL6KqN6Ki844OZ44O844K544GuIHB1bGwg44Gu44Gf44KB44CBcmVzb3VyY2UtYmFzZWQgcG9saWN5IOOBp+WIpemAlOODl+ODquODs+OCt+ODkeODq+WItumZkOOBmeOCi+W/heimgeOBr+OBquOBhOOAgg==",
+        },
+        {
+          "applies_to": [
+            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+          ],
+          "id": "AwsSolutions-IAM4",
+          "is_reason_encoded": true,
+          "reason": "RUNTIHRhc2sgRXhlY3V0aW9uUm9sZSDjga4gQW1hem9uRUNTVGFza0V4ZWN1dGlvblJvbGVQb2xpY3kg44GvIEVDUiBwdWxsIC8gQ2xvdWRXYXRjaCBMb2dzIOabuOOBjei+vOOBv+OBruacgOWwj+aoqemZkOOCu+ODg+ODiOOBp+OAgUFXUyDlhazlvI/jga7jg5njgrnjg4jjg5fjg6njgq/jg4bjgqPjgrnpgJrjgorjgILjgqvjgrnjgr/jg57jg7znrqHnkIbjg53jg6rjgrfjg7zljJbjga/nhKHnkIbjgavooYzjgo/jgarjgYTjgII=",
+        },
+        {
+          "applies_to": [
+            "Resource::*",
+          ],
+          "id": "AwsSolutions-IAM5",
+          "is_reason_encoded": true,
+          "reason": "RUNTIFVwZGF0ZVRhc2tQcm90ZWN0aW9uIOOBr+WvvuixoSB0YXNrIOOBjCBkZXBsb3kg5pmC44Gr5YuV55qE44Gr5rG644G+44KL44Gf44KB44Oq44K944O844K5IEFSTiDjgpLkuovliY3jgavntZ7jgozjgarjgYTjgIJrbXM6RGVjcnlwdCDjga8gU1NNIFNlY3VyZVN0cmluZyDlvqnlj7fnlKjjgacgZGVmYXVsdCBLTVMga2V5IChhbGlhcy9hd3Mvc3NtKSDjga7jgb/jgavpmZDlrprmuIjjgb/jgII=",
+        },
+      ],
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ProxyCloudMapNamespace7C8C0BC2": {
+      "Properties": {
+        "Name": "internal",
+        "Vpc": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace",
+    },
+    "ProxyCloudMapNamespaceCloudMapService8FD028DA": {
+      "Properties": {
+        "DnsConfig": {
+          "DnsRecords": [
+            {
+              "TTL": 10,
+              "Type": "A",
+            },
+          ],
+          "NamespaceId": {
+            "Fn::GetAtt": [
+              "ProxyCloudMapNamespace7C8C0BC2",
+              "Id",
+            ],
+          },
+          "RoutingPolicy": "MULTIVALUE",
+        },
+        "HealthCheckCustomConfig": {
+          "FailureThreshold": 1,
+        },
+        "Name": "tidb-proxy",
+        "NamespaceId": {
+          "Fn::GetAtt": [
+            "ProxyCloudMapNamespace7C8C0BC2",
+            "Id",
+          ],
+        },
+      },
+      "Type": "AWS::ServiceDiscovery::Service",
+    },
+    "ProxyCloudMapNamespaceIdParam9A92B795": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/cloud-map-namespace-id",
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "ProxyCloudMapNamespace7C8C0BC2",
+            "Id",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyCloudMapServiceArnParamF35FBAF0": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/cloud-map-service-arn",
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "ProxyCloudMapNamespaceCloudMapService8FD028DA",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyCluster29DC0C5A": {
+      "Properties": {
+        "ClusterName": "tidb-proxy",
+      },
+      "Type": "AWS::ECS::Cluster",
+    },
+    "ProxyCluster4A1D0DF4": {
+      "Properties": {
+        "CapacityProviders": [
+          "FARGATE",
+          "FARGATE_SPOT",
+        ],
+        "Cluster": {
+          "Ref": "ProxyCluster29DC0C5A",
+        },
+        "DefaultCapacityProviderStrategy": [],
+      },
+      "Type": "AWS::ECS::ClusterCapacityProviderAssociations",
+    },
+    "ProxyClusterNameParam9495AE94": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/cluster-name",
+        "Type": "String",
+        "Value": {
+          "Ref": "ProxyCluster29DC0C5A",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyEcrRepository985B45E5": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "EmptyOnDelete": true,
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true,
+        },
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": "{"rules":[{"rulePriority":1,"description":"Keep only the latest 1 image","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":1},"action":{"type":"expire"}}]}",
+        },
+        "RepositoryName": "tidb-proxy",
+      },
+      "Type": "AWS::ECR::Repository",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ProxyEcrRepositoryUriParamB736060A": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/ecr-repository-uri",
+        "Type": "String",
+        "Value": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Fn::Select": [
+                  4,
+                  {
+                    "Fn::Split": [
+                      ":",
+                      {
+                        "Fn::GetAtt": [
+                          "ProxyEcrRepository985B45E5",
+                          "Arn",
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+              ".dkr.ecr.",
+              {
+                "Fn::Select": [
+                  3,
+                  {
+                    "Fn::Split": [
+                      ":",
+                      {
+                        "Fn::GetAtt": [
+                          "ProxyEcrRepository985B45E5",
+                          "Arn",
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+              ".",
+              {
+                "Ref": "AWS::URLSuffix",
+              },
+              "/",
+              {
+                "Ref": "ProxyEcrRepository985B45E5",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyExecutionRole4BF4E10B": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+              ],
+            ],
+          },
+        ],
+        "RoleName": "tidb-proxy-exec",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ProxyExecutionRoleDefaultPolicyBDDAE8B4": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "ssm:GetParameters",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:ssm:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":parameter/shared/shuntaka/tailscale/proxy-auth-key",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:kms:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":alias/aws/ssm",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ProxyExecutionRoleDefaultPolicyBDDAE8B4",
+        "Roles": [
+          {
+            "Ref": "ProxyExecutionRole4BF4E10B",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "ProxyLogGroup29A2C131": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/ecs/tidb-proxy",
+        "RetentionInDays": 90,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ProxyLogGroupNameParam509B1E77": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/log-group-name",
+        "Type": "String",
+        "Value": {
+          "Ref": "ProxyLogGroup29A2C131",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxySecurityGroup31CCABE3": {
+      "Properties": {
+        "GroupDescription": "tidb-proxy Fargate task SG (inbound from lambda SGs added per stage)",
+        "GroupName": "tidb-proxy-sg",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "ProxyServiceNameParam9C1117C1": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/service-name",
+        "Type": "String",
+        "Value": "tidb-proxy",
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxySgIdParamCBE825C5": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/sg-id",
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "ProxySecurityGroup31CCABE3",
+            "GroupId",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyTaskExecRoleParam492AA7B1": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/task-exec-role",
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "ProxyExecutionRole4BF4E10B",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "ProxyTaskRole5DB6A540": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "RoleName": "tidb-proxy-task",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ProxyTaskRoleDefaultPolicy933321B8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "ecs:UpdateTaskProtection",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "ssmmessages:CreateControlChannel",
+                "ssmmessages:CreateDataChannel",
+                "ssmmessages:OpenControlChannel",
+                "ssmmessages:OpenDataChannel",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ProxyTaskRoleDefaultPolicy933321B8",
+        "Roles": [
+          {
+            "Ref": "ProxyTaskRole5DB6A540",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "ProxyTaskRoleParam5E482226": {
+      "Properties": {
+        "Name": "/tidb-proxy/proxy/task-role",
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "ProxyTaskRole5DB6A540",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "VpcC3027511": {
+      "Properties": {
+        "CidrBlock": "10.50.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "VpcIGW488B0FEB": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "VpcPrivateSubnet1RouteTable901BAEEE": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc/PrivateSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcPrivateSubnet1RouteTableAssociation2BC202CB": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateSubnet1RouteTable901BAEEE",
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateSubnet1Subnet67A4DBCB",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcPrivateSubnet1Subnet67A4DBCB": {
+      "Properties": {
+        "AvailabilityZone": "ap-northeast-1a",
+        "CidrBlock": "10.50.1.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc/PrivateSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcPrivateSubnetId1ParamC729E2BE": {
+      "Properties": {
+        "Name": "/tidb-proxy/vpc/private-subnet-id-1",
+        "Type": "String",
+        "Value": {
+          "Ref": "VpcPrivateSubnet1Subnet67A4DBCB",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "VpcPublicSubnet1DefaultRoute0F5C6C43": {
+      "DependsOn": [
+        "VpcVPCGW42EC8516",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcIGW488B0FEB",
+        },
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet1RouteTable431DD755",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "VpcPublicSubnet1RouteTable431DD755": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcPublicSubnet1RouteTableAssociationBBCB7AA1": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet1RouteTable431DD755",
+        },
+        "SubnetId": {
+          "Ref": "VpcPublicSubnet1Subnet8E8DEDC0",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcPublicSubnet1Subnet8E8DEDC0": {
+      "Properties": {
+        "AvailabilityZone": "ap-northeast-1a",
+        "CidrBlock": "10.50.0.0/24",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/Vpc/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcPublicSubnetId1ParamAE4E4CF7": {
+      "Properties": {
+        "Name": "/tidb-proxy/vpc/public-subnet-id-1",
+        "Type": "String",
+        "Value": {
+          "Ref": "VpcPublicSubnet1Subnet8E8DEDC0",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "VpcVPCGW42EC8516": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "VpcIGW488B0FEB",
+        },
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+    "VpcVpcIdParam3BFEFC9C": {
+      "Properties": {
+        "Name": "/tidb-proxy/vpc/id",
+        "Type": "String",
+        "Value": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
