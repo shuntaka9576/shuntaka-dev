@@ -1,16 +1,13 @@
 import * as cdk from 'aws-cdk-lib';
-import { Annotations, Match, Template } from 'aws-cdk-lib/assertions';
+import { Template } from 'aws-cdk-lib/assertions';
+import { AwsSolutionsChecks } from 'cdk-nag';
 import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
-import { applyNag } from '../lib/nag.js';
 import { applyDeployRoleSuppressions } from '../lib/nag-suppressions.js';
 
 const expectNoNagErrors = (stack: cdk.Stack): void => {
-  const errors = Annotations.fromStack(stack).findError(
-    '*',
-    Match.stringLikeRegexp('AwsSolutions-.*'),
-  );
-  expect(errors).toEqual([]);
+  const report = new AwsSolutionsChecks(undefined, { verbose: true }).validateScope(stack);
+  expect(report.violations).toEqual([]);
 };
 
 describe('OidcProviderStack', () => {
@@ -24,7 +21,6 @@ describe('OidcProviderStack', () => {
       },
     });
 
-    applyNag(stack);
     expectNoNagErrors(stack);
 
     const template = Template.fromStack(stack);
@@ -47,7 +43,6 @@ describe('DeployRoleStack', () => {
       },
     });
 
-    applyNag(stack);
     applyDeployRoleSuppressions(stack);
     expectNoNagErrors(stack);
 

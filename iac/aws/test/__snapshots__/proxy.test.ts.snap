@@ -2,43 +2,6 @@
 
 exports[`TidbProxyStack > snapshot 1`] = `
 {
-  "Metadata": {
-    "cdk_nag": {
-      "rules_to_suppress": [
-        {
-          "id": "AwsSolutions-VPC7",
-          "is_reason_encoded": true,
-          "reason": "5YCL5Lq644OW44Ot44Kw55So6YCU44GnIFZQQyBGbG93IExvZ3MgKENsb3VkV2F0Y2ggLyBTMykg44KS5oGS5bi455qE44Gr5L+d5oyB44GX44Gq44GE5pa56Yed44CCcHJveHkgU0cgaW5ib3VuZCDjga8gbGFtYmRhLXNnIOOBi+OCieOBriAyIOODneODvOODiOOBruOBv+OBp+OAgeiqv+afu+OBjOW/heimgeOBquWgtOWQiOOBr+aJi+WLleOBpyBmbG93IGxvZ3Mg44KS5pyJ5Yq55YyW44GZ44KL44CC",
-        },
-        {
-          "id": "AwsSolutions-ECS4",
-          "is_reason_encoded": true,
-          "reason": "Q29udGFpbmVyIEluc2lnaHRzIOOBruaciOOCs+OCueODiCAofiQx44CcKSDjgpLpgb/jgZHjgovjgZ/jgoEgT0ZG44CCMSB0YXNrIOmBi+eUqOOBi+OBpCBhd3Nsb2dzIGRyaXZlciDjgacgQ2xvdWRXYXRjaCBMb2dzIOOBqyBjb250YWluZXIg44Ot44Kw44KS5rWB44GZ44Gu44Gn44CB5b+F6KaB5pmC44Gr44Gd44GT44GL44KJ6Kq/5p+744GZ44KL44CC",
-        },
-        {
-          "id": "AwsSolutions-ECR1",
-          "is_reason_encoded": true,
-          "reason": "cHJpdmF0ZSBFQ1IgcmVwb3NpdG9yeSDjgacgSUFNIHJvbGUg44Gr44KI44KL6KqN6Ki844OZ44O844K544GuIHB1bGwg44Gu44Gf44KB44CBcmVzb3VyY2UtYmFzZWQgcG9saWN5IOOBp+WIpemAlOODl+ODquODs+OCt+ODkeODq+WItumZkOOBmeOCi+W/heimgeOBr+OBquOBhOOAgg==",
-        },
-        {
-          "applies_to": [
-            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
-          ],
-          "id": "AwsSolutions-IAM4",
-          "is_reason_encoded": true,
-          "reason": "RUNTIHRhc2sgRXhlY3V0aW9uUm9sZSDjga4gQW1hem9uRUNTVGFza0V4ZWN1dGlvblJvbGVQb2xpY3kg44GvIEVDUiBwdWxsIC8gQ2xvdWRXYXRjaCBMb2dzIOabuOOBjei+vOOBv+OBruacgOWwj+aoqemZkOOCu+ODg+ODiOOBp+OAgUFXUyDlhazlvI/jga7jg5njgrnjg4jjg5fjg6njgq/jg4bjgqPjgrnpgJrjgorjgILjgqvjgrnjgr/jg57jg7znrqHnkIbjg53jg6rjgrfjg7zljJbjga/nhKHnkIbjgavooYzjgo/jgarjgYTjgII=",
-        },
-        {
-          "applies_to": [
-            "Resource::*",
-          ],
-          "id": "AwsSolutions-IAM5",
-          "is_reason_encoded": true,
-          "reason": "RUNTIFVwZGF0ZVRhc2tQcm90ZWN0aW9uIOOBr+WvvuixoSB0YXNrIOOBjCBkZXBsb3kg5pmC44Gr5YuV55qE44Gr5rG644G+44KL44Gf44KB44Oq44K944O844K5IEFSTiDjgpLkuovliY3jgavntZ7jgozjgarjgYTjgIJrbXM6RGVjcnlwdCDjga8gU1NNIFNlY3VyZVN0cmluZyDlvqnlj7fnlKjjgacgZGVmYXVsdCBLTVMga2V5IChhbGlhcy9hd3Mvc3NtKSDjga7jgb/jgavpmZDlrprmuIjjgb/jgII=",
-        },
-      ],
-    },
-  },
   "Parameters": {
     "BootstrapVersion": {
       "Default": "/cdk-bootstrap/hnb659fds/version",
