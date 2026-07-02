@@ -1,0 +1,82 @@
+apiVersion: pingcap.com/v1alpha1
+kind: TidbCluster
+metadata:
+  name: basic
+  namespace: tidb-cluster
+spec:
+  version: v8.1.0
+  timezone: UTC
+  pvReclaimPolicy: Retain
+  enableDynamicConfiguration: true
+  configUpdateStrategy: RollingUpdate
+  helper:
+    image: alpine:3.16.0
+  pd:
+    baseImage: pingcap/pd
+    replicas: 3
+    requests:
+      cpu: "100m"
+      memory: "1Gi"
+      storage: "10Gi"
+    storageClassName: local-path
+    config: |
+      [dashboard]
+        internal-proxy = true
+      [log.file]
+        filename = "/var/log/pd/pd.log"
+        max-size = 300
+        max-days = 7
+        max-backups = 3
+    additionalVolumes:
+      - name: pd-log
+        emptyDir: {}
+    additionalVolumeMounts:
+      - name: pd-log
+        mountPath: /var/log/pd
+    topologySpreadConstraints:
+      - topologyKey: kubernetes.io/hostname
+        maxSkew: 1
+  tikv:
+    baseImage: pingcap/tikv
+    replicas: 3
+    requests:
+      cpu: "500m"
+      memory: "8Gi"
+      storage: "100Gi"
+    limits:
+      memory: "12Gi"
+    storageClassName: local-path
+    config: |
+      [storage.block-cache]
+        capacity = "4GB"
+      [log.file]
+        filename = "/var/log/tikv/tikv.log"
+        max-size = 300
+        max-days = 7
+        max-backups = 3
+    additionalVolumes:
+      - name: tikv-log
+        emptyDir: {}
+    additionalVolumeMounts:
+      - name: tikv-log
+        mountPath: /var/log/tikv
+    topologySpreadConstraints:
+      - topologyKey: kubernetes.io/hostname
+        maxSkew: 1
+  tidb:
+    baseImage: pingcap/tidb
+    replicas: 3
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+    service:
+      type: ClusterIP
+    config: |
+      [log.file]
+        filename = "/var/log/tidb/tidb.log"
+        max-size = 300
+        max-days = 7
+        max-backups = 3
+    topologySpreadConstraints:
+      - topologyKey: kubernetes.io/hostname
+        maxSkew: 1

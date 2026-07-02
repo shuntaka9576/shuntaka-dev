@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ng-monitoring
+  labels:
+    app.kubernetes.io/name: ng-monitoring
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ng-monitoring
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ng-monitoring
+    spec:
+      containers:
+        - name: ng-monitoring
+          image: pingcap/ng-monitoring:v8.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config=/etc/ng-monitoring/ng-monitoring.toml
+            - --advertise-address=$(POD_IP):12020
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: server
+              containerPort: 12020
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: server
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ng-monitoring
+            - name: storage
+              mountPath: /var/lib/ng-monitoring
+      volumes:
+        - name: config
+          configMap:
+            name: ng-monitoring-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: ng-monitoring

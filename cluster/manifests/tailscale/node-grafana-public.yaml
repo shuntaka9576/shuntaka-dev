@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-grafana-public
+  namespace: monitoring
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: "node-grafana"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: kube-prom-stack
+  ports:
+    - port: 3000
+      targetPort: 3000

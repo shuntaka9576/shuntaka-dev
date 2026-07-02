@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ng-monitoring-config
+data:
+  ng-monitoring.toml: |
+    # NgMonitoring server config
+    # ref: https://github.com/pingcap/ng-monitoring
+    address = "0.0.0.0:12020"
+    storage_path = "/var/lib/ng-monitoring"
+    metric_storage = "http://kube-prom-stack-kube-prome-prometheus.monitoring:9090"
+
+    [log]
+    path = ""
+    level = "INFO"
+
+    [pd]
+    endpoints = ["basic-pd:2379"]
+
+    [continuous_profiling]
+    enable = true
+    profile_seconds = 10
+    interval_seconds = 60
+    timeout_seconds = 120
+    data_retention_seconds = 259200

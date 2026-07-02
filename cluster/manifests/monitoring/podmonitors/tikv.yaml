@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tidb-tikv
+  labels:
+    release: kube-prom-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - tidb-cluster
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: basic
+      app.kubernetes.io/component: tikv
+  podMetricsEndpoints:
+    # TiKV Pod は containerPort 定義に status (20180) を持たず server (20160) のみのため、
+    # `port: server` で target を生成させ、relabeling で scrape 先のポート番号を 20180 に書き換える。
+    # tidb-operator が将来 status containerPort を追加したら `port: status` に戻して relabelings を削除可。
+    - port: server
+      path: /metrics
+      interval: 15s
+      relabelings:
+        - sourceLabels: [__address__]
+          regex: '([^:]+)(?::\d+)?'
+          replacement: '${1}:20180'
+          targetLabel: __address__

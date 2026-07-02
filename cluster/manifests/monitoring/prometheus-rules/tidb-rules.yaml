@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tidb-rules
+  labels:
+    release: kube-prom-stack
+spec:
+  groups:
+    - name: tidb.recording
+      rules:
+        - record: tidb:qps
+          expr: sum(rate(tidb_executor_statement_total[1m])) by (type)
+        - record: tikv:write_latency:p99
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(tikv_storage_engine_async_request_duration_seconds_bucket{type="write"}[5m]))
+              by (le, instance))
+    - name: tidb.alerts
+      rules:
+        - alert: TiKVStoreDown
+          expr: count(up{job=~".*tikv.*"} == 0) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "TiKV store down"
