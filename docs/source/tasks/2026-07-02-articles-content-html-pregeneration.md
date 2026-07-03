@@ -29,9 +29,13 @@ webhook の upsert は `UPDATE ... SET updated_at = now` を含むため、埋�
 
 ### 1. DDL 適用（依頼者が手動実行）
 
-```sql
-ALTER TABLE `blog_dev`.`articles`
-  ADD COLUMN `content_html` LONGTEXT NULL AFTER `content`;
+Tailnet suffix を取得してから mysql で流す。
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+mysql -h tidb.$TAILNET -P 4000 -u root \
+  -e 'ALTER TABLE `blog_dev`.`articles` ADD COLUMN `content_html` LONGTEXT NULL AFTER `content`'
 ```
 
 `blog_prod` にも同様に実行する。TiDB の `ADD COLUMN` はオンライン DDL なので停止不要。
@@ -40,18 +44,29 @@ ALTER TABLE `blog_dev`.`articles`
 
 DDL 適用後に新バイナリをデプロイする（旧バイナリは `content_html` を SELECT しないため順序は DDL → デプロイ）。
 
-### 3. 既存レコードの埋め戻し（content-html-backfill）
+### 3. 埋め戻しの dry-run（content-html-backfill）
+
+wasm をビルドし、まず dry-run で確認する。UPDATE は実行されず、対象記事ごとに保存済み `content_html` との差分（新規/一致/差分あり）が表示される。`--out-dir` を付けると生成 HTML が `./out/<slug>.html` に書き出されるので、内容をブラウザ等で確認できる。
 
 ```bash
 cd tools/content-html-backfill
 bun run build:wasm
+bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --dry-run --out-dir ./out
+```
+
+初回埋め戻し時は全件「新規」になるのが期待値。件数と `./out` の HTML に問題がないことを確認してから次へ進む。
+
+### 4. 本実行
+
+```bash
 bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 ```
 
-使い方の詳細は [content-html-backfill](../01_development.md#content-html-backfill) を参照。埋め戻し完了は以下で確認できる。
+生成結果が保存済みと同一の記事は UPDATE 自体がスキップされる。使い方の詳細は [content-html-backfill](../01_development.md#content-html-backfill) を参照。埋め戻し完了は以下で確認できる。
 
-```sql
-SELECT COUNT(*) FROM `blog_dev`.`articles` WHERE `content_html` IS NULL;
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root \
+  -e 'SELECT COUNT(*) FROM `blog_dev`.`articles` WHERE `content_html` IS NULL'
 ```
 
 0 になれば完了。フォールバック（GET 時のオンザフライ変換）は残してあるので、埋め戻し前でも API は動作する。
