@@ -63,18 +63,31 @@ pub async fn observe_request(req: Request, next: Next) -> Response {
         http.request.method = %method,
         cold_start = cold_start,
         http.response.status_code = tracing::field::Empty,
+        // ADOT collector (awsxray exporter) が旧 semconv キーしか見ない場合でも
+        // X-Ray セグメントの http.response.status に反映されるよう旧キーも併記する
+        http.status_code = tracing::field::Empty,
         otel.status_code = tracing::field::Empty,
     );
 
     let start = Instant::now();
-    let response = next.run(req).instrument(span.clone()).await;
-    let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-
-    let status = response.status();
-    span.record("http.response.status_code", status.as_u16());
-    if status.is_server_error() {
-        span.record("otel.status_code", "ERROR");
+    // status は span が生きている instrument スコープ内で record し、
+    // await 完了 = span の最後のハンドル drop で flush() より前に確実に close させる。
+    // close 前に flush が走ると、このリクエストの span 自体が今回の export に
+    // 乗らない (次の invoke まで持ち越される) ため。
+    let response = async {
+        let response = next.run(req).await;
+        let status = response.status();
+        let current = tracing::Span::current();
+        current.record("http.response.status_code", status.as_u16());
+        current.record("http.status_code", status.as_u16());
+        if status.is_server_error() {
+            current.record("otel.status_code", "ERROR");
+        }
+        response
     }
+    .instrument(span)
+    .await;
+    let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     REQUEST_DURATION.record(
         elapsed_ms,

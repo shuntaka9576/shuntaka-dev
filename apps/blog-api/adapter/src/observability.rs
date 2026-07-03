@@ -150,6 +150,10 @@ where
         db.statement_hash = %statement_hash,
         db.query_type = query_type,
         net.peer.name = peer_name,
+        // awsxray exporter は db.connection_string が無いと接続先を localhost に
+        // フォールバックするため実ホストを明示する。server.address は新 semconv 用
+        server.address = peer_name,
+        db.connection_string = peer_name,
         db.rows_returned = tracing::field::Empty,
         otel.status_code = tracing::field::Empty,
         error.message = tracing::field::Empty,
