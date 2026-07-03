@@ -1,6 +1,6 @@
 # dsl-tidb: DSQL → TSV → TiDB 取り込み手順書
 
-`tools/dsql-cli/dsl-tidb/` 配下の DDL と `load.sh` で、AWS DSQL からエクスポートした TSV を TiDB（self-hosted）に取り込む。スキーマ名を `--database` で差し替えるだけで `blog_dev` / `blog_prod` 等で同じ DSL を再利用できる。
+`tools/dsql-cli/dsl-tidb/` 配下の DDL と `load.sh` で、AWS DSQL からエクスポートした TSV を TiDB（self-hosted）に取り込む。スキーマ名を `--database` で差し替えるだけで `blog_dev` / `blog_prd` 等で同じ DSL を再利用できる。
 
 ## ディレクトリ構成
 
@@ -82,7 +82,7 @@ Export completed successfully
 
 ## 2. TSV → TiDB ロード
 
-`load.sh` で DDL → LOAD DATA → 行数確認 を一括実行する。`--database` で取り込み先スキーマを切り替える（`blog_dev` / `blog_prod` 等）。
+`load.sh` で DDL → LOAD DATA → 行数確認 を一括実行する。`--database` で取り込み先スキーマを切り替える（`blog_dev` / `blog_prd` 等）。
 
 ```bash
 cd tools/dsql-cli
@@ -153,7 +153,7 @@ Warning 1265    Data truncated for column 'description' at row 42
 
 ```text
 Required:
-  -d, --database <name>      取り込み先 TiDB データベース名 (例: blog_dev / blog_prod)
+  -d, --database <name>      取り込み先 TiDB データベース名 (例: blog_dev / blog_prd)
 
 Connection:
   -H, --host <host>          TiDB ホスト (default: $TIDB_HOST or 127.0.0.1)
@@ -260,7 +260,7 @@ bun run export --endpoint "$DSQL_ENDPOINT" --out-dir ./backup-prd
 
 # 本番 TiDB スキーマに投入
 bash dsl-tidb/load.sh \
-  --database blog_prod \
+  --database blog_prd \
   --tsv-dir ./backup-prd \
   --host tidb.$TAILNET
 ```
