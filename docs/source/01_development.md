@@ -675,7 +675,13 @@ content_html が NULL の記事だけ埋め戻す
 bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 ```
 
-全記事を再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、変換結果のサイズ確認だけなら `--dry-run` を付ける。リンクカード・GitHub 埋め込みの外部フェッチは記事ごとに URL を列挙してから並列 fetch し、失敗した URL は変換せず元のまま残す（API 側と同じフォールバック挙動）。
+全記事を再生成する場合は `--all`、特定記事だけなら `--slug <slug>` を付ける。リンクカード・GitHub 埋め込みの外部フェッチは記事ごとに URL を列挙してから並列 fetch し、失敗した URL は変換せず元のまま残す（API 側と同じフォールバック挙動）。生成結果が保存済み `content_html` と同一の記事は UPDATE 自体をスキップする。
+
+本番実行前の事前確認（UPDATE せず、保存済み content_html との差分を新規/一致/差分ありで表示。`--out-dir` で生成 HTML を `<slug>.html` として書き出してブラウザ等で確認できる）
+
+```bash
+bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --all --dry-run --out-dir ./out
+```
 
 wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` でも実行される）
 
