@@ -8,9 +8,11 @@ import { Construct } from 'constructs';
 // PromQL で参照する。ADOT Collector (iac/aws/ecspresso/tidb-proxy/otel-config.yaml)
 // の otlphttp/cloudwatch exporter の送信先と対応する。
 //
-// PromQL 上の見え方:
-// - ドット入りメトリクス名は {"db.query.duration_bucket", ...} の引用構文で参照
-// - OTLP histogram は <name>_bucket 系列 + le ラベルになり histogram_quantile が使える
+// PromQL 上の見え方 (dev 環境の実データで確認済み):
+// - ドット入りメトリクス名は {"db.query.duration", ...} の引用構文で参照
+// - OTLP histogram は _bucket 系列に分解されず native histogram として格納される。
+//   histogram_quantile(0.95, sum(rate({...}[15m]))) の形で直接クエリする
+//   (`sum by (le)` や `_bucket` サフィックスは不要)
 // - resource 属性は "@resource.service.name" 等のラベルとして付与される
 //
 // 注意: cumulative temporality のため、1 サンプルしか持たない系列 (一度だけ
@@ -56,6 +58,22 @@ class PromqlChartWidget extends cloudwatch.ConcreteWidget {
               ...(q.label ? { label: q.label } : {}),
             })),
           },
+          // ドキュメント上は省略可だが、無いとコンソールのレンダラーが
+          // style.markOptions 参照で落ちて "Something went wrong" になる
+          // (2026-07 時点の実測)。明示的にデフォルト相当を指定する。
+          plotOptions: {
+            legend: { position: 'bottom', show: true },
+            style: {
+              lineOptions: {
+                width: 2,
+                pattern: 'solid',
+                spline: false,
+                filled: false,
+                stacked: false,
+              },
+              markOptions: { enabled: false },
+            },
+          },
         },
       },
     ];
@@ -74,7 +92,7 @@ const latencyQuantiles = (metricName: string, serviceName: string): PromqlQuery[
   ].map(({ quantile, label }) => ({
     id: label,
     label,
-    query: `histogram_quantile(${quantile}, sum by (le) (rate({"${metricName}_bucket", ${serviceMatcher(serviceName)}}[15m])))`,
+    query: `histogram_quantile(${quantile}, sum(rate({"${metricName}", ${serviceMatcher(serviceName)}}[15m])))`,
   }));
 
 const counterIncrease = (id: string, metricName: string, serviceName: string): PromqlQuery => ({

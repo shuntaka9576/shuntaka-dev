@@ -90,17 +90,23 @@ Client / API Gateway
 | クエリ         | Metric Math                               | PromQL (`histogram_quantile` 等)                     |
 | dimension 制御 | metric_declarations で厳密に管理          | 不要 (150 ラベルまで)                                |
 
-PromQL 上の見え方:
+PromQL 上の見え方（dev 環境の実データで確認済み）:
 
-- ドット入りメトリクス名は引用構文で参照する: `{"db.query.duration_bucket", "@resource.service.name"="blog-api-prd"}`
-- OTLP histogram は `<name>_bucket` 系列 + `le` ラベルになり `histogram_quantile` が使える
-- resource 属性は `@resource.service.name` 等のラベルになる
+- ドット入りメトリクス名は引用構文で参照する: `{"db.query.duration", "@resource.service.name"="blog-api-prd"}`
+- OTLP histogram は **`_bucket` 系列に分解されず native histogram としてそのままの名前で格納**される。`sum by (le)` や `_bucket` サフィックスは不要
+- resource 属性は `@resource.service.name` 等のラベルになる。`__type__` / `__unit__` / `__temporality__` などのメタラベルも付く
+- counter を `rate()`/`increase()` すると「name does not end in \_total/...」という informational warning が付くが動作に問題はない
 
 ダッシュボードの p95 クエリ例:
 
 ```
-histogram_quantile(0.95, sum by (le) (rate({"db.query.duration_bucket", "@resource.service.name"="blog-api-prd"}[15m])))
+histogram_quantile(0.95, sum(rate({"db.query.duration", "@resource.service.name"="blog-api-prd"}[15m])))
 ```
+
+ダッシュボードの chart ウィジェットの注意点（2026-07 時点の実測）:
+
+- `plotOptions` はドキュメント上省略可能だが、**無いとコンソールが `markOptions` 参照の TypeError で全ウィジェット "Something went wrong" になる**。`plotOptions.style.lineOptions` / `markOptions` を明示的に入れる（`observability-construct.ts` で対応済み）
+- chart ウィジェットは `x` / `width` 等のレイアウトプロパティが無視される（put-dashboard 時に warning。自動レイアウトになるだけで実害なし）
 
 ## 設計判断・注意点
 
@@ -201,13 +207,11 @@ bunx dotenv -- cdk deploy \
 
 1. collector 起動確認: `/ecs/tidb-proxy` ロググループの `otel-collector` prefix にエラーが無いこと
 2. トレース確認: X-Ray コンソールで `lambda.handler` 配下に `db.query` / `db.healthcheck` がぶら下がる 1 リクエスト 1 トレースが見えること
-3. **メトリクス名の実地確認**: CloudWatch Query Studio で以下を実行し、系列が返ることを確認する
+3. **メトリクス名の実地確認**: CloudWatch Query Studio で以下を実行し、系列が返ることを確認する（dev では確認済み。histogram は `_bucket` 分解されず元の名前のまま）
 
    ```
-   {"db.healthcheck.duration_bucket"}
+   {"db.healthcheck.duration"}
    ```
-
-   histogram の `_bucket` サフィックスは公式ドキュメント + AWS ブログの例に基づく想定のため、**実データで名前が違っていた場合は `iac/aws/lib/api/observability-construct.ts` のクエリだけ修正**する（構造はクエリ文字列を差し替えるだけで済むようにしてある）
 
 4. ダッシュボード確認: `d-st-observability` / `p-st-observability` で p50/p95/p99 が描画されること（プローブが 5 分毎なので初回データまで最大 ~15 分待つ）
 5. TiDB Dashboard の statement duration と CloudWatch を同一時間窓で並べ、突き合わせができること
