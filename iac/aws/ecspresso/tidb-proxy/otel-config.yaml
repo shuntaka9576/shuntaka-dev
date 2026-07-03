@@ -1,0 +1,65 @@
+# ADOT Collector sidecar 設定。
+#
+# ecs-task-def.jsonnet が importstr でこのファイルを AOT_CONFIG_CONTENT 環境変数に
+# 埋め込む (SSM 経由にしない: 設定は秘匿情報ではなく、task def と一緒に版管理したい)。
+#
+# 受信: Lambda (blog-api) から VPC 越しに http://tidb-proxy.internal:4318 (OTLP/HTTP)、
+#       同一 task 内の forwarder から http://localhost:4317 (OTLP/gRPC)。
+# 送信: traces  -> X-Ray (awsxray exporter)
+#       metrics -> CloudWatch OTel Metrics (OTLP ネイティブエンドポイント)。
+#                  GB ベース課金で PromQL / Query Studio から参照する。
+#                  Classic (EMF) と違い dimension 制御が不要なため
+#                  metric_declarations は持たない。
+extensions:
+  health_check:
+  # CloudWatch OTLP エンドポイントは sigv4 認証必須。service 名は "monitoring"。
+  sigv4auth:
+    region: ap-northeast-1
+    service: monitoring
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+  # CloudWatch OTLP metrics エンドポイントは 1 リクエスト最大 1,000 datapoint /
+  # 1MB 制限があるため、metrics だけバッチサイズを抑える
+  batch/metrics:
+    send_batch_size: 500
+    send_batch_max_size: 800
+
+exporters:
+  awsxray:
+    region: ap-northeast-1
+    # X-Ray コンソールでフィルタ検索できるように annotation 化する属性
+    indexed_attributes:
+      - app.route
+      - cold_start
+      - db.query_type
+      - db.statement_hash
+      - proxy.close.reason
+      - error.type
+      - peer.service
+      - external.operation
+  otlphttp/cloudwatch:
+    metrics_endpoint: https://monitoring.ap-northeast-1.amazonaws.com/v1/metrics
+    compression: gzip
+    auth:
+      authenticator: sigv4auth
+
+service:
+  extensions: [health_check, sigv4auth]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awsxray]
+    metrics:
+      receivers: [otlp]
+      processors: [batch/metrics]
+      exporters: [otlphttp/cloudwatch]

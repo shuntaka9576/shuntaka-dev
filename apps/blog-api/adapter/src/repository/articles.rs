@@ -9,6 +9,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::database::ConnectionPool;
+use crate::observability::observe_query;
 
 #[derive(FromRow)]
 struct ArticleRow {
@@ -74,8 +75,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
         user_id: &UserId,
         slug: &str,
     ) -> Result<Option<Article>, anyhow::Error> {
-        let row: Option<ArticleRow> = sqlx::query_as(
-            r#"
+        let sql = r#"
             SELECT
                 article_id,
                 title,
@@ -91,11 +91,16 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 updated_at
             FROM articles
             WHERE user_id = ? AND slug = ?
-            "#,
+            "#;
+        let row: Option<ArticleRow> = observe_query(
+            "article_by_user_and_slug",
+            sql,
+            sqlx::query_as(sql)
+                .bind(user_id.as_uuid().to_string())
+                .bind(slug)
+                .fetch_optional(&self.db.pool()),
+            |row| Some(i64::from(row.is_some())),
         )
-        .bind(user_id.as_uuid().to_string())
-        .bind(slug)
-        .fetch_optional(&self.db.pool())
         .await?;
 
         row.map(Article::try_from).transpose()
@@ -156,8 +161,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     .cloned()
                     .unwrap_or_else(|| article.description.as_str().to_string());
 
-                sqlx::query(
-                    r#"
+                let sql = r#"
                     UPDATE articles
                     SET title = ?,
                         content = ?,
@@ -168,18 +172,23 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         published_at = ?,
                         updated_at = ?
                     WHERE article_id = ?
-                    "#,
+                    "#;
+                observe_query(
+                    "article_update",
+                    sql,
+                    sqlx::query(sql)
+                        .bind(&input.title)
+                        .bind(&input.content)
+                        .bind(&input.thumbnail)
+                        .bind(&new_description)
+                        .bind(&input.article_type)
+                        .bind(new_status)
+                        .bind(published_at)
+                        .bind(now)
+                        .bind(article.article_id.as_uuid().to_string())
+                        .execute(&self.db.pool()),
+                    |res| Some(res.rows_affected() as i64),
                 )
-                .bind(&input.title)
-                .bind(&input.content)
-                .bind(&input.thumbnail)
-                .bind(&new_description)
-                .bind(&input.article_type)
-                .bind(new_status)
-                .bind(published_at)
-                .bind(now)
-                .bind(article.article_id.as_uuid().to_string())
-                .execute(&self.db.pool())
                 .await?;
 
                 Ok(UpsertResult::Updated(article.article_id))
@@ -199,8 +208,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     .cloned()
                     .unwrap_or_else(|| input.title.clone());
 
-                sqlx::query(
-                    r#"
+                let sql = r#"
                     INSERT INTO articles (
                         article_id,
                         user_id,
@@ -215,21 +223,26 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         created_at,
                         updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    "#,
+                    "#;
+                observe_query(
+                    "article_insert",
+                    sql,
+                    sqlx::query(sql)
+                        .bind(article_id.to_string())
+                        .bind(input.user_id.as_uuid().to_string())
+                        .bind(&input.title)
+                        .bind(input.slug.as_str())
+                        .bind(&input.content)
+                        .bind(&input.thumbnail)
+                        .bind(&description)
+                        .bind(&input.article_type)
+                        .bind(status)
+                        .bind(published_at)
+                        .bind(now)
+                        .bind(now)
+                        .execute(&self.db.pool()),
+                    |res| Some(res.rows_affected() as i64),
                 )
-                .bind(article_id.to_string())
-                .bind(input.user_id.as_uuid().to_string())
-                .bind(&input.title)
-                .bind(input.slug.as_str())
-                .bind(&input.content)
-                .bind(&input.thumbnail)
-                .bind(&description)
-                .bind(&input.article_type)
-                .bind(status)
-                .bind(published_at)
-                .bind(now)
-                .bind(now)
-                .execute(&self.db.pool())
                 .await?;
 
                 Ok(UpsertResult::Created(ArticleId::new(article_id)))

@@ -10,6 +10,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::database::ConnectionPool;
+use crate::observability::observe_query;
 
 #[derive(FromRow)]
 struct ArticleRow {
@@ -127,8 +128,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         offset: u64,
         limit: u64,
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
-        let rows: Vec<ArticleSummaryRow> = sqlx::query_as(
-            r#"
+        let list_sql = r#"
             SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
                 a.title,
@@ -147,27 +147,36 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
               AND a.`type` = ?
             ORDER BY a.published_at DESC, a.article_id DESC
             LIMIT ? OFFSET ?
-            "#,
+            "#;
+        let rows: Vec<ArticleSummaryRow> = observe_query(
+            "article_list",
+            list_sql,
+            sqlx::query_as(list_sql)
+                .bind(user_name)
+                .bind(article_type.as_str())
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&self.db.pool()),
+            |rows| Some(rows.len() as i64),
         )
-        .bind(user_name)
-        .bind(article_type.as_str())
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&self.db.pool())
         .await?;
 
-        let total_count: (i64,) = sqlx::query_as(
-            r#"
+        let count_sql = r#"
             SELECT COUNT(*)
             FROM articles a
             WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
               AND a.status = 'published'
               AND a.`type` = ?
-            "#,
+            "#;
+        let total_count: (i64,) = observe_query(
+            "article_list_count",
+            count_sql,
+            sqlx::query_as(count_sql)
+                .bind(user_name)
+                .bind(article_type.as_str())
+                .fetch_one(&self.db.pool()),
+            |_| Some(1),
         )
-        .bind(user_name)
-        .bind(article_type.as_str())
-        .fetch_one(&self.db.pool())
         .await?;
 
         let articles: Vec<ArticleSummary> = rows
@@ -186,8 +195,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         user_name: &str,
         slug: &str,
     ) -> Result<Option<Article>, anyhow::Error> {
-        let row: Option<ArticleRow> = sqlx::query_as(
-            r#"
+        let detail_sql = r#"
             SELECT
                 a.article_id,
                 a.title,
@@ -204,11 +212,16 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             FROM articles a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.status = 'published' AND a.slug = ? AND u.name = ?
-            "#,
+            "#;
+        let row: Option<ArticleRow> = observe_query(
+            "article_detail",
+            detail_sql,
+            sqlx::query_as(detail_sql)
+                .bind(slug)
+                .bind(user_name)
+                .fetch_optional(&self.db.pool()),
+            |row| Some(i64::from(row.is_some())),
         )
-        .bind(slug)
-        .bind(user_name)
-        .fetch_optional(&self.db.pool())
         .await?;
 
         row.map(Article::try_from).transpose()

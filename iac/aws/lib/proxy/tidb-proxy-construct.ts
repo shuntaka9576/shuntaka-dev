@@ -131,6 +131,33 @@ export class TidbProxyConstruct extends Construct {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // ---- OTel Collector sidecar (observability) ----
+    // awsxray exporter 用。X-Ray API はリソースレベル制限非対応のため Resource:*。
+    this.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'xray:PutTraceSegments',
+          'xray:PutTelemetryRecords',
+          'xray:GetSamplingRules',
+          'xray:GetSamplingTargets',
+          'xray:GetSamplingStatisticsSummaries',
+        ],
+        resources: ['*'],
+      }),
+    );
+
+    // CloudWatch OTel Metrics (OTLP ネイティブエンドポイント) への送信用。
+    // otlphttp exporter + sigv4auth が monitoring エンドポイントへ PutMetricData
+    // 権限で書き込む。PutMetricData はリソースレベル制限非対応のため Resource:*。
+    this.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*'],
+      }),
+    );
+
     // ---- Security Group ----
     // inbound rule の追加は Lambda stack (タスク 4 / 6) 側で SecurityGroup.fromSecurityGroupId
     // で参照して `addIngressRule` する。ここでは空で作る。

@@ -1,3 +1,4 @@
+use api::observability::observe_request;
 use api::route::build_swagger_router;
 use api::route::health::build_health_check_routers;
 use api::route::users_articles::build_users_articles_routers;
@@ -9,24 +10,49 @@ use adapter::database::connect_database_with;
 use anyhow::{Error, Result};
 use axum::Router;
 use shared::config::AppConfig;
+use shared::telemetry::Telemetry;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    bootstrap().await
+fn main() -> Result<()> {
+    // OTLP exporter (reqwest blocking client) は async context 内で生成すると
+    // panic し得るため、tokio runtime を起動する前に初期化する。
+    let telemetry = shared::telemetry::init_telemetry();
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(bootstrap(telemetry))
 }
 
-async fn bootstrap() -> Result<()> {
+async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
+    // OTel layer は自クレート群の span (lambda.handler / db.query 等) だけを
+    // export する。tower_http の request span まで送るとトレースが二重になる。
+    let otel_layer = telemetry.map(|t| {
+        tracing_opentelemetry::layer()
+            .with_tracer(t.tracer)
+            .with_filter(
+                Targets::new()
+                    .with_target("blog_api", Level::INFO)
+                    .with_target("api", Level::INFO)
+                    .with_target("adapter", Level::INFO)
+                    .with_target("shared", Level::INFO)
+                    .with_target("infrastructure", Level::INFO),
+            )
+    });
+
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().json())
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "blog_api=debug,api=debug,tower_http=debug".into()),
-        )
+        .with(otel_layer)
+        .with(tracing_subscriber::fmt::layer().json().with_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "blog_api=debug,api=debug,adapter=debug,infrastructure=debug,tower_http=debug"
+                    .into()
+            }),
+        ))
         .init();
 
     let app_config = AppConfig::new()?;
@@ -55,6 +81,8 @@ async fn bootstrap() -> Result<()> {
         .merge(build_users_articles_routers())
         .merge(build_webhooks_routers())
         .merge(build_swagger_router())
+        // route_layer なので MatchedPath (app.route) が取れる。
+        .route_layer(axum::middleware::from_fn(observe_request))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -68,5 +96,7 @@ async fn bootstrap() -> Result<()> {
 
     println!("Listening on {addr}");
 
-    axum::serve(listener, app).await.map_err(Error::from)
+    let result = axum::serve(listener, app).await.map_err(Error::from);
+    shared::telemetry::shutdown();
+    result
 }
