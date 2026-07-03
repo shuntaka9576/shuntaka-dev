@@ -68,13 +68,17 @@ dependencies = [
  "kernel",
  "markdown",
  "opentelemetry",
+ "opentelemetry_sdk",
  "regex",
  "registry",
  "serde",
  "serde_json",
  "shared",
  "tokio",
+ "tower",
  "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -2548,6 +2552,7 @@ dependencies = [
  "portable-atomic",
  "rand 0.9.4",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

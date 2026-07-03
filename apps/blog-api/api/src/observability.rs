@@ -78,8 +78,11 @@ pub async fn observe_request(req: Request, next: Next) -> Response {
         let response = next.run(req).await;
         let status = response.status();
         let current = tracing::Span::current();
-        current.record("http.response.status_code", status.as_u16());
-        current.record("http.status_code", status.as_u16());
+        // i64 で record する。u16/u64 のままだと tracing-opentelemetry (0.33) が
+        // record_u64 未実装のため Debug 文字列になり、ADOT の awsxray translator の
+        // Value.Int() が 0 を返して X-Ray の http.response.status が 0 に化ける
+        current.record("http.response.status_code", i64::from(status.as_u16()));
+        current.record("http.status_code", i64::from(status.as_u16()));
         if status.is_server_error() {
             current.record("otel.status_code", "ERROR");
         }
@@ -102,4 +105,84 @@ pub async fn observe_request(req: Request, next: Next) -> Response {
     shared::telemetry::flush();
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::Router;
+    use axum::body::Body;
+    use axum::http::Request as HttpRequest;
+    use axum::routing::get;
+    use opentelemetry::trace::TracerProvider as _;
+    use opentelemetry_sdk::trace::{InMemorySpanExporter, SdkTracerProvider};
+    use tower::ServiceExt;
+    use tracing::Level;
+    use tracing_subscriber::Layer;
+    use tracing_subscriber::filter::Targets;
+    use tracing_subscriber::layer::SubscriberExt;
+
+    /// 本番 (src/bin/app.rs) と同じ「Targets フィルタ付き otel layer」構成で、
+    /// export された lambda.handler span に後から record した status が
+    /// 乗ることを検証する回帰テスト。
+    /// X-Ray で http.response.status が 0 になる問題の切り分け用。
+    #[tokio::test]
+    async fn lambda_handler_span_exports_response_status() {
+        let exporter = InMemorySpanExporter::default();
+        let provider = SdkTracerProvider::builder()
+            .with_simple_exporter(exporter.clone())
+            .build();
+        let tracer = provider.tracer("test");
+
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_opentelemetry::layer().with_tracer(tracer).with_filter(
+                Targets::new()
+                    .with_target("api", Level::INFO)
+                    .with_target("adapter", Level::INFO),
+            ),
+        );
+        let _guard = tracing::subscriber::set_default(subscriber);
+
+        let app = Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .route_layer(axum::middleware::from_fn(observe_request));
+
+        let response = app
+            .oneshot(HttpRequest::get("/ping").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+
+        provider.force_flush().unwrap();
+        let spans = exporter.get_finished_spans().unwrap();
+        let handler = spans
+            .iter()
+            .find(|s| s.name == "lambda.handler")
+            .unwrap_or_else(|| panic!("lambda.handler span not exported: {spans:?}"));
+
+        let attr = |key: &str| {
+            handler
+                .attributes
+                .iter()
+                .find(|kv| kv.key.as_str() == key)
+                .map(|kv| kv.value.clone())
+        };
+        // 値の「型」まで検証する。u16 のまま record すると tracing-opentelemetry が
+        // record_u64 を実装していないため Debug 文字列 ("200") になり、ADOT の
+        // awsxray translator の Value.Int() が 0 を返して X-Ray の status が 0 になる
+        assert_eq!(
+            attr("http.response.status_code"),
+            Some(opentelemetry::Value::I64(200)),
+            "attributes: {:?}",
+            handler.attributes
+        );
+        assert_eq!(
+            attr("http.status_code"),
+            Some(opentelemetry::Value::I64(200))
+        );
+        assert_eq!(
+            attr("app.route"),
+            Some(opentelemetry::Value::from("/ping".to_string()))
+        );
+    }
 }
