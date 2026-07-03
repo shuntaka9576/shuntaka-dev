@@ -7,6 +7,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | 症状                           | 見る節                 |
 | ------------------------------ | ---------------------- |
 | API / ブログが遅い             | ボトルネック切り分け   |
+| グラフの意味を知りたい         | ダッシュボード         |
 | ダッシュボードにデータが出ない | テレメトリが出ないとき |
 | クエリの書き方を調べたい       | クエリリファレンス     |
 | 検索がヒットしない・表示が変   | ハマりどころ           |
@@ -16,7 +17,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | #   | 手順                                                  | 使うもの                                                   |
 | --- | ----------------------------------------------------- | ---------------------------------------------------------- |
 | 1   | p95 が悪化している時間帯を特定する                    | ダッシュボード `d-st-observability` / `p-st-observability` |
-| 2   | SELECT 1（経路コストのみ）と実クエリの p95 を比較する | ダッシュボード or PromQL（クエリリファレンス参照）         |
+| 2   | SELECT 1（経路コストのみ）と実クエリの p95 を比較する | ダッシュボード                                             |
 | 3   | TiDB 側の実行時間を同一時間窓で並べる                 | TiDB Dashboard / Statement Summary / Slow Query            |
 | 4   | 判定表で原因を絞る                                    | 下表                                                       |
 | 5   | 該当リクエストを個別に深掘りする                      | X-Ray（クエリリファレンス参照）                            |
@@ -32,6 +33,21 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | forwarder の `proxy.upstream.connect.duration` が高い   | forwarder → TiDB 経路                           |
 
 参考実測値（2026-07-03）: Tailscale 経由の AWS Tokyo ⇄ 自宅 RTT ≈ 8ms。`SELECT 1` は ~18ms ≈ 2 往復（sqlx の `test_before_acquire` による取得前 ping の 1 往復を含む）。
+
+## ダッシュボード
+
+CloudWatch Dashboards の `d-st-observability`（dev）/ `p-st-observability`（prd）。定義は `iac/aws/lib/api/observability-construct.ts`。レイテンシ系はすべて p50 / p95 / p99、rate window は 15 分。
+
+| ウィジェット                       | メトリクス（計測元）                                                      | 見方                                                                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lambda request latency             | `app.request.duration`（blog-api）                                        | ハンドラ全体のエンドツーエンド。ユーザー体感に最も近い                                                                                                                                                                          |
+| DB client latency                  | `db.query.duration`（blog-api）                                           | Lambda から見た実クエリのレイテンシ                                                                                                                                                                                             |
+| DB baseline latency (SELECT 1)     | `db.healthcheck.duration`（blog-api）                                     | クエリ実行以外の経路コスト全部。Tailscale の片道遅延そのものではなく「RTT × 往復回数 + forwarder 中継」（`test_before_acquire` の ping 込みで ~2 往復）。実クエリとの差分が SQL 実行 + 結果転送。欠損が多い（ハマりどころ参照） |
+| DB connection latency              | `db.connection.duration`（blog-api）                                      | pool の新規接続確立。ここだけ高ければ pool / TLS / Tailscale 経路                                                                                                                                                               |
+| Forwarder upstream connect latency | `proxy.upstream.connect.duration`（tidb-proxy）                           | forwarder → TiDB の接続確立                                                                                                                                                                                                     |
+| Forwarder connections              | `proxy.connection.active` / `proxy.connection.accept.count`（tidb-proxy） | アクティブ接続数と accept 数（15 分増分）。accept の急増は再接続の嵐を疑う                                                                                                                                                      |
+| Forwarder errors                   | `proxy.error.count` / `proxy.timeout.count`（tidb-proxy）                 | 中継エラーとタイムアウト（15 分増分）。平常時はゼロ                                                                                                                                                                             |
+| Lambda cold starts / DB errors     | `lambda.cold_start.count` / `db.query.error.count`（blog-api）            | cold start 回数とクエリエラー数（15 分増分）                                                                                                                                                                                    |
 
 ## テレメトリが出ないとき
 
@@ -51,51 +67,6 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 
 ## クエリリファレンス
 
-### PromQL（CloudWatch > Metrics > Query Studio）
-
-書き方の前提。
-
-- ドット入りメトリクス名は引用構文 `{"db.query.duration", ...}` で参照する
-- histogram は native histogram のまま格納される。`_bucket` サフィックスや `sum by (le)` は書かない
-- 環境は `@resource.service.name`（`blog-api-dev` / `blog-api-prd` / `tidb-proxy`）で絞る
-- コンソール経由は無料（課金は `/api/v1/query` の API 経由のみ）。クエリ範囲は最大 7 日・1 クエリ 500 系列
-
-クエリレイテンシ p95:
-
-```
-histogram_quantile(0.95, sum(rate({"db.query.duration", "@resource.service.name"="blog-api-prd"}[15m])))
-```
-
-SELECT 1 ベースライン（経路コストのみ。実クエリとの差分が SQL 実行 + 結果転送）:
-
-```
-histogram_quantile(0.95, sum(rate({"db.healthcheck.duration", "@resource.service.name"="blog-api-prd"}[15m])))
-```
-
-クエリ種別ごと（`db.query_type` = `article_list` / `article_list_count` / `article_detail` など）:
-
-```
-histogram_quantile(0.95, sum by (db.query_type) (rate({"db.query.duration", "@resource.service.name"="blog-api-prd"}[15m])))
-```
-
-forwarder の accept 数（15 分増分）:
-
-```
-sum(increase({"proxy.connection.accept.count", "@resource.service.name"="tidb-proxy"}[15m]))
-```
-
-アクティブ接続数:
-
-```
-sum({"proxy.connection.active", "@resource.service.name"="tidb-proxy"})
-```
-
-dev / prd 比較:
-
-```
-histogram_quantile(0.95, sum by (@resource.service.name) (rate({"app.request.duration", "@resource.service.name"=~"blog-api-.*"}[15m])))
-```
-
 ### X-Ray（CloudWatch > トレース）
 
 annotation キーはドットがアンダースコアに変換される。
@@ -109,23 +80,24 @@ annotation キーはドットがアンダースコアに変換される。
 | `proxy.close.reason` | `annotation.proxy_close_reason` |
 | `error.type`         | `annotation.error_type`         |
 
-環境で絞る（X-Ray グループに登録しておくとドロップダウンで常時絞れる）:
+`app.route` に入る値（axum の MatchedPath そのまま。health のルートは末尾スラッシュ付き `/health/` になる点に注意）:
 
-```
-service(id(name: "blog-api-prd"))
-```
+| `app.route`                     | メソッド | 内容                                                                     |
+| ------------------------------- | -------- | ------------------------------------------------------------------------ |
+| `/users/{name}/articles`        | GET      | 記事一覧                                                                 |
+| `/users/{name}/articles/{slug}` | GET      | 記事詳細                                                                 |
+| `/health/`                      | GET      | ヘルスチェック                                                           |
+| `/health/db`                    | GET      | DB ヘルスチェック（5 分毎の SELECT 1 プローブが叩く）                    |
+| `/webhooks/github`              | POST     | GitHub Webhook（記事同期）                                               |
+| `/swagger` ほか                 | GET      | Swagger UI（`/swagger/` / `/swagger/{*rest}` / `/swagger/openapi.json`） |
 
-環境 + ルート:
+クエリサンプル:
 
-```
-service(id(name: "blog-api-prd")) AND annotation.app_route = "/users/{name}/articles"
-```
-
-遅いリクエスト（1 秒以上）:
-
-```
-service(id(name: "blog-api-prd")) AND duration > 1
-```
+| 用途                                                                   | クエリ                                                                                  |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 環境で絞る（X-Ray グループに登録しておくとドロップダウンで常時絞れる） | `service(id(name: "blog-api-prd"))`                                                     |
+| 環境 + ルート                                                          | `service(id(name: "blog-api-prd")) AND annotation.app_route = "/users/{name}/articles"` |
+| 遅いリクエスト（1 秒以上）                                             | `service(id(name: "blog-api-prd")) AND duration > 1`                                    |
 
 ## ハマりどころ
 
