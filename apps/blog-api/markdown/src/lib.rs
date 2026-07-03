@@ -2,8 +2,17 @@ use comrak::Options;
 use comrak::plugins::syntect::SyntectAdapter;
 use regex::Regex;
 use scraper::{Html, Selector};
+use std::sync::LazyLock;
 use std::time::Duration;
+use syntect::highlighting::ThemeSet;
+use syntect::parsing::SyntaxSet;
 use url::Url;
+
+// syntect のデフォルト定義ロードは1回数十msかかるため、プロセス内で1度だけ行い使い回す
+static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
+static SYNTECT_ADAPTER: LazyLock<SyntectAdapter> =
+    LazyLock::new(|| SyntectAdapter::new(Some("base16-ocean.dark")));
 
 /// GitHub link information extracted from URL
 #[derive(Debug, Clone)]
@@ -353,11 +362,13 @@ fn process_link_cards(markdown: &str) -> String {
 /// Parse a GitHub blob URL into its components
 fn parse_github_link(url: &str) -> Option<GitHubLink> {
     // Pattern: https://github.com/{owner}/{repo}/blob/{branch}/{path}[?plain=1][#L{start}[-L{end}]]
-    let re = Regex::new(
-        r"^https://github\.com/([^/]+)/([^/]+)/blob/([^/?#]+)/([^?#]+)(?:\?[^#]*)?(?:#L(\d+)(?:-L(\d+))?)?$"
-    ).ok()?;
+    static GITHUB_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^https://github\.com/([^/]+)/([^/]+)/blob/([^/?#]+)/([^?#]+)(?:\?[^#]*)?(?:#L(\d+)(?:-L(\d+))?)?$"
+        ).unwrap()
+    });
 
-    let caps = re.captures(url)?;
+    let caps = GITHUB_LINK_RE.captures(url)?;
 
     Some(GitHubLink {
         owner: caps.get(1)?.as_str().to_string(),
@@ -825,9 +836,10 @@ fn is_valid_html_tag(content: &str) -> bool {
 /// Preprocess markdown to handle custom embed syntax
 fn preprocess_embeds(markdown: &str) -> String {
     // SpeakerDeck: @[sd](slideId,slideNo,aspectRatio,dataRatio)
-    let sd_re = Regex::new(r"@\[sd\]\(([^,]+),([^,]*),([^,]+),([^)]+)\)").unwrap();
+    static SD_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"@\[sd\]\(([^,]+),([^,]*),([^,]+),([^)]+)\)").unwrap());
 
-    sd_re
+    SD_RE
         .replace_all(markdown, |caps: &regex::Captures| {
             let slide_id = &caps[1];
             let slide_no = &caps[2];
@@ -852,9 +864,11 @@ fn process_containers<F>(markdown: &str, convert_inner: F) -> String
 where
     F: Fn(&str) -> String,
 {
-    let container_re = Regex::new(r"(?s):::[ \t]*(details|message)[ \t]*([^\n]*)\n(.*?):::").unwrap();
+    static CONTAINER_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?s):::[ \t]*(details|message)[ \t]*([^\n]*)\n(.*?):::").unwrap()
+    });
 
-    container_re
+    CONTAINER_RE
         .replace_all(markdown, |caps: &regex::Captures| {
             let container_type = &caps[1];
             let argument = caps[2].trim();
@@ -883,7 +897,7 @@ where
 
 /// Markdown to HTML converter with syntax highlighting
 pub struct MarkdownConverter {
-    syntect_adapter: SyntectAdapter,
+    syntect_adapter: &'static SyntectAdapter,
 }
 
 impl Default for MarkdownConverter {
@@ -895,7 +909,7 @@ impl Default for MarkdownConverter {
 impl MarkdownConverter {
     pub fn new() -> Self {
         Self {
-            syntect_adapter: SyntectAdapter::new(Some("base16-ocean.dark")),
+            syntect_adapter: &SYNTECT_ADAPTER,
         }
     }
 
@@ -932,19 +946,16 @@ impl MarkdownConverter {
 
     /// Highlight code using syntect
     fn highlight_code(&self, code: &str, lang: &str) -> String {
-        use syntect::highlighting::ThemeSet;
         use syntect::html::highlighted_html_for_string;
-        use syntect::parsing::SyntaxSet;
 
-        let ss = SyntaxSet::load_defaults_newlines();
-        let ts = ThemeSet::load_defaults();
-        let theme = &ts.themes["base16-ocean.dark"];
+        let ss = &*SYNTAX_SET;
+        let theme = &THEME_SET.themes["base16-ocean.dark"];
 
         let syntax = ss
             .find_syntax_by_token(lang)
             .unwrap_or_else(|| ss.find_syntax_plain_text());
 
-        highlighted_html_for_string(code, &ss, syntax, theme).unwrap_or_else(|_| html_escape(code))
+        highlighted_html_for_string(code, ss, syntax, theme).unwrap_or_else(|_| html_escape(code))
     }
 
     /// Simple conversion without container processing (used for inner content)
@@ -963,14 +974,16 @@ impl MarkdownConverter {
         options.render.github_pre_lang = true;
 
         let mut plugins = comrak::options::Plugins::default();
-        plugins.render.codefence_syntax_highlighter = Some(&self.syntect_adapter);
+        plugins.render.codefence_syntax_highlighter = Some(self.syntect_adapter);
 
         comrak::markdown_to_html_with_plugins(markdown, &options, &plugins)
     }
 
     fn add_target_blank_to_external_links(&self, html: &str) -> String {
-        let re = Regex::new(r#"<a href="(https?://[^"]*)""#).unwrap();
-        re.replace_all(html, r#"<a href="$1" target="_blank" rel="noopener noreferrer""#)
+        static EXTERNAL_LINK_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"<a href="(https?://[^"]*)""#).unwrap());
+        EXTERNAL_LINK_RE
+            .replace_all(html, r#"<a href="$1" target="_blank" rel="noopener noreferrer""#)
             .to_string()
     }
 }
