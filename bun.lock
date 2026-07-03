@@ -75,7 +75,7 @@
       "version": "0.1.0",
       "dependencies": {
         "commander": "^15.0.0",
-        "mysql2": "^3.15.0",
+        "mysql2": "^3.22.5",
       },
       "devDependencies": {
         "wasm-pack": "^0.13.1",
