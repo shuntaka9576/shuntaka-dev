@@ -120,7 +120,31 @@ CloudWatch コンソール (ap-northeast-1) → Settings で OpenTelemetry (OTLP
 
 未有効のまま送信すると collector ログ (`/ecs/tidb-proxy` の `otel-collector` prefix) に 4xx が出るので、疎通確認はそこで行う。
 
-### 2. tidb-proxy スタックのデプロイ（IAM 変更）
+### 2. deploy role の更新（ローカルから、GitHub Actions デプロイより先）
+
+本タスクで deploy role に `cloudwatch:*`（ダッシュボード）/ `events:*`（ヘルスチェックプローブ）を追加した。GitHub Actions はこのロールを assume してデプロイするため、**先にローカルの管理者権限で deploy role スタックを反映**する。
+
+dev:
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk deploy \
+  -c stageName=dev \
+  d-st-deploy-role \
+  --require-approval never
+```
+
+prd:
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk deploy \
+  -c stageName=prd \
+  p-st-deploy-role \
+  --require-approval never
+```
+
+### 3. tidb-proxy スタックのデプロイ（IAM 変更）
 
 task role への X-Ray 書き込み + `cloudwatch:PutMetricData` 付与。
 
@@ -137,7 +161,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-### 3. tidb-proxy イメージ更新 + ecspresso deploy（collector sidecar 追加）
+### 4. tidb-proxy イメージ更新 + ecspresso deploy（collector sidecar 追加）
 
 forwarder の OTel 計装入りイメージを push し、otel-collector sidecar 入りの task def を反映する。
 
@@ -145,25 +169,35 @@ forwarder の OTel 計装入りイメージを push し、otel-collector sidecar
 scripts/deploy-tidb-proxy.sh
 ```
 
-### 4. main スタックのデプロイ（dev / prd）
+### 5. main スタックのデプロイ（dev / prd）
 
 Lambda 環境変数 (`OTEL_*`, `NO_PROXY`) / SG 4318 / ダッシュボード / ヘルスチェックプローブ。
 
-**GitHub Actions (推奨)**: Deploy workflow を workflow_dispatch で `stack=main` を選択し、`stageName=dev` と `stageName=prd` でそれぞれ実行する（`stack=all` なら 2 と 4 をまとめて実行できる）。
+**GitHub Actions (推奨)**: Deploy workflow を workflow_dispatch で `stack=main` を選択し、`stageName=dev` と `stageName=prd` でそれぞれ実行する（`stack=all` なら 3 と 5 をまとめて実行できる）。
 
 ローカルから実行する場合:
 
+dev:
+
 ```bash
 cd iac/aws
-for STAGE_NAME in dev prd; do
-  bunx dotenv -- cdk deploy \
-    -c stageName=${STAGE_NAME} \
-    ${STAGE_NAME:0:1}-st-main \
-    --require-approval never
-done
+bunx dotenv -- cdk deploy \
+  -c stageName=dev \
+  d-st-main \
+  --require-approval never
 ```
 
-### 5. デプロイ後の確認
+prd:
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk deploy \
+  -c stageName=prd \
+  p-st-main \
+  --require-approval never
+```
+
+### 6. デプロイ後の確認
 
 1. collector 起動確認: `/ecs/tidb-proxy` ロググループの `otel-collector` prefix にエラーが無いこと
 2. トレース確認: X-Ray コンソールで `lambda.handler` 配下に `db.query` / `db.healthcheck` がぶら下がる 1 リクエスト 1 トレースが見えること
@@ -178,7 +212,7 @@ done
 4. ダッシュボード確認: `d-st-observability` / `p-st-observability` で p50/p95/p99 が描画されること（プローブが 5 分毎なので初回データまで最大 ~15 分待つ）
 5. TiDB Dashboard の statement duration と CloudWatch を同一時間窓で並べ、突き合わせができること
 
-### 6. 運用上の手動作業（継続）
+### 7. 運用上の手動作業（継続）
 
 - 新規追加の恒常的な手動運用は無し。Tailscale auth key の 90 日ローテーション（既存運用）のみ
 - コスト観点で外したくなったら: collector sidecar を task def から外せばメトリクス課金は止まる（アプリ側計装は endpoint 未設定なら no-op なので残してよい）
