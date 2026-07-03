@@ -37,6 +37,8 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::ec2:*',
       'Action::ecs:*',
       'Action::servicediscovery:*',
+      'Action::cloudwatch:*',
+      'Action::events:*',
       'Resource::*',
     ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
@@ -67,7 +69,7 @@ export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
     {
       id: 'AwsSolutions-IAM5[Resource::*]',
       reason:
-        'ECS UpdateTaskProtection は対象 task が deploy 時に動的に決まるためリソース ARN を事前に絞れない。kms:Decrypt は SSM SecureString 復号用で default KMS key (alias/aws/ssm) のみに限定済み。',
+        'ECS UpdateTaskProtection は対象 task が deploy 時に動的に決まるためリソース ARN を事前に絞れない。kms:Decrypt は SSM SecureString 復号用で default KMS key (alias/aws/ssm) のみに限定済み。X-Ray (PutTraceSegments 等) と cloudwatch:PutMetricData はリソースレベル制限非対応の API。',
     },
   ]);
 };

@@ -292,7 +292,19 @@ IndexLookUp        actRows:10       time:824ms  memory:9.05 MB  limit embedded(o
 
 ![TiDB cluster region distribution](./images/tidb-region-distribution.png)
 
+以下のコマンドは対象 DB を環境変数で指定する。検証に使った `blog_test` は survey 後に drop 済みのため、再実行するには `tools/tidb-seeder` で再シードするか、現存する `blog_prd` を指定する（region 数は 5M 投入時の値にはならない）。
+
+```bash
+export BLOG_DB=blog_dev
+```
+
 ### クラスタ構成
+
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root -e \
+  "SELECT store_id, address, capacity, available
+   FROM information_schema.tikv_store_status"
+```
 
 ```
 +----------+-----------------------------------------------------+----------+-----------+
@@ -307,6 +319,16 @@ IndexLookUp        actRows:10       time:824ms  memory:9.05 MB  limit embedded(o
 3 台の TiKV ノード、各 935GiB キャパ・~850GiB available（k8s cluster 内、StatefulSet 想定）。
 
 ### `blog_test.articles` の region 分布
+
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root -e \
+  "SELECT store_id, COUNT(*) AS region_count, SUM(is_index) AS index_regions,
+          ROUND(SUM(approximate_size)/1024) AS total_gb
+   FROM information_schema.tikv_region_status r
+   LEFT JOIN information_schema.tikv_region_peers p ON r.region_id = p.region_id
+   WHERE r.db_name='$BLOG_DB' AND r.table_name='articles'
+   GROUP BY store_id"
+```
 
 ```
 +----------+--------------+---------------+----------+
@@ -331,6 +353,18 @@ IndexLookUp        actRows:10       time:824ms  memory:9.05 MB  limit embedded(o
 ![TiDB leader distribution and load asymmetry](./images/tidb-leader-load-asymmetry.png)
 
 replica 配置が完璧でも、TiDB では **leader replica だけが read/write を捌く**ので、leader が偏ってると片方の store がホットスポットになる。5M 投入 + 一連の OFFSET 系 EXPLAIN ANALYZE を叩いた直後のスナップショット:
+
+```bash
+mysql -h tidb.$TAILNET -P 4000 -u root -e \
+  "SELECT p.store_id, COUNT(*) AS leader_count,
+          ROUND(SUM(r.approximate_size)/1024, 1) AS leader_gb,
+          ROUND(SUM(r.read_bytes)/1024/1024, 1) AS read_mb,
+          ROUND(SUM(r.written_bytes)/1024/1024, 1) AS write_mb
+   FROM information_schema.tikv_region_peers p
+   JOIN information_schema.tikv_region_status r ON p.region_id = r.region_id
+   WHERE p.is_leader = 1 AND r.db_name='$BLOG_DB' AND r.table_name='articles'
+   GROUP BY p.store_id ORDER BY p.store_id"
+```
 
 ```
 +----------+--------------+-----------+---------+----------+

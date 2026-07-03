@@ -18,3 +18,5 @@ tokio.workspace = true
 tracing.workspace = true
 futures.workspace = true
 regex.workspace = true
+shared.workspace = true
+opentelemetry.workspace = true

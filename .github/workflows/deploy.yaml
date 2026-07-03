@@ -15,6 +15,15 @@ on:
         options:
           - dev
           - prd
+      stack:
+        description: 'Deploy stack (all = st-tidb-proxy -> main の順で両方)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - st-tidb-proxy
+          - main
 
 permissions: {}
 
@@ -30,6 +39,8 @@ jobs:
     uses: ./.github/workflows/reusable-deploy.yaml
     with:
       stageName: ${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
+      # push トリガでは inputs が空なので all (従来挙動) になる
+      stack: ${{ inputs.stack || 'all' }}
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       GH_APP_ID: ${{ secrets.GH_APP_ID }}

@@ -109,6 +109,8 @@ exports[`DeployRoleStack > snapshot 1`] = `
                     "ec2:*",
                     "ecs:*",
                     "servicediscovery:*",
+                    "cloudwatch:*",
+                    "events:*",
                   ],
                   "Effect": "Allow",
                   "Resource": "*",
