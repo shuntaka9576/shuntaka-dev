@@ -2,14 +2,15 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_new::new;
 use kernel::model::article::{
-    Article, ArticleId, ArticleSummary, ArticleType, Content, Description, Slug, Status, Thumbnail,
-    Title, UserId,
+    Article, ArticleId, ArticleSummary, ArticleType, Content, ContentHtml, Description, Slug,
+    Status, Thumbnail, Title, UserId,
 };
 use kernel::repository::users_articles::{ArticleSummaryPage, UsersArticlesRepository};
 use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::database::ConnectionPool;
+use crate::observability::observe_query;
 
 #[derive(FromRow)]
 struct ArticleRow {
@@ -18,6 +19,7 @@ struct ArticleRow {
     slug: String,
     user_id: String,
     content: String,
+    content_html: Option<String>,
     thumbnail: Option<String>,
     description: String,
     status: String,
@@ -52,6 +54,7 @@ impl TryFrom<ArticleRow> for Article {
             Slug::new(row.slug),
             UserId::new(user_id),
             Content::new(row.content),
+            row.content_html.map(ContentHtml::new),
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
@@ -127,8 +130,9 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         offset: u64,
         limit: u64,
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
-        let rows: Vec<ArticleSummaryRow> = sqlx::query_as(
-            r#"
+        let pool = self.db.pool();
+
+        let list_sql = r#"
             SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
                 a.title,
@@ -147,28 +151,38 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
               AND a.`type` = ?
             ORDER BY a.published_at DESC, a.article_id DESC
             LIMIT ? OFFSET ?
-            "#,
-        )
-        .bind(user_name)
-        .bind(article_type.as_str())
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&self.db.pool())
-        .await?;
+            "#;
+        let rows_future = observe_query(
+            "article_list",
+            list_sql,
+            sqlx::query_as::<_, ArticleSummaryRow>(list_sql)
+                .bind(user_name)
+                .bind(article_type.as_str())
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&pool),
+            |rows| Some(rows.len() as i64),
+        );
 
-        let total_count: (i64,) = sqlx::query_as(
-            r#"
+        let count_sql = r#"
             SELECT COUNT(*)
             FROM articles a
             WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
               AND a.status = 'published'
               AND a.`type` = ?
-            "#,
-        )
-        .bind(user_name)
-        .bind(article_type.as_str())
-        .fetch_one(&self.db.pool())
-        .await?;
+            "#;
+        let count_future = observe_query(
+            "article_list_count",
+            count_sql,
+            sqlx::query_as::<_, (i64,)>(count_sql)
+                .bind(user_name)
+                .bind(article_type.as_str())
+                .fetch_one(&pool),
+            |_| Some(1),
+        );
+
+        // DB が Tailscale 越しで RTT が大きいため、一覧と件数を並列に投げる
+        let (rows, total_count) = tokio::try_join!(rows_future, count_future)?;
 
         let articles: Vec<ArticleSummary> = rows
             .into_iter()
@@ -186,14 +200,14 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         user_name: &str,
         slug: &str,
     ) -> Result<Option<Article>, anyhow::Error> {
-        let row: Option<ArticleRow> = sqlx::query_as(
-            r#"
+        let detail_sql = r#"
             SELECT
                 a.article_id,
                 a.title,
                 a.slug,
                 a.user_id,
                 a.content,
+                a.content_html,
                 a.thumbnail,
                 a.description,
                 a.status,
@@ -204,11 +218,16 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             FROM articles a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.status = 'published' AND a.slug = ? AND u.name = ?
-            "#,
+            "#;
+        let row: Option<ArticleRow> = observe_query(
+            "article_detail",
+            detail_sql,
+            sqlx::query_as(detail_sql)
+                .bind(slug)
+                .bind(user_name)
+                .fetch_optional(&self.db.pool()),
+            |row| Some(i64::from(row.is_some())),
         )
-        .bind(slug)
-        .bind(user_name)
-        .fetch_optional(&self.db.pool())
         .await?;
 
         row.map(Article::try_from).transpose()

@@ -2,8 +2,79 @@ use comrak::Options;
 use comrak::plugins::syntect::SyntectAdapter;
 use regex::Regex;
 use scraper::{Html, Selector};
-use std::time::Duration;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use syntect::highlighting::ThemeSet;
+use syntect::parsing::SyntaxSet;
 use url::Url;
+
+// syntect のデフォルト定義ロードは1回数十msかかるため、プロセス内で1度だけ行い使い回す
+static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
+static SYNTECT_ADAPTER: LazyLock<SyntectAdapter> =
+    LazyLock::new(|| SyntectAdapter::new(Some("base16-ocean.dark")));
+
+/// 外部リソース（OGP ページ・GitHub raw ファイル）取得の抽象化。
+/// wasm では同期 HTTP が使えないため、事前フェッチ済みリソースを注入できるようにする
+pub trait ResourceFetcher {
+    fn fetch(&self, url: &str) -> Result<String, String>;
+}
+
+/// ureq による同期 HTTP フェッチ（native 専用）
+#[cfg(not(target_arch = "wasm32"))]
+pub struct UreqFetcher;
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ResourceFetcher for UreqFetcher {
+    fn fetch(&self, url: &str) -> Result<String, String> {
+        let agent = ureq::Agent::config_builder()
+            .timeout_global(Some(std::time::Duration::from_secs(5)))
+            .build()
+            .new_agent();
+
+        let response = agent
+            .get(url)
+            .header("User-Agent", "Mozilla/5.0 (compatible; LinkCardBot/1.0)")
+            .call()
+            .map_err(|e| e.to_string())?;
+
+        response.into_body().read_to_string().map_err(|e| e.to_string())
+    }
+}
+
+/// 事前フェッチ済みリソース（url → body）から解決する fetcher（wasm / バッチ用）。
+/// 未登録の URL は Err となり、変換側は元の URL をそのまま残すフォールバックに入る
+pub struct MapResourceFetcher {
+    resources: HashMap<String, String>,
+}
+
+impl MapResourceFetcher {
+    pub fn new(resources: HashMap<String, String>) -> Self {
+        Self { resources }
+    }
+}
+
+impl ResourceFetcher for MapResourceFetcher {
+    fn fetch(&self, url: &str) -> Result<String, String> {
+        self.resources
+            .get(url)
+            .cloned()
+            .ok_or_else(|| format!("resource not prefetched: {url}"))
+    }
+}
+
+/// フェッチ対象 URL の収集専用 fetcher。URL を記録して常に Err を返す
+struct RecordingFetcher {
+    urls: RefCell<Vec<String>>,
+}
+
+impl ResourceFetcher for RecordingFetcher {
+    fn fetch(&self, url: &str) -> Result<String, String> {
+        self.urls.borrow_mut().push(url.to_string());
+        Err("recording only".to_string())
+    }
+}
 
 /// GitHub link information extracted from URL
 #[derive(Debug, Clone)]
@@ -25,22 +96,6 @@ struct OgpInfo {
     description: Option<String>,
     image: Option<String>,
     favicon: Option<String>,
-}
-
-/// Fetch HTML content from URL
-fn fetch_ogp_html(url: &str) -> Result<String, String> {
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build()
-        .new_agent();
-
-    let response = agent
-        .get(url)
-        .header("User-Agent", "Mozilla/5.0 (compatible; LinkCardBot/1.0)")
-        .call()
-        .map_err(|e| e.to_string())?;
-
-    response.into_body().read_to_string().map_err(|e| e.to_string())
 }
 
 /// Parse OGP information from HTML
@@ -288,7 +343,7 @@ fn process_x_embeds(markdown: &str) -> (String, bool) {
 
 /// Process link cards in markdown
 /// Only processes standalone URLs at the start of a line (excluding GitHub blob URLs)
-fn process_link_cards(markdown: &str) -> String {
+fn process_link_cards(markdown: &str, fetcher: &dyn ResourceFetcher) -> String {
     let mut result = String::new();
     let mut in_code_block = false;
 
@@ -319,7 +374,7 @@ fn process_link_cards(markdown: &str) -> String {
             }
 
             // Try to fetch OGP info
-            match fetch_ogp_html(trimmed) {
+            match fetcher.fetch(trimmed) {
                 Ok(html_content) => {
                     let ogp = parse_ogp(&html_content, trimmed);
                     let card_html = render_link_card(&ogp);
@@ -353,11 +408,13 @@ fn process_link_cards(markdown: &str) -> String {
 /// Parse a GitHub blob URL into its components
 fn parse_github_link(url: &str) -> Option<GitHubLink> {
     // Pattern: https://github.com/{owner}/{repo}/blob/{branch}/{path}[?plain=1][#L{start}[-L{end}]]
-    let re = Regex::new(
-        r"^https://github\.com/([^/]+)/([^/]+)/blob/([^/?#]+)/([^?#]+)(?:\?[^#]*)?(?:#L(\d+)(?:-L(\d+))?)?$"
-    ).ok()?;
+    static GITHUB_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^https://github\.com/([^/]+)/([^/]+)/blob/([^/?#]+)/([^?#]+)(?:\?[^#]*)?(?:#L(\d+)(?:-L(\d+))?)?$"
+        ).unwrap()
+    });
 
-    let caps = re.captures(url)?;
+    let caps = GITHUB_LINK_RE.captures(url)?;
 
     Some(GitHubLink {
         owner: caps.get(1)?.as_str().to_string(),
@@ -371,23 +428,13 @@ fn parse_github_link(url: &str) -> Option<GitHubLink> {
 }
 
 /// Fetch code from raw.githubusercontent.com
-fn fetch_github_code(link: &GitHubLink) -> Result<String, String> {
+fn fetch_github_code(link: &GitHubLink, fetcher: &dyn ResourceFetcher) -> Result<String, String> {
     let raw_url = format!(
         "https://raw.githubusercontent.com/{}/{}/{}/{}",
         link.owner, link.repo, link.branch, link.path
     );
 
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build()
-        .new_agent();
-
-    let response = agent
-        .get(&raw_url)
-        .call()
-        .map_err(|e| e.to_string())?;
-
-    response.into_body().read_to_string().map_err(|e| e.to_string())
+    fetcher.fetch(&raw_url)
 }
 
 /// Extract specified line range from code
@@ -520,7 +567,11 @@ fn render_github_embed(link: &GitHubLink, highlighted_code: &str, _raw_code: &st
 
 /// Process GitHub embeds in markdown
 /// Only processes standalone GitHub links at the start of a line
-fn process_github_embeds(markdown: &str, converter: &MarkdownConverter) -> String {
+fn process_github_embeds(
+    markdown: &str,
+    converter: &MarkdownConverter,
+    fetcher: &dyn ResourceFetcher,
+) -> String {
     let mut result = String::new();
     let mut in_code_block = false;
 
@@ -547,7 +598,7 @@ fn process_github_embeds(markdown: &str, converter: &MarkdownConverter) -> Strin
             && let Some(link) = parse_github_link(trimmed)
         {
             // Try to fetch and render the code
-            match fetch_github_code(&link) {
+            match fetch_github_code(&link, fetcher) {
                 Ok(code) => {
                     let code_to_render = match (link.start_line, link.end_line) {
                         (Some(start), Some(end)) => extract_lines(&code, start, end),
@@ -825,9 +876,10 @@ fn is_valid_html_tag(content: &str) -> bool {
 /// Preprocess markdown to handle custom embed syntax
 fn preprocess_embeds(markdown: &str) -> String {
     // SpeakerDeck: @[sd](slideId,slideNo,aspectRatio,dataRatio)
-    let sd_re = Regex::new(r"@\[sd\]\(([^,]+),([^,]*),([^,]+),([^)]+)\)").unwrap();
+    static SD_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"@\[sd\]\(([^,]+),([^,]*),([^,]+),([^)]+)\)").unwrap());
 
-    sd_re
+    SD_RE
         .replace_all(markdown, |caps: &regex::Captures| {
             let slide_id = &caps[1];
             let slide_no = &caps[2];
@@ -852,9 +904,11 @@ fn process_containers<F>(markdown: &str, convert_inner: F) -> String
 where
     F: Fn(&str) -> String,
 {
-    let container_re = Regex::new(r"(?s):::[ \t]*(details|message)[ \t]*([^\n]*)\n(.*?):::").unwrap();
+    static CONTAINER_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?s):::[ \t]*(details|message)[ \t]*([^\n]*)\n(.*?):::").unwrap()
+    });
 
-    container_re
+    CONTAINER_RE
         .replace_all(markdown, |caps: &regex::Captures| {
             let container_type = &caps[1];
             let argument = caps[2].trim();
@@ -883,7 +937,7 @@ where
 
 /// Markdown to HTML converter with syntax highlighting
 pub struct MarkdownConverter {
-    syntect_adapter: SyntectAdapter,
+    syntect_adapter: &'static SyntectAdapter,
 }
 
 impl Default for MarkdownConverter {
@@ -895,22 +949,28 @@ impl Default for MarkdownConverter {
 impl MarkdownConverter {
     pub fn new() -> Self {
         Self {
-            syntect_adapter: SyntectAdapter::new(Some("base16-ocean.dark")),
+            syntect_adapter: &SYNTECT_ADAPTER,
         }
     }
 
+    /// Convert markdown using ureq for external resource fetching (native only)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn convert(&self, markdown: &str) -> String {
+        self.convert_with_fetcher(markdown, &UreqFetcher)
+    }
+
+    pub fn convert_with_fetcher(&self, markdown: &str, fetcher: &dyn ResourceFetcher) -> String {
         // Escape invalid HTML-like tags (e.g., <script> in headings)
         let escaped = escape_invalid_html_tags(markdown);
 
         // Process GitHub embeds (fetch code and render)
-        let with_github = process_github_embeds(&escaped, self);
+        let with_github = process_github_embeds(&escaped, self, fetcher);
 
         // Process X embeds (output placeholder divs with tweet IDs)
         let (with_x, _has_x_embed) = process_x_embeds(&with_github);
 
         // Process link cards (OGP cards) for standalone URLs
-        let with_link_cards = process_link_cards(&with_x);
+        let with_link_cards = process_link_cards(&with_x, fetcher);
 
         // Process code blocks with filename (e.g., ```json:package.json)
         let with_code_blocks = process_code_blocks_with_filename(&with_link_cards, self);
@@ -932,19 +992,16 @@ impl MarkdownConverter {
 
     /// Highlight code using syntect
     fn highlight_code(&self, code: &str, lang: &str) -> String {
-        use syntect::highlighting::ThemeSet;
         use syntect::html::highlighted_html_for_string;
-        use syntect::parsing::SyntaxSet;
 
-        let ss = SyntaxSet::load_defaults_newlines();
-        let ts = ThemeSet::load_defaults();
-        let theme = &ts.themes["base16-ocean.dark"];
+        let ss = &*SYNTAX_SET;
+        let theme = &THEME_SET.themes["base16-ocean.dark"];
 
         let syntax = ss
             .find_syntax_by_token(lang)
             .unwrap_or_else(|| ss.find_syntax_plain_text());
 
-        highlighted_html_for_string(code, &ss, syntax, theme).unwrap_or_else(|_| html_escape(code))
+        highlighted_html_for_string(code, ss, syntax, theme).unwrap_or_else(|_| html_escape(code))
     }
 
     /// Simple conversion without container processing (used for inner content)
@@ -963,27 +1020,84 @@ impl MarkdownConverter {
         options.render.github_pre_lang = true;
 
         let mut plugins = comrak::options::Plugins::default();
-        plugins.render.codefence_syntax_highlighter = Some(&self.syntect_adapter);
+        plugins.render.codefence_syntax_highlighter = Some(self.syntect_adapter);
 
         comrak::markdown_to_html_with_plugins(markdown, &options, &plugins)
     }
 
     fn add_target_blank_to_external_links(&self, html: &str) -> String {
-        let re = Regex::new(r#"<a href="(https?://[^"]*)""#).unwrap();
-        re.replace_all(html, r#"<a href="$1" target="_blank" rel="noopener noreferrer""#)
+        static EXTERNAL_LINK_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"<a href="(https?://[^"]*)""#).unwrap());
+        EXTERNAL_LINK_RE
+            .replace_all(html, r#"<a href="$1" target="_blank" rel="noopener noreferrer""#)
             .to_string()
     }
 }
 
-/// Convert markdown to HTML (convenience function)
+/// Convert markdown to HTML (convenience function, native only)
+#[cfg(not(target_arch = "wasm32"))]
 pub fn convert_markdown_to_html(markdown: &str) -> String {
     let converter = MarkdownConverter::new();
     converter.convert(markdown)
 }
 
+/// 変換時に外部フェッチが必要になる URL（OGP ページ・GitHub raw）を列挙する。
+/// wasm / バッチではこの結果を JS 側で fetch し、
+/// `convert_markdown_to_html_with_resources` に渡す2パス方式で変換する
+pub fn collect_resource_urls(markdown: &str) -> Vec<String> {
+    let recorder = RecordingFetcher {
+        urls: RefCell::new(Vec::new()),
+    };
+    let converter = MarkdownConverter::new();
+    let _ = converter.convert_with_fetcher(markdown, &recorder);
+
+    let mut urls = recorder.urls.into_inner();
+    let mut seen = std::collections::HashSet::new();
+    urls.retain(|u| seen.insert(u.clone()));
+    urls
+}
+
+/// 事前フェッチ済みリソース（url → body）を使って markdown を HTML に変換する
+pub fn convert_markdown_to_html_with_resources(
+    markdown: &str,
+    resources: HashMap<String, String>,
+) -> String {
+    let converter = MarkdownConverter::new();
+    let fetcher = MapResourceFetcher::new(resources);
+    converter.convert_with_fetcher(markdown, &fetcher)
+}
+
+#[cfg(target_arch = "wasm32")]
+mod wasm_api {
+    use wasm_bindgen::prelude::*;
+
+    /// 変換前に事前フェッチが必要な URL を列挙する
+    #[wasm_bindgen(js_name = collectResourceUrls)]
+    pub fn collect_resource_urls(markdown: &str) -> Vec<String> {
+        crate::collect_resource_urls(markdown)
+    }
+
+    /// 事前フェッチ済みリソース（Record<string, string>）を使って変換する。
+    /// フェッチに失敗した URL はマップに入れなければ元の URL のまま残る
+    #[wasm_bindgen(js_name = convertMarkdownWithResources)]
+    pub fn convert_markdown_with_resources(
+        markdown: &str,
+        resources: JsValue,
+    ) -> Result<String, JsValue> {
+        let map: std::collections::HashMap<String, String> =
+            serde_wasm_bindgen::from_value(resources).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(crate::convert_markdown_to_html_with_resources(markdown, map))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// テスト用: 何もフェッチできない fetcher（変換側のフォールバック経路に入る）
+    fn no_fetch() -> MapResourceFetcher {
+        MapResourceFetcher::new(HashMap::new())
+    }
 
     #[test]
     fn test_basic_markdown() {
@@ -1177,7 +1291,7 @@ mod tests {
     fn test_github_embed_not_in_code_block() {
         let markdown = "```\nhttps://github.com/owner/repo/blob/main/file.rs#L1-L5\n```";
         let converter = MarkdownConverter::new();
-        let result = process_github_embeds(markdown, &converter);
+        let result = process_github_embeds(markdown, &converter, &no_fetch());
         // Should not be processed (inside code block)
         assert!(result.contains("https://github.com/owner/repo/blob/main/file.rs#L1-L5"));
         assert!(!result.contains("github-embed-card"));
@@ -1187,7 +1301,7 @@ mod tests {
     fn test_github_link_in_markdown_link_not_processed() {
         let markdown = "[link](https://github.com/owner/repo/blob/main/file.rs)";
         let converter = MarkdownConverter::new();
-        let result = process_github_embeds(markdown, &converter);
+        let result = process_github_embeds(markdown, &converter, &no_fetch());
         // Should not be processed (inside markdown link)
         assert!(!result.contains("github-embed-card"));
     }
@@ -1380,7 +1494,7 @@ mod tests {
     #[test]
     fn test_link_cards_not_in_code_block() {
         let markdown = "```\nhttps://example.com\n```";
-        let result = process_link_cards(markdown);
+        let result = process_link_cards(markdown, &no_fetch());
         // Should not be processed (inside code block)
         assert!(result.contains("https://example.com"));
         assert!(!result.contains("link-card"));
@@ -1389,7 +1503,7 @@ mod tests {
     #[test]
     fn test_link_cards_skip_localhost() {
         let markdown = "https://localhost:3000/test";
-        let result = process_link_cards(markdown);
+        let result = process_link_cards(markdown, &no_fetch());
         // Should not be processed (localhost)
         assert!(result.contains("https://localhost:3000/test"));
         assert!(!result.contains("link-card"));
@@ -1398,7 +1512,7 @@ mod tests {
     #[test]
     fn test_link_cards_skip_github_blob() {
         let markdown = "https://github.com/owner/repo/blob/main/file.rs";
-        let result = process_link_cards(markdown);
+        let result = process_link_cards(markdown, &no_fetch());
         // Should not be processed (GitHub blob - handled by GitHub embed)
         assert!(result.contains("https://github.com/owner/repo/blob/main/file.rs"));
         assert!(!result.contains("link-card"));
@@ -1457,9 +1571,92 @@ mod tests {
     #[test]
     fn test_link_cards_skip_x_url() {
         let markdown = "https://x.com/user/status/1234567890";
-        let result = process_link_cards(markdown);
+        let result = process_link_cards(markdown, &no_fetch());
         // Should not be processed (X URL - handled by X embed)
         assert!(result.contains("https://x.com/user/status/1234567890"));
         assert!(!result.contains("link-card"));
+    }
+
+    // 2パス変換（collect_resource_urls → convert_markdown_to_html_with_resources）のテスト
+    // tools/content-html-backfill が wasm 経由で使う経路
+
+    #[test]
+    fn test_collect_resource_urls() {
+        let markdown = "\
+https://github.com/owner/repo/blob/main/notes.txt#L1-L2
+
+https://example.com/page
+
+https://x.com/user/status/1234567890
+
+```
+https://example.com/in-code-block
+```
+";
+        let urls = collect_resource_urls(markdown);
+        // GitHub blob は raw URL に変換され、OGP 対象の standalone URL はそのまま列挙される。
+        // X URL とコードブロック内の URL はフェッチ対象にならない
+        assert_eq!(
+            urls,
+            vec![
+                "https://raw.githubusercontent.com/owner/repo/main/notes.txt".to_string(),
+                "https://example.com/page".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_collect_resource_urls_dedupes() {
+        let markdown = "https://example.com/page\n\nhttps://example.com/page";
+        let urls = collect_resource_urls(markdown);
+        assert_eq!(urls, vec!["https://example.com/page".to_string()]);
+    }
+
+    #[test]
+    fn test_convert_with_resources_github_embed() {
+        let markdown = "https://github.com/owner/repo/blob/main/notes.txt#L1-L2";
+        let mut resources = HashMap::new();
+        resources.insert(
+            "https://raw.githubusercontent.com/owner/repo/main/notes.txt".to_string(),
+            "alpha\nbravo\ncharlie".to_string(),
+        );
+        let html = convert_markdown_to_html_with_resources(markdown, resources);
+        assert!(html.contains("github-embed-card"));
+        assert!(html.contains("alpha"));
+        assert!(html.contains("bravo"));
+        // L1-L2 指定なので 3 行目は含まれない
+        assert!(!html.contains("charlie"));
+    }
+
+    #[test]
+    fn test_convert_with_resources_link_card() {
+        let markdown = "https://example.com/page";
+        let mut resources = HashMap::new();
+        resources.insert(
+            "https://example.com/page".to_string(),
+            r#"<html><head><meta property="og:title" content="Example Title"><meta property="og:description" content="Example Description"></head></html>"#.to_string(),
+        );
+        let html = convert_markdown_to_html_with_resources(markdown, resources);
+        assert!(html.contains("link-card"));
+        assert!(html.contains("Example Title"));
+        assert!(html.contains("Example Description"));
+    }
+
+    #[test]
+    fn test_convert_with_resources_missing_resource_falls_back() {
+        let markdown = "https://example.com/page";
+        let html = convert_markdown_to_html_with_resources(markdown, HashMap::new());
+        // リソース未注入の URL はリンクカード化せず元の URL を残す
+        assert!(!html.contains("link-card"));
+        assert!(html.contains("https://example.com/page"));
+    }
+
+    #[test]
+    fn test_map_resource_fetcher() {
+        let mut resources = HashMap::new();
+        resources.insert("https://example.com".to_string(), "body".to_string());
+        let fetcher = MapResourceFetcher::new(resources);
+        assert_eq!(fetcher.fetch("https://example.com"), Ok("body".to_string()));
+        assert!(fetcher.fetch("https://missing.example.com").is_err());
     }
 }

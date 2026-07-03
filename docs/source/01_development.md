@@ -657,3 +657,34 @@ bun run load --host tidb.$TAILNET --database blog_test --tsv-dir ./out --paralle
 500 万行スケールでは articles 合計で約 33GB になる。TiDB 側の region 数増加とローカルディスクの空きを事前に見積もる。scale を下げたい場合は `--articles-per-user 300000` (合計 150 万行 / 約 10GB) や `--articles-per-user 50000` (合計 25 万行 / 約 1.7GB) に落として同じ手順で回す。scale が小さければ `--no-concat` を外して単一ファイルにまとめても速度差は小さい。
 
 同じ `--seed` を渡せば内容は決定的に再現される（default `42`）。`--content-size` は 1 記事あたりの目標バイト数で、paragraph 合成が閾値を超えた時点で打ち切るため実サイズは目標をやや上回る。`--workers 1` にすると子プロセス不使用の直書き single-process 経路に切り替わる。
+
+### content-html-backfill
+
+`articles.content_html` を blog-api と同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で生成して埋め戻す。UPDATE は `content_html` カラムのみで、`updated_at` は変更しない（webhook 再実行での埋め戻しは upsert が `updated_at` を更新してしまうため使わない）。
+
+wasm ビルド（初回、および markdown crate を変更したとき。`rustup target add wasm32-unknown-unknown` 済みが前提）
+
+```bash
+cd tools/content-html-backfill
+bun run build:wasm
+```
+
+content_html が NULL の記事だけ埋め戻す
+
+```bash
+bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
+```
+
+全記事を再生成する場合は `--all`、特定記事だけなら `--slug <slug>` を付ける。リンクカード・GitHub 埋め込みの外部フェッチは記事ごとに URL を列挙してから並列 fetch し、失敗した URL は変換せず元のまま残す（API 側と同じフォールバック挙動）。生成結果が保存済み `content_html` と同一の記事は UPDATE 自体をスキップする。
+
+本番実行前の事前確認（UPDATE せず、保存済み content_html との差分を新規/一致/差分ありで表示。`--out-dir` で生成 HTML を `<slug>.html` として書き出してブラウザ等で確認できる）
+
+```bash
+bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --all --dry-run --out-dir ./out
+```
+
+wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` でも実行される）
+
+```bash
+bun run test
+```

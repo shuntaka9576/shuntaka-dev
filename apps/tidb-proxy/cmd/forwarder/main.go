@@ -10,7 +10,7 @@
 // blog-api/tsnet-launcher との差分:
 //   - SSM Parameter Store / OAuth client_credentials による auth key 発行を削除
 //     (常駐 proxy なので reusable / non-ephemeral / tagged な auth key を
-//      ecspresso 経由で SSM から runtime fetch する想定)
+//     ecspresso 経由で SSM から runtime fetch する想定)
 //   - Rust HTTP server を子プロセス起動するロジックを削除 (forwarder のみ)
 //   - listen を 127.0.0.1 ではなく 0.0.0.0 にして同 VPC 内 Lambda から到達可能に
 //   - state dir を /var/lib/tsnet-state (コンテナ内の通常パス) に変更
@@ -25,10 +25,15 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"tailscale.com/tsnet"
 )
 
@@ -53,7 +58,10 @@ type forwarderConfig struct {
 	Hostname      string
 	ListenAddr    string
 	ForwardTarget string
-	StateDir      string
+	// ForwardTarget のホスト論理名 (例: "tidb")。span/metric の
+	// proxy.upstream.name 属性に使う。
+	UpstreamName string
+	StateDir     string
 }
 
 func main() {
@@ -81,6 +89,11 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	tel, err := setupTelemetry(ctx, cfg.UpstreamName)
+	if err != nil {
+		log.Fatalf("setupTelemetry: %v", err)
+	}
+
 	if _, err := ts.Up(ctx); err != nil {
 		log.Fatalf("tsnet.Up: %v", err)
 	}
@@ -97,7 +110,7 @@ func main() {
 	// ACL で tag:proxy -> tag:k8s (TiDB Operator Proxy) が許可されていれば
 	// `tidb.<TAILNET_SUFFIX>` が解決可能になる。未許可だと netmap に peer が無く
 	// OS resolver にフォールバックして NXDOMAIN になるので、ACL 設定漏れに注意。
-	go runForwarder(ts, listener, cfg.ForwardTarget)
+	go runForwarder(ts, listener, cfg.ForwardTarget, tel)
 
 	// Pre-warm DERP / DNS by dialing once.
 	prewarmCtx, prewarmCancel := context.WithTimeout(ctx, 10*time.Second)
@@ -111,6 +124,13 @@ func main() {
 
 	<-ctx.Done()
 	log.Printf("shutdown signal received, exiting")
+
+	// 溜まっている traces / metrics を送り切ってから終了する。
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := tel.shutdown(shutdownCtx); err != nil {
+		log.Printf("otel shutdown: %v", err)
+	}
+	shutdownCancel()
 }
 
 func loadConfig() (*forwarderConfig, error) {
@@ -134,6 +154,7 @@ func loadConfig() (*forwarderConfig, error) {
 		Hostname:      hostname,
 		ListenAddr:    listenAddr,
 		ForwardTarget: fmt.Sprintf("%s.%s:%s", tidbHost, suffix, tidbPort),
+		UpstreamName:  tidbHost,
 		StateDir:      stateDir,
 	}, nil
 }
@@ -145,7 +166,7 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func runForwarder(ts *tsnet.Server, listener net.Listener, target string) {
+func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *telemetry) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -155,37 +176,142 @@ func runForwarder(ts *tsnet.Server, listener net.Listener, target string) {
 			log.Printf("forwarder accept: %v", err)
 			return
 		}
-		go forwardConn(ts, conn, target)
+		go forwardConn(ts, conn, target, tel)
 	}
 }
 
-func forwardConn(ts *tsnet.Server, src net.Conn, target string) {
+func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry) {
 	defer src.Close()
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	dst, err := ts.Dial(dialCtx, "tcp", target)
+	connStart := time.Now()
+	ctx := context.Background()
+	upstreamAttr := attribute.String("proxy.upstream.name", tel.upstreamName)
+
+	tel.acceptCount.Add(ctx, 1)
+	tel.activeConns.Add(1)
+	defer tel.activeConns.Add(-1)
+
+	// proxy.forward span は proxy された TCP 接続 (= MySQL セッション) の一生。
+	peerHost, peerPort := splitHostPort(src.RemoteAddr().String())
+	forwardCtx, span := tel.tracer.Start(ctx, "proxy.forward",
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(
+			attribute.String("net.transport", "ip_tcp"),
+			attribute.String("net.peer.ip", peerHost),
+			attribute.Int("net.peer.port", peerPort),
+			upstreamAttr,
+		))
+	defer span.End()
+
+	// accept 〜 upstream dial 開始までのハンドオフを示すマーカー span。
+	_, acceptSpan := tel.tracer.Start(forwardCtx, "proxy.accept")
+	acceptSpan.End()
+
+	dialStart := time.Now()
+	dialCtx, cancel := context.WithTimeout(forwardCtx, 5*time.Second)
+	connectCtx, connectSpan := tel.tracer.Start(dialCtx, "proxy.upstream.connect",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(upstreamAttr))
+	dst, err := ts.Dial(connectCtx, "tcp", target)
 	cancel()
+	tel.upstreamConnectDur.Record(ctx, durationMs(dialStart), metric.WithAttributes(upstreamAttr))
 	if err != nil {
+		errType := "connect_error"
+		if errors.Is(err, context.DeadlineExceeded) {
+			errType = "connect_timeout"
+			tel.timeoutCount.Add(ctx, 1)
+		}
+		tel.errorCount.Add(ctx, 1,
+			metric.WithAttributes(attribute.String("error.type", errType)))
+		connectSpan.RecordError(err)
+		connectSpan.SetStatus(codes.Error, errType)
+		connectSpan.End()
+		span.SetAttributes(
+			attribute.String("proxy.close.reason", "error"),
+			attribute.String("error.type", errType),
+		)
+		span.SetStatus(codes.Error, errType)
 		log.Printf("forwarder dial %s: %v", target, err)
 		return
 	}
+	connectSpan.End()
 	defer dst.Close()
 
+	var bytesIn, bytesOut int64
+	var errIn, errOut error
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(dst, src)
+		bytesIn, errIn = io.Copy(dst, src)
 		if c, ok := dst.(interface{ CloseWrite() error }); ok {
 			_ = c.CloseWrite()
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(src, dst)
+		bytesOut, errOut = io.Copy(src, dst)
 		if c, ok := src.(interface{ CloseWrite() error }); ok {
 			_ = c.CloseWrite()
 		}
 	}()
 	wg.Wait()
+
+	reason := closeReason(errIn, errOut)
+	reasonAttr := attribute.String("proxy.close.reason", reason)
+
+	tel.bytesIn.Add(ctx, bytesIn, metric.WithAttributes(upstreamAttr))
+	tel.bytesOut.Add(ctx, bytesOut, metric.WithAttributes(upstreamAttr))
+	tel.connectionDur.Record(ctx, durationMs(connStart),
+		metric.WithAttributes(upstreamAttr, reasonAttr))
+	if reason == "error" {
+		tel.errorCount.Add(ctx, 1,
+			metric.WithAttributes(attribute.String("error.type", "forward_error")))
+	}
+
+	span.SetAttributes(
+		attribute.Int64("proxy.bytes.in", bytesIn),
+		attribute.Int64("proxy.bytes.out", bytesOut),
+		reasonAttr,
+	)
+	span.AddEvent("proxy.close", trace.WithAttributes(reasonAttr))
+	if reason == "error" {
+		span.SetStatus(codes.Error, "forward_error")
+	}
+}
+
+func durationMs(start time.Time) float64 {
+	return float64(time.Since(start)) / float64(time.Millisecond)
+}
+
+func splitHostPort(addr string) (string, int) {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr, 0
+	}
+	port, _ := strconv.Atoi(portStr)
+	return host, port
+}
+
+// closeReason は双方向 copy の結果から接続クローズ理由を正規化する。
+// 優先度: reset > error > timeout > eof (異常度の高い方を採用する)。
+func closeReason(errs ...error) string {
+	rank := map[string]int{"eof": 0, "timeout": 1, "error": 2, "reset": 3}
+	reason := "eof"
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		r := "error"
+		var netErr net.Error
+		if errors.Is(err, syscall.ECONNRESET) {
+			r = "reset"
+		} else if errors.As(err, &netErr) && netErr.Timeout() {
+			r = "timeout"
+		}
+		if rank[r] > rank[reason] {
+			reason = r
+		}
+	}
+	return reason
 }

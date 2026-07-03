@@ -17,6 +17,9 @@ node_modules
 # cspell
 .cspellcache
 
+# wasm-pack 生成物 (content-html-backfill)
+tools/content-html-backfill/pkg
+
 # cdk
 cdk.context.json
 tsconfig.tsbuildinfo

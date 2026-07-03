@@ -1,0 +1,19 @@
+{
+  "name": "content-html-backfill",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../apps/blog-api/markdown --release --target nodejs --out-dir ../../../tools/content-html-backfill/pkg",
+    "build:wasm:dev": "wasm-pack build ../../apps/blog-api/markdown --dev --target nodejs --out-dir ../../../tools/content-html-backfill/pkg",
+    "backfill": "tsx src/index.ts",
+    "test": "bun run build:wasm:dev && bun test src/",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "mysql2": "^3.22.5"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.15.0"
+  }
+}

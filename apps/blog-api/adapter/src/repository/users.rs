@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::database::ConnectionPool;
+use crate::observability::observe_query;
 
 #[derive(FromRow)]
 struct UserIdRow {
@@ -23,15 +24,19 @@ impl UsersRepository for UsersRepositoryImpl {
         &self,
         installation_id: i64,
     ) -> Result<Option<UserId>, anyhow::Error> {
-        let row: Option<UserIdRow> = sqlx::query_as(
-            r#"
+        let sql = r#"
             SELECT user_id
             FROM users
             WHERE github_installation_id = ?
-            "#,
+            "#;
+        let row: Option<UserIdRow> = observe_query(
+            "user_by_installation_id",
+            sql,
+            sqlx::query_as(sql)
+                .bind(installation_id)
+                .fetch_optional(&self.db.pool()),
+            |row| Some(i64::from(row.is_some())),
         )
-        .bind(installation_id)
-        .fetch_optional(&self.db.pool())
         .await?;
 
         row.map(|r| {

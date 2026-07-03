@@ -116,6 +116,25 @@ impl Content {
     }
 }
 
+// webhook upsert 時に事前生成した変換済みHTML
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ContentHtml(String);
+
+impl ContentHtml {
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Thumbnail(String);
@@ -296,6 +315,7 @@ pub struct Article {
     pub slug: Slug,
     pub user_id: UserId,
     pub content: Content,
+    pub content_html: Option<ContentHtml>,
     pub thumbnail: Option<Thumbnail>,
     pub description: Description,
     pub status: Status,
@@ -313,6 +333,7 @@ impl Article {
         slug: Slug,
         user_id: UserId,
         content: Content,
+        content_html: Option<ContentHtml>,
         thumbnail: Option<Thumbnail>,
         description: Description,
         status: Status,
@@ -327,6 +348,7 @@ impl Article {
             slug,
             user_id,
             content,
+            content_html,
             thumbnail,
             description,
             status,

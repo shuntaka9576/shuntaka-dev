@@ -11,7 +11,7 @@
     "clean": "rm -rf cdk.out .turbo"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.260.0",
+    "aws-cdk-lib": "^2.261.0",
     "cdk-nag": "^3.0.1",
     "change-case": "^5.4.4",
     "constructs": "^10.6.0",

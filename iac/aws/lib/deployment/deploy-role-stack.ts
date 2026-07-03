@@ -83,6 +83,10 @@ export class DeployRoleStack extends cdk.Stack {
                 'ec2:*',
                 'ecs:*',
                 'servicediscovery:*',
+                // observability (CloudWatch dashboard + EventBridge healthcheck
+                // probe) のため。上と同じ流儀で service wildcard。
+                'cloudwatch:*',
+                'events:*',
               ],
               resources: ['*'],
             }),

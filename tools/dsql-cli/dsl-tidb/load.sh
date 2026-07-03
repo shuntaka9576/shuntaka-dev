@@ -11,7 +11,7 @@ TSV file path. SHOW WARNINGS runs in the same session as each LOAD DATA so the
 mysql client surfaces any conversion warnings.
 
 Required:
-  -d, --database <name>      Target TiDB database name (e.g. blog_dev, blog_prod)
+  -d, --database <name>      Target TiDB database name (e.g. blog_dev, blog_prd)
 
 Connection (defaults to env then sane fallback):
   -H, --host <host>          TiDB host       (default: $TIDB_HOST or 127.0.0.1)
