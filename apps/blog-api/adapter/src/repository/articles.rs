@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_new::new;
 use kernel::model::article::{
-    Article, ArticleId, ArticleType, Content, Description, Slug, Status, Thumbnail, Title, UserId,
+    Article, ArticleId, ArticleType, Content, ContentHtml, Description, Slug, Status, Thumbnail,
+    Title, UserId,
 };
 use kernel::repository::articles::{ArticlesRepository, UpsertArticleInput, UpsertResult};
 use sqlx::FromRow;
@@ -18,6 +19,7 @@ struct ArticleRow {
     slug: String,
     user_id: String,
     content: String,
+    content_html: Option<String>,
     thumbnail: Option<String>,
     description: String,
     status: String,
@@ -52,6 +54,7 @@ impl TryFrom<ArticleRow> for Article {
             Slug::new(row.slug),
             UserId::new(user_id),
             Content::new(row.content),
+            row.content_html.map(ContentHtml::new),
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
@@ -82,6 +85,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 slug,
                 user_id,
                 content,
+                content_html,
                 thumbnail,
                 description,
                 status,
@@ -165,6 +169,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     UPDATE articles
                     SET title = ?,
                         content = ?,
+                        content_html = COALESCE(?, content_html),
                         thumbnail = ?,
                         description = ?,
                         `type` = ?,
@@ -179,6 +184,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     sqlx::query(sql)
                         .bind(&input.title)
                         .bind(&input.content)
+                        .bind(&input.content_html)
                         .bind(&input.thumbnail)
                         .bind(&new_description)
                         .bind(&input.article_type)
@@ -215,6 +221,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         title,
                         slug,
                         content,
+                        content_html,
                         thumbnail,
                         description,
                         `type`,
@@ -222,7 +229,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         published_at,
                         created_at,
                         updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     "#;
                 observe_query(
                     "article_insert",
@@ -233,6 +240,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         .bind(&input.title)
                         .bind(input.slug.as_str())
                         .bind(&input.content)
+                        .bind(&input.content_html)
                         .bind(&input.thumbnail)
                         .bind(&description)
                         .bind(&input.article_type)

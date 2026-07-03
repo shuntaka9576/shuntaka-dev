@@ -10,6 +10,7 @@ use infrastructure::webhook::verify_signature;
 use kernel::model::article::Slug;
 use kernel::model::frontmatter::ArticleFrontmatter;
 use kernel::repository::articles::UpsertArticleInput;
+use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
@@ -240,12 +241,61 @@ pub async fn handle_github_webhook(
                 // Extract slug from filename
                 let slug = file_content.name.trim_end_matches(".md").to_string();
 
+                // content が変わった場合と新規作成時のみ HTML を再生成する。
+                // それ以外は None を渡して既存の content_html を維持する。
+                // 既存レコードの埋め戻しは tools/content-html-backfill で行う
+                // （webhook 経由だと UPDATE で updated_at が更新されてしまうため）
+                let existing = match registry
+                    .articles_repository()
+                    .find_by_user_id_and_slug(&user_id, &slug)
+                    .await
+                {
+                    Ok(existing) => existing,
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(ArticleProcessError {
+                            slug,
+                            error: format!("Database error: {e}"),
+                        });
+                        continue;
+                    }
+                };
+
+                let needs_html = match &existing {
+                    Some(article) => article.content.as_str() != content,
+                    None => true,
+                };
+
+                let content_html = if needs_html {
+                    // OGP リンクカードや GitHub 埋め込みで同期 HTTP フェッチが走るため
+                    // blocking スレッドで実行して tokio ワーカーを塞がない
+                    let markdown_content = content.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        convert_markdown_to_html(&markdown_content)
+                    })
+                    .await
+                    {
+                        Ok(html) => Some(html),
+                        Err(e) => {
+                            failed += 1;
+                            errors.push(ArticleProcessError {
+                                slug,
+                                error: format!("Failed to convert markdown: {e}"),
+                            });
+                            continue;
+                        }
+                    }
+                } else {
+                    None
+                };
+
                 // Build upsert input
                 let input = UpsertArticleInput {
                     user_id: user_id.clone(),
                     slug: Slug::new(slug.clone()),
                     title: frontmatter.title,
                     content,
+                    content_html,
                     description: frontmatter.description,
                     thumbnail: frontmatter.thumbnail,
                     article_type: frontmatter.article_type,

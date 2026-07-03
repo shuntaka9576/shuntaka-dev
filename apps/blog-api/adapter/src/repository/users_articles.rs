@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_new::new;
 use kernel::model::article::{
-    Article, ArticleId, ArticleSummary, ArticleType, Content, Description, Slug, Status, Thumbnail,
-    Title, UserId,
+    Article, ArticleId, ArticleSummary, ArticleType, Content, ContentHtml, Description, Slug,
+    Status, Thumbnail, Title, UserId,
 };
 use kernel::repository::users_articles::{ArticleSummaryPage, UsersArticlesRepository};
 use sqlx::FromRow;
@@ -19,6 +19,7 @@ struct ArticleRow {
     slug: String,
     user_id: String,
     content: String,
+    content_html: Option<String>,
     thumbnail: Option<String>,
     description: String,
     status: String,
@@ -53,6 +54,7 @@ impl TryFrom<ArticleRow> for Article {
             Slug::new(row.slug),
             UserId::new(user_id),
             Content::new(row.content),
+            row.content_html.map(ContentHtml::new),
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
@@ -205,6 +207,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.slug,
                 a.user_id,
                 a.content,
+                a.content_html,
                 a.thumbnail,
                 a.description,
                 a.status,

@@ -214,7 +214,17 @@ pub async fn get_users_article(
 
     let title = article.title.into_inner();
     let content = article.content.into_inner();
-    let content_html = convert_markdown_to_html(&content);
+    // webhook upsert 時に事前生成した HTML を返す。未生成の旧レコードのみ
+    // オンザフライ変換にフォールバック（同期 HTTP フェッチを含むため blocking スレッドで実行）
+    let content_html = match article.content_html {
+        Some(html) => html.into_inner(),
+        None => {
+            let markdown_content = content.clone();
+            tokio::task::spawn_blocking(move || convert_markdown_to_html(&markdown_content))
+                .await
+                .map_err(|e| AppError::internal("Failed to convert markdown", e))?
+        }
+    };
     let ogp_url = cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
 
     let response = ArticleResponse {
