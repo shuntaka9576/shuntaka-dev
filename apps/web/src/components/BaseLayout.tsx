@@ -26,7 +26,7 @@ export function BaseLayout({ children, showTypeHeader = false, currentTab }: Bas
   const tabActiveClass = 'border-b-2 pb-0.5 border-[var(--color-text)]';
 
   return (
-    <div className="relative min-h-[110%]">
+    <div className="relative min-h-full">
       {/* Header */}
       <div className="h-12 w-full bg-[var(--color-surface-raised)]">
         <div className="mx-auto flex max-w-[var(--layout-max)] items-center justify-between px-8 pt-3 pb-1 max-sm:px-4">
