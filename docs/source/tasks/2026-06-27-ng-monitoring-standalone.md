@@ -59,7 +59,7 @@ data_retention_seconds = 259200    # 3日
 
 - **`log.level` は大文字** (`DEBUG` / `INFO` / `WARN` / `ERROR`)。小文字を指定すると `Failed to initialize config, err: log level should be DEBUG, INFO, WARN or ERROR` で CrashLoopBackOff になる
 - **`metric_storage`** は kube-prom-stack の Prometheus を向ける。Decommission 手順 Step 5 で PD の `metric-storage` に入れたのと同じ宛先
-- **`continuous_profiling.enable = true`** にしておかないと Dashboard の Continuous Profiling タブから "プロファイル収集を有効化" を手動で押す手間が増える
+- **`continuous_profiling.enable = true`** は初回起動時 (docdb が空のとき) の初期値にしかならない。一度 UI / API で OFF にされると docdb に永続化された値が TOML より優先され、Pod を再起動しても無効のまま (復旧は後述「Continuous Profiling の有効化」)
 
 ### deployment ポイント
 
@@ -114,7 +114,36 @@ mysql -h 127.0.0.1 -P 14000 -u root --protocol=TCP -e "
 pkill -f "port-forward.*basic-tidb.*14000"
 ```
 
-> Continuous Profiling は `configmap.yaml` の `[continuous_profiling] enable = true` で ng-monitoring 側だけで完結するが、Top SQL は TiDB 側のフラグも要る、という非対称があるので注意。
+> Continuous Profiling は ng-monitoring 側だけで完結するが、Top SQL は TiDB 側のフラグも要る、という非対称があるので注意。
+
+### Continuous Profiling の有効化 (ng-monitoring 実行時設定)
+
+TOML の `[continuous_profiling] enable = true` は **初回起動時 (docdb が空のとき) の初期値** でしかない。一度でも Dashboard UI や API で OFF にされると docdb に `false` が永続化され、以後 Pod を再起動しても docdb の値が TOML より優先される。ON に戻すには ng-monitoring の `/config` API を叩く (Dashboard UI の「プロファイリングを有効化」ボタンが裏で呼んでいるのと同じ API)。
+
+```bash
+export KUBECONFIG=~/.kube/config-mycluster
+kubectl -n tidb-cluster port-forward svc/ng-monitoring 12020:12020 >/dev/null 2>&1 &
+sleep 2
+
+# 実効設定の確認 (TOML ではなく docdb 反映後の値が返る)
+curl -s http://localhost:12020/config | jq .continuous_profiling
+
+# 有効化 (docdb に永続化。Pod 再起動でも維持、PVC を消したら再投入が必要)
+curl -s -X POST http://localhost:12020/config \
+  -H 'Content-Type: application/json' \
+  -d '{"continuous_profiling": {"enable": true}}'
+# → {"status":"ok"}
+
+# 収集確認 (interval_seconds=60 なので 1〜2 分待ってから)
+NOW=$(date +%s)
+curl -s "http://localhost:12020/continuous_profiling/group_profiles?begin_time=$((NOW-300))&end_time=$NOW" \
+  | jq '[.[] | {ts, state}]'
+# → state: "finished" のエントリが 1 分刻みで並べば OK
+
+pkill -f "port-forward.*ng-monitoring.*12020"
+```
+
+> Top SQL (`tidb_enable_top_sql`) と同じ性質: コマンドで永続化され Pod 再起動では消えないが、ストレージ (PVC) ごと作り直したら再投入が必要。TOML だけ直しても docdb に古い値が残っていると反映されない。
 
 ## 動作確認
 
@@ -165,6 +194,11 @@ Failed to initialize config, err: log level should be DEBUG, INFO, WARN or ERROR
 - TiDB の `tidb_enable_top_sql` が 0 のまま。「Top SQL の計測を有効化」節の手順で 1 にする
 - それでも出ない時は ng-monitoring の `metric_storage` が kube-prom-stack の Prometheus を向いているか確認 (`configmap.yaml`)。Top SQL UI は ng-monitoring 経由で Prometheus にも問い合わせる
 - 一定時間経過しても出ない場合は `kubectl -n tidb-cluster logs deploy/ng-monitoring | grep -i topsql` でエラーがないか確認
+
+### Continuous Profiling が TOML で `enable = true` なのに無効のまま
+
+- 実行時設定は docdb に永続化された値が TOML より優先される。「Continuous Profiling の有効化」節の `/config` API で ON に戻す
+- 有効化直後の収集で `finished_with_error` (TiKV heap profile の `Unable to create profile directory /root/jeprof: File exists`) が単発で出ることがあるが、以降の収集が `finished` になっていれば問題ない
 
 ### Dashboard で ngm_state が "unknown" のまま
 
