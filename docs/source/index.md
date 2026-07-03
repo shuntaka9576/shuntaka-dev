@@ -9,7 +9,7 @@
 
 01_development
 02_database
-03_authorization
+03_operations
 incidents/index
 refactors/index
 survey/index
