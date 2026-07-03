@@ -183,6 +183,14 @@ func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *t
 func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry) {
 	defer src.Close()
 
+	// ECS ヘルスチェック (nc -z) は同一 task 内の loopback から来る。
+	// TCP ハンドシェイク成立時点でチェックは成功しているので、upstream への dial もテレメトリも行わずに閉じる。
+	// dial すると即クローズ済みの src への greeting 書き戻しが失敗し、偽の forward_error とトレースノイズになる。
+	// 実トラフィック (Lambda) は VPC の private IP から来る。
+	if addr, ok := src.RemoteAddr().(*net.TCPAddr); ok && addr.IP.IsLoopback() {
+		return
+	}
+
 	connStart := time.Now()
 	ctx := context.Background()
 	upstreamAttr := attribute.String("proxy.upstream.name", tel.upstreamName)
