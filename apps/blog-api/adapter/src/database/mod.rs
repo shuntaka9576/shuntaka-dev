@@ -18,7 +18,7 @@ impl ConnectionPool {
 ///
 /// 接続先は `cfg.url` (例: `mysql://root@tidb.<TAILNET>:4000/blog_dev`) で指定する。
 /// database 名を URL に含めるため、リポジトリ層の SQL では `FROM users` のように
-/// スキーマ無しで書き、`blog_dev` / `blog_prod` の切り替えは URL 一行で行う。
+/// スキーマ無しで書き、`blog_dev` / `blog_prd` の切り替えは URL 一行で行う。
 ///
 /// Tailscale 接続前提:
 /// - ローカル / EC2 / コンテナ: 既に Tailscale CLI / daemon が常駐し、

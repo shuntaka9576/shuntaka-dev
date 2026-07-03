@@ -121,7 +121,7 @@ SHOW WARNINGS;
   └── load.sh        # CLI ラッパ
   ```
 
-- `${SCHEMA}` を sed で `--database` 引数に置換するため、`blog_dev` / `blog_prod` 等を切り替えて同じ DSL を再利用できる。
+- `${SCHEMA}` を sed で `--database` 引数に置換するため、`blog_dev` / `blog_prd` 等を切り替えて同じ DSL を再利用できる。
 - 各 LOAD DATA は `LOAD DATA LOCAL INFILE` を使うため、`mysql --local-infile=1` で接続する。サーバー側にも `local_infile=1` が必要（TiDB 既定で ON、`SELECT @@local_infile` で確認可）。
 - TiDB は `tidb_enable_check_constraint` が既定 OFF で、CHECK 句を含む CREATE TABLE は `Warning 1105: the switch of check constraint is off` を出す。warning 0 が要件のため `04_articles.sql` から CHECK を外し、status のバリデーションはアプリ層 (blog-api) で行う方針とした。クラスタ単位で有効化する場合は管理者が `SET GLOBAL tidb_enable_check_constraint = ON;` を実施したうえで ALTER TABLE で CHECK を追加する。
 - PG TEXT 形式 (`\N`, `\t`, `\n`, `\r`, `\\`) と MySQL `FIELDS ESCAPED BY '\\'` は相互運用可能。SET 句で `@var` 受けにしたカラムだけは `\N` が文字列のまま入るため `NULLIF(@var, '\N')` を明示する。
