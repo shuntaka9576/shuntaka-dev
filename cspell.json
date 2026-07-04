@@ -101,6 +101,7 @@
     "logfile",
     "logformat",
     "longtext",
+    "lookback",
     "lukemathwalker",
     "maxage",
     "memlock",
