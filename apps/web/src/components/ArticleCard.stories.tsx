@@ -10,6 +10,7 @@ const baseArticle: ArticleSummary = {
   type: 'tech',
   thumbnail: 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png',
   ogpUrl: '',
+  tags: ['tech/claude-code', 'tech/frontend'],
   publishedAt: '2026-04-29T09:00:00.000Z',
   createdAt: '2026-04-29T09:00:00.000Z',
   updatedAt: '2026-04-29T09:00:00.000Z',
@@ -57,5 +58,14 @@ export const LongTitle: Story = {
 export const NoPublishedAt: Story = {
   args: {
     article: { ...baseArticle, publishedAt: null },
+  },
+};
+
+export const Filtering: Story = {
+  args: {
+    tags: [
+      { path: 'claude-code', matched: true },
+      { path: 'frontend', matched: false },
+    ],
   },
 };

@@ -5,6 +5,7 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-07-05-article-tag-filter-ui
 2026-07-05-tidb-prd-dump
 2026-07-05-article-tags
 2026-07-03-tikv-memory-after-drop-table

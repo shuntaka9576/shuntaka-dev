@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticleListView } from '@/components/ArticleListView';
 import { getArticlesByType } from '@/lib/api';
-import { SITE_URL, USER_NAME } from '@/lib/constants';
+import { ARTICLES_PER_PAGE, SITE_URL, USER_NAME } from '@/lib/constants';
 
 interface PageProps {
   params: Promise<{ page: string }>;
@@ -30,8 +30,9 @@ export default async function TechPaginationPage({ params }: PageProps) {
   const page = parsePage(rawPage);
   if (page === null) notFound();
 
-  const probe = await getArticlesByType(USER_NAME, 'tech', { page, perPage: 10 });
-  if (probe.articles.length === 0) notFound();
+  // ArticleListView と同じ perPage=all フェッチにして Next の fetch dedup を効かせる
+  const probe = await getArticlesByType(USER_NAME, 'tech', { perPage: 'all' });
+  if (probe.articles.length <= (page - 1) * ARTICLES_PER_PAGE) notFound();
 
   return <ArticleListView type="tech" currentTab="tech" page={page} baseHref="/" />;
 }

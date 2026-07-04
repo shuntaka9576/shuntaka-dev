@@ -1,6 +1,13 @@
+import { loadEnvConfig } from '@next/env';
 import type { NextConfig } from 'next';
 
+// next.config 評価時点では .env.local が未ロードのため明示的に読み込む
+loadEnvConfig(process.cwd());
+
 const nextConfig: NextConfig = {
+  // dev サーバーへ localhost 以外のオリジン (Tailscale Funnel 等) からアクセスする場合に
+  // .env.local の ALLOWED_DEV_ORIGINS (カンマ区切り) で許可する。本番ビルドには影響しない
+  allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS?.split(','),
   images: {
     remotePatterns: [
       {
