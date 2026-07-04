@@ -20,6 +20,8 @@ jobs:
     name: Build & Deploy (ecspresso)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
+    # AWS_ACCOUNT_ID は dev environment のシークレットのため environment 指定が必須
+    environment: dev
     permissions:
       id-token: write
       contents: read
