@@ -18,7 +18,8 @@
     "tools/dsql-cli/backup*/**",
     "tools/tidb-seeder/out/**",
     "**/go.mod",
-    "**/go.sum"
+    "**/go.sum",
+    "tools/dsql-cli/dsl-tidb/backfill/**"
   ],
   "language": "en",
   "words": [
@@ -82,6 +83,8 @@
     "dberrors",
     "dbname",
     "dedup",
+    "deepl",
+    "denops",
     "derp",
     "descryption",
     "devio",
@@ -276,6 +279,7 @@
     "tailnet",
     "tailscaled",
     "takahashi",
+    "tauri",
     "tbls",
     "testuser",
     "tfvars",

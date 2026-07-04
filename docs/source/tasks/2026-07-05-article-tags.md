@@ -19,6 +19,7 @@ blog-api は frontmatter の `tags` をパースするだけで破棄してお�
 | updated_at          | タグだけの変更では `articles` を UPDATE しない（更新日は変わらない）。`UpsertResult::TagsUpdated` を新設                               |
 | 記事とタグの関連    | leaf タグのみに張る。祖先は読み取り時に JOIN で導出                                                                                    |
 | タグ名              | グローバル一意（`uq_tags_name` 維持）。技術名は英小文字、カテゴリ的なものは日本語も許容。正規化は trim + 英字小文字化 + 空除去 + dedup |
+| タクソノミー        | ルートは tech / misc の2つ。旧「日常」「メモ」ジャンルはルートタグ misc を直接付ける。散歩・料理などの個別タグは misc 配下に維持       |
 | 既存記事の category | 全記事で空配列 `[]` のため削除し、`tags` に置き換える                                                                                  |
 | backfill            | slug ベースの冪等 SQL（INSERT IGNORE + JOIN 形式）。環境間で article_id が異なるため slug で引く                                       |
 | スコープ            | webhook 経由の保存 + API レスポンス（一覧・詳細）への tags 含めまで。フロントエンド表示は別タスク                                      |
@@ -29,7 +30,7 @@ blog-api は frontmatter の `tags` をパースするだけで破棄してお�
 - [x] Phase B: 本手順書の作成
 - [x] Phase C: DDL（`tags.parent_tag_id` 追加）をスキーマファイルに追記
 - [x] Phase D: blog-api 実装（保存 + 読み取り + webhook 配線）
-- [ ] Phase E: 既存記事タグ案生成 → レビュー → frontmatter 更新 + backfill SQL 生成
+- [x] Phase E: 既存記事タグ案生成 → レビュー → スクリプト作成（frontmatter 更新の実行は依頼者）
 - [ ] Phase F: dev（blog_dev）適用・E2E テスト
 - [ ] Phase G: 本番（blog_prd）適用
 
@@ -112,24 +113,44 @@ blog_dev の EXPLAIN で以下を確認済み。
 
 ## Phase E: 既存記事タグ付与 + backfill SQL
 
-1. publish: true の 89 件の本文を読んでタグ案を生成（1記事 2〜5 個、最大3階層）し、slug → tags の一覧でレビュー
-2. 確定後、article リポジトリの frontmatter を更新（全 111 件から `category: []` 削除、89 件に `tags:` 追記）。push は本番デプロイ後
-3. backfill SQL を生成する。テンプレート:
+タグのタクソノミー（レビュー済み）。
 
-```sql
--- 記事: <slug>  tags: aws/lambda/snapstart, rust
-INSERT IGNORE INTO tags (name) VALUES ('aws'), ('rust');
-INSERT IGNORE INTO tags (name, parent_tag_id)
-  SELECT 'lambda', tag_id FROM tags WHERE name = 'aws';
-INSERT IGNORE INTO tags (name, parent_tag_id)
-  SELECT 'snapstart', tag_id FROM tags WHERE name = 'lambda';
-INSERT IGNORE INTO articles_tags (article_id, tag_id)
-  SELECT a.article_id, t.tag_id
-  FROM articles a JOIN tags t ON t.name IN ('snapstart', 'rust') -- leaf のみ
-  WHERE a.slug = '<slug>';
+```
+tech/
+├── aws (lambda, cdk, dynamodb, iot, s3)   ← tech/aws/lambda など3階層
+├── gcp, cloudflare, cloudinary
+├── rust, go, typescript, javascript, zig, wasm
+├── next.js, react, tailwindcss, css
+├── node.js, deno, bun
+├── neovim, denops
+├── kubernetes, raspberry-pi, tidb, postgresql
+├── github, github-actions, nix, mcp, tauri, macos
+├── npm, モノレポ, cli, oauth, jwt, セキュリティ, dns, cdn, mqtt, arduino, iot
+├── figma, deepl, devops, 開発生産性, 開発環境, 技術メモ
+├── イベント参加, 登壇, 関数型プログラミング
+misc/
+├── 散歩, 引っ越し, 健康, 料理, コミュニケーション, youtube
+├── 振り返り, キャリア, 読書
 ```
 
-JOIN 形式なので slug が存在しない環境では 0 行 insert になるだけ（`SET @var` 方式は NULL 混入の footgun があるため使わない）。INSERT IGNORE で再実行可能。
+旧「日常」「メモ」ジャンルは子タグを作らず、ルートタグ misc を記事に直接付ける。ただし同じ記事に他の misc/\* タグが付く場合（散歩・キャリア等）は親子で冗長になるため素の misc は付けない。
+
+タグ案の生成・レビューは実施済み（下書き2件にも付与）。slug → tags のマッピングと適用処理は `tools/dsql-cli/dsl-tidb/backfill/2026-07-05-article-tags.ts` の `MAPPING` が正。
+
+```bash
+# dry-run: backfill SQL の生成のみ（frontmatter は変更しない）
+bun tools/dsql-cli/dsl-tidb/backfill/2026-07-05-article-tags.ts
+
+# apply: article リポジトリの frontmatter も書き換える
+#   - 全 111 件から category: [] を削除
+#   - 91 件（公開89 + 下書き2）に tags: を追記
+bun tools/dsql-cli/dsl-tidb/backfill/2026-07-05-article-tags.ts --apply
+```
+
+- 実行は依頼者が行う。apply 後に article リポジトリの git diff を確認し、push は本番デプロイ後（Phase G）
+- 生成される SQL は同ディレクトリの `2026-07-05-article-tags.sql`。冪等（INSERT IGNORE）で、articles_tags は leaf タグのみに張る。slug が存在しない環境では 0 行 insert（`SET @var` 方式は NULL 混入の footgun があるため JOIN 形式）
+- スクリプトは leaf 名の重複（name グローバル一意違反）と4階層以上をバリデーションする。実際に `tech/iot` と `tech/aws/iot` の leaf 衝突を検出したため、AWS IoT 系3記事は `tech/iot` + `tech/aws` の2タグに分解した
+- 検証済み: /tmp のコピーで --apply を通し 111 件の category 削除・91 件の tags 追記を確認（最終タクソノミー: root 2 / 2階層 58 / 3階層 4 = 64 タグ）。SQL は初期版タクソノミー時点で blog_dev にトランザクション + ROLLBACK で流し、構文・冪等性・ROLLBACK 後 0 件を確認済み（dev に無い 13 slug は 0 行 insert でスキップされる）
 
 ## Phase F: dev への適用手順
 
