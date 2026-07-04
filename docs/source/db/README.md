@@ -1,36 +1,36 @@
-# postgres
+# blog_dev
 
 ## Tables
 
-| Name                                      | Columns | Comment | Type       |
-| ----------------------------------------- | ------- | ------- | ---------- |
-| [app.users](app.users.md)                 | 6       |         | BASE TABLE |
-| [app.tags](app.tags.md)                   | 2       |         | BASE TABLE |
-| [app.articles](app.articles.md)           | 12      |         | BASE TABLE |
-| [app.articles_tags](app.articles_tags.md) | 2       |         | BASE TABLE |
+| Name                              | Columns | Comment | Type       |
+| --------------------------------- | ------- | ------- | ---------- |
+| [articles](articles.md)           | 13      |         | BASE TABLE |
+| [articles_tags](articles_tags.md) | 2       |         | BASE TABLE |
+| [users](users.md)                 | 6       |         | BASE TABLE |
+| [tags](tags.md)                   | 2       |         | BASE TABLE |
 
 ## Relations
 
 ```mermaid
 erDiagram
 
-"app.articles" }o--|| "app.users" : "Additional Relation"
-"app.articles_tags" }o--|| "app.articles" : "Additional Relation"
-"app.articles_tags" }o--|| "app.tags" : "Additional Relation"
+"articles" }o--|| "users" : "Additional Relation"
+"articles_tags" }o--|| "articles" : "Additional Relation"
+"articles_tags" }o--|| "tags" : "Additional Relation"
 
-"app.users" {
-  uuid user_id
+"articles" {
+  char_36_ article_id PK
+  char_36_ user_id
 }
-"app.tags" {
-  uuid tag_id
+"articles_tags" {
+  char_36_ article_id PK
+  char_36_ tag_id PK
 }
-"app.articles" {
-  uuid article_id
-  uuid user_id
+"users" {
+  char_36_ user_id PK
 }
-"app.articles_tags" {
-  uuid article_id
-  uuid tag_id
+"tags" {
+  char_36_ tag_id PK
 }
 ```
 

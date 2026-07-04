@@ -25,9 +25,19 @@ struct ArticleRow {
     status: String,
     #[sqlx(rename = "type")]
     article_type: Option<String>,
+    /// GROUP_CONCAT したフルパス表記のタグ（カンマ区切り）。タグなしは NULL
+    tag_names: Option<String>,
     published_at: Option<DateTime<Utc>>,
     created_at: Option<DateTime<Utc>>,
     updated_at: Option<DateTime<Utc>>,
+}
+
+fn parse_tag_names(tag_names: Option<String>) -> Vec<String> {
+    let mut tags: Vec<String> = tag_names
+        .map(|s| s.split(',').map(str::to_string).collect())
+        .unwrap_or_default();
+    tags.sort();
+    tags
 }
 
 impl TryFrom<ArticleRow> for Article {
@@ -39,8 +49,7 @@ impl TryFrom<ArticleRow> for Article {
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
 
-        let status =
-            Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
+        let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
 
         let article_type = row
             .article_type
@@ -59,6 +68,7 @@ impl TryFrom<ArticleRow> for Article {
             Description::new(row.description),
             status,
             article_type,
+            parse_tag_names(row.tag_names),
             row.published_at,
             row.created_at,
             row.updated_at,
@@ -77,6 +87,8 @@ struct ArticleSummaryRow {
     status: String,
     #[sqlx(rename = "type")]
     article_type: Option<String>,
+    /// GROUP_CONCAT したフルパス表記のタグ（カンマ区切り）。タグなしは NULL
+    tag_names: Option<String>,
     published_at: Option<DateTime<Utc>>,
     created_at: Option<DateTime<Utc>>,
     updated_at: Option<DateTime<Utc>>,
@@ -91,8 +103,7 @@ impl TryFrom<ArticleSummaryRow> for ArticleSummary {
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
 
-        let status =
-            Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
+        let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
 
         let article_type = row
             .article_type
@@ -109,6 +120,7 @@ impl TryFrom<ArticleSummaryRow> for ArticleSummary {
             Description::new(row.description),
             status,
             article_type,
+            parse_tag_names(row.tag_names),
             row.published_at,
             row.created_at,
             row.updated_at,
@@ -132,7 +144,19 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
     ) -> Result<ArticleSummaryPage, anyhow::Error> {
         let pool = self.db.pool();
 
+        // タグは再帰CTE（ナイーブツリーの隣接リストをフルパスに展開）+ 相関サブクエリ
+        // 1列で取得する（追加ラウンドトリップなし）。WITH 句が付いても USE_INDEX
+        // ヒントが効くことは EXPLAIN で確認済み
         let list_sql = r#"
+            WITH RECURSIVE tag_paths AS (
+                SELECT tag_id, name AS path
+                FROM tags
+                WHERE parent_tag_id IS NULL
+                UNION ALL
+                SELECT t.tag_id, CONCAT(tp.path, '/', t.name)
+                FROM tags t
+                JOIN tag_paths tp ON t.parent_tag_id = tp.tag_id
+            )
             SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 a.article_id,
                 a.title,
@@ -142,6 +166,10 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.description,
                 a.status,
                 a.`type`,
+                (SELECT GROUP_CONCAT(tp.path SEPARATOR ',')
+                 FROM articles_tags at2
+                 JOIN tag_paths tp ON at2.tag_id = tp.tag_id
+                 WHERE at2.article_id = a.article_id) AS tag_names,
                 a.published_at,
                 a.created_at,
                 a.updated_at
@@ -201,6 +229,15 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         slug: &str,
     ) -> Result<Option<Article>, anyhow::Error> {
         let detail_sql = r#"
+            WITH RECURSIVE tag_paths AS (
+                SELECT tag_id, name AS path
+                FROM tags
+                WHERE parent_tag_id IS NULL
+                UNION ALL
+                SELECT t.tag_id, CONCAT(tp.path, '/', t.name)
+                FROM tags t
+                JOIN tag_paths tp ON t.parent_tag_id = tp.tag_id
+            )
             SELECT
                 a.article_id,
                 a.title,
@@ -212,6 +249,10 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.description,
                 a.status,
                 a.`type`,
+                (SELECT GROUP_CONCAT(tp.path SEPARATOR ',')
+                 FROM articles_tags at2
+                 JOIN tag_paths tp ON at2.tag_id = tp.tag_id
+                 WHERE at2.article_id = a.article_id) AS tag_names,
                 a.published_at,
                 a.created_at,
                 a.updated_at

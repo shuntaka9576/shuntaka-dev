@@ -23,6 +23,7 @@
     "lint": "turbo lint",
     "fix": "vp fmt && prettier --write '**/*.{json,yaml}'",
     "deploy": "bun --filter @shuntaka-dev/aws deploy",
+    "dump:prd": "./scripts/dump-tidb.sh --database blog_prd",
     "clean": "turbo clean",
     "postinstall": "lefthook install"
   },

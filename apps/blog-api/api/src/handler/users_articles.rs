@@ -1,7 +1,7 @@
 use axum::{
-    extract::{Path, Query, State},
-    http::{header, HeaderName, HeaderValue},
     Json,
+    extract::{Path, Query, State},
+    http::{HeaderName, HeaderValue, header},
 };
 use infrastructure::cloudinary::client::{CloudinaryClient, CloudinaryClientImpl};
 use kernel::model::article::ArticleType;
@@ -50,6 +50,8 @@ pub struct ArticleResponse {
     pub article_type: Option<String>,
     pub thumbnail: Option<String>,
     pub ogp_url: String,
+    /// フルパス表記のタグ（例: "rust", "aws/lambda"）
+    pub tags: Vec<String>,
     pub published_at: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
@@ -67,6 +69,8 @@ pub struct ArticleSummaryResponse {
     pub article_type: Option<String>,
     pub thumbnail: Option<String>,
     pub ogp_url: String,
+    /// フルパス表記のタグ（例: "rust", "aws/lambda"）
+    pub tags: Vec<String>,
     pub published_at: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
@@ -147,6 +151,7 @@ pub async fn get_users_articles(
                     article_type: article.article_type.map(|t| t.into_inner()),
                     thumbnail: article.thumbnail.map(|t| t.into_inner()),
                     ogp_url,
+                    tags: article.tags,
                     published_at: article.published_at.map(|d| d.to_rfc3339()),
                     created_at: article.created_at.map(|d| d.to_rfc3339()),
                     updated_at: article.updated_at.map(|d| d.to_rfc3339()),
@@ -237,6 +242,7 @@ pub async fn get_users_article(
         article_type: article.article_type.map(|t| t.into_inner()),
         thumbnail: article.thumbnail.map(|t| t.into_inner()),
         ogp_url,
+        tags: article.tags,
         published_at: article.published_at.map(|d| d.to_rfc3339()),
         created_at: article.created_at.map(|d| d.to_rfc3339()),
         updated_at: article.updated_at.map(|d| d.to_rfc3339()),

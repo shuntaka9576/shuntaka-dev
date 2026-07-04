@@ -35,3 +35,6 @@ storybook-static
 apm_modules/
 .claude/skills/
 .agents/skills/
+
+# tidb dump (本番データはコミットしない)
+/backup/

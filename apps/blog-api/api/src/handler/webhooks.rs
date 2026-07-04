@@ -1,9 +1,4 @@
-use axum::{
-    body::Bytes,
-    extract::State,
-    http::HeaderMap,
-    Json,
-};
+use axum::{Json, body::Bytes, extract::State, http::HeaderMap};
 use futures::future::join_all;
 use infrastructure::github::{GitHubAppClient, GitHubAppClientImpl, PushEvent};
 use infrastructure::webhook::verify_signature;
@@ -83,8 +78,8 @@ pub async fn handle_github_webhook(
     })?;
 
     // Parse JSON body
-    let parsed_body: serde_json::Value = serde_json::from_slice(&body)
-        .map_err(|e| AppError::bad_request_with("Invalid JSON", e))?;
+    let parsed_body: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|e| AppError::bad_request_with("Invalid JSON", e))?;
 
     // Get X-GitHub-Event header
     let event_type = headers
@@ -140,8 +135,10 @@ pub async fn handle_github_webhook(
     }
 
     // Create GitHub client using app PEM embedded at deploy time.
-    let github_client =
-        GitHubAppClientImpl::new(config.github_app_id.clone(), config.github_app_secret_pem.clone());
+    let github_client = GitHubAppClientImpl::new(
+        config.github_app_id.clone(),
+        config.github_app_secret_pem.clone(),
+    );
 
     let access_token = github_client
         .get_access_token(push_event.installation.id)
@@ -178,12 +175,7 @@ pub async fn handle_github_webhook(
 
     // Fetch all file contents in parallel
     let fetch_futures = file_paths.iter().map(|path| {
-        github_client.get_content(
-            owner,
-            &push_event.repository.name,
-            path,
-            &access_token,
-        )
+        github_client.get_content(owner, &push_event.repository.name, path, &access_token)
     });
     let fetch_results = join_all(fetch_futures).await;
 
@@ -300,6 +292,7 @@ pub async fn handle_github_webhook(
                     thumbnail: frontmatter.thumbnail,
                     article_type: frontmatter.article_type,
                     should_publish: frontmatter.publish,
+                    tags: frontmatter.tags,
                 };
 
                 // Upsert article
@@ -330,7 +323,10 @@ pub async fn handle_github_webhook(
 
     // Log errors if any
     for err in &errors {
-        warn!("Article processing error: slug={}, error={}", err.slug, err.error);
+        warn!(
+            "Article processing error: slug={}, error={}",
+            err.slug, err.error
+        );
     }
 
     info!(

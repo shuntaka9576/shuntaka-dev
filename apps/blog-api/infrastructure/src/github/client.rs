@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use base64::Engine;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use reqwest::Client;
 
 use crate::error::GitHubError;
