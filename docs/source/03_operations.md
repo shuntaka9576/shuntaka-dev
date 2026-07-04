@@ -9,6 +9,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | API / ブログが遅い             | ボトルネック切り分け   |
 | グラフの意味を知りたい         | ダッシュボード         |
 | ダッシュボードにデータが出ない | テレメトリが出ないとき |
+| 誰が何を送っているか知りたい   | テレメトリ一覧         |
 | クエリの書き方を調べたい       | クエリリファレンス     |
 | 検索がヒットしない・表示が変   | ハマりどころ           |
 
@@ -48,6 +49,39 @@ CloudWatch Dashboards の `d-st-observability`（dev）/ `p-st-observability`（
 | Forwarder connections              | `proxy.connection.active` / `proxy.connection.accept.count`（tidb-proxy） | アクティブ接続数と accept 数（15 分増分）。accept の急増は再接続の嵐を疑う                                                                                                                                                                                |
 | Forwarder errors                   | `proxy.error.count` / `proxy.timeout.count`（tidb-proxy）                 | 中継エラーとタイムアウト（15 分増分）。平常時はゼロ。loopback からの ECS ヘルスチェック接続は計測対象外（ハマりどころ参照）                                                                                                                               |
 | Lambda cold starts / DB errors     | `lambda.cold_start.count` / `db.query.error.count`（blog-api）            | cold start 回数とクエリエラー数（15 分増分）                                                                                                                                                                                                              |
+
+## テレメトリ一覧
+
+送信元は blog-api（Lambda / Rust）と tidb-proxy（forwarder / Go）の 2 つ。どちらも OTLP で ADOT collector（tidb-proxy タスクの sidecar）に送り、collector が traces → X-Ray、metrics → CloudWatch Metrics に振り分ける。
+
+### blog-api（Lambda / Rust）
+
+計装の実体は `apps/blog-api/{api,adapter}/src/observability.rs`。
+
+| テレメトリ                             | シグナル | 型        | 利用先（ダッシュボードのウィジェット等）  |
+| -------------------------------------- | -------- | --------- | ----------------------------------------- |
+| `app.request.duration`                 | metrics  | Histogram | Lambda request latency                    |
+| `db.query.duration`                    | metrics  | Histogram | DB client latency                         |
+| `db.healthcheck.duration`              | metrics  | Histogram | DB baseline latency (SELECT 1)            |
+| `db.connection.duration`               | metrics  | Histogram | DB connection latency                     |
+| `lambda.cold_start.count`              | metrics  | Counter   | Lambda cold starts / DB errors            |
+| `db.query.error.count`                 | metrics  | Counter   | Lambda cold starts / DB errors            |
+| segment `lambda.handler` + subsegments | traces   | Span      | X-Ray（トレース検索・ウォーターフォール） |
+
+### tidb-proxy（forwarder / Go）
+
+計装の実体は `apps/tidb-proxy/cmd/forwarder/otel.go`。
+
+| テレメトリ                           | シグナル | 型               | 利用先（ダッシュボードのウィジェット等）    |
+| ------------------------------------ | -------- | ---------------- | ------------------------------------------- |
+| `proxy.upstream.connect.duration`    | metrics  | Histogram        | Forwarder upstream connect latency          |
+| `proxy.connection.active`            | metrics  | Observable Gauge | Forwarder connections                       |
+| `proxy.connection.accept.count`      | metrics  | Counter          | Forwarder connections                       |
+| `proxy.error.count`                  | metrics  | Counter          | Forwarder errors                            |
+| `proxy.timeout.count`                | metrics  | Counter          | Forwarder errors                            |
+| `proxy.connection.duration`          | metrics  | Histogram        | （ダッシュボード未使用。PromQL で直接参照） |
+| `proxy.bytes.in` / `proxy.bytes.out` | metrics  | Counter          | （ダッシュボード未使用。PromQL で直接参照） |
+| segment `proxy.forward`              | traces   | Span             | X-Ray（トレース検索・ウォーターフォール）   |
 
 ## テレメトリが出ないとき
 
