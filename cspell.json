@@ -107,6 +107,7 @@
     "envrc",
     "ethernets",
     "fanout",
+    "faws",
     "ffprobe",
     "fira",
     "flambda",
@@ -115,6 +116,7 @@
     "fopen",
     "fouc",
     "frontmatter",
+    "frust",
     "getvar",
     "glassmorphism",
     "gmktec",
@@ -330,6 +332,7 @@
     "wwsg",
     "xlarge",
     "zenn",
+    "zipf",
     "zizmor"
   ],
   "flagWords": [],
