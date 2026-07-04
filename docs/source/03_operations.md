@@ -1,6 +1,6 @@
 # 運用
 
-blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・おかしい」が起きたときに、原因箇所を最短で切り分けるための手順。設計・デプロイ手順は [OTel ボトルネック観測基盤](tasks/2026-07-03-otel-bottleneck-observability.md) を参照。
+blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・おかしい」が起きたときに、原因箇所を最短で切り分けるための手順と、MiniPC クラスタの定常メンテナンス手順。設計・デプロイ手順は [OTel ボトルネック観測基盤](tasks/2026-07-03-otel-bottleneck-observability.md) を参照。
 
 ## 症状別インデックス
 
@@ -12,6 +12,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | 誰が何を送っているか知りたい   | テレメトリ一覧         |
 | クエリの書き方を調べたい       | クエリリファレンス     |
 | 検索がヒットしない・表示が変   | ハマりどころ           |
+| MiniPC を再起動したい          | ノード再起動           |
 
 ## ボトルネック切り分け
 
@@ -98,6 +99,86 @@ CloudWatch Dashboards の `d-st-observability`（dev）/ `p-st-observability`（
 | collector 疎通確認   | `aws logs tail /ecs/tidb-proxy --since 15m` で `otel-collector` prefix にエラーが無いこと                                                             |
 | 再デプロイ           | Deploy workflow の workflow_dispatch（`stack` = `all` / `st-tidb-proxy` / `main`）。forwarder / collector 設定の変更は `scripts/deploy-tidb-proxy.sh` |
 | 止める（コスト削減） | task def から `otel-collector` コンテナを外す（月 ~$1 が止まる）。アプリ側計装は `OTEL_EXPORTER_OTLP_ENDPOINT` 未設定なら no-op なので残してよい      |
+
+## ノード再起動
+
+MiniPC（node1〜3）を OS 再起動するときの手順。ノード配置の前提は [構築計画](tasks/2026-06-25-construction-plan.md) の「ノード別配置の想定」を参照。
+
+### 前提と原則
+
+| 項目             | 内容                                                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| control plane    | node1 のみ（apiserver / etcd / controller-manager / scheduler）。etcd は単一で、データは node1 のディスクにのみ存在する                                    |
+| PD / TiKV / TiDB | 各ノードに 1 つずつ（3 レプリカ）。1 台落ちても raft quorum（2/3）が保たれるので DB は継続する                                                             |
+| 原則 1           | **必ず 1 台ずつ**再起動する。2 台同時に落とすと PD / TiKV の quorum が崩れて DB 全体が止まる。前のノードが復帰して Pod が Running に戻ってから次へ進む     |
+| 原則 2           | TiKV の `max-store-down-time`（デフォルト 30 分）以内に復帰させる（3 ノード 3 レプリカだとレプリカの移動先が無いため超過しても実害は小さいが、原則として） |
+| 原則 3           | node1 停止中は kubectl / Pod 再スケジュール / Service エンドポイント更新がすべて止まる。node2/3 で動いている既存 Pod はそのまま動き続ける                  |
+
+再起動後の自動復旧は構築時の永続化設定で担保されている。swap は `/etc/fstab` でコメントアウト済み、カーネルモジュールは `/etc/modules-load.d/k8s.conf`、sysctl は `/etc/sysctl.d/k8s.conf` に永続化済み。kubelet / containerd / tailscaled は systemd で enable されており、control plane（apiserver / etcd）は static pod なので kubelet が上がれば自動で復活する。
+
+### 事前確認
+
+```bash
+# 再起動対象ノード（以降の手順はすべてこの変数を参照する）
+export NODE=node2
+
+# 自動起動の enable 確認（3 つとも enabled であること）
+ssh "$NODE" 'systemctl is-enabled kubelet containerd tailscaled'
+
+# tidb-public の Tailscale proxy Pod がどのノードに載っているか確認する。
+# 再起動対象ノードに載っている場合、そのノード停止中は
+# Fargate proxy → tidb.<tailnet>:4000 のブログ DB 経路が止まる
+kubectl -n tailscale get pods -o wide
+
+# クラスタが健全であること
+kubectl get nodes
+kubectl -n tidb-cluster get pods -o wide
+```
+
+### worker（node2 / node3）の再起動
+
+```bash
+kubectl cordon "$NODE"
+
+# 【事前確認で ts-tidb-public が対象ノードに載っていた場合のみ】
+# proxy Pod を消して別ノードへ退避させる（ブログ DB 経路のダウンを数十秒に抑える）。
+# Tailscale のデバイス状態は Secret 保存のため、移動しても `tidb` の
+# ホスト名・identity は維持される。SPOF 許容方針なので、退避せず数分止めてもよい
+kubectl -n tailscale delete pod ts-tidb-public-<suffix>-0
+kubectl -n tailscale get pods -o wide   # 別ノードで Running になるまで待つ
+
+ssh "$NODE" 'sudo reboot'
+
+# Ready に戻るまで待つ
+kubectl get nodes -w
+
+kubectl uncordon "$NODE"
+
+# TiDB クラスタの Pod がすべて Running に戻るのを確認してから次のノードへ
+kubectl -n tidb-cluster get pods -o wide
+```
+
+- `kubectl drain` でノード丸ごと退避するのは不可。TiKV / PD は local PV に紐付いていて他ノードへ移動できず、Pending で待つだけの無駄な churn が起きる。動かすのは tailscale proxy Pod だけでよい
+- `ts-node-grafana-public` / `ts-tidb-dashboard-public` / tailscale operator / hubble-ui は退避不要。観測系なので再起動の数分止まっても実害はない（operator は既存 proxy の通信に関与しない）
+
+### control plane（node1）の再起動
+
+worker と同じ手順でよい。以下の点だけ異なる。
+
+- 再起動中は kubectl が返らなくなるが正常。node1 の kubelet が上がると static pod（apiserver / etcd）が自動復旧し、kubectl も戻る
+- アクセスの少ない時間帯に行う
+- `ts-tidb-public` の proxy Pod が node1 に載っている場合、退避は**必ず再起動前に**行う。apiserver も同時に停止するため、落ちてからでは他ノードへ退避できず、ブログ DB 経路が node1 復帰まで止まる
+- 万一 node1 のディスクが死ぬと etcd（クラスタ状態）を失う。TiDB のデータ自体は TiKV 3 レプリカなので無事
+
+### 復帰確認
+
+```bash
+kubectl get nodes                          # 全ノード Ready
+kubectl -n kube-system get pods            # control plane / cilium / coredns が Running
+kubectl -n tidb-cluster get pods -o wide   # PD / TiKV / TiDB が Running
+kubectl -n tailscale get pods -o wide      # tidb-public の proxy Pod が Running
+curl -s https://api.shuntaka.dev/health/db # ブログ DB 経路の疎通
+```
 
 ## クエリリファレンス
 
