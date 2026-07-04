@@ -1,9 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigationProgress } from '@/components/NavigationProgressProvider';
-import { SafeTweet } from '@/components/SafeTweet';
+
+// react-tweet (+ swr) はツイートを含む記事でのみ必要なので遅延ロードする
+const SafeTweet = dynamic(() => import('@/components/SafeTweet').then((m) => m.SafeTweet));
 
 function AvatarImg({ src, ...props }: ComponentProps<'img'>) {
   const hiResSrc = typeof src === 'string' ? src.replace('_normal.', '_bigger.') : src;
