@@ -37,7 +37,7 @@ jobs:
           aws-region: ap-northeast-1
 
       - name: Install ecspresso
-        uses: kayac/ecspresso@d4d5193102a5fb45e84fa8fd0fc9a524a7bf8893 # v2.8.0
+        uses: kayac/ecspresso@3d47a637a1f8f2dd5c91bb616ac4b7a0e55b18ca # v2.8.4
         with:
           version: v2.6.0
 
