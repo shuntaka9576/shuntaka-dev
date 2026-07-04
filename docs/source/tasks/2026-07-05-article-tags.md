@@ -159,7 +159,31 @@ export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 export SCHEMA=blog_dev
 ```
 
-### 1. DDL 適用（blog_dev は適用済み）
+### 0. 本番ダンプを dev にリストア（dev を本番相当データにする）
+
+本番の論理ダンプを取得して blog_dev に流し込む（ダンプの詳細は [本番 TiDB (blog_prd) の論理ダンプ手順](2026-07-05-tidb-prd-dump.md)）。ダンプはスキーマ名非依存（`CREATE DATABASE` / `USE` を含まない）なので、リストアは `-D blog_dev` を指定するだけでよい。
+
+```bash
+# 1. 本番ダンプを取得（backup/blog_prd-<timestamp>.sql が生成され、行数サマリが表示される）
+bun run dump:prd
+
+# 2. 最新のダンプを blog_dev にリストア（dump-tidb.sh が blog_prd-latest.sql の symlink を張る）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
+  < backup/blog_prd-latest.sql
+
+# 3. 件数確認（1 のサマリと一致すること。2026-07-05 時点: articles 131 / users 1 / tags 0 / articles_tags 0）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev -e '
+SELECT "articles" AS t, COUNT(*) AS cnt FROM articles
+UNION ALL SELECT "users", COUNT(*) FROM users
+UNION ALL SELECT "tags", COUNT(*) FROM tags
+UNION ALL SELECT "articles_tags", COUNT(*) FROM articles_tags'
+```
+
+- ダンプは `DROP TABLE IF EXISTS` を含むため、blog_dev の既存テーブル・データは丸ごと置き換わる
+- tags テーブルは本番スキーマ（`parent_tag_id` なし）で作り直されるため、リストア後に次の 1 の DDL を必ず再適用する（blog_dev に一度適用済みでもリストアで巻き戻る）
+- 2026-07-05 06:10 より前の旧仕様ダンプ（`--databases` 付き）を使う場合は `CREATE DATABASE` / `USE blog_prd` の2行を grep -v で除外してから流すこと（詳細はダンプ手順書）
+
+### 1. DDL 適用（blog_dev は 2026-07-05 適用済み。ただし 0 のリストア後は再適用が必要）
 
 ```bash
 mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA \

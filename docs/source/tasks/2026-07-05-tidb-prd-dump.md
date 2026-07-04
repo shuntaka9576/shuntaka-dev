@@ -14,11 +14,19 @@ bun run dump:prd
 
 前提は Tailnet に接続済みであること（ホストは `tidb.<tailnet MagicDNS suffix>:4000` を自動解決）。接続先は `TIDB_HOST` / `TIDB_PORT` / `TIDB_USER` / `TIDB_PASSWORD` で上書きできる。
 
-出力は `backup/<database>-<timestamp>.sql`。`--databases` 付きでダンプしているため `CREATE DATABASE` 文を含み、リストアは以下で完結する。
+出力は `backup/<database>-<timestamp>.sql`。DB 名は位置引数で渡しており（`--databases` は使わない）、ダンプに `CREATE DATABASE` / `USE` を含めない。そのためリストア先のスキーマを `-D` で自由に選べる（blog_prd のダンプを blog_dev に戻す、といった別スキーマ間の移送がそのままできる）。
+
+最新のダンプにはスクリプトが `backup/<database>-latest.sql` の symlink を張る（`ls -t` によるファイル解決は ls が eza 等に alias された環境で壊れるため使わない）。
 
 ```bash
-mysql -h tidb.$TAILNET -P 4000 -u root < backup/blog_prd-<timestamp>.sql
+# 同名リストア
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_prd < backup/blog_prd-latest.sql
+
+# 別スキーマへのリストア（例: 本番データを dev へ）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev < backup/blog_prd-latest.sql
 ```
+
+リストア先の DB 自体は存在している前提（無ければ `CREATE DATABASE` を手動で実行する）。2026-07-05 06:10 より前に取得したダンプは旧仕様（`--databases` 付き）で `CREATE DATABASE` / `USE blog_prd` を含むため、別スキーマに戻す場合は `grep -v -e '^CREATE DATABASE ' -e '^USE ' ` で除外してから流すこと。
 
 ## ハマりどころ: mysqldump 8.x の --single-transaction が使えない
 

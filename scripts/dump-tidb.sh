@@ -73,15 +73,23 @@ echo "==> Dumping \`${DATABASE}\` from ${HOST}:${PORT} to ${OUT_FILE}"
 # ダンプする。テーブル間の完全な一貫性は保証されないが、書き込み頻度の低い
 # ブログ DB では実用上問題ない。厳密なスナップショットが必要な規模になったら
 # Dumpling / BR に移行する。
+# DB 名は --databases ではなく位置引数で渡す。--databases だと CREATE DATABASE /
+# USE がダンプに埋め込まれ、別スキーマ（blog_prd → blog_dev 等）へのリストアが
+# できなくなるため。リストアは mysql -D <対象DB> < dump で行う。
 mysqldump -h "${HOST}" -P "${PORT}" -u "${USER}" \
   --skip-lock-tables --skip-add-locks --no-tablespaces --set-gtid-purged=OFF \
-  --databases "${DATABASE}" \
+  "${DATABASE}" \
   > "${OUT_FILE}"
 
 if ! tail -1 "${OUT_FILE}" | grep -q "^-- Dump completed"; then
   echo "Error: dump seems incomplete (no '-- Dump completed' footer): ${OUT_FILE}" >&2
   exit 1
 fi
+
+# 最新ダンプへの安定パス。リストア手順で `ls -t` 等のシェル依存の
+# ファイル解決をしなくて済むようにする（ls が eza 等に alias されている
+# 環境で $(ls -t ...) が壊れる事故があった）。
+ln -sf "$(basename "${OUT_FILE}")" "${OUT_DIR}/${DATABASE}-latest.sql"
 
 echo
 echo "==> Row count verification"
