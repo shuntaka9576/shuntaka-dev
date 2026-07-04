@@ -12,23 +12,23 @@ blog-api は frontmatter の `tags` をパースするだけで破棄してお�
 
 ## 設計方針
 
-| 論点                     | 決定                                                                                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| タグの階層               | 最大3階層。`tags.parent_tag_id`（隣接リスト）を追加。frontmatter は `aws/lambda/snapstart` のようにスラッシュ区切りで表現                 |
-| 読み取り                 | 深さ3固定なので自己 LEFT JOIN 2回 + GROUP_CONCAT の相関サブクエリ1列で一括取得（追加ラウンドトリップなし）。再帰CTEは深さ可変になったら   |
-| updated_at               | タグだけの変更では `articles` を UPDATE しない（更新日は変わらない）。`UpsertResult::TagsUpdated` を新設                                  |
-| 記事とタグの関連         | leaf タグのみに張る。祖先は読み取り時に JOIN で導出                                                                                       |
-| タグ名                   | グローバル一意（`uq_tags_name` 維持）。技術名は英小文字、カテゴリ的なものは日本語も許容。正規化は trim + 英字小文字化 + 空除去 + dedup    |
-| 既存記事の category      | 全記事で空配列 `[]` のため削除し、`tags` に置き換える                                                                                     |
-| backfill                 | slug ベースの冪等 SQL（INSERT IGNORE + JOIN 形式）。環境間で article_id が異なるため slug で引く                                          |
-| スコープ                 | webhook 経由の保存 + API レスポンス（一覧・詳細）への tags 含めまで。フロントエンド表示は別タスク                                         |
+| 論点                | 決定                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| タグの階層          | 最大3階層。`tags.parent_tag_id`（隣接リスト）を追加。frontmatter は `aws/lambda/snapstart` のようにスラッシュ区切りで表現              |
+| 読み取り            | 再帰CTE（WITH RECURSIVE）で隣接リストをフルパスに展開し、GROUP_CONCAT の相関サブクエリ1列で一括取得（追加ラウンドトリップなし）        |
+| updated_at          | タグだけの変更では `articles` を UPDATE しない（更新日は変わらない）。`UpsertResult::TagsUpdated` を新設                               |
+| 記事とタグの関連    | leaf タグのみに張る。祖先は読み取り時に JOIN で導出                                                                                    |
+| タグ名              | グローバル一意（`uq_tags_name` 維持）。技術名は英小文字、カテゴリ的なものは日本語も許容。正規化は trim + 英字小文字化 + 空除去 + dedup |
+| 既存記事の category | 全記事で空配列 `[]` のため削除し、`tags` に置き換える                                                                                  |
+| backfill            | slug ベースの冪等 SQL（INSERT IGNORE + JOIN 形式）。環境間で article_id が異なるため slug で引く                                       |
+| スコープ            | webhook 経由の保存 + API レスポンス（一覧・詳細）への tags 含めまで。フロントエンド表示は別タスク                                      |
 
 ## 進捗
 
 - [x] Phase A: tbls の TiDB 切り替え + DB ドキュメント再生成
 - [x] Phase B: 本手順書の作成
 - [x] Phase C: DDL（`tags.parent_tag_id` 追加）をスキーマファイルに追記
-- [ ] Phase D: blog-api 実装（保存 + 読み取り + webhook 配線）
+- [x] Phase D: blog-api 実装（保存 + 読み取り + webhook 配線）
 - [ ] Phase E: 既存記事タグ案生成 → レビュー → frontmatter 更新 + backfill SQL 生成
 - [ ] Phase F: dev（blog_dev）適用・E2E テスト
 - [ ] Phase G: 本番（blog_prd）適用
@@ -53,24 +53,26 @@ bun run doc-gen
 ```sql
 -- 2026-07-05 タグ階層（最大3階層）対応
 ALTER TABLE `${SCHEMA}`.`tags`
-  ADD COLUMN `parent_tag_id` CHAR(36) NULL,
+  ADD COLUMN `parent_tag_id` CHAR(36) NULL;
+ALTER TABLE `${SCHEMA}`.`tags`
   ADD KEY `idx_tags_parent_tag_id` (`parent_tag_id`);
 ```
 
+- TiDB は ADD COLUMN と ADD KEY を1つの ALTER にまとめられない（`ERROR 1072: column does not exist`）ため2文に分ける
 - FK は付けない（既存方針: アプリ層で担保）
 - `name` の UNIQUE は維持。同名タグを別の親配下に持てない制約になるが許容する。leaf 名だけで tag_id を逆引きできるため同期・backfill が単純になる
-- 適用は Phase F / G で環境ごとに実施
+- blog_dev には適用済み（2026-07-05、CTE クエリの動作検証を兼ねて前倒し）。blog_prd は Phase G で適用
 
 ## Phase D: blog-api 実装
 
-| レイヤー                                            | 変更                                                                                                                     |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| kernel (`kernel/src/model/article.rs`)              | `Article` / `ArticleSummary` に `tags: Vec<String>`（フルパス表記）。正規化 + `parse_tag_path`（4階層以上はエラー）を追加 |
-| kernel (`kernel/src/repository/articles.rs`)        | `UpsertArticleInput` に `tags` 追加。`UpsertResult::TagsUpdated` 追加                                                     |
-| adapter (`adapter/src/repository/articles.rs`)      | upsert をトランザクション化し `sync_tags`（DELETE ALL + INSERT IGNORE の冪等方式）。記事差分とタグ差分を独立評価          |
-| adapter (`adapter/src/repository/users_articles.rs`) | 一覧・詳細クエリに自己 LEFT JOIN 2回 + GROUP_CONCAT のサブクエリ1列を追加                                                 |
-| api (`api/src/handler/users_articles.rs`)           | `ArticleResponse` / `ArticleSummaryResponse` に `tags: Vec<String>` 追加                                                  |
-| api (`api/src/handler/webhooks.rs`)                 | `UpsertArticleInput` に `frontmatter.tags` を配線                                                                          |
+| レイヤー                                             | 変更                                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| kernel (`kernel/src/model/article.rs`)               | `Article` / `ArticleSummary` に `tags: Vec<String>`（フルパス表記）。正規化 + `parse_tag_path`（4階層以上はエラー）を追加 |
+| kernel (`kernel/src/repository/articles.rs`)         | `UpsertArticleInput` に `tags` 追加。`UpsertResult::TagsUpdated` 追加                                                     |
+| adapter (`adapter/src/repository/articles.rs`)       | upsert をトランザクション化し `sync_tags`（DELETE ALL + INSERT IGNORE の冪等方式）。記事差分とタグ差分を独立評価          |
+| adapter (`adapter/src/repository/users_articles.rs`) | 一覧・詳細クエリに再帰CTE + GROUP_CONCAT のサブクエリ1列を追加                                                            |
+| api (`api/src/handler/users_articles.rs`)            | `ArticleResponse` / `ArticleSummaryResponse` に `tags: Vec<String>` 追加                                                  |
+| api (`api/src/handler/webhooks.rs`)                  | `UpsertArticleInput` に `frontmatter.tags` を配線                                                                         |
 
 upsert の制御フロー。
 
@@ -84,16 +86,27 @@ existing あり:
 existing なし: tx 内で INSERT + sync_tags → Created
 ```
 
-タグ読み取りのサブクエリ。
+タグ読み取りは再帰CTE + 相関サブクエリ1列（一覧・詳細・upsert 前の既存取得の3クエリ共通）。
 
 ```sql
-(SELECT GROUP_CONCAT(CONCAT_WS('/', g.name, p.name, t.name) ORDER BY t.name SEPARATOR ',')
- FROM articles_tags at2
- JOIN tags t ON at2.tag_id = t.tag_id
- LEFT JOIN tags p ON t.parent_tag_id = p.tag_id
- LEFT JOIN tags g ON p.parent_tag_id = g.tag_id
- WHERE at2.article_id = a.article_id) AS tag_names
+WITH RECURSIVE tag_paths AS (
+    SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
+    UNION ALL
+    SELECT t.tag_id, CONCAT(tp.path, '/', t.name)
+    FROM tags t JOIN tag_paths tp ON t.parent_tag_id = tp.tag_id
+)
+SELECT a.…,
+    (SELECT GROUP_CONCAT(tp.path SEPARATOR ',')
+     FROM articles_tags at2
+     JOIN tag_paths tp ON at2.tag_id = tp.tag_id
+     WHERE at2.article_id = a.article_id) AS tag_names
+FROM articles a …
 ```
+
+blog_dev の EXPLAIN で以下を確認済み。
+
+- WITH 句が付いても一覧クエリの `USE_INDEX(a, idx_articles_user_status_type_published_at_id)` ヒントは効く（IndexRangeScan + limit embedded を維持）
+- CTE は1回 materialize され hash join される。タグ数規模では問題なし
 
 既存タグ名が別の親で登録済みの場合、INSERT IGNORE は既存の親子関係を維持する（name がグローバル一意のため同名タグは常に1系統）。
 
@@ -125,11 +138,11 @@ export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 export SCHEMA=blog_dev
 ```
 
-### 1. DDL 適用
+### 1. DDL 適用（blog_dev は適用済み）
 
 ```bash
 mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA \
-  -e 'ALTER TABLE `tags` ADD COLUMN `parent_tag_id` CHAR(36) NULL, ADD KEY `idx_tags_parent_tag_id` (`parent_tag_id`)'
+  -e 'ALTER TABLE `tags` ADD COLUMN `parent_tag_id` CHAR(36) NULL; ALTER TABLE `tags` ADD KEY `idx_tags_parent_tag_id` (`parent_tag_id`)'
 ```
 
 ### 2. tbls doc 再実行
@@ -193,4 +206,4 @@ webhook 経由の更新テスト（タグのみ変更 → TagsUpdated ログ + u
 
 - apps/web でのタグ表示 UI（別タスク）
 - タグでの記事絞り込み API
-- 3階層を超える深さ（必要になったら再帰CTE WITH RECURSIVE に切り替える。TiDB v5.1+ でサポート済み）
+- 3階層を超える深さ（読み取りは再帰CTEなので深さ非依存だが、書き込み側 parse_tag_path が4階層以上を拒否する。緩和する場合はそこだけ変更）

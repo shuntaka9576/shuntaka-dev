@@ -15,6 +15,8 @@ pub struct UpsertArticleInput {
     pub thumbnail: Option<String>,
     pub article_type: String,
     pub should_publish: bool,
+    /// フルパス表記のタグ（例: "rust", "aws/lambda"）。正規化は adapter 側で行う
+    pub tags: Vec<String>,
 }
 
 /// Result of article upsert operation
@@ -22,6 +24,8 @@ pub struct UpsertArticleInput {
 pub enum UpsertResult {
     Created(ArticleId),
     Updated(ArticleId),
+    /// 記事本文は変更なしでタグのみ更新（articles.updated_at は変わらない）
+    TagsUpdated(ArticleId),
     NoChange(ArticleId),
 }
 
@@ -35,6 +39,8 @@ pub trait ArticlesRepository: Send + Sync {
     ) -> Result<Option<Article>, anyhow::Error>;
 
     /// Create or update an article
-    async fn upsert_article(&self, input: UpsertArticleInput)
-        -> Result<UpsertResult, anyhow::Error>;
+    async fn upsert_article(
+        &self,
+        input: UpsertArticleInput,
+    ) -> Result<UpsertResult, anyhow::Error>;
 }

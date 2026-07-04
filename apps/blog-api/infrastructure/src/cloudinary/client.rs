@@ -59,8 +59,7 @@ mod tests {
 
     #[test]
     fn test_create_signed_ogp_url() {
-        let client =
-            CloudinaryClientImpl::new("test_cloud".to_string(), "test_secret".to_string());
+        let client = CloudinaryClientImpl::new("test_cloud".to_string(), "test_secret".to_string());
 
         let url = client.create_signed_ogp_url("blog/og/ogp", "Hello World", "webp");
 

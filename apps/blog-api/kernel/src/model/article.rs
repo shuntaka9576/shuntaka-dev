@@ -260,6 +260,43 @@ impl Status {
     }
 }
 
+// タグはフルパス表記の文字列で扱う（例: "rust", "aws/lambda", "aws/lambda/snapstart"）。
+// DB 上は tags.parent_tag_id の隣接リスト（最大3階層）で、記事との関連は leaf タグのみに張る。
+
+/// タグ名を正規化する: trim + 英字小文字化 + 空要素除去 + sort/dedup
+pub fn normalize_tags(tags: &[String]) -> Vec<String> {
+    let mut normalized: Vec<String> = tags
+        .iter()
+        .map(|t| {
+            t.split('/')
+                .map(|seg| seg.trim().to_lowercase())
+                .filter(|seg| !seg.is_empty())
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .filter(|t| !t.is_empty())
+        .collect();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
+/// フルパス表記のタグを祖先→leaf 順のセグメントに分解する。4階層以上はエラー
+pub fn parse_tag_path(tag: &str) -> Result<Vec<String>, String> {
+    let segments: Vec<String> = tag
+        .split('/')
+        .map(|seg| seg.trim().to_lowercase())
+        .filter(|seg| !seg.is_empty())
+        .collect();
+    if segments.is_empty() {
+        return Err(format!("Empty tag path: {tag}"));
+    }
+    if segments.len() > 3 {
+        return Err(format!("Tag path too deep (max 3 levels): {tag}"));
+    }
+    Ok(segments)
+}
+
 // 一覧用のサマリモデル（content を持たない）
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArticleSummary {
@@ -271,6 +308,7 @@ pub struct ArticleSummary {
     pub description: Description,
     pub status: Status,
     pub article_type: Option<ArticleType>,
+    pub tags: Vec<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -287,6 +325,7 @@ impl ArticleSummary {
         description: Description,
         status: Status,
         article_type: Option<ArticleType>,
+        tags: Vec<String>,
         published_at: Option<DateTime<Utc>>,
         created_at: Option<DateTime<Utc>>,
         updated_at: Option<DateTime<Utc>>,
@@ -300,6 +339,7 @@ impl ArticleSummary {
             description,
             status,
             article_type,
+            tags,
             published_at,
             created_at,
             updated_at,
@@ -320,6 +360,7 @@ pub struct Article {
     pub description: Description,
     pub status: Status,
     pub article_type: Option<ArticleType>,
+    pub tags: Vec<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -338,6 +379,7 @@ impl Article {
         description: Description,
         status: Status,
         article_type: Option<ArticleType>,
+        tags: Vec<String>,
         published_at: Option<DateTime<Utc>>,
         created_at: Option<DateTime<Utc>>,
         updated_at: Option<DateTime<Utc>>,
@@ -353,9 +395,54 @@ impl Article {
             description,
             status,
             article_type,
+            tags,
             published_at,
             created_at,
             updated_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_tags() {
+        let tags = vec![
+            " Rust ".to_string(),
+            "AWS/Lambda".to_string(),
+            "rust".to_string(),
+            "".to_string(),
+            " / ".to_string(),
+        ];
+        assert_eq!(normalize_tags(&tags), vec!["aws/lambda", "rust"]);
+    }
+
+    #[test]
+    fn test_normalize_tags_keeps_japanese() {
+        let tags = vec!["振り返り".to_string(), "登壇".to_string()];
+        assert_eq!(normalize_tags(&tags), vec!["振り返り", "登壇"]);
+    }
+
+    #[test]
+    fn test_parse_tag_path() {
+        assert_eq!(parse_tag_path("rust").unwrap(), vec!["rust"]);
+        assert_eq!(parse_tag_path("AWS/Lambda").unwrap(), vec!["aws", "lambda"]);
+        assert_eq!(
+            parse_tag_path("aws/lambda/snapstart").unwrap(),
+            vec!["aws", "lambda", "snapstart"]
+        );
+    }
+
+    #[test]
+    fn test_parse_tag_path_too_deep() {
+        assert!(parse_tag_path("a/b/c/d").is_err());
+    }
+
+    #[test]
+    fn test_parse_tag_path_empty() {
+        assert!(parse_tag_path("").is_err());
+        assert!(parse_tag_path(" / ").is_err());
     }
 }

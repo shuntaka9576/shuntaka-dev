@@ -18,23 +18,23 @@ CREATE TABLE `tags` (
 
 ## Columns
 
-| Name | Type | Default | Nullable | Extra Definition | Children | Parents | Comment |
-| ---- | ---- | ------- | -------- | ---------------- | -------- | ------- | ------- |
-| tag_id | char(36) | uuid() | false | DEFAULT_GENERATED | [articles_tags](articles_tags.md) |  |  |
-| name | varchar(255) |  | false |  |  |  |  |
+| Name   | Type         | Default | Nullable | Extra Definition  | Children                          | Parents | Comment |
+| ------ | ------------ | ------- | -------- | ----------------- | --------------------------------- | ------- | ------- |
+| tag_id | char(36)     | uuid()  | false    | DEFAULT_GENERATED | [articles_tags](articles_tags.md) |         |         |
+| name   | varchar(255) |         | false    |                   |                                   |         |         |
 
 ## Constraints
 
-| Name | Type | Definition |
-| ---- | ---- | ---------- |
-| PRIMARY | PRIMARY KEY | PRIMARY KEY (tag_id) |
-| uq_tags_name | UNIQUE | UNIQUE KEY uq_tags_name (name) |
+| Name         | Type        | Definition                     |
+| ------------ | ----------- | ------------------------------ |
+| PRIMARY      | PRIMARY KEY | PRIMARY KEY (tag_id)           |
+| uq_tags_name | UNIQUE      | UNIQUE KEY uq_tags_name (name) |
 
 ## Indexes
 
-| Name | Definition |
-| ---- | ---------- |
-| PRIMARY | PRIMARY KEY (tag_id) USING BTREE |
+| Name         | Definition                                 |
+| ------------ | ------------------------------------------ |
+| PRIMARY      | PRIMARY KEY (tag_id) USING BTREE           |
 | uq_tags_name | UNIQUE KEY uq_tags_name (name) USING BTREE |
 
 ## Relations

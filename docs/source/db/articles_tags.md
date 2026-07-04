@@ -18,22 +18,22 @@ CREATE TABLE `articles_tags` (
 
 ## Columns
 
-| Name | Type | Default | Nullable | Children | Parents | Comment |
-| ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| article_id | char(36) |  | false |  | [articles](articles.md) |  |
-| tag_id | char(36) |  | false |  | [tags](tags.md) |  |
+| Name       | Type     | Default | Nullable | Children | Parents                 | Comment |
+| ---------- | -------- | ------- | -------- | -------- | ----------------------- | ------- |
+| article_id | char(36) |         | false    |          | [articles](articles.md) |         |
+| tag_id     | char(36) |         | false    |          | [tags](tags.md)         |         |
 
 ## Constraints
 
-| Name | Type | Definition |
-| ---- | ---- | ---------- |
+| Name    | Type        | Definition                       |
+| ------- | ----------- | -------------------------------- |
 | PRIMARY | PRIMARY KEY | PRIMARY KEY (article_id, tag_id) |
 
 ## Indexes
 
-| Name | Definition |
-| ---- | ---------- |
-| PRIMARY | PRIMARY KEY (article_id, tag_id) USING BTREE |
+| Name                     | Definition                                        |
+| ------------------------ | ------------------------------------------------- |
+| PRIMARY                  | PRIMARY KEY (article_id, tag_id) USING BTREE      |
 | idx_articles_tags_tag_id | KEY idx_articles_tags_tag_id (tag_id) USING BTREE |
 
 ## Relations

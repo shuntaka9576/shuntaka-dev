@@ -39,7 +39,10 @@ impl ResourceFetcher for UreqFetcher {
             .call()
             .map_err(|e| e.to_string())?;
 
-        response.into_body().read_to_string().map_err(|e| e.to_string())
+        response
+            .into_body()
+            .read_to_string()
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -593,8 +596,10 @@ fn process_github_embeds(
         let trimmed = line.trim();
 
         // Check if line is a standalone GitHub blob URL (not part of a markdown link)
-        if trimmed.starts_with("https://github.com/") && trimmed.contains("/blob/")
-            && !line.contains('[') && !line.contains('(')
+        if trimmed.starts_with("https://github.com/")
+            && trimmed.contains("/blob/")
+            && !line.contains('[')
+            && !line.contains('(')
             && let Some(link) = parse_github_link(trimmed)
         {
             // Try to fetch and render the code
@@ -845,29 +850,120 @@ fn is_valid_html_tag(content: &str) -> bool {
 
     // List of common valid HTML tags
     let valid_tags = [
-        "a", "abbr", "address", "area", "article", "aside", "audio",
-        "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
-        "canvas", "caption", "cite", "code", "col", "colgroup",
-        "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div", "dl", "dt",
-        "em", "embed",
-        "fieldset", "figcaption", "figure", "footer", "form",
-        "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hgroup", "hr", "html",
-        "i", "iframe", "img", "input", "ins",
+        "a",
+        "abbr",
+        "address",
+        "area",
+        "article",
+        "aside",
+        "audio",
+        "b",
+        "base",
+        "bdi",
+        "bdo",
+        "blockquote",
+        "body",
+        "br",
+        "button",
+        "canvas",
+        "caption",
+        "cite",
+        "code",
+        "col",
+        "colgroup",
+        "data",
+        "datalist",
+        "dd",
+        "del",
+        "details",
+        "dfn",
+        "dialog",
+        "div",
+        "dl",
+        "dt",
+        "em",
+        "embed",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "head",
+        "header",
+        "hgroup",
+        "hr",
+        "html",
+        "i",
+        "iframe",
+        "img",
+        "input",
+        "ins",
         "kbd",
-        "label", "legend", "li", "link",
-        "main", "map", "mark", "menu", "meta", "meter",
-        "nav", "noscript",
-        "object", "ol", "optgroup", "option", "output",
-        "p", "picture", "pre", "progress",
+        "label",
+        "legend",
+        "li",
+        "link",
+        "main",
+        "map",
+        "mark",
+        "menu",
+        "meta",
+        "meter",
+        "nav",
+        "noscript",
+        "object",
+        "ol",
+        "optgroup",
+        "option",
+        "output",
+        "p",
+        "picture",
+        "pre",
+        "progress",
         "q",
-        "rp", "rt", "ruby",
-        "s", "samp", "section", "select", "slot", "small", "source", "span", "strong", "style", "sub", "summary", "sup", "svg",
-        "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "time", "title", "tr", "track",
-        "u", "ul",
-        "var", "video",
+        "rp",
+        "rt",
+        "ruby",
+        "s",
+        "samp",
+        "section",
+        "select",
+        "slot",
+        "small",
+        "source",
+        "span",
+        "strong",
+        "style",
+        "sub",
+        "summary",
+        "sup",
+        "svg",
+        "table",
+        "tbody",
+        "td",
+        "template",
+        "textarea",
+        "tfoot",
+        "th",
+        "thead",
+        "time",
+        "title",
+        "tr",
+        "track",
+        "u",
+        "ul",
+        "var",
+        "video",
         "wbr",
         // Also allow common self-closing patterns
-        "!--", "!DOCTYPE",
+        "!--",
+        "!DOCTYPE",
     ];
 
     valid_tags.iter().any(|&t| tag_name.eq_ignore_ascii_case(t))
@@ -1029,7 +1125,10 @@ impl MarkdownConverter {
         static EXTERNAL_LINK_RE: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r#"<a href="(https?://[^"]*)""#).unwrap());
         EXTERNAL_LINK_RE
-            .replace_all(html, r#"<a href="$1" target="_blank" rel="noopener noreferrer""#)
+            .replace_all(
+                html,
+                r#"<a href="$1" target="_blank" rel="noopener noreferrer""#,
+            )
             .to_string()
     }
 }
@@ -1085,8 +1184,11 @@ mod wasm_api {
         resources: JsValue,
     ) -> Result<String, JsValue> {
         let map: std::collections::HashMap<String, String> =
-            serde_wasm_bindgen::from_value(resources).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(crate::convert_markdown_to_html_with_resources(markdown, map))
+            serde_wasm_bindgen::from_value(resources)
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(crate::convert_markdown_to_html_with_resources(
+            markdown, map,
+        ))
     }
 }
 
@@ -1308,9 +1410,18 @@ mod tests {
 
     #[test]
     fn test_parse_code_info() {
-        assert_eq!(parse_code_info("json:package.json"), Some(("json", "package.json")));
-        assert_eq!(parse_code_info("rust:src/main.rs"), Some(("rust", "src/main.rs")));
-        assert_eq!(parse_code_info("typescript:index.ts"), Some(("typescript", "index.ts")));
+        assert_eq!(
+            parse_code_info("json:package.json"),
+            Some(("json", "package.json"))
+        );
+        assert_eq!(
+            parse_code_info("rust:src/main.rs"),
+            Some(("rust", "src/main.rs"))
+        );
+        assert_eq!(
+            parse_code_info("typescript:index.ts"),
+            Some(("typescript", "index.ts"))
+        );
         assert_eq!(parse_code_info("json"), None);
         assert_eq!(parse_code_info(":filename"), None);
         assert_eq!(parse_code_info("lang:"), None);
@@ -1369,7 +1480,9 @@ mod tests {
 
     #[test]
     fn test_is_github_blob_url() {
-        assert!(is_github_blob_url("https://github.com/owner/repo/blob/main/file.rs"));
+        assert!(is_github_blob_url(
+            "https://github.com/owner/repo/blob/main/file.rs"
+        ));
         assert!(!is_github_blob_url("https://github.com/owner/repo"));
         assert!(!is_github_blob_url("https://example.com"));
     }
@@ -1419,7 +1532,10 @@ mod tests {
         assert_eq!(ogp.title, "Test Title");
         assert_eq!(ogp.description, Some("Test Description".to_string()));
         assert_eq!(ogp.image, Some("https://example.com/image.png".to_string()));
-        assert_eq!(ogp.favicon, Some("https://example.com/favicon.ico".to_string()));
+        assert_eq!(
+            ogp.favicon,
+            Some("https://example.com/favicon.ico".to_string())
+        );
     }
 
     #[test]

@@ -135,11 +135,13 @@ mod tests {
         let tracer = provider.tracer("test");
 
         let subscriber = tracing_subscriber::registry().with(
-            tracing_opentelemetry::layer().with_tracer(tracer).with_filter(
-                Targets::new()
-                    .with_target("api", Level::INFO)
-                    .with_target("adapter", Level::INFO),
-            ),
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer)
+                .with_filter(
+                    Targets::new()
+                        .with_target("api", Level::INFO)
+                        .with_target("adapter", Level::INFO),
+                ),
         );
         let _guard = tracing::subscriber::set_default(subscriber);
 

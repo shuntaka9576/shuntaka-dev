@@ -30,36 +30,36 @@ CREATE TABLE `articles` (
 
 ## Columns
 
-| Name | Type | Default | Nullable | Extra Definition | Children | Parents | Comment |
-| ---- | ---- | ------- | -------- | ---------------- | -------- | ------- | ------- |
-| article_id | char(36) | uuid() | false | DEFAULT_GENERATED | [articles_tags](articles_tags.md) |  |  |
-| title | varchar(500) |  | false |  |  |  |  |
-| slug | varchar(255) |  | false |  |  |  |  |
-| user_id | char(36) |  | false |  |  | [users](users.md) |  |
-| content | longtext |  | false |  |  |  |  |
-| content_html | longtext |  | true |  |  |  |  |
-| thumbnail | text |  | true |  |  |  |  |
-| description | text |  | false |  |  |  |  |
-| status | varchar(20) | draft | false |  |  |  | 記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み) |
-| type | varchar(50) |  | true |  |  |  |  |
-| published_at | datetime(6) |  | true |  |  |  |  |
-| created_at | datetime(6) | CURRENT_TIMESTAMP(6) | false |  |  |  |  |
-| updated_at | datetime(6) | CURRENT_TIMESTAMP(6) | false |  |  |  |  |
+| Name         | Type         | Default              | Nullable | Extra Definition  | Children                          | Parents           | Comment                                                                                                                   |
+| ------------ | ------------ | -------------------- | -------- | ----------------- | --------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| article_id   | char(36)     | uuid()               | false    | DEFAULT_GENERATED | [articles_tags](articles_tags.md) |                   |                                                                                                                           |
+| title        | varchar(500) |                      | false    |                   |                                   |                   |                                                                                                                           |
+| slug         | varchar(255) |                      | false    |                   |                                   |                   |                                                                                                                           |
+| user_id      | char(36)     |                      | false    |                   |                                   | [users](users.md) |                                                                                                                           |
+| content      | longtext     |                      | false    |                   |                                   |                   |                                                                                                                           |
+| content_html | longtext     |                      | true     |                   |                                   |                   |                                                                                                                           |
+| thumbnail    | text         |                      | true     |                   |                                   |                   |                                                                                                                           |
+| description  | text         |                      | false    |                   |                                   |                   |                                                                                                                           |
+| status       | varchar(20)  | draft                | false    |                   |                                   |                   | 記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み) |
+| type         | varchar(50)  |                      | true     |                   |                                   |                   |                                                                                                                           |
+| published_at | datetime(6)  |                      | true     |                   |                                   |                   |                                                                                                                           |
+| created_at   | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                   |                   |                                                                                                                           |
+| updated_at   | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                   |                   |                                                                                                                           |
 
 ## Constraints
 
-| Name | Type | Definition |
-| ---- | ---- | ---------- |
-| PRIMARY | PRIMARY KEY | PRIMARY KEY (article_id) |
-| uq_articles_slug | UNIQUE | UNIQUE KEY uq_articles_slug (slug) |
+| Name             | Type        | Definition                         |
+| ---------------- | ----------- | ---------------------------------- |
+| PRIMARY          | PRIMARY KEY | PRIMARY KEY (article_id)           |
+| uq_articles_slug | UNIQUE      | UNIQUE KEY uq_articles_slug (slug) |
 
 ## Indexes
 
-| Name | Definition |
-| ---- | ---------- |
+| Name                                          | Definition                                                                                                      |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | idx_articles_user_status_type_published_at_id | KEY idx_articles_user_status_type_published_at_id (user_id, status, type, published_at, article_id) USING BTREE |
-| PRIMARY | PRIMARY KEY (article_id) USING BTREE |
-| uq_articles_slug | UNIQUE KEY uq_articles_slug (slug) USING BTREE |
+| PRIMARY                                       | PRIMARY KEY (article_id) USING BTREE                                                                            |
+| uq_articles_slug                              | UNIQUE KEY uq_articles_slug (slug) USING BTREE                                                                  |
 
 ## Relations
 
