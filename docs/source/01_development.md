@@ -239,10 +239,13 @@ brew install kayac/tap/ecspresso
 ecspresso version
 ```
 
-tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめた `scripts/deploy-tidb-proxy.sh` を実行する。`IMAGE_TAG` は git short SHA が自動で使われる（環境変数で上書き可）。
+tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめた `scripts/deploy-tidb-proxy.sh` を実行する。`IMAGE_TAG` は git short SHA が自動で使われる（環境変数で上書き可）。GitHub Actions の Deploy tidb-proxy ワークフロー（workflow_dispatch、`ref` 入力で commit SHA / タグ指定可）でも同じスクリプトを実行できる。
 
 ```bash
 scripts/deploy-tidb-proxy.sh
+
+# GitHub Actions から実行する場合
+gh workflow run deploy-tidb-proxy.yaml --ref preview
 ```
 
 tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
