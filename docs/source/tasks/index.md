@@ -5,6 +5,7 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-07-05-article-tags
 2026-07-03-tikv-memory-after-drop-table
 2026-07-03-otel-bottleneck-observability
 2026-07-02-articles-content-html-pregeneration

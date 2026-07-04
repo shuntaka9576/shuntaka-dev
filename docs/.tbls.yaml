@@ -1,7 +1,11 @@
-dsn: postgres://postgres:postgres@127.0.0.1:5433/postgres?sslmode=disable&search_path=app
+# TiDB (MySQL互換) の blog_dev スキーマからドキュメントを生成する
+# 実行例:
+#   export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+#   cd docs && TBLS_DSN="mysql://root@tidb.$TAILNET:4000/blog_dev" tbls doc -c .tbls.yaml --rm-dist
+dsn: ${TBLS_DSN}
 
 comments:
-  - table: app.articles
+  - table: articles
     columnComments:
       status: '記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)'
 
@@ -12,21 +16,21 @@ er:
     related: true
     primary: true
 relations:
-  - table: app.articles
+  - table: articles
     columns:
       - user_id
-    parentTable: app.users
+    parentTable: users
     parentColumns:
       - user_id
-  - table: app.articles_tags
+  - table: articles_tags
     columns:
       - article_id
-    parentTable: app.articles
+    parentTable: articles
     parentColumns:
       - article_id
-  - table: app.articles_tags
+  - table: articles_tags
     columns:
       - tag_id
-    parentTable: app.tags
+    parentTable: tags
     parentColumns:
       - tag_id
