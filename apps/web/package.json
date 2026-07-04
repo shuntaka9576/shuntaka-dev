@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
+    "test": "bun test src/",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "clean": "rm -rf .next .turbo storybook-static"
@@ -24,6 +25,7 @@
     "tocbot": "^4.36.8"
   },
   "devDependencies": {
+    "@next/env": "16.2.10",
     "@storybook/addon-themes": "^10.4.6",
     "@storybook/nextjs-vite": "^10.4.6",
     "@tailwindcss/postcss": "^4.3.2",

@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-05
 - 関連: [記事詳細 API の content_html 事前生成](2026-07-02-articles-content-html-pregeneration.md)
-- ステータス: 進行中
+- ステータス: 完了（2026-07-05 本番適用・検証済み）
 
 ## 起票理由
 
@@ -31,8 +31,8 @@ blog-api は frontmatter の `tags` をパースするだけで破棄してお�
 - [x] Phase C: DDL（`tags.parent_tag_id` 追加）をスキーマファイルに追記
 - [x] Phase D: blog-api 実装（保存 + 読み取り + webhook 配線）
 - [x] Phase E: 既存記事タグ案生成 → レビュー → スクリプト作成（frontmatter 更新の実行は依頼者）
-- [ ] Phase F: dev（blog_dev）適用・E2E テスト
-- [ ] Phase G: 本番（blog_prd）適用
+- [x] Phase F: dev（blog_dev）適用・E2E テスト
+- [x] Phase G: 本番（blog_prd）適用（2026-07-05 検証済み: tags 64 / articles_tags 230 / タグ付き91記事 / updated_at 不変 / API レスポンス確認）
 
 ## Phase A: tbls の TiDB 切り替え
 

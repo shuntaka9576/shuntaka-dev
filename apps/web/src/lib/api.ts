@@ -8,6 +8,8 @@ export interface Article {
   type: string | null;
   thumbnail: string | null;
   ogpUrl: string;
+  /** フルパス表記のタグ（例: "tech/rust", "tech/aws/lambda"） */
+  tags: string[];
   publishedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -21,6 +23,8 @@ export interface ArticleSummary {
   type: string | null;
   thumbnail: string | null;
   ogpUrl: string;
+  /** フルパス表記のタグ（例: "tech/rust", "tech/aws/lambda"） */
+  tags: string[];
   publishedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
