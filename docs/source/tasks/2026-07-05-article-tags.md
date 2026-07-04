@@ -209,7 +209,7 @@ gh workflow run deploy.yaml --field stageName=dev --field stack=main
 mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA \
   -e 'SELECT MAX(updated_at) FROM articles'
 
-mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA < backfill.sql
+mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA < tools/dsql-cli/dsl-tidb/backfill/2026-07-05-article-tags.sql
 
 # タグ別記事数
 mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA -e '
