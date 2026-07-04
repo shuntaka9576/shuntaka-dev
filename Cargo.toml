@@ -19,7 +19,7 @@ shared = { path = "./apps/blog-api/shared" }
 registry = { path = "./apps/blog-api/registry" }
 markdown = { path = "./apps/blog-api/markdown" }
 infrastructure = { path = "./apps/blog-api/infrastructure" }
-anyhow = "1.0.102"
+anyhow = "1.0.103"
 axum = { version = "0.8.9", features = ["macros"] }
 sqlx = { version = "0.9.0", features = [
   "runtime-tokio",
@@ -39,7 +39,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 serde_yaml = "0.9.34"
-uuid = { version = "1.23.3", features = ["serde", "v4"] }
+uuid = { version = "1.23.4", features = ["serde", "v4"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 aws-config = "1.8.18"
 aws-sdk-ssm = "1.113.0"
@@ -58,7 +58,7 @@ thiserror = "2.0.18"
 tracing = "0.1.44"
 hex = "0.4.3"
 opentelemetry = "0.32.0"
-opentelemetry_sdk = "0.32.0"
+opentelemetry_sdk = "0.32.1"
 opentelemetry-otlp = "0.32.0"
 opentelemetry-aws = { version = "0.20.0", default-features = false, features = ["trace"] }
 tracing-opentelemetry = "0.33.0"
