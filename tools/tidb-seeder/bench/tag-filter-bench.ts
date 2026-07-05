@@ -54,9 +54,19 @@ async function main(): Promise<void> {
     return rows as Record<string, unknown>[];
   };
 
+  // AND 計測が root 違い（tech × misc）で 0 件マッチにならないよう、
+  // hot / mid / rare は tech root 配下のタグに限定して選ぶ
   const dist = await one(
-    `SELECT at2.tag_id, t.name, COUNT(*) AS cnt
-     FROM articles_tags at2 JOIN tags t ON t.tag_id = at2.tag_id
+    `WITH RECURSIVE tag_roots AS (
+       SELECT tag_id, name AS root_name FROM tags WHERE parent_tag_id IS NULL
+       UNION ALL
+       SELECT t.tag_id, tr.root_name FROM tags t JOIN tag_roots tr ON t.parent_tag_id = tr.tag_id
+     )
+     SELECT at2.tag_id, t.name, COUNT(*) AS cnt
+     FROM articles_tags at2
+     JOIN tags t ON t.tag_id = at2.tag_id
+     JOIN tag_roots r ON r.tag_id = at2.tag_id
+     WHERE r.root_name = 'tech'
      GROUP BY at2.tag_id, t.name ORDER BY cnt DESC`,
   );
   const hot = dist[0];
@@ -64,9 +74,15 @@ async function main(): Promise<void> {
   const rare = dist[dist.length - 1];
   const parentRow = (
     await one(
-      `SELECT p.tag_id, p.name, COUNT(*) AS child_count
+      `WITH RECURSIVE tag_roots AS (
+         SELECT tag_id, name AS root_name FROM tags WHERE parent_tag_id IS NULL
+         UNION ALL
+         SELECT t.tag_id, tr.root_name FROM tags t JOIN tag_roots tr ON t.parent_tag_id = tr.tag_id
+       )
+       SELECT p.tag_id, p.name, COUNT(*) AS child_count
        FROM tags p JOIN tags c ON c.parent_tag_id = p.tag_id
-       WHERE p.parent_tag_id IS NOT NULL
+       JOIN tag_roots r ON r.tag_id = p.tag_id
+       WHERE p.parent_tag_id IS NOT NULL AND r.root_name = 'tech'
        GROUP BY p.tag_id, p.name ORDER BY child_count DESC LIMIT 1`,
     )
   )[0];
@@ -189,6 +205,17 @@ async function main(): Promise<void> {
     { name: 'filter: hot OR mid, list page1', sql: listQuery([hotId, midId], 'or') },
     { name: 'filter: hot OR mid, count', sql: countQuery([hotId, midId], 'or') },
     { name: 'facets: no selection (type all)', sql: facetsQuery([]) },
+    {
+      // blog-api adapter のフィルタなし分岐と同形（tag_article_counts 前計算。要バックフィル）
+      name: 'facets: no selection via tag_article_counts (precomputed)',
+      sql: `WITH RECURSIVE ${tagPathsCte}
+        SELECT tp.path, tac.article_count AS cnt
+        FROM tag_article_counts tac
+        JOIN tag_paths tp ON tp.tag_id = tac.tag_id
+        WHERE tac.user_id = (SELECT user_id FROM users WHERE name = '${userName}')
+          AND tac.\`type\` = 'tech' AND tac.article_count > 0
+        ORDER BY tac.article_count DESC, tp.path ASC`,
+    },
     { name: 'facets: selected hot', sql: facetsQuery([hotId]) },
     { name: 'facets: selected hot AND mid', sql: facetsQuery([hotId, midId]) },
   ];

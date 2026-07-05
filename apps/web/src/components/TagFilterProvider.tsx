@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ArticleSummary, TagFacet } from '@/lib/api';
 import { getArticlesByType, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE } from '@/lib/constants';
@@ -193,22 +201,14 @@ export function TagFilterProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtering, selected, mode, filterPage, retryCount, userName, type, tagRoot]);
 
-  const tagTree = useMemo(
-    () => buildTagTreeFromFacets(facets, tagRoot),
-    [facets, tagRoot],
-  );
+  const tagTree = useMemo(() => buildTagTreeFromFacets(facets, tagRoot), [facets, tagRoot]);
 
   // 絞り込み URL はタブの先頭ページ（baseHref）に載せる
   // 選択が空になったら SSR が表示していたページ URL に戻す
   const unfilteredHref = page > 1 ? `${baseHref.replace(/\/$/, '')}/page/${page}` : baseHref;
 
   const pushFilterUrl = useCallback(
-    (
-      nextSelected: string[],
-      nextMode: TagFilterMode,
-      nextFilterPage: number,
-      replace = false,
-    ) => {
+    (nextSelected: string[], nextMode: TagFilterMode, nextFilterPage: number, replace = false) => {
       let url: string;
       if (nextSelected.length === 0) {
         url = unfilteredHref;

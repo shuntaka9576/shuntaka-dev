@@ -72,8 +72,7 @@ export function buildTagTreeFromFacets(
     }
   }
 
-  const byCountDesc = (a: TagNode, b: TagNode) =>
-    b.count - a.count || a.path.localeCompare(b.path);
+  const byCountDesc = (a: TagNode, b: TagNode) => b.count - a.count || a.path.localeCompare(b.path);
   const sortTree = (list: TagNode[]) => {
     list.sort(byCountDesc);
     for (const node of list) sortTree(node.children);

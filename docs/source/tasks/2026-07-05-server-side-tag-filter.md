@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-05
 - 関連: [記事一覧へのタグ絞り込みUIの追加](2026-07-05-article-tag-filter-ui.md) / [記事タグ機能の追加](2026-07-05-article-tags.md) / [TiDB 性能ベンチ](2026-06-27-perf-bench.md)
-- ステータス: Phase C/D/F 完了・tag_article_counts 実装済み（Phase E クラスタ再計測・G 未着手）
+- ステータス: Phase C/D/E/F 完了（Phase G 本番反映のみ未着手）
 
 ## 起票理由
 
@@ -123,7 +123,7 @@ GROUP BY anc.anc_tag_id
 - [x] Phase B: blog_test に 50万記事 + 150万 articles_tags を投入し、現行一覧クエリのベースライン計測（指示によりローカル Docker TiDB で実施。結果は下記）
 - [x] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
 - [x] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
-- [x] Phase E: tag_article_counts 集計テーブルを実装（フィルタなしファセットを前計算化。クラスタ再計測は Phase G 実施前に行う）
+- [x] Phase E: tag_article_counts 集計テーブルを実装（フィルタなしファセットを前計算化）+ クラスタ 50万件で再計測（前計算 17.7ms で要否判定「必要」が確定。選択後 facets のクエリ形も実測起点で修正）
 - [x] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
 - [ ] Phase G: dev（blog_dev）E2E → 本番反映
 
@@ -154,15 +154,15 @@ GROUP BY anc.anc_tag_id
 
 ### 実装概要
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `kernel/src/model/article.rs` | `TagFilterMode` (And/Or) + `TagFilter { paths, mode }` を追加 |
-| `kernel/src/repository/users_articles.rs` | `TagFacet`, `TagFacetsResult` 構造体を追加。trait に `tag_filter: Option<&TagFilter>` パラメータと `find_tag_facets` メソッドを追加 |
+| ファイル                                   | 変更内容                                                                                                                                                                                                                                                               |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kernel/src/model/article.rs`              | `TagFilterMode` (And/Or) + `TagFilter { paths, mode }` を追加                                                                                                                                                                                                          |
+| `kernel/src/repository/users_articles.rs`  | `TagFacet`, `TagFacetsResult` 構造体を追加。trait に `tag_filter: Option<&TagFilter>` パラメータと `find_tag_facets` メソッドを追加                                                                                                                                    |
 | `adapter/src/repository/users_articles.rs` | 2クエリ方式に全面移行（`ArticleSummaryBaseRow` でタグなし一覧取得 → `fetch_article_tags` で別クエリ）。タグフィルタの動的 SQL 構築（`build_list_filter_parts` / `build_facets_filter_parts`）。`find_tag_facets` 実装。`sqlx::AssertSqlSafe` で動的 SQL を安全にラップ |
-| `api/src/handler/users_articles.rs` | `UsersArticlesQuery` に `tags` / `mode` 追加。`parse_tag_filter` ヘルパー追加。`get_users_articles_tag_facets` ハンドラ追加（`TagFacetsResponse` / `TagFacetEntry`） |
-| `api/src/route/users_articles.rs` | `/articles/tag-facets` ルートを静的セグメント優先で登録 |
-| `api/src/lib.rs` | OpenAPI パス・スキーマに tag-facets エンドポイントを登録 |
-| `cspell.json` | `conds`, `matchit` を words に追加 |
+| `api/src/handler/users_articles.rs`        | `UsersArticlesQuery` に `tags` / `mode` 追加。`parse_tag_filter` ヘルパー追加。`get_users_articles_tag_facets` ハンドラ追加（`TagFacetsResponse` / `TagFacetEntry`）                                                                                                   |
+| `api/src/route/users_articles.rs`          | `/articles/tag-facets` ルートを静的セグメント優先で登録                                                                                                                                                                                                                |
+| `api/src/lib.rs`                           | OpenAPI パス・スキーマに tag-facets エンドポイントを登録                                                                                                                                                                                                               |
+| `cspell.json`                              | `conds`, `matchit` を words に追加                                                                                                                                                                                                                                     |
 
 ### 設計の選択ポイント
 
@@ -173,15 +173,15 @@ GROUP BY anc.anc_tag_id
 
 ### ローカル E2E 計測結果（unistore, 50万記事）
 
-| エンドポイント | 操作 | レイテンシ | 備考 |
-| --- | --- | --- | --- |
-| 一覧 API（フィルタなし、page=1） | 2クエリ方式 | 約 780ms | unistore floor 込み |
-| 一覧 API（単一タグ AND、page=1） | タグ解決 + EXISTS | 約 7.4s | COUNT が重い（Phase B の計測と一致） |
-| 一覧 API（2タグ OR、page=1） | タグ解決 + EXISTS | 約 7.3s | |
-| 一覧 API（未知タグ AND）| 短絡返却 | 約 20ms | DB クエリなし |
-| 一覧 API（全未知タグ OR）| 短絡返却 | 約 17ms | DB クエリなし |
-| tag-facets（フィルタなし） | 祖先ロールアップ全域集計 | 約 44s | Phase B 計測（21〜24s）と同水準。Phase E でクラスタ再計測要 |
-| tag-facets（単一タグ AND フィルタ） | 絞り込み後ロールアップ | 約 37s | 対象が 1211 件でも重い（unistore の floor） |
+| エンドポイント                      | 操作                     | レイテンシ | 備考                                                        |
+| ----------------------------------- | ------------------------ | ---------- | ----------------------------------------------------------- |
+| 一覧 API（フィルタなし、page=1）    | 2クエリ方式              | 約 780ms   | unistore floor 込み                                         |
+| 一覧 API（単一タグ AND、page=1）    | タグ解決 + EXISTS        | 約 7.4s    | COUNT が重い（Phase B の計測と一致）                        |
+| 一覧 API（2タグ OR、page=1）        | タグ解決 + EXISTS        | 約 7.3s    |                                                             |
+| 一覧 API（未知タグ AND）            | 短絡返却                 | 約 20ms    | DB クエリなし                                               |
+| 一覧 API（全未知タグ OR）           | 短絡返却                 | 約 17ms    | DB クエリなし                                               |
+| tag-facets（フィルタなし）          | 祖先ロールアップ全域集計 | 約 44s     | Phase B 計測（21〜24s）と同水準。Phase E でクラスタ再計測要 |
+| tag-facets（単一タグ AND フィルタ） | 絞り込み後ロールアップ   | 約 37s     | 対象が 1211 件でも重い（unistore の floor）                 |
 
 `tag_article_counts` 集計テーブルの前計算（Phase B で格上げした候補）は Phase E でのクラスタ計測後に判断する。
 
@@ -189,14 +189,14 @@ GROUP BY anc.anc_tag_id
 
 ### 実装概要
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql` | 集計テーブル DDL（PRIMARY KEY `(user_id, type, tag_id)`） |
-| `tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql` | 既存データの一括バックフィル SQL（DELETE ALL + INSERT WITH RECURSIVE） |
-| `adapter/src/repository/users_articles.rs` | `find_tag_facets` のフィルタなし分岐を `tag_article_counts` + `tag_paths` CTE に変更。フィルタあり分岐に `MAX_EXECUTION_TIME(8000)` ヒントを追加 |
-| `adapter/src/repository/articles.rs` | `sync_tag_article_counts` 関数を追加。`upsert_article` の UPDATE / INSERT 両パスで status 変化・type 変化・tags 変化があれば同一トランザクション内で再計算する |
-| `apps/web/src/components/TagFilterProvider.tsx` | `facetsError` state を追加。facets API 失敗時は前回値を維持してアーティクル一覧の表示を継続する |
-| `apps/web/src/components/TagFilterControls.tsx` | `facetsError` 時にパネル下部へミュートテキストを表示する |
+| ファイル                                                           | 変更内容                                                                                                                                                       |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql`         | 集計テーブル DDL（PRIMARY KEY `(user_id, type, tag_id)`）                                                                                                      |
+| `tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql` | 既存データの一括バックフィル SQL（DELETE ALL + INSERT WITH RECURSIVE）                                                                                         |
+| `adapter/src/repository/users_articles.rs`                         | `find_tag_facets` のフィルタなし分岐を `tag_article_counts` + `tag_paths` CTE に変更。フィルタあり分岐に `MAX_EXECUTION_TIME(8000)` ヒントを追加               |
+| `adapter/src/repository/articles.rs`                               | `sync_tag_article_counts` 関数を追加。`upsert_article` の UPDATE / INSERT 両パスで status 変化・type 変化・tags 変化があれば同一トランザクション内で再計算する |
+| `apps/web/src/components/TagFilterProvider.tsx`                    | `facetsError` state を追加。facets API 失敗時は前回値を維持してアーティクル一覧の表示を継続する                                                                |
+| `apps/web/src/components/TagFilterControls.tsx`                    | `facetsError` 時にパネル下部へミュートテキストを表示する                                                                                                       |
 
 ### 設計の選択ポイント
 
@@ -220,18 +220,79 @@ mysql -h 127.0.0.1 -P 4100 -u root -D blog_test \
 
 ### ローカル検証結果（2026-07-05, Docker TiDB unistore, 50万記事・150万 articles_tags）
 
-| エンドポイント | 計測値 | 備考 |
-| --- | --- | --- |
-| `GET /tag-facets?type=tech`（選択なし） | **19ms** | 旧実装（祖先ロールアップ全件集計）は 40 秒超。300 タグ行の読み取りのみで完結 |
-| `GET /articles?type=tech&page=1&perPage=10` | 769ms | 初回呼び出し。通常は低レイテンシ |
-| `GET /tag-facets?type=tech&tags=tech%2F…`（選択あり） | タイムアウト | unistore は `MAX_EXECUTION_TIME` を無視するため 8 秒で切れない。実クラスタ（TiKV）では絞り込み後集合が小さいため高速化見込み |
-| `http://localhost:3000/` SSR | 正常（記事リンク返却） | `testuser-cvtb-0/articles/…` リンク複数確認済み |
-| backfill 所要時間 | **35 秒** | 500,000 記事・150万 articles_tags → 300 行挿入 |
+| エンドポイント                                        | 計測値                 | 備考                                                                                                                         |
+| ----------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `GET /tag-facets?type=tech`（選択なし）               | **19ms**               | 旧実装（祖先ロールアップ全件集計）は 40 秒超。300 タグ行の読み取りのみで完結                                                 |
+| `GET /articles?type=tech&page=1&perPage=10`           | 769ms                  | 初回呼び出し。通常は低レイテンシ                                                                                             |
+| `GET /tag-facets?type=tech&tags=tech%2F…`（選択あり） | タイムアウト           | unistore は `MAX_EXECUTION_TIME` を無視するため 8 秒で切れない。実クラスタ（TiKV）では絞り込み後集合が小さいため高速化見込み |
+| `http://localhost:3000/` SSR                          | 正常（記事リンク返却） | `testuser-cvtb-0/articles/…` リンク複数確認済み                                                                              |
+| backfill 所要時間                                     | **35 秒**              | 500,000 記事・150万 articles_tags → 300 行挿入                                                                               |
+
+## Phase E: クラスタ実測結果（2026-07-05）
+
+環境: 実クラスタ（MiniPC 3ノード、TiKV。point-select p95 4.3ms 環境）に Tailscale 経由で接続し、`blog_test` へ articles 500,000（published+tech 269,768）/ articles_tags 1,500,000 / tags 300 を投入して計測。計測は `tools/tidb-seeder/bench/tag-filter-bench.ts`（warmup 1 + 5回 avg、Tailscale RTT 込み）。Phase B 注記 5 のとおり、hot / mid / rare / parent の選定を tech root 配下に限定するようベンチを修正済み（AND 計測が root 違いで 0 件マッチになる問題の解消）。
+
+### 投入・計測手順（クラスタ操作の記録）
+
+```bash
+cd tools/tidb-seeder
+export TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
+
+# TSV 再生成（root タグ名 tech/misc 修正後の形。1.3s）
+bun run generate --users 1 --articles-per-user 500000 --tags 300 \
+  --tags-per-article 3 --content-size 500 --seed 42 --rows-per-part 15000 --no-concat
+
+# blog_test 再作成 + 並列 LOAD DATA（70.5s）
+mysql -h tidb.$TAILNET -P 4000 -u root -e "DROP DATABASE IF EXISTS blog_test; CREATE DATABASE blog_test;"
+bun run load --host tidb.$TAILNET --port 4000 --database blog_test --tsv-dir ./out --parallelism 8
+
+# tag_article_counts バックフィル（4.0s。unistore では 35s だった）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_test \
+  < ../dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql
+
+# ベンチ実行
+bun bench/tag-filter-bench.ts --host tidb.$TAILNET --port 4000 --database blog_test --runs 5
+```
+
+### 計測結果（avg。比較列は Phase B/C のローカル unistore 計測）
+
+| クエリ                                                   | クラスタ avg           | unistore           |
+| -------------------------------------------------------- | ---------------------- | ------------------ |
+| 現行本番形 一覧 page1（相関 GROUP_CONCAT）               | 844ms                  | 8,837ms            |
+| 提案形 一覧 page1（タグ列なし）                          | **9.6ms**              | 262ms              |
+| 提案形 deep offset（page 1000）                          | **13.9ms**             | 1,887ms            |
+| 提案形 ページ内10記事のタグ取得                          | 19.1ms                 | 4.7ms（RTT 差）    |
+| COUNT（絞り込みなし）                                    | 7.1ms                  | 237ms              |
+| 絞り込み一覧 page1（hot 13.5万件 / rare 981件 / 親タグ） | 287 / 187 / 207ms      | 855 / 381 / 506ms  |
+| 絞り込み一覧 page1（hot AND mid / hot OR mid）           | 314 / 291ms            | —（0件マッチ計測） |
+| 絞り込み COUNT（hot / 親タグ / AND / OR）                | 105 / 32 / 109 / 106ms | 約 2,600ms         |
+| facets オンザフライ（選択なし・type 全体）               | 1,645ms                | 21〜24s            |
+| facets 前計算（tag_article_counts、選択なし）            | **17.7ms**             | 19ms（API 実測）   |
+| facets オンザフライ（hot 選択 / hot AND mid）            | 1,483 / 1,384ms        | 37s（API 実測）    |
+
+### 判定
+
+1. **tag_article_counts 集計テーブルは「必要」で確定**: 「実クラスタなら前計算不要では」という仮説は棄却。オンザフライの type 全体 facets はクラスタでも 1.6 秒で目標 200ms を大きく外れる。前計算は 17.7ms で目標達成、バックフィルも 4 秒と軽い
+2. **絞り込み COUNT 問題（ローカル 2.6s）は解消**: 31〜109ms。tag 起点プラン誘導や totalCount 遅延取得は不要
+3. **deep offset 問題は解消**: page 1000 でも 13.9ms。カーソル方式やページ数上限は不要
+4. **絞り込み一覧は 187〜314ms で目標 p95 50ms は未達**: ただし Zipf 最頻タグ（tech 記事 27万件中 13.5万件ヒット）を含む合成ワーストケースで、EXISTS プローブが type 全記事に走るのが支配項。実データ（111 記事）では問題にならないため許容とし、実データ増加で悪化が見えたら tag 起点プラン誘導を再検討する
+5. 一覧 API E2E（hot 親タグ、dev debug ビルド）は warm 約 1.0s。ベンチ合算（list 207ms + count 32ms + tags 19ms）との差は debug ビルドと直列のタグ解決クエリによるもので、release ビルドでは縮む見込み
+
+### 選択後 facets クエリの修正（クラスタ実測起点）
+
+E2E 検証で、選択後 facets（ホット親タグ選択）が `MAX_EXECUTION_TIME(8000)` に到達して 500 を返す問題を発見した。SQL 直実測 8.2s に対しベンチ簡略形は 2.8s で、乖離の原因は API 実装が集計**前**に tag_paths を JOIN してパス文字列で GROUP BY していたこと。`anc_tag_id` で集計してから高々タグ数行（300 行）に tag_paths を JOIN する形へ書き換え、8.2s → **1.5s**（SQL 直実測）、E2E も 500/8.1s → **200/2.6s** に改善した（`adapter/src/repository/users_articles.rs` の `find_tag_facets` フィルタあり分岐）。
+
+### 動作確認環境（Phase F の体験確認用）
+
+```bash
+# dev を実クラスタ blog_test に向けて起動（Makefile.toml が TIDB_DATABASE を尊重）
+TIDB_DATABASE=blog_test NEXT_PUBLIC_USER_NAME=testuser-cvtb-0 bun run dev
+```
 
 ## 検証項目（Phase E / F）
 
-1. 50万記事投入時、絞り込み一覧 API が p95 50ms 以下（DB 内。Tailscale RTT を除く）
-2. tags なし facets（type 全体、150万行集計）が p95 200ms 以下。未達なら集計テーブル方式に切り替え
+1. 50万記事投入時、絞り込み一覧 API が p95 50ms 以下（DB 内。Tailscale RTT を除く）→ **未達だが許容**（187〜314ms。Phase E 判定 4 を参照。合成ワーストケースであり実データ規模では問題なし）
+2. tags なし facets（type 全体、150万行集計）が p95 200ms 以下。未達なら集計テーブル方式に切り替え → **集計テーブル方式で達成**（前計算 17.7ms。オンザフライは 1.6s で未達のため tag_article_counts を維持）
 3. UI 体験が #550 と同等であること: ファセット表示 / AND デフォルト / 祖先マッチ / 選択中バー / 0件導線 / 直リンク復元 / 戻る進む / タブリセット
 4. 絞り込み結果のページネーション（`?tags=..&page=2`）の直リンク・リロード動作
 5. デフォルト表示（絞り込みなし）の静的生成・ISR が現行構造（loading.tsx なしの単一形 HTML）を維持していること
@@ -249,16 +310,16 @@ mysql -h 127.0.0.1 -P 4100 -u root -D blog_test \
 
 ### 変更ファイル概要
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `apps/web/src/lib/api.ts` | `getArticlesByType` に `tags` / `mode` / `noCache` / `signal` オプションを追加。`getTagFacets` を新設（tag-facets エンドポイント呼び出し） |
-| `apps/web/src/lib/tagFilter.ts` | クライアントサイド集計の `matchesSelection` / `buildTagTree` を削除。API 応答（フルパス）からタグツリーを構築する `buildTagTreeFromFacets` を追加 |
-| `apps/web/src/lib/tagFilter.test.ts` | `buildTagTree` / `matchesSelection` のテストを削除。`buildTagTreeFromFacets` のテスト（6ケース）を追加 |
-| `apps/web/src/components/TagFilterProvider.tsx` | `articles` 全件 → `initialFacets` / `initialTotalPages` に変更。絞り込み中は一覧 API + facets API を AbortController 付き並列フェッチ。fetchedArticles / loading / error / filterPage / filteredTotalPages を Context に公開 |
-| `apps/web/src/components/TagFilterControls.tsx` | `matched.length` → `totalCount`（API からの件数）に変更 |
-| `apps/web/src/components/FilteredArticleList.tsx` | fetchedArticles によるレンダリングに切り替え。loading 時は opacity 低下 + "読み込み中…" テキスト表示。error 時は再試行ボタン表示。FilterPagination コンポーネントを追加 |
-| `apps/web/src/components/ArticleListView.tsx` | `perPage=all` 全件フェッチを廃止。`getArticlesByType`（現在ページ分）と `getTagFacets`（初期ファセット）を `Promise.all` で並列取得に変更 |
-| `tools/tidb-seeder/src/generate.ts` | root タグ名を `tech-${runTag}` / `misc-${runTag}` から `tech` / `misc` に修正（API が期待するフルパス形式に合わせる） |
+| ファイル                                          | 変更内容                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/api.ts`                         | `getArticlesByType` に `tags` / `mode` / `noCache` / `signal` オプションを追加。`getTagFacets` を新設（tag-facets エンドポイント呼び出し）                                                                                   |
+| `apps/web/src/lib/tagFilter.ts`                   | クライアントサイド集計の `matchesSelection` / `buildTagTree` を削除。API 応答（フルパス）からタグツリーを構築する `buildTagTreeFromFacets` を追加                                                                            |
+| `apps/web/src/lib/tagFilter.test.ts`              | `buildTagTree` / `matchesSelection` のテストを削除。`buildTagTreeFromFacets` のテスト（6ケース）を追加                                                                                                                       |
+| `apps/web/src/components/TagFilterProvider.tsx`   | `articles` 全件 → `initialFacets` / `initialTotalPages` に変更。絞り込み中は一覧 API + facets API を AbortController 付き並列フェッチ。fetchedArticles / loading / error / filterPage / filteredTotalPages を Context に公開 |
+| `apps/web/src/components/TagFilterControls.tsx`   | `matched.length` → `totalCount`（API からの件数）に変更                                                                                                                                                                      |
+| `apps/web/src/components/FilteredArticleList.tsx` | fetchedArticles によるレンダリングに切り替え。loading 時は opacity 低下 + "読み込み中…" テキスト表示。error 時は再試行ボタン表示。FilterPagination コンポーネントを追加                                                      |
+| `apps/web/src/components/ArticleListView.tsx`     | `perPage=all` 全件フェッチを廃止。`getArticlesByType`（現在ページ分）と `getTagFacets`（初期ファセット）を `Promise.all` で並列取得に変更                                                                                    |
+| `tools/tidb-seeder/src/generate.ts`               | root タグ名を `tech-${runTag}` / `misc-${runTag}` から `tech` / `misc` に修正（API が期待するフルパス形式に合わせる）                                                                                                        |
 
 ### 設計の選択ポイント
 

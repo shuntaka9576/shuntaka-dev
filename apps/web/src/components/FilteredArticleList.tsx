@@ -42,10 +42,7 @@ function FilterPagination({
   if (totalPages <= 1) return null;
   const items = buildPageItems(currentPage, totalPages);
   return (
-    <nav
-      className="mt-6 flex items-center justify-center text-sm sm:mt-8"
-      aria-label="pagination"
-    >
+    <nav className="mt-6 flex items-center justify-center text-sm sm:mt-8" aria-label="pagination">
       <ul className="flex items-center gap-1 sm:gap-2">
         {items.map((item, idx) =>
           item === 'ellipsis' ? (
@@ -130,9 +127,7 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
   // 初回フェッチ中（まだ記事がない）
   if (fetchedArticles === null && loading) {
     return (
-      <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
-        読み込み中…
-      </p>
+      <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">読み込み中…</p>
     );
   }
 

@@ -6,8 +6,17 @@ import { TAG_FILTER_PANEL_ID, useTagFilter } from '@/components/TagFilterProvide
 
 /** 一覧上部に置くタグパネル + 選択中バーのアイランド */
 export function TagFilterControls() {
-  const { panelOpen, selected, mode, totalCount, tagTree, facetsError, toggleTag, changeMode, clear } =
-    useTagFilter();
+  const {
+    panelOpen,
+    selected,
+    mode,
+    totalCount,
+    tagTree,
+    facetsError,
+    toggleTag,
+    changeMode,
+    clear,
+  } = useTagFilter();
 
   return (
     <>
