@@ -487,9 +487,18 @@ mod tests {
         assert_eq!(TagFilterMode::from_str_or_default("or"), TagFilterMode::Or);
         assert_eq!(TagFilterMode::from_str_or_default("OR"), TagFilterMode::Or);
         assert_eq!(TagFilterMode::from_str_or_default("Or"), TagFilterMode::Or);
-        assert_eq!(TagFilterMode::from_str_or_default("and"), TagFilterMode::And);
-        assert_eq!(TagFilterMode::from_str_or_default("AND"), TagFilterMode::And);
-        assert_eq!(TagFilterMode::from_str_or_default("invalid"), TagFilterMode::And);
+        assert_eq!(
+            TagFilterMode::from_str_or_default("and"),
+            TagFilterMode::And
+        );
+        assert_eq!(
+            TagFilterMode::from_str_or_default("AND"),
+            TagFilterMode::And
+        );
+        assert_eq!(
+            TagFilterMode::from_str_or_default("invalid"),
+            TagFilterMode::And
+        );
         assert_eq!(TagFilterMode::from_str_or_default(""), TagFilterMode::And);
     }
 

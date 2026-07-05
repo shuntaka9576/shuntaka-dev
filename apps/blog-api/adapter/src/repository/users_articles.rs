@@ -45,8 +45,7 @@ impl TryFrom<ArticleSummaryBaseRow> for ArticleSummary {
             .map_err(|e| anyhow::anyhow!("Invalid article_id UUID: {e}"))?;
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
-        let status =
-            Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
+        let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
         let article_type = row
             .article_type
             .map(ArticleType::new)
@@ -114,8 +113,7 @@ impl TryFrom<ArticleRow> for Article {
             .map_err(|e| anyhow::anyhow!("Invalid article_id UUID: {e}"))?;
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
-        let status =
-            Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
+        let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
         let article_type = row
             .article_type
             .map(ArticleType::new)
@@ -184,7 +182,11 @@ async fn fetch_article_tags(
     if article_ids.is_empty() {
         return Ok(HashMap::new());
     }
-    let placeholders = article_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let placeholders = article_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
     let sql = format!(
         r#"WITH RECURSIVE tag_paths AS (
     SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
@@ -221,7 +223,10 @@ GROUP BY at2.article_id"#
 ///   AND: バインド順 → CTE 用 [tag_ids...], user_name, type, EXISTS 用 [tag_ids...]
 ///   OR:  バインド順 → CTE 用 [tag_ids...], user_name, type
 fn build_list_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String, String) {
-    let cte_in = (0..tag_ids.len()).map(|_| "?").collect::<Vec<_>>().join(", ");
+    let cte_in = (0..tag_ids.len())
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
     let cte = match mode {
         TagFilterMode::And => format!(
             "WITH RECURSIVE tag_descendants AS (\n    \
@@ -262,7 +267,10 @@ fn build_list_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String,
 /// ファセット集計クエリ用の tag_descendants CTE 本体と WHERE 条件句を構築する。
 /// ファセットクエリでは、一覧クエリと別エイリアス (ft0, ft1..., fts) を使う。
 fn build_facets_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String, String) {
-    let cte_in = (0..tag_ids.len()).map(|_| "?").collect::<Vec<_>>().join(", ");
+    let cte_in = (0..tag_ids.len())
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
     let cte_body = match mode {
         TagFilterMode::And => format!(
             "tag_descendants AS (\n    \
@@ -433,8 +441,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         // カウントクエリ Future を構築する
         // バインド順: [cte_tag_ids...], user_name, type, [exists_tag_ids... (AND のみ)]
         let count_future = {
-            let mut q =
-                sqlx::query_as::<_, (i64,)>(sqlx::AssertSqlSafe(count_sql.as_str()));
+            let mut q = sqlx::query_as::<_, (i64,)>(sqlx::AssertSqlSafe(count_sql.as_str()));
             if let Some(ids) = &resolved_ids {
                 for id in ids {
                     q = q.bind(id.as_str());
@@ -598,6 +605,9 @@ ORDER BY tac.article_count DESC, tp.path ASC"#
                 let (cte_body, filter_conds) = build_facets_filter_parts(ids, mode);
                 // tag_descendants CTE を tag_ancestors の直後に追加する。
                 // MAX_EXECUTION_TIME(8000) ヒントを付けて 8 秒でタイムアウトさせる。
+                // 集計は anc_tag_id で行い、tag_paths の JOIN は集計後の高々タグ数行に対して行う。
+                // 集計前に JOIN してパス文字列で GROUP BY すると、クラスタ実測で 5 倍以上遅い
+                // （50万記事・ホット親タグ選択で 8.2s → 1.5s）。
                 format!(
                     r#"WITH RECURSIVE
 tag_paths AS (
@@ -613,25 +623,27 @@ tag_ancestors AS (
     JOIN tags t ON t.tag_id = ta.anc_tag_id WHERE t.parent_tag_id IS NOT NULL
 ),
 {cte_body}
-SELECT /*+ MAX_EXECUTION_TIME(8000) */ tp.path, COUNT(DISTINCT ats.article_id) AS cnt
-FROM articles a
-JOIN articles_tags ats ON ats.article_id = a.article_id
-JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
-JOIN tag_paths tp ON tp.tag_id = ta.anc_tag_id
-WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
-  AND a.status = 'published'
-  AND a.`type` = ?
-{filter_conds}
-GROUP BY tp.tag_id, tp.path
-HAVING cnt > 0
-ORDER BY cnt DESC, tp.path ASC"#
+SELECT /*+ MAX_EXECUTION_TIME(8000) */ tp.path, agg.cnt
+FROM (
+    SELECT ta.anc_tag_id, COUNT(DISTINCT ats.article_id) AS cnt
+    FROM articles a
+    JOIN articles_tags ats ON ats.article_id = a.article_id
+    JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
+    WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
+      AND a.status = 'published'
+      AND a.`type` = ?
+    {filter_conds}
+    GROUP BY ta.anc_tag_id
+    HAVING cnt > 0
+) agg
+JOIN tag_paths tp ON tp.tag_id = agg.anc_tag_id
+ORDER BY agg.cnt DESC, tp.path ASC"#
                 )
             }
         };
 
         // バインド順: [cte_tag_ids...], user_name, type, [exists_tag_ids... (AND のみ)]
-        let mut q =
-            sqlx::query_as::<_, (String, i64)>(sqlx::AssertSqlSafe(facets_sql.as_str()));
+        let mut q = sqlx::query_as::<_, (String, i64)>(sqlx::AssertSqlSafe(facets_sql.as_str()));
         if let Some(ids) = &resolved_ids {
             for id in ids {
                 q = q.bind(id.as_str());
@@ -697,9 +709,15 @@ mod tests {
     fn build_list_filter_parts_and_one_tag() {
         let ids = vec!["id1".to_string()];
         let (cte, conds) = build_list_filter_parts(&ids, &TagFilterMode::And);
-        assert!(cte.contains("root_tag_id"), "AND CTE should contain root_tag_id");
+        assert!(
+            cte.contains("root_tag_id"),
+            "AND CTE should contain root_tag_id"
+        );
         assert!(cte.contains("IN (?)"), "CTE should have one placeholder");
-        assert!(conds.contains("td.root_tag_id = ?"), "AND condition must bind root_tag_id");
+        assert!(
+            conds.contains("td.root_tag_id = ?"),
+            "AND condition must bind root_tag_id"
+        );
         assert!(conds.contains("at0"), "alias at0 expected");
     }
 
@@ -707,7 +725,10 @@ mod tests {
     fn build_list_filter_parts_and_two_tags() {
         let ids = vec!["id1".to_string(), "id2".to_string()];
         let (cte, conds) = build_list_filter_parts(&ids, &TagFilterMode::And);
-        assert!(cte.contains("IN (?, ?)"), "CTE should have two placeholders");
+        assert!(
+            cte.contains("IN (?, ?)"),
+            "CTE should have two placeholders"
+        );
         assert!(conds.contains("at0"), "alias at0 expected");
         assert!(conds.contains("at1"), "alias at1 expected");
         // two separate EXISTS conditions
@@ -718,8 +739,14 @@ mod tests {
     fn build_list_filter_parts_or_mode() {
         let ids = vec!["id1".to_string(), "id2".to_string()];
         let (cte, conds) = build_list_filter_parts(&ids, &TagFilterMode::Or);
-        assert!(!cte.contains("root_tag_id"), "OR CTE should not contain root_tag_id");
-        assert!(cte.contains("IN (?, ?)"), "CTE should have two placeholders");
+        assert!(
+            !cte.contains("root_tag_id"),
+            "OR CTE should not contain root_tag_id"
+        );
+        assert!(
+            cte.contains("IN (?, ?)"),
+            "CTE should have two placeholders"
+        );
         // single EXISTS condition for OR
         assert_eq!(conds.matches("EXISTS").count(), 1);
         assert!(conds.contains("ats"), "OR uses alias 'ats'");

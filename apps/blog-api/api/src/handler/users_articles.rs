@@ -390,8 +390,7 @@ mod tests {
 
     #[test]
     fn parse_tag_filter_multiple_tags_or_mode() {
-        let f =
-            parse_tag_filter(Some("tech/rust,tech/aws/lambda"), Some("or")).unwrap();
+        let f = parse_tag_filter(Some("tech/rust,tech/aws/lambda"), Some("or")).unwrap();
         assert_eq!(f.paths, vec!["tech/rust", "tech/aws/lambda"]);
         assert_eq!(f.mode, TagFilterMode::Or);
     }
