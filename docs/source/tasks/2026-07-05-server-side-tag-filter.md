@@ -125,7 +125,7 @@ GROUP BY anc.anc_tag_id
 - [x] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
 - [x] Phase E: tag_article_counts 集計テーブルを実装（フィルタなしファセットを前計算化）+ クラスタ 50万件で再計測（前計算 17.7ms で要否判定「必要」が確定。選択後 facets のクエリ形も実測起点で修正）
 - [x] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
-- [ ] Phase G: dev（blog_dev）E2E → 本番反映
+- [ ] Phase G: dev（blog_dev）E2E → 本番反映（DB 適用手順は下記「Phase G: DB 適用手順」参照）
 
 ## Phase B: ローカルベースライン計測結果（2026-07-05）
 
@@ -297,6 +297,53 @@ TIDB_DATABASE=blog_test NEXT_PUBLIC_USER_NAME=testuser-cvtb-0 bun run dev
 4. 絞り込み結果のページネーション（`?tags=..&page=2`）の直リンク・リロード動作
 5. デフォルト表示（絞り込みなし）の静的生成・ISR が現行構造（loading.tsx なしの単一形 HTML）を維持していること
 6. 連打時に古いレスポンスで UI が巻き戻らないこと（AbortController / リクエスト順序制御）
+
+## Phase G: DB 適用手順（blog_dev → blog_prd）
+
+`tag_article_counts` は blog_dev / blog_prd に未適用（適用済みなのは検証用 blog_test のみ）。Phase G は **DDL → バックフィル → blog-api デプロイ** の順を厳守する。新 facets API の tags なし分岐はテーブル前提のため、テーブルなしで新コードを先に出すと 500 になる。逆に DB 側の先行は旧コードがテーブルを参照しないため無害。
+
+### 1. blog_dev への適用
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
+
+# DDL（${SCHEMA} を置換して適用。CREATE TABLE IF NOT EXISTS のため再実行可）
+sed 's/${SCHEMA}/blog_dev/g' tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql \
+  | mysql -h tidb.$TAILNET -P 4000 -u root
+
+# バックフィル（冪等: 全削除 + 再計算 INSERT。50万件クラスタ実測 4.0s、実データ規模なら一瞬）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
+  < tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql
+
+# 妥当性確認（type ごとのタグ行数と記事数合計を目視）
+mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
+  -e "SELECT \`type\`, COUNT(*) AS tag_rows, SUM(article_count) AS total FROM tag_article_counts GROUP BY \`type\`"
+```
+
+### 2. dev デプロイと E2E
+
+1. PR #551 を preview にマージ → GitHub Actions `deploy.yaml` が dev へ自動デプロイ
+2. デプロイ完了後にバックフィルをもう一度実行（デプロイまでの間に webhook 更新が入った場合の取りこぼし対策。冪等なので常に安全）
+3. E2E は「検証項目（Phase E / F）」の 3〜6 に加えて、**webhook upsert → tag_article_counts 同期更新**を必ず確認する。同期コード（`sync_tag_article_counts`）は実装・計装済みだが実 DB では未検証（これまでの投入は backfill 経由のみ）。記事を1本更新し、tags なし facets の件数が追随することを見る
+
+### 3. blog_prd への適用と本番反映
+
+1. 手順 1. を `blog_dev` → `blog_prd` に置換して実行（main マージ前に実施）
+2. preview → main のマージ（Git Rules どおり人間が実施）→ prd 自動デプロイ
+3. デプロイ後にバックフィル再実行 + 本番スモーク（一覧 / タグ絞り込み1回 / facets / 記事詳細）
+
+### 4. DB スキーマドキュメントの再生成
+
+blog_dev への適用後、tbls で `docs/source/db/` を再生成する（`.tbls.yaml` に tag_article_counts の仮想リレーション追加済み）。
+
+```bash
+cd docs && TBLS_DSN="mysql://root@tidb.$TAILNET:4000/blog_dev" tbls doc -c .tbls.yaml --rm-dist
+```
+
+### 再構築・リストア時の注意
+
+- `bun run load` / `dsl-tidb/load.sh` は `dsl-tidb/schema/*.sql` を glob で適用するため、テーブル自体は再構築時に自動作成される
+- ただし**中身は復元経路に依存する**（TSV / ダンプに tag_article_counts が含まれなければ空のまま）。リストア後はバックフィルを1回流すのを標準手順とする（冪等なので条件判断不要で常に流してよい）
 
 ## 論点・保留
 
