@@ -197,14 +197,15 @@ annotation キーはドットがアンダースコアに変換される。
 
 `app.route` に入る値（axum の MatchedPath そのまま。health のルートは末尾スラッシュ付き `/health/` になる点に注意）:
 
-| `app.route`                     | メソッド | 内容                                                                     |
-| ------------------------------- | -------- | ------------------------------------------------------------------------ |
-| `/users/{name}/articles`        | GET      | 記事一覧                                                                 |
-| `/users/{name}/articles/{slug}` | GET      | 記事詳細                                                                 |
-| `/health/`                      | GET      | ヘルスチェック                                                           |
-| `/health/db`                    | GET      | DB ヘルスチェック（5 分毎の SELECT 1 プローブが叩く）                    |
-| `/webhooks/github`              | POST     | GitHub Webhook（記事同期）                                               |
-| `/swagger` ほか                 | GET      | Swagger UI（`/swagger/` / `/swagger/{*rest}` / `/swagger/openapi.json`） |
+| `app.route`                         | メソッド | 内容                                                                                             |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `/users/{name}/articles`            | GET      | 記事一覧（`tags` 指定時はタグ絞り込み。一覧 + COUNT + ページ内タグ取得の複数クエリ span が出る） |
+| `/users/{name}/articles/tag-facets` | GET      | タグファセット集計（絞り込みパネル用。tags なしは `tag_article_counts` 前計算読み）              |
+| `/users/{name}/articles/{slug}`     | GET      | 記事詳細                                                                                         |
+| `/health/`                          | GET      | ヘルスチェック                                                                                   |
+| `/health/db`                        | GET      | DB ヘルスチェック（5 分毎の SELECT 1 プローブが叩く）                                            |
+| `/webhooks/github`                  | POST     | GitHub Webhook（記事同期。`tag_article_counts` の同期再計算 subsegment を含む）                  |
+| `/swagger` ほか                     | GET      | Swagger UI（`/swagger/` / `/swagger/{*rest}` / `/swagger/openapi.json`）                         |
 
 クエリサンプル:
 
