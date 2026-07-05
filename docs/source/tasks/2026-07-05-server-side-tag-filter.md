@@ -119,13 +119,36 @@ GROUP BY anc.anc_tag_id
 
 ## 実装フェーズ
 
-- [ ] Phase A: tidb-seeder 拡張（`parent_tag_id` 付き階層タグの生成。2〜3階層・数百タグ・Zipf 分布で記事に付与）
-- [ ] Phase B: blog_test に 50万記事 + 150万 articles_tags を投入し、現行一覧クエリのベースライン計測（EXPLAIN + 実測）
+- [x] Phase A: tidb-seeder 拡張（`parent_tag_id` 付き階層タグの生成。2〜3階層・数百タグ・Zipf 分布で記事に付与。tags TSV は3列化し load テンプレートも更新）
+- [x] Phase B: blog_test に 50万記事 + 150万 articles_tags を投入し、現行一覧クエリのベースライン計測（指示によりローカル Docker TiDB で実施。結果は下記）
 - [ ] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
 - [ ] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
 - [ ] Phase E: 50万件での性能検証（p95 目標達成を確認。未達ならインデックス / 集計テーブルを追加検討）
 - [ ] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
 - [ ] Phase G: dev（blog_dev）E2E → 本番反映
+
+## Phase B: ローカルベースライン計測結果（2026-07-05）
+
+環境: Docker `pingcap/tidb:v8.1.0` 単体（unistore、Docker VM 4GB）、articles 50万（published+tech 約27万）/ articles_tags 150万 / tags 300（leaf 210）。計測は `tools/tidb-seeder/bench/tag-filter-bench.ts`（warmup 1 + 5回、avg)。**unistore は hint 付きでも IndexRangeScan 自体に約 440ms かかる floor があり絶対値は参考値**。プラン形状（IndexRangeScan + Limit pushdown、テーブル参照はページ分のみ）は EXPLAIN ANALYZE で正しいことを確認済みで、実クラスタ（TiKV、point-select p95 4.3ms）では大幅に速くなる見込み。Phase E でクラスタ再計測する。
+
+| クエリ                                                      | avg               | 備考                                                  |
+| ----------------------------------------------------------- | ----------------- | ----------------------------------------------------- |
+| 現行本番形 一覧 page1（相関 GROUP_CONCAT）                  | **8,837ms**       | 50万件で破綻。deep offset は OOM でサーバーごと落ちる |
+| 提案形 一覧 page1（タグ列なし）                             | 262ms             | unistore floor 込み。プランは正                       |
+| 提案形 deep offset（page 1000）                             | 1,887ms           | OFFSET スキャンコスト。深いページは実用外（後述）     |
+| 提案形 ページ内10記事のタグ取得（2クエリ目）                | **4.7ms**         | 2クエリ方式は成立                                     |
+| COUNT（絞り込みなし）                                       | 237ms             | covering index                                        |
+| 絞り込み一覧 page1（hot 単一 / rare 単一 / 親タグ子孫展開） | 855 / 381 / 506ms |                                                       |
+| 絞り込み COUNT（各条件ほぼ共通）                            | 約 2,600ms        | EXISTS を全域に適用。要対策                           |
+| ファセット集計（選択なし / 選択あり）                       | **21〜24秒**      | 完全に目標外。前計算必須                              |
+
+### 計測から得た設計への反映
+
+1. **一覧のタグ列は2クエリ方式に変更（決定）**: 現行の相関 GROUP_CONCAT + 再帰 CTE を一覧クエリに残したままでは 50万件で page1 が約9秒・deep offset で OOM。ページ確定後の記事 ID（≤ perPage 件）に対して別クエリでタグを取得する（4.7ms）。これは絞り込みの有無に関わらず必要な変更
+2. **ファセットは `tag_article_counts` 集計テーブルの前計算を第一候補に格上げ**: 素朴な祖先ロールアップ集計は 21 秒超で、unistore の floor を差し引いてもクラスタで目標（200ms）に収まる見込みが薄い。webhook upsert 時の同期更新で前計算する。選択後ファセットは絞り込み後集合が小さければオンザフライで足りる可能性があり Phase E で再判定
+3. **絞り込み COUNT が重い（約2.6秒）**: EXISTS の全域適用が原因。tag 起点（articles_tags から article_id 集合を作って COUNT）のプラン誘導、または totalCount の遅延取得（一覧と分離してキャッシュ）を Phase C で検討
+4. **deep offset は制限する**: OFFSET が深いほど線形にコスト増。UI 上もページ上限（例: 100ページ）または published_at カーソル方式への移行を検討
+5. 計測上の注記: mid タグが misc root 配下だったため AND（tech × misc）は 0 件マッチの計測になっている。クラスタ再計測時は同一 root 内の組み合わせに揃える
 
 ## 検証項目（Phase E / F）
 
