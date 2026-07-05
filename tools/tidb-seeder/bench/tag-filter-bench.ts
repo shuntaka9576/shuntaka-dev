@@ -77,7 +77,7 @@ async function main(): Promise<void> {
   console.log(`# tag-filter-bench`);
   console.log(`# user=${userName}`);
   console.log(
-    `# hot=${hot.name} (${hot.cnt}) mid=${mid.name} (${mid.cnt}) rare=${rare.name} (${rare.cnt})`,
+    `# hot=${String(hot.name)} (${String(hot.cnt)}) mid=${String(mid.name)} (${String(mid.cnt)}) rare=${String(rare.name)} (${String(rare.cnt)})`,
   );
   console.log(
     `# parent(with children)=${String(parentRow.name)} (children: ${String(parentRow.child_count)})`,
