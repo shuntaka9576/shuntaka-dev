@@ -218,6 +218,16 @@ mysql -h 127.0.0.1 -P 4100 -u root -D blog_test \
   < tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql
 ```
 
+### ローカル検証結果（2026-07-05, Docker TiDB unistore, 50万記事・150万 articles_tags）
+
+| エンドポイント | 計測値 | 備考 |
+| --- | --- | --- |
+| `GET /tag-facets?type=tech`（選択なし） | **19ms** | 旧実装（祖先ロールアップ全件集計）は 40 秒超。300 タグ行の読み取りのみで完結 |
+| `GET /articles?type=tech&page=1&perPage=10` | 769ms | 初回呼び出し。通常は低レイテンシ |
+| `GET /tag-facets?type=tech&tags=tech%2F…`（選択あり） | タイムアウト | unistore は `MAX_EXECUTION_TIME` を無視するため 8 秒で切れない。実クラスタ（TiKV）では絞り込み後集合が小さいため高速化見込み |
+| `http://localhost:3000/` SSR | 正常（記事リンク返却） | `testuser-cvtb-0/articles/…` リンク複数確認済み |
+| backfill 所要時間 | **35 秒** | 500,000 記事・150万 articles_tags → 300 行挿入 |
+
 ## 検証項目（Phase E / F）
 
 1. 50万記事投入時、絞り込み一覧 API が p95 50ms 以下（DB 内。Tailscale RTT を除く）
@@ -230,7 +240,7 @@ mysql -h 127.0.0.1 -P 4100 -u root -D blog_test \
 ## 論点・保留
 
 - **`name` グローバル一意前提**: leaf 名でのタグ解決はこの制約に依存する。将来「別親配下の同名タグ」を許可する場合はフルパス解決（祖先 JOIN での検証）に切り替える
-- **ファセットの重い集計**: tags なし全体集計が最重量。ISR 埋め込みでブラウザからの呼び出し頻度は抑えられるが、それでも遅い場合は `tag_article_counts` 集計テーブル（webhook upsert 時に同期更新）を導入する
+- ~~**ファセットの重い集計**~~: **解決済み（2026-07-05）**。`tag_article_counts` 集計テーブル前計算を導入。tags なし全体ファセットは 40 秒超 → **19ms** に短縮。webhook upsert 内の同一トランザクションで同期更新するため整合性も担保されている。
 - **TiFlash**: 現段階では導入しない。絞り込み一覧はインデックス駆動の OLTP 型で TiKV で十分。唯一 OLAP 的な tags なし全体ファセット集計（150万行の GROUP BY + COUNT DISTINCT）も、低頻度（ISR 埋め込み）であり、目標未達時は集計テーブルの前計算（webhook 単一ライターのため upsert 内同期更新で整合性が自明）の方が安くて確実。MiniPC 3ノードに TiFlash レプリカを同居させるとメモリ・ディスク負担とリソース競合（2026-06-27 ベンチで観測）を悪化させるリスクの方が大きい。集計テーブルで賄えない ad-hoc な分析クエリが増えた時点で再検討する
 - **CDN**: API 前段に CloudFront を置けば組み合わせクエリもエッジキャッシュできるが、コストと構成変更が大きいため本タスクのスコープ外。必要になったら別起票
 - **検索（全文）との統合**: タグ絞り込みとキーワード検索の複合は将来課題。API のクエリパラメータ設計（`tags` + `q` が共存できる形）だけ意識しておく
