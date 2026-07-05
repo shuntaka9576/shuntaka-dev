@@ -8,7 +8,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-comrak = { version = "0.52.0", default-features = false, features = ["syntect"] }
+comrak = { version = "0.53.0", default-features = false, features = ["syntect"] }
 regex = "1.12.4"
 scraper = "0.27.0"
 url = "2.5.8"
@@ -23,5 +23,5 @@ syntect = "5.3.0"
 # HTTP フェッチは JS 側で事前に行い、MapResourceFetcher で注入する
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 syntect = { version = "5.3.0", default-features = false, features = ["default-fancy"] }
-wasm-bindgen = "0.2"
-serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2.126"
+serde-wasm-bindgen = "0.6.5"
