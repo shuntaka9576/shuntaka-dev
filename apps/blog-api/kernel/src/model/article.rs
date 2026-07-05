@@ -263,6 +263,42 @@ impl Status {
 // タグはフルパス表記の文字列で扱う（例: "rust", "aws/lambda", "aws/lambda/snapstart"）。
 // DB 上は tags.parent_tag_id の隣接リスト（最大3階層）で、記事との関連は leaf タグのみに張る。
 
+/// タグ絞り込みのモード: AND（全て一致）または OR（いずれか一致）
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TagFilterMode {
+    And,
+    Or,
+}
+
+impl TagFilterMode {
+    /// 文字列から変換する。"or" 以外はデフォルトの And にフォールバックする。
+    pub fn from_str_or_default(s: &str) -> Self {
+        if s.eq_ignore_ascii_case("or") {
+            Self::Or
+        } else {
+            Self::And
+        }
+    }
+}
+
+/// タグ絞り込み条件（フルパス表記のタグリスト + モード）
+#[derive(Debug, Clone)]
+pub struct TagFilter {
+    /// フルパス表記のタグパスリスト（例: "tech/aws/lambda"）
+    pub paths: Vec<String>,
+    pub mode: TagFilterMode,
+}
+
+impl TagFilter {
+    pub fn new(paths: Vec<String>, mode: TagFilterMode) -> Self {
+        Self { paths, mode }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.paths.is_empty()
+    }
+}
+
 /// タグ名を正規化する: trim + 英字小文字化 + 空要素除去 + sort/dedup
 pub fn normalize_tags(tags: &[String]) -> Vec<String> {
     let mut normalized: Vec<String> = tags
@@ -444,5 +480,25 @@ mod tests {
     fn test_parse_tag_path_empty() {
         assert!(parse_tag_path("").is_err());
         assert!(parse_tag_path(" / ").is_err());
+    }
+
+    #[test]
+    fn test_tag_filter_mode_from_str_or_default() {
+        assert_eq!(TagFilterMode::from_str_or_default("or"), TagFilterMode::Or);
+        assert_eq!(TagFilterMode::from_str_or_default("OR"), TagFilterMode::Or);
+        assert_eq!(TagFilterMode::from_str_or_default("Or"), TagFilterMode::Or);
+        assert_eq!(TagFilterMode::from_str_or_default("and"), TagFilterMode::And);
+        assert_eq!(TagFilterMode::from_str_or_default("AND"), TagFilterMode::And);
+        assert_eq!(TagFilterMode::from_str_or_default("invalid"), TagFilterMode::And);
+        assert_eq!(TagFilterMode::from_str_or_default(""), TagFilterMode::And);
+    }
+
+    #[test]
+    fn test_tag_filter_is_empty() {
+        let empty = TagFilter::new(vec![], TagFilterMode::And);
+        assert!(empty.is_empty());
+
+        let non_empty = TagFilter::new(vec!["tech/rust".to_string()], TagFilterMode::And);
+        assert!(!non_empty.is_empty());
     }
 }

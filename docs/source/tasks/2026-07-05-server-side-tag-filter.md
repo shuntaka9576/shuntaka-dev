@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-05
 - 関連: [記事一覧へのタグ絞り込みUIの追加](2026-07-05-article-tag-filter-ui.md) / [記事タグ機能の追加](2026-07-05-article-tags.md) / [TiDB 性能ベンチ](2026-06-27-perf-bench.md)
-- ステータス: 未着手
+- ステータス: Phase C/D 完了（Phase E 以降は未着手）
 
 ## 起票理由
 
@@ -121,8 +121,8 @@ GROUP BY anc.anc_tag_id
 
 - [x] Phase A: tidb-seeder 拡張（`parent_tag_id` 付き階層タグの生成。2〜3階層・数百タグ・Zipf 分布で記事に付与。tags TSV は3列化し load テンプレートも更新）
 - [x] Phase B: blog_test に 50万記事 + 150万 articles_tags を投入し、現行一覧クエリのベースライン計測（指示によりローカル Docker TiDB で実施。結果は下記）
-- [ ] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
-- [ ] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
+- [x] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
+- [x] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
 - [ ] Phase E: 50万件での性能検証（p95 目標達成を確認。未達ならインデックス / 集計テーブルを追加検討）
 - [ ] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
 - [ ] Phase G: dev（blog_dev）E2E → 本番反映
@@ -149,6 +149,41 @@ GROUP BY anc.anc_tag_id
 3. **絞り込み COUNT が重い（約2.6秒）**: EXISTS の全域適用が原因。tag 起点（articles_tags から article_id 集合を作って COUNT）のプラン誘導、または totalCount の遅延取得（一覧と分離してキャッシュ）を Phase C で検討
 4. **deep offset は制限する**: OFFSET が深いほど線形にコスト増。UI 上もページ上限（例: 100ページ）または published_at カーソル方式への移行を検討
 5. 計測上の注記: mid タグが misc root 配下だったため AND（tech × misc）は 0 件マッチの計測になっている。クラスタ再計測時は同一 root 内の組み合わせに揃える
+
+## Phase C/D: 実装メモ（2026-07-05）
+
+### 実装概要
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `kernel/src/model/article.rs` | `TagFilterMode` (And/Or) + `TagFilter { paths, mode }` を追加 |
+| `kernel/src/repository/users_articles.rs` | `TagFacet`, `TagFacetsResult` 構造体を追加。trait に `tag_filter: Option<&TagFilter>` パラメータと `find_tag_facets` メソッドを追加 |
+| `adapter/src/repository/users_articles.rs` | 2クエリ方式に全面移行（`ArticleSummaryBaseRow` でタグなし一覧取得 → `fetch_article_tags` で別クエリ）。タグフィルタの動的 SQL 構築（`build_list_filter_parts` / `build_facets_filter_parts`）。`find_tag_facets` 実装。`sqlx::AssertSqlSafe` で動的 SQL を安全にラップ |
+| `api/src/handler/users_articles.rs` | `UsersArticlesQuery` に `tags` / `mode` 追加。`parse_tag_filter` ヘルパー追加。`get_users_articles_tag_facets` ハンドラ追加（`TagFacetsResponse` / `TagFacetEntry`） |
+| `api/src/route/users_articles.rs` | `/articles/tag-facets` ルートを静的セグメント優先で登録 |
+| `api/src/lib.rs` | OpenAPI パス・スキーマに tag-facets エンドポイントを登録 |
+| `cspell.json` | `conds`, `matchit` を words に追加 |
+
+### 設計の選択ポイント
+
+- **タグ解決**: `name` グローバル一意制約を前提に、フルパスの leaf 名（最終セグメント）を `tags.name` で直接 lookup する。階層全体の検証は行わない（古いパスを 400 ではなく 0 件で許容するため）
+- **AND mode 短絡**: 1つでも未知のタグがあれば DB クエリを発行せず即座に空ページを返す（0.02 秒未満）
+- **OR mode 部分無視**: 未知のタグは除外し、既知のタグのみで絞り込む。全タグ未知の場合のみ空ページを返す
+- **sqlx 0.9 の `AssertSqlSafe`**: 動的 SQL 文字列は全て `sqlx::AssertSqlSafe(s.as_str())` でラップ。動的部分はプレースホルダ数（`?` の個数）のみで、ユーザー入力は全てバインドパラメータで渡す
+
+### ローカル E2E 計測結果（unistore, 50万記事）
+
+| エンドポイント | 操作 | レイテンシ | 備考 |
+| --- | --- | --- | --- |
+| 一覧 API（フィルタなし、page=1） | 2クエリ方式 | 約 780ms | unistore floor 込み |
+| 一覧 API（単一タグ AND、page=1） | タグ解決 + EXISTS | 約 7.4s | COUNT が重い（Phase B の計測と一致） |
+| 一覧 API（2タグ OR、page=1） | タグ解決 + EXISTS | 約 7.3s | |
+| 一覧 API（未知タグ AND）| 短絡返却 | 約 20ms | DB クエリなし |
+| 一覧 API（全未知タグ OR）| 短絡返却 | 約 17ms | DB クエリなし |
+| tag-facets（フィルタなし） | 祖先ロールアップ全域集計 | 約 44s | Phase B 計測（21〜24s）と同水準。Phase E でクラスタ再計測要 |
+| tag-facets（単一タグ AND フィルタ） | 絞り込み後ロールアップ | 約 37s | 対象が 1211 件でも重い（unistore の floor） |
+
+`tag_article_counts` 集計テーブルの前計算（Phase B で格上げした候補）は Phase E でのクラスタ計測後に判断する。
 
 ## 検証項目（Phase E / F）
 

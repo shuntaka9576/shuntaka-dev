@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderName, HeaderValue, header},
 };
 use infrastructure::cloudinary::client::{CloudinaryClient, CloudinaryClientImpl};
-use kernel::model::article::ArticleType;
+use kernel::model::article::{ArticleType, TagFilter, TagFilterMode};
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
@@ -23,11 +23,32 @@ const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesQuery {
+    /// Article type to filter by (e.g. "tech" or "note")
     #[serde(rename = "type")]
     pub article_type: String,
+    /// Page number (1-based, default 1)
     pub page: Option<u32>,
+    /// Number of articles per page. Use "all" for maximum (capped at 500).
     #[serde(rename = "perPage")]
     pub per_page: Option<String>,
+    /// Comma-separated full-path tags for filtering (e.g. "tech/rust,tech/aws/lambda").
+    /// Omit to return all articles.
+    pub tags: Option<String>,
+    /// Tag filter mode: "and" (default, all tags must match) or "or" (any tag matches).
+    /// Ignored when `tags` is omitted or contains a single tag.
+    pub mode: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct UsersArticlesTagFacetsQuery {
+    /// Article type to aggregate facets for (e.g. "tech" or "note")
+    #[serde(rename = "type")]
+    pub article_type: String,
+    /// Comma-separated full-path tags to pre-filter the article set before aggregation.
+    /// Omit to aggregate over all published articles of the given type.
+    pub tags: Option<String>,
+    /// Tag filter mode for the pre-filter: "and" (default) or "or".
+    pub mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +108,64 @@ pub struct UsersArticlesResponse {
     pub total_pages: u32,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TagFacetEntry {
+    /// Full-path tag (e.g. "tech/aws" or "tech/aws/lambda")
+    pub path: String,
+    /// Number of published articles that match this tag (including descendant tags)
+    pub count: u64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TagFacetsResponse {
+    /// Tag facets sorted by count descending, then path ascending. Count-zero tags are omitted.
+    pub facets: Vec<TagFacetEntry>,
+}
+
+// ─────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────
+
+/// `tags` クエリパラメータ（カンマ区切りのフルパス）と `mode` から TagFilter を生成する。
+/// `tags` が省略または空の場合は None を返す。
+fn parse_tag_filter(tags: Option<&str>, mode: Option<&str>) -> Option<TagFilter> {
+    let tags_str = tags?;
+    let paths: Vec<String> = tags_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if paths.is_empty() {
+        return None;
+    }
+    let filter_mode = TagFilterMode::from_str_or_default(mode.unwrap_or("and"));
+    Some(TagFilter::new(paths, filter_mode))
+}
+
+fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
+    let Some(value) = raw else {
+        return Ok(DEFAULT_PER_PAGE);
+    };
+    if value.eq_ignore_ascii_case("all") {
+        return Ok(MAX_PER_PAGE);
+    }
+    let parsed: u32 = value
+        .parse()
+        .map_err(|_| AppError::bad_request("Invalid perPage value"))?;
+    if parsed == 0 {
+        return Err(AppError::bad_request("perPage must be >= 1"));
+    }
+    if parsed > MAX_PER_PAGE {
+        return Err(AppError::bad_request("perPage exceeds maximum"));
+    }
+    Ok(parsed)
+}
+
+// ─────────────────────────────────────────
+// Handlers
+// ─────────────────────────────────────────
+
 #[utoipa::path(
     get,
     path = "/users/{name}/articles",
@@ -96,7 +175,7 @@ pub struct UsersArticlesResponse {
     ),
     responses(
         (status = 200, description = "Article list retrieved successfully", body = UsersArticlesResponse),
-        (status = 400, description = "Invalid article type"),
+        (status = 400, description = "Invalid article type or perPage"),
         (status = 500, description = "Internal server error")
     ),
     tag = "users_articles"
@@ -111,13 +190,20 @@ pub async fn get_users_articles(
 
     let page = query.page.unwrap_or(1).max(1);
     let per_page = parse_per_page(query.per_page.as_deref())?;
-
     let offset = (u64::from(page) - 1) * u64::from(per_page);
     let limit = u64::from(per_page);
 
+    let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
+
     let result = registry
         .users_articles_repository()
-        .find_published_by_user_name_and_type(&name, &article_type, offset, limit)
+        .find_published_by_user_name_and_type(
+            &name,
+            &article_type,
+            tag_filter.as_ref(),
+            offset,
+            limit,
+        )
         .await
         .map_err(|e| AppError::internal("Failed to find articles", e))?;
 
@@ -167,23 +253,48 @@ pub async fn get_users_articles(
     Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
 }
 
-fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
-    let Some(value) = raw else {
-        return Ok(DEFAULT_PER_PAGE);
+#[utoipa::path(
+    get,
+    path = "/users/{name}/articles/tag-facets",
+    params(
+        ("name" = String, Path, description = "User name"),
+        UsersArticlesTagFacetsQuery,
+    ),
+    responses(
+        (status = 200, description = "Tag facets retrieved successfully", body = TagFacetsResponse),
+        (status = 400, description = "Invalid article type"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users_articles"
+)]
+pub async fn get_users_articles_tag_facets(
+    State(registry): State<AppRegistry>,
+    Path(name): Path<String>,
+    Query(query): Query<UsersArticlesTagFacetsQuery>,
+) -> Result<([(HeaderName, HeaderValue); 1], Json<TagFacetsResponse>), AppError> {
+    let article_type = ArticleType::new(query.article_type)
+        .map_err(|_| AppError::bad_request("Invalid article type"))?;
+
+    let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
+
+    let result = registry
+        .users_articles_repository()
+        .find_tag_facets(&name, &article_type, tag_filter.as_ref())
+        .await
+        .map_err(|e| AppError::internal("Failed to find tag facets", e))?;
+
+    let response = TagFacetsResponse {
+        facets: result
+            .facets
+            .into_iter()
+            .map(|f| TagFacetEntry {
+                path: f.path,
+                count: f.count,
+            })
+            .collect(),
     };
-    if value.eq_ignore_ascii_case("all") {
-        return Ok(MAX_PER_PAGE);
-    }
-    let parsed: u32 = value
-        .parse()
-        .map_err(|_| AppError::bad_request("Invalid perPage value"))?;
-    if parsed == 0 {
-        return Err(AppError::bad_request("perPage must be >= 1"));
-    }
-    if parsed > MAX_PER_PAGE {
-        return Err(AppError::bad_request("perPage exceeds maximum"));
-    }
-    Ok(parsed)
+
+    Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
 }
 
 #[utoipa::path(
@@ -249,4 +360,77 @@ pub async fn get_users_article(
     };
 
     Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
+}
+
+// ─────────────────────────────────────────
+// Unit tests
+// ─────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_tag_filter_none_when_tags_absent() {
+        assert!(parse_tag_filter(None, None).is_none());
+    }
+
+    #[test]
+    fn parse_tag_filter_none_when_tags_empty_string() {
+        assert!(parse_tag_filter(Some(""), None).is_none());
+        assert!(parse_tag_filter(Some("  ,  "), None).is_none());
+    }
+
+    #[test]
+    fn parse_tag_filter_single_tag_and_mode() {
+        let f = parse_tag_filter(Some("tech/rust"), None).unwrap();
+        assert_eq!(f.paths, vec!["tech/rust"]);
+        assert_eq!(f.mode, TagFilterMode::And);
+    }
+
+    #[test]
+    fn parse_tag_filter_multiple_tags_or_mode() {
+        let f =
+            parse_tag_filter(Some("tech/rust,tech/aws/lambda"), Some("or")).unwrap();
+        assert_eq!(f.paths, vec!["tech/rust", "tech/aws/lambda"]);
+        assert_eq!(f.mode, TagFilterMode::Or);
+    }
+
+    #[test]
+    fn parse_tag_filter_trims_whitespace_around_commas() {
+        let f = parse_tag_filter(Some(" tech/rust , tech/aws "), None).unwrap();
+        assert_eq!(f.paths, vec!["tech/rust", "tech/aws"]);
+    }
+
+    #[test]
+    fn parse_tag_filter_invalid_mode_defaults_to_and() {
+        let f = parse_tag_filter(Some("tech/rust"), Some("xor")).unwrap();
+        assert_eq!(f.mode, TagFilterMode::And);
+    }
+
+    #[test]
+    fn parse_per_page_defaults() {
+        assert_eq!(parse_per_page(None).unwrap(), DEFAULT_PER_PAGE);
+    }
+
+    #[test]
+    fn parse_per_page_all() {
+        assert_eq!(parse_per_page(Some("all")).unwrap(), MAX_PER_PAGE);
+        assert_eq!(parse_per_page(Some("ALL")).unwrap(), MAX_PER_PAGE);
+    }
+
+    #[test]
+    fn parse_per_page_numeric() {
+        assert_eq!(parse_per_page(Some("20")).unwrap(), 20);
+    }
+
+    #[test]
+    fn parse_per_page_zero_is_error() {
+        assert!(parse_per_page(Some("0")).is_err());
+    }
+
+    #[test]
+    fn parse_per_page_over_max_is_error() {
+        assert!(parse_per_page(Some("501")).is_err());
+    }
 }
