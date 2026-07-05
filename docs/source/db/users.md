@@ -24,14 +24,14 @@ CREATE TABLE `users` (
 
 ## Columns
 
-| Name                   | Type         | Default              | Nullable | Extra Definition  | Children                | Parents | Comment |
-| ---------------------- | ------------ | -------------------- | -------- | ----------------- | ----------------------- | ------- | ------- |
-| user_id                | char(36)     | uuid()               | false    | DEFAULT_GENERATED | [articles](articles.md) |         |         |
-| name                   | varchar(255) |                      | false    |                   |                         |         |         |
-| email                  | varchar(255) |                      | false    |                   |                         |         |         |
-| github_installation_id | bigint(20)   |                      | true     |                   |                         |         |         |
-| created_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                         |         |         |
-| updated_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                         |         |         |
+| Name                   | Type         | Default              | Nullable | Extra Definition  | Children                                                            | Parents | Comment |
+| ---------------------- | ------------ | -------------------- | -------- | ----------------- | ------------------------------------------------------------------- | ------- | ------- |
+| user_id                | char(36)     | uuid()               | false    | DEFAULT_GENERATED | [articles](articles.md) [tag_article_counts](tag_article_counts.md) |         |         |
+| name                   | varchar(255) |                      | false    |                   |                                                                     |         |         |
+| email                  | varchar(255) |                      | false    |                   |                                                                     |         |         |
+| github_installation_id | bigint(20)   |                      | true     |                   |                                                                     |         |         |
+| created_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                     |         |         |
+| updated_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                     |         |         |
 
 ## Constraints
 
@@ -57,6 +57,7 @@ CREATE TABLE `users` (
 erDiagram
 
 "articles" }o--|| "users" : "Additional Relation"
+"tag_article_counts" }o--|| "users" : "Additional Relation"
 
 "users" {
   char_36_ user_id PK
@@ -64,6 +65,11 @@ erDiagram
 "articles" {
   char_36_ article_id PK
   char_36_ user_id
+}
+"tag_article_counts" {
+  char_36_ user_id PK
+  varchar_20_ type PK
+  char_36_ tag_id PK
 }
 ```
 
