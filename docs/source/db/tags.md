@@ -9,8 +9,10 @@
 CREATE TABLE `tags` (
   `tag_id` char(36) NOT NULL DEFAULT (uuid()),
   `name` varchar(255) NOT NULL,
+  `parent_tag_id` char(36) DEFAULT NULL,
   PRIMARY KEY (`tag_id`) /*T![clustered_index] CLUSTERED */,
-  UNIQUE KEY `uq_tags_name` (`name`)
+  UNIQUE KEY `uq_tags_name` (`name`),
+  KEY `idx_tags_parent_tag_id` (`parent_tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
 ```
 
@@ -18,10 +20,11 @@ CREATE TABLE `tags` (
 
 ## Columns
 
-| Name   | Type         | Default | Nullable | Extra Definition  | Children                          | Parents | Comment |
-| ------ | ------------ | ------- | -------- | ----------------- | --------------------------------- | ------- | ------- |
-| tag_id | char(36)     | uuid()  | false    | DEFAULT_GENERATED | [articles_tags](articles_tags.md) |         |         |
-| name   | varchar(255) |         | false    |                   |                                   |         |         |
+| Name          | Type         | Default | Nullable | Extra Definition  | Children                                                                      | Parents | Comment |
+| ------------- | ------------ | ------- | -------- | ----------------- | ----------------------------------------------------------------------------- | ------- | ------- |
+| tag_id        | char(36)     | uuid()  | false    | DEFAULT_GENERATED | [articles_tags](articles_tags.md) [tag_article_counts](tag_article_counts.md) |         |         |
+| name          | varchar(255) |         | false    |                   |                                                                               |         |         |
+| parent_tag_id | char(36)     |         | true     |                   |                                                                               |         |         |
 
 ## Constraints
 
@@ -32,10 +35,11 @@ CREATE TABLE `tags` (
 
 ## Indexes
 
-| Name         | Definition                                 |
-| ------------ | ------------------------------------------ |
-| PRIMARY      | PRIMARY KEY (tag_id) USING BTREE           |
-| uq_tags_name | UNIQUE KEY uq_tags_name (name) USING BTREE |
+| Name                   | Definition                                             |
+| ---------------------- | ------------------------------------------------------ |
+| PRIMARY                | PRIMARY KEY (tag_id) USING BTREE                       |
+| uq_tags_name           | UNIQUE KEY uq_tags_name (name) USING BTREE             |
+| idx_tags_parent_tag_id | KEY idx_tags_parent_tag_id (parent_tag_id) USING BTREE |
 
 ## Relations
 
@@ -43,12 +47,18 @@ CREATE TABLE `tags` (
 erDiagram
 
 "articles_tags" }o--|| "tags" : "Additional Relation"
+"tag_article_counts" }o--|| "tags" : "Additional Relation"
 
 "tags" {
   char_36_ tag_id PK
 }
 "articles_tags" {
   char_36_ article_id PK
+  char_36_ tag_id PK
+}
+"tag_article_counts" {
+  char_36_ user_id PK
+  varchar_20_ type PK
   char_36_ tag_id PK
 }
 ```

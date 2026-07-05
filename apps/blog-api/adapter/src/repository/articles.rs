@@ -16,6 +16,10 @@ use crate::observability::observe_query;
 const TAGS_SYNC_SQL: &str =
     "DELETE FROM articles_tags; INSERT IGNORE INTO tags; INSERT IGNORE INTO articles_tags";
 
+/// sync_tag_article_counts 全体を 1 span で計装するための代表 SQL（statement_hash 用）
+const TAG_ARTICLE_COUNTS_SYNC_SQL: &str =
+    "DELETE FROM tag_article_counts; INSERT INTO tag_article_counts";
+
 #[derive(FromRow)]
 struct ArticleRow {
     article_id: String,
@@ -125,6 +129,48 @@ async fn sync_tags(
         .execute(&mut **tx)
         .await?;
     }
+
+    Ok(())
+}
+
+/// (user_id, type) の tag_article_counts を DELETE + INSERT で再計算する。
+/// published 記事の articles_tags を祖先ロールアップして集計するため、
+/// status 変化・tags 変化・type 変化のいずれに対しても正しい結果になる。
+/// トランザクション内で呼ぶことで、articles / articles_tags の変更と原子的に反映される。
+async fn sync_tag_article_counts(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    user_id: &str,
+    article_type: &str,
+) -> Result<(), anyhow::Error> {
+    // 対象 (user_id, type) の既存集計を削除する
+    sqlx::query("DELETE FROM tag_article_counts WHERE user_id = ? AND `type` = ?")
+        .bind(user_id)
+        .bind(article_type)
+        .execute(&mut **tx)
+        .await?;
+
+    // published 記事 × leaf タグ × 祖先ロールアップで再集計して INSERT する
+    let insert_sql = r#"INSERT INTO tag_article_counts (user_id, `type`, tag_id, article_count)
+WITH RECURSIVE tag_ancestors AS (
+    SELECT tag_id AS leaf_tag_id, tag_id AS anc_tag_id FROM tags
+    UNION ALL
+    SELECT ta.leaf_tag_id, t.parent_tag_id AS anc_tag_id
+    FROM tag_ancestors ta
+    JOIN tags t ON t.tag_id = ta.anc_tag_id
+    WHERE t.parent_tag_id IS NOT NULL
+)
+SELECT a.user_id, a.`type`, ta.anc_tag_id, COUNT(DISTINCT ats.article_id)
+FROM articles a
+JOIN articles_tags ats ON ats.article_id = a.article_id
+JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
+WHERE a.user_id = ? AND a.`type` = ? AND a.status = 'published'
+GROUP BY a.user_id, a.`type`, ta.anc_tag_id"#;
+
+    sqlx::query(insert_sql)
+        .bind(user_id)
+        .bind(article_type)
+        .execute(&mut **tx)
+        .await?;
 
     Ok(())
 }
@@ -239,6 +285,26 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 }
 
                 let article_id_str = article.article_id.as_uuid().to_string();
+                let user_id_str = input.user_id.as_uuid().to_string();
+
+                // tag_article_counts の再計算が必要な条件:
+                //   status 変化（published ↔ draft）→ カウント対象の増減
+                //   type 変化 → バケットの変更（旧 type と新 type の両方を再計算）
+                //   tags 変化 → 集計値の増減
+                let counts_affected = status_changed || type_changed || tags_changed;
+                let types_to_sync: Vec<String> = if counts_affected {
+                    let mut types = vec![input.article_type.clone()];
+                    if type_changed && let Some(old_type) = &article.article_type {
+                        let old = old_type.as_str().to_string();
+                        if old != input.article_type {
+                            types.push(old);
+                        }
+                    }
+                    types
+                } else {
+                    vec![]
+                };
+
                 let mut tx = self.db.pool().begin().await?;
 
                 if article_changed {
@@ -299,6 +365,17 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     .await?;
                 }
 
+                // status / type / tags の変化がある場合、影響する type の集計を再計算する
+                for type_str in &types_to_sync {
+                    observe_query(
+                        "tag_article_counts_sync",
+                        TAG_ARTICLE_COUNTS_SYNC_SQL,
+                        sync_tag_article_counts(&mut tx, &user_id_str, type_str),
+                        |_| None,
+                    )
+                    .await?;
+                }
+
                 tx.commit().await?;
 
                 if article_changed {
@@ -310,6 +387,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
             None => {
                 let article_id = Uuid::new_v4();
                 let article_id_str = article_id.to_string();
+                let user_id_str = input.user_id.as_uuid().to_string();
                 let now = Utc::now();
                 let status = if input.should_publish {
                     "published"
@@ -351,7 +429,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     sql,
                     sqlx::query(sql)
                         .bind(&article_id_str)
-                        .bind(input.user_id.as_uuid().to_string())
+                        .bind(&user_id_str)
                         .bind(&input.title)
                         .bind(input.slug.as_str())
                         .bind(&input.content)
@@ -377,6 +455,15 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     )
                     .await?;
                 }
+
+                // 新規記事の tag_article_counts を再計算する（draft でも冪等なので常に実行）
+                observe_query(
+                    "tag_article_counts_sync",
+                    TAG_ARTICLE_COUNTS_SYNC_SQL,
+                    sync_tag_article_counts(&mut tx, &user_id_str, &input.article_type),
+                    |_| None,
+                )
+                .await?;
 
                 tx.commit().await?;
 

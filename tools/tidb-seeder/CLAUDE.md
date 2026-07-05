@@ -44,7 +44,7 @@ bun run load \
 - DB には接続しない。純粋にファイル生成のみ。取り込みは既存 load.sh に完全に委ねる
 - TSV のファイル名と列順は `dsl-tidb/load/*.sql` に合わせる:
   - `app.users.tsv`: user_id, name, email, github_installation_id, created_at, updated_at
-  - `app.tags.tsv`: tag_id, name
+  - `app.tags.tsv`: tag_id, name, parent_tag_id（root は `\N`。tech / misc の2 root・最大3階層のツリーを生成し、記事には子を持たないタグだけを Zipf 分布で付与する）
   - `app.articles.tsv`: article_id, title, slug, user_id, content, thumbnail, description, status, type, published_at, created_at, updated_at
   - `app.articles_tags.tsv`: article_id, tag_id
 - content は既存 prd の平均 6.4KB を再現するため、`--content-size` の paragraph 合成で埋める

@@ -34,3 +34,15 @@ relations:
     parentTable: tags
     parentColumns:
       - tag_id
+  - table: tag_article_counts
+    columns:
+      - user_id
+    parentTable: users
+    parentColumns:
+      - user_id
+  - table: tag_article_counts
+    columns:
+      - tag_id
+    parentTable: tags
+    parentColumns:
+      - tag_id

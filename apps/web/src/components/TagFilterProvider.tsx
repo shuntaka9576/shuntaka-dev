@@ -1,24 +1,27 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { ArticleSummary } from '@/lib/api';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { ArticleSummary, TagFacet } from '@/lib/api';
+import { getArticlesByType, getTagFacets } from '@/lib/api';
+import { ARTICLES_PER_PAGE } from '@/lib/constants';
 import {
   buildFilterQuery,
-  buildTagTree,
-  matchesSelection,
+  buildTagTreeFromFacets,
   parseModeParam,
   parseTagsParam,
   type TagFilterMode,
   type TagNode,
-  toRelativeTags,
 } from '@/lib/tagFilter';
 
 export const TAG_FILTER_PANEL_ID = 'tag-filter-panel';
-
-export interface TagFilterEntry {
-  article: ArticleSummary;
-  relativeTags: string[];
-}
 
 interface TagFilterContextValue {
   panelOpen: boolean;
@@ -26,13 +29,29 @@ interface TagFilterContextValue {
   mode: TagFilterMode;
   /** 選択タグが1つ以上あるか */
   filtering: boolean;
-  /** 現在の選択にヒットする記事（選択なしなら全件） */
-  matched: TagFilterEntry[];
+  /** タグのルート名（"tech" or "misc"）。FilteredArticleList でのタグ変換に使用 */
+  tagRoot: string;
+  /** 絞り込み中の記事一覧。フィルタなし時は null（SSR の children を表示する） */
+  fetchedArticles: ArticleSummary[] | null;
+  /** API レスポンスの totalCount（ActiveTagBar のヒット件数表示用） */
+  totalCount: number;
+  /** 絞り込み中の現在ページ番号 */
+  filterPage: number;
+  /** 絞り込み結果の総ページ数 */
+  filteredTotalPages: number;
+  loading: boolean;
+  error: string | null;
+  /** facets API が失敗した場合 true。記事一覧は表示し、パネルに通知を表示する */
+  facetsError: boolean;
+  /** タグパネルに表示するツリー（facets から構築） */
   tagTree: TagNode[];
   togglePanel: () => void;
   toggleTag: (path: string) => void;
   changeMode: (mode: TagFilterMode) => void;
   clear: () => void;
+  setFilterPage: (page: number) => void;
+  retry: () => void;
+  /** 相対パスが選択中のタグにマッチするか（ArticleCard タグ強調用） */
   isTagMatched: (path: string) => boolean;
 }
 
@@ -45,9 +64,15 @@ export function useTagFilter(): TagFilterContextValue {
 }
 
 interface TagFilterProviderProps {
-  articles: ArticleSummary[];
+  userName: string;
+  type: 'tech' | 'note';
   /** タグのルート階層。tech タブ → "tech"、note タブ → "misc" */
   tagRoot: string;
+  /** SSR 時に取得した type 全体のファセット（パネル初期表示用） */
+  initialFacets: TagFacet[];
+  /** SSR 時の総ページ数（フィルタなし時の Pagination に渡す） */
+  initialTotalPages: number;
+  /** SSR 時の現在ページ番号 */
   page: number;
   baseHref: string;
   children: React.ReactNode;
@@ -62,13 +87,17 @@ interface TagFilterProviderProps {
  * ハイドレーションが不安定になるため、この構造を崩さないこと。
  *
  * URL 同期は useSearchParams ではなく history.pushState / popstate による
- * シャローナビゲーションで行う。useSearchParams は静的ルートで Suspense 境界を
- * 要求するため使わない。SSR は常に絞り込みなしで描画し、直リンク時はマウント後の
- * effect で URL から状態を復元する。
+ * シャローナビゲーションで行う。SSR は常に絞り込みなしで描画し、直リンク時は
+ * マウント後の effect で URL から状態を復元する。
+ *
+ * 絞り込み中はブラウザから一覧 API と tag-facets API を並列フェッチする。
+ * AbortController で古いリクエストをキャンセルし、UI の巻き戻しを防ぐ。
  */
 export function TagFilterProvider({
-  articles,
+  userName,
+  type,
   tagRoot,
+  initialFacets,
   page,
   baseHref,
   children,
@@ -76,6 +105,21 @@ export function TagFilterProvider({
   const [panelOpen, setPanelOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<TagFilterMode>('and');
+  const [filterPage, setFilterPageState] = useState(1);
+
+  const [fetchedArticles, setFetchedArticles] = useState<ArticleSummary[] | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [filteredTotalPages, setFilteredTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [facetsError, setFacetsError] = useState(false);
+  const [facets, setFacets] = useState<TagFacet[]>(initialFacets);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // initialFacets を ref で保持し、effect の deps から除外する
+  const initialFacetsRef = useRef(initialFacets);
+
+  const filtering = selected.length > 0;
 
   // 直リンク・リロード・戻る/進むで URL から選択状態を復元する
   useEffect(() => {
@@ -83,59 +127,138 @@ export function TagFilterProvider({
       const params = new URLSearchParams(window.location.search);
       setSelected(parseTagsParam(params.get('tags')));
       setMode(parseModeParam(params.get('mode')));
+      const pageParam = params.get('page');
+      setFilterPageState(pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1);
     };
     readFromLocation();
     window.addEventListener('popstate', readFromLocation);
     return () => window.removeEventListener('popstate', readFromLocation);
   }, []);
 
-  const entries = useMemo(
-    () =>
-      articles.map((article) => ({
-        article,
-        relativeTags: toRelativeTags(article.tags ?? [], tagRoot),
-      })),
-    [articles, tagRoot],
-  );
-
-  const filtering = selected.length > 0;
-  const matched = useMemo(
-    () =>
-      filtering ? entries.filter((e) => matchesSelection(e.relativeTags, selected, mode)) : entries,
-    [entries, filtering, selected, mode],
-  );
-
-  // AND（デフォルト）ではヒット集合と組み合わせられるタグだけをパネルに出し、
-  // 0件になる組み合わせを選べなくする（ファセット表示）。OR は選択で結果が
-  // 広がるため全タグを出す。直リンクで0件になった場合は全タグにフォールバック
-  const tagTree = useMemo(() => {
-    const source = mode === 'and' && matched.length > 0 ? matched : entries;
-    return buildTagTree(source.map((e) => e.relativeTags));
-  }, [entries, matched, mode]);
-
-  // 絞り込み URL はタブの先頭ページ（baseHref）に載せ、選択が空になったら
-  // このコンポーネントが表示しているページの URL に戻す（/page/N との整合）
-  const unfilteredHref = page > 1 ? `${baseHref.replace(/\/$/, '')}/page/${page}` : baseHref;
-  const applySelection = (nextSelected: string[], nextMode: TagFilterMode, replace = false) => {
-    setSelected(nextSelected);
-    setMode(nextMode);
-    const url =
-      nextSelected.length === 0
-        ? unfilteredHref
-        : `${baseHref}${buildFilterQuery(nextSelected, nextMode)}`;
-    if (replace) {
-      window.history.replaceState(null, '', url);
-    } else {
-      window.history.pushState(null, '', url);
+  // フィルタ変更時に一覧 API と facets API を並列フェッチする
+  useEffect(() => {
+    if (!filtering) {
+      // フィルタクリア時は SSR 初期ファセットに戻す
+      setFetchedArticles(null);
+      setFacets(initialFacetsRef.current);
+      setError(null);
+      setFacetsError(false);
+      return;
     }
-  };
+
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    setLoading(true);
+    setError(null);
+
+    // selected（相対パス）に root プレフィックスを付与してフルパスにする
+    const fullPathTags = selected.map((tag) => `${tagRoot}/${tag}`);
+
+    const listPromise = getArticlesByType(userName, type, {
+      tags: fullPathTags,
+      mode,
+      page: filterPage,
+      perPage: ARTICLES_PER_PAGE,
+      noCache: true,
+      signal,
+    });
+
+    // OR モードは「全タグ表示」のため initialFacets をそのまま使い、API を呼ばない。
+    // facets API が失敗した場合は null を返してエラーとして扱い、前回値を維持する。
+    const safeFacetsPromise: Promise<{ facets: TagFacet[] } | null> =
+      mode === 'or'
+        ? Promise.resolve({ facets: initialFacetsRef.current })
+        : getTagFacets(userName, type, { tags: fullPathTags, noCache: true, signal }).catch(
+            (err: unknown) => {
+              // AbortError は上位 catch に伝播させてリトライを防ぐ
+              if ((err as Error)?.name === 'AbortError') throw err;
+              return null;
+            },
+          );
+
+    Promise.all([listPromise, safeFacetsPromise])
+      .then(([listResult, facetsResult]) => {
+        setFetchedArticles(listResult.articles);
+        setTotalCount(listResult.totalCount);
+        setFilteredTotalPages(listResult.totalPages);
+        if (facetsResult !== null) {
+          setFacets(facetsResult.facets);
+          setFacetsError(false);
+        } else {
+          // facets 取得失敗: 前回値を維持してパネルに通知を表示する
+          setFacetsError(true);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        if ((err as Error)?.name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'エラーが発生しました');
+        setLoading(false);
+      });
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtering, selected, mode, filterPage, retryCount, userName, type, tagRoot]);
+
+  const tagTree = useMemo(() => buildTagTreeFromFacets(facets, tagRoot), [facets, tagRoot]);
+
+  // 絞り込み URL はタブの先頭ページ（baseHref）に載せる
+  // 選択が空になったら SSR が表示していたページ URL に戻す
+  const unfilteredHref = page > 1 ? `${baseHref.replace(/\/$/, '')}/page/${page}` : baseHref;
+
+  const pushFilterUrl = useCallback(
+    (nextSelected: string[], nextMode: TagFilterMode, nextFilterPage: number, replace = false) => {
+      let url: string;
+      if (nextSelected.length === 0) {
+        url = unfilteredHref;
+      } else {
+        const query = buildFilterQuery(nextSelected, nextMode);
+        const pageParam = nextFilterPage > 1 ? `&page=${nextFilterPage}` : '';
+        url = `${baseHref}${query}${pageParam}`;
+      }
+      if (replace) {
+        window.history.replaceState(null, '', url);
+      } else {
+        window.history.pushState(null, '', url);
+      }
+    },
+    [baseHref, unfilteredHref],
+  );
+
+  const applySelection = useCallback(
+    (nextSelected: string[], nextMode: TagFilterMode, replace = false) => {
+      setSelected(nextSelected);
+      setMode(nextMode);
+      setFilterPageState(1); // フィルタ変更時は1ページ目に戻す
+      pushFilterUrl(nextSelected, nextMode, 1, replace);
+    },
+    [pushFilterUrl],
+  );
+
+  const setFilterPage = useCallback(
+    (p: number) => {
+      setFilterPageState(p);
+      pushFilterUrl(selected, mode, p);
+    },
+    [selected, mode, pushFilterUrl],
+  );
+
+  const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   const value: TagFilterContextValue = {
     panelOpen,
     selected,
     mode,
     filtering,
-    matched,
+    tagRoot,
+    fetchedArticles,
+    totalCount,
+    filterPage,
+    filteredTotalPages,
+    loading,
+    error,
+    facetsError,
     tagTree,
     togglePanel: () => setPanelOpen((prev) => !prev),
     toggleTag: (path) => {
@@ -146,6 +269,8 @@ export function TagFilterProvider({
     },
     changeMode: (nextMode) => applySelection(selected, nextMode, true),
     clear: () => applySelection([], 'and'),
+    setFilterPage,
+    retry,
     isTagMatched: (path) => selected.some((s) => path === s || path.startsWith(`${s}/`)),
   };
 

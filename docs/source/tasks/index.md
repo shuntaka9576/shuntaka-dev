@@ -5,6 +5,7 @@
 ```{toctree}
 :maxdepth: 1
 
+2026-07-05-server-side-tag-filter
 2026-07-05-article-tag-filter-ui
 2026-07-05-tidb-prd-dump
 2026-07-05-article-tags

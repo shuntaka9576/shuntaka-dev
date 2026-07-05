@@ -7,8 +7,9 @@ import {
   buildUsersTsv,
   generatePartition,
   log,
-  makeTagIds,
+  makeTagTree,
   makeUsers,
+  type TagLeaves,
 } from './generate.js';
 
 export interface MasterOptions {
@@ -27,7 +28,7 @@ export interface MasterOptions {
 
 interface StateFile {
   userIds: string[];
-  tagIds: string[];
+  tagLeaves: TagLeaves;
   articlesPerUser: number;
   tagsPerArticle: number;
   contentSize: number;
@@ -46,14 +47,16 @@ export async function runMaster(opts: MasterOptions): Promise<void> {
   const now = formatDateTime(new Date());
 
   const { users, runTag } = makeUsers(opts.users, rng, now);
-  const tagIds = makeTagIds(opts.tags);
+  const { tags, leaves } = makeTagTree(opts.tags, runTag, rng);
 
   const usersPath = path.join(opts.outDir, `${opts.sourceSchema}.users.tsv`);
   const tagsPath = path.join(opts.outDir, `${opts.sourceSchema}.tags.tsv`);
   fs.writeFileSync(usersPath, buildUsersTsv(users));
-  fs.writeFileSync(tagsPath, buildTagsTsv(tagIds, runTag));
+  fs.writeFileSync(tagsPath, buildTagsTsv(tags));
   log(`users: ${users.length} rows -> ${usersPath}`);
-  log(`tags: ${tagIds.length} rows -> ${tagsPath}`);
+  log(
+    `tags: ${tags.length} rows (tech leaves: ${leaves.tech.length}, misc leaves: ${leaves.note.length}) -> ${tagsPath}`,
+  );
 
   const totalArticles = opts.users * opts.articlesPerUser;
   const chunkSize = Math.ceil(totalArticles / opts.workers);
@@ -75,7 +78,7 @@ export async function runMaster(opts: MasterOptions): Promise<void> {
       : path.join(opts.outDir, `${opts.sourceSchema}.articles_tags.tsv`);
     await generatePartition({
       userIds: users.map((u) => u.id),
-      tagIds,
+      tagLeaves: leaves,
       seed: opts.seed,
       articlesPerUser: opts.articlesPerUser,
       tagsPerArticle: opts.tagsPerArticle,
@@ -93,7 +96,7 @@ export async function runMaster(opts: MasterOptions): Promise<void> {
   const stateFile = path.join(opts.outDir, STATE_FILE);
   const state: StateFile = {
     userIds: users.map((u) => u.id),
-    tagIds,
+    tagLeaves: leaves,
     articlesPerUser: opts.articlesPerUser,
     tagsPerArticle: opts.tagsPerArticle,
     contentSize: opts.contentSize,

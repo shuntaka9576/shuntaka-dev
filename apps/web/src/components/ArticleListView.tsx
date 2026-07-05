@@ -6,7 +6,7 @@ import { Pagination } from '@/components/Pagination';
 import { TagFilterControls } from '@/components/TagFilterControls';
 import { TagFilterHeaderToggle } from '@/components/TagFilterHeaderToggle';
 import { TagFilterProvider } from '@/components/TagFilterProvider';
-import { getArticlesByType } from '@/lib/api';
+import { getArticlesByType, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE, USER_NAME } from '@/lib/constants';
 
 interface ArticleListViewProps {
@@ -18,13 +18,20 @@ interface ArticleListViewProps {
 
 export async function ArticleListView({ type, currentTab, page, baseHref }: ArticleListViewProps) {
   let articles: Awaited<ReturnType<typeof getArticlesByType>>['articles'] = [];
+  let totalPages = 1;
+  let initialFacets: Awaited<ReturnType<typeof getTagFacets>>['facets'] = [];
   let error: string | null = null;
 
   try {
-    // タグ絞り込みはクライアントサイドフィルタのため type 単位で全件取得し、
-    // 既定表示のページスライスはサーバー側で行う
-    const result = await getArticlesByType(USER_NAME, type, { perPage: 'all' });
-    articles = result.articles;
+    // 現在ページの記事と type 全体のファセットを並列取得する
+    // perPage=all の全件フェッチはやめ、1ページ分のみ取得する
+    const [pageResult, facetsResult] = await Promise.all([
+      getArticlesByType(USER_NAME, type, { page, perPage: ARTICLES_PER_PAGE }),
+      getTagFacets(USER_NAME, type),
+    ]);
+    articles = pageResult.articles;
+    totalPages = pageResult.totalPages;
+    initialFacets = facetsResult.facets;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to fetch articles';
   }
@@ -42,10 +49,8 @@ export async function ArticleListView({ type, currentTab, page, baseHref }: Arti
     );
   }
 
-  const visible = articles.slice((page - 1) * ARTICLES_PER_PAGE, page * ARTICLES_PER_PAGE);
-  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE);
   const priorityArticleIds = new Set(
-    visible
+    articles
       .filter((a) => a.thumbnail)
       .slice(0, 2)
       .map((a) => a.articleId),
@@ -53,8 +58,11 @@ export async function ArticleListView({ type, currentTab, page, baseHref }: Arti
 
   return (
     <TagFilterProvider
-      articles={articles}
+      userName={USER_NAME}
+      type={type}
       tagRoot={type === 'tech' ? 'tech' : 'misc'}
+      initialFacets={initialFacets}
+      initialTotalPages={totalPages}
       page={page}
       baseHref={baseHref}
     >
@@ -63,11 +71,11 @@ export async function ArticleListView({ type, currentTab, page, baseHref }: Arti
           <div className="max-w-[var(--layout-list-max)]">
             <TagFilterControls />
             <FilteredArticleList userName={USER_NAME}>
-              {visible.length === 0 ? (
+              {articles.length === 0 ? (
                 <p>No articles found.</p>
               ) : (
                 <>
-                  {visible.map((article) => (
+                  {articles.map((article) => (
                     <ArticleCard
                       key={article.articleId}
                       article={article}

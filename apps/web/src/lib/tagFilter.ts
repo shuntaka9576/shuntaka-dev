@@ -25,49 +25,50 @@ export function matchesTag(selected: string, tags: string[]): boolean {
   return tags.some((tag) => tag === selected || tag.startsWith(`${selected}/`));
 }
 
-export function matchesSelection(tags: string[], selected: string[], mode: TagFilterMode): boolean {
-  if (selected.length === 0) return true;
-  return mode === 'and'
-    ? selected.every((s) => matchesTag(s, tags))
-    : selected.some((s) => matchesTag(s, tags));
-}
-
 /**
- * 記事ごとの相対タグ配列からタグツリーを構築する。
- * 件数は祖先タグへ合算し、同一記事内の重複（"aws/lambda" と "aws/cdk" を持つ記事の
- * "aws"）は1件として数える。並び順は件数降順、同数はパス昇順。
+ * API の tag-facets レスポンス（path/count の配列、フルパス）からタグツリーを構築する。
+ * root プレフィックス（例: "tech/"）を除去し、相対パスの TagNode[] を返す。
+ * count は API が祖先ロールアップ済みの値を返すためそのまま使用する。
+ * 並び順は count 降順、同数はパス昇順。
  */
-export function buildTagTree(articlesTags: string[][]): TagNode[] {
-  const counts = new Map<string, number>();
-  for (const tags of articlesTags) {
-    const prefixes = new Set<string>();
-    for (const tag of tags) {
-      const segments = tag.split('/');
-      for (let i = 1; i <= segments.length; i += 1) {
-        prefixes.add(segments.slice(0, i).join('/'));
-      }
-    }
-    for (const prefix of prefixes) {
-      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
-    }
-  }
+export function buildTagTreeFromFacets(
+  facets: { path: string; count: number }[],
+  root: string,
+): TagNode[] {
+  const prefix = `${root}/`;
+
+  // root 配下のパスのみ抽出して相対パスに変換する
+  const relativeFacets = facets
+    .filter((f) => f.path.startsWith(prefix) && f.path.length > prefix.length)
+    .map((f) => ({ path: f.path.slice(prefix.length), count: f.count }));
 
   const nodes = new Map<string, TagNode>();
   const roots: TagNode[] = [];
-  const sortedPaths = [...counts.keys()].sort();
-  for (const path of sortedPaths) {
+
+  // パス昇順でソートしてから処理することで、親が子より先に登録される
+  const sorted = [...relativeFacets].sort((a, b) => a.path.localeCompare(b.path));
+
+  for (const { path, count } of sorted) {
     const segments = path.split('/');
     const node: TagNode = {
       path,
       label: segments[segments.length - 1],
-      count: counts.get(path) ?? 0,
+      count,
       children: [],
     };
     nodes.set(path, node);
+
     if (segments.length === 1) {
       roots.push(node);
     } else {
-      nodes.get(segments.slice(0, -1).join('/'))?.children.push(node);
+      const parentPath = segments.slice(0, -1).join('/');
+      const parent = nodes.get(parentPath);
+      if (parent) {
+        parent.children.push(node);
+      } else {
+        // 親がファセットに含まれない場合はルートとして扱う
+        roots.push(node);
+      }
     }
   }
 
@@ -77,6 +78,7 @@ export function buildTagTree(articlesTags: string[][]): TagNode[] {
     for (const node of list) sortTree(node.children);
   };
   sortTree(roots);
+
   return roots;
 }
 

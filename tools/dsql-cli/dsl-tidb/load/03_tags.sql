@@ -5,7 +5,7 @@ INTO TABLE `${SCHEMA}`.`tags`
 CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' ESCAPED BY '\\'
 LINES TERMINATED BY '\n'
-(`tag_id`, `name`);
+(`tag_id`, `name`, `parent_tag_id`);
 
 SELECT 'tags' AS table_name, @@warning_count AS warnings;
 SHOW WARNINGS;

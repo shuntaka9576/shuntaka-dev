@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { generatePartition, log, partPaths } from './generate.js';
+import { generatePartition, log, partPaths, type TagLeaves } from './generate.js';
 
 export interface WorkerOptions {
   workerIndex: number;
@@ -9,7 +9,7 @@ export interface WorkerOptions {
 
 interface StateFile {
   userIds: string[];
-  tagIds: string[];
+  tagLeaves: TagLeaves;
   articlesPerUser: number;
   tagsPerArticle: number;
   contentSize: number;
@@ -35,7 +35,7 @@ export async function runWorker(opts: WorkerOptions): Promise<void> {
   log(`[worker ${opts.workerIndex}] range ${start}..${end} (${end - start} rows)`);
   await generatePartition({
     userIds: state.userIds,
-    tagIds: state.tagIds,
+    tagLeaves: state.tagLeaves,
     seed: state.seed + opts.workerIndex,
     articlesPerUser: state.articlesPerUser,
     tagsPerArticle: state.tagsPerArticle,
