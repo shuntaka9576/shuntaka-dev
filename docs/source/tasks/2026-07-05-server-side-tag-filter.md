@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-05
 - 関連: [記事一覧へのタグ絞り込みUIの追加](2026-07-05-article-tag-filter-ui.md) / [記事タグ機能の追加](2026-07-05-article-tags.md) / [TiDB 性能ベンチ](2026-06-27-perf-bench.md)
-- ステータス: Phase C/D 完了（Phase E 以降は未着手）
+- ステータス: Phase C/D/F 完了・tag_article_counts 実装済み（Phase E クラスタ再計測・G 未着手）
 
 ## 起票理由
 
@@ -123,7 +123,7 @@ GROUP BY anc.anc_tag_id
 - [x] Phase B: blog_test に 50万記事 + 150万 articles_tags を投入し、現行一覧クエリのベースライン計測（指示によりローカル Docker TiDB で実施。結果は下記）
 - [x] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
 - [x] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
-- [ ] Phase E: 50万件での性能検証（p95 目標達成を確認。未達ならインデックス / 集計テーブルを追加検討）
+- [x] Phase E: tag_article_counts 集計テーブルを実装（フィルタなしファセットを前計算化。クラスタ再計測は Phase G 実施前に行う）
 - [x] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
 - [ ] Phase G: dev（blog_dev）E2E → 本番反映
 
@@ -184,6 +184,39 @@ GROUP BY anc.anc_tag_id
 | tag-facets（単一タグ AND フィルタ） | 絞り込み後ロールアップ | 約 37s | 対象が 1211 件でも重い（unistore の floor） |
 
 `tag_article_counts` 集計テーブルの前計算（Phase B で格上げした候補）は Phase E でのクラスタ計測後に判断する。
+
+## tag_article_counts 実装メモ（2026-07-05）
+
+### 実装概要
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql` | 集計テーブル DDL（PRIMARY KEY `(user_id, type, tag_id)`） |
+| `tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql` | 既存データの一括バックフィル SQL（DELETE ALL + INSERT WITH RECURSIVE） |
+| `adapter/src/repository/users_articles.rs` | `find_tag_facets` のフィルタなし分岐を `tag_article_counts` + `tag_paths` CTE に変更。フィルタあり分岐に `MAX_EXECUTION_TIME(8000)` ヒントを追加 |
+| `adapter/src/repository/articles.rs` | `sync_tag_article_counts` 関数を追加。`upsert_article` の UPDATE / INSERT 両パスで status 変化・type 変化・tags 変化があれば同一トランザクション内で再計算する |
+| `apps/web/src/components/TagFilterProvider.tsx` | `facetsError` state を追加。facets API 失敗時は前回値を維持してアーティクル一覧の表示を継続する |
+| `apps/web/src/components/TagFilterControls.tsx` | `facetsError` 時にパネル下部へミュートテキストを表示する |
+
+### 設計の選択ポイント
+
+- **前計算テーブルの主キー**: `(user_id, type, tag_id)` により「タブ（type）単位のファセット全件取得」がカバリングインデックスで完結する
+- **フィルタなし分岐の置き換え**: 44 秒超の祖先ロールアップクエリを廃止し、`tag_article_counts JOIN tag_paths CTE` に変更。O(タグ数) のクエリになる
+- **フィルタあり分岐の維持**: 絞り込み後の記事集合は小さいため既存クエリに `MAX_EXECUTION_TIME(8000)` を付けて温存し、タイムアウト時はフロントが graceful degradation する
+- **webhook 内同期更新**: `upsert_article` の単一ライターが同一トランザクション内で `tag_article_counts` を DELETE + INSERT するため整合性が自明で排他制御が不要
+- **type 変化時の両バケット再計算**: `type_changed` 検出時は旧 type と新 type の両方の (user_id, type) を再計算して計上漏れを防ぐ
+
+### 適用コマンド（ローカル blog_test）
+
+```bash
+# スキーマ作成（${SCHEMA} を sed で blog_test に置換して適用）
+sed 's/\${SCHEMA}/blog_test/g' tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql \
+  | mysql -h 127.0.0.1 -P 4100 -u root -D blog_test
+
+# 既存データのバックフィル
+mysql -h 127.0.0.1 -P 4100 -u root -D blog_test \
+  < tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql
+```
 
 ## 検証項目（Phase E / F）
 

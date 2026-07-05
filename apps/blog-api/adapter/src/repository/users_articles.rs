@@ -570,41 +570,34 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         let filter_mode: Option<&TagFilterMode> = tag_filter.map(|f| &f.mode);
 
         // ファセット集計 SQL を構築する。
-        // 祖先ロールアップ: 各記事に紐づく leaf タグの祖先（自身を含む）を展開し、
-        // 祖先ごとにヒット記事数を COUNT DISTINCT する。
+        // フィルタなし（パネル初期表示・SSR 埋め込み用）: tag_article_counts 前計算テーブルを
+        // そのまま読むだけなので O(タグ数) で完了し、事前の 44 秒超クエリを廃止できる。
+        // フィルタあり（タグ選択後の再集計）: 絞り込み後の記事集合は小さいため、
+        // 従来の祖先ロールアップクエリに MAX_EXECUTION_TIME(8000) を付けて実行し、
+        // タイムアウト時は呼び出し元がエラーとして扱う。
         let facets_sql = match &resolved_ids {
             None => {
-                // フィルタなし: type 全体のファセット集計
-                r#"WITH RECURSIVE
-tag_paths AS (
+                // フィルタなし: tag_article_counts + tag_paths CTE でパス名を付けて返す
+                r#"WITH RECURSIVE tag_paths AS (
     SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
     UNION ALL
     SELECT t.tag_id, CONCAT(tp.path, '/', t.name) FROM tags t
     JOIN tag_paths tp ON t.parent_tag_id = tp.tag_id
-),
-tag_ancestors AS (
-    SELECT tag_id AS leaf_tag_id, tag_id AS anc_tag_id FROM tags
-    UNION ALL
-    SELECT ta.leaf_tag_id, t.parent_tag_id AS anc_tag_id FROM tag_ancestors ta
-    JOIN tags t ON t.tag_id = ta.anc_tag_id WHERE t.parent_tag_id IS NOT NULL
 )
-SELECT tp.path, COUNT(DISTINCT ats.article_id) AS cnt
-FROM articles a
-JOIN articles_tags ats ON ats.article_id = a.article_id
-JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
-JOIN tag_paths tp ON tp.tag_id = ta.anc_tag_id
-WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
-  AND a.status = 'published'
-  AND a.`type` = ?
-GROUP BY tp.tag_id, tp.path
-HAVING cnt > 0
-ORDER BY cnt DESC, tp.path ASC"#
+SELECT tp.path, tac.article_count AS cnt
+FROM tag_article_counts tac
+JOIN tag_paths tp ON tp.tag_id = tac.tag_id
+WHERE tac.user_id = (SELECT user_id FROM users WHERE name = ?)
+  AND tac.`type` = ?
+  AND tac.article_count > 0
+ORDER BY tac.article_count DESC, tp.path ASC"#
                     .to_string()
             }
             Some(ids) => {
                 let mode = filter_mode.unwrap();
                 let (cte_body, filter_conds) = build_facets_filter_parts(ids, mode);
-                // tag_descendants CTE を tag_ancestors の直後に追加する
+                // tag_descendants CTE を tag_ancestors の直後に追加する。
+                // MAX_EXECUTION_TIME(8000) ヒントを付けて 8 秒でタイムアウトさせる。
                 format!(
                     r#"WITH RECURSIVE
 tag_paths AS (
@@ -620,7 +613,7 @@ tag_ancestors AS (
     JOIN tags t ON t.tag_id = ta.anc_tag_id WHERE t.parent_tag_id IS NOT NULL
 ),
 {cte_body}
-SELECT tp.path, COUNT(DISTINCT ats.article_id) AS cnt
+SELECT /*+ MAX_EXECUTION_TIME(8000) */ tp.path, COUNT(DISTINCT ats.article_id) AS cnt
 FROM articles a
 JOIN articles_tags ats ON ats.article_id = a.article_id
 JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id

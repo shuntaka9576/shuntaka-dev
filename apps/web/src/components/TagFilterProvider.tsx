@@ -33,6 +33,8 @@ interface TagFilterContextValue {
   filteredTotalPages: number;
   loading: boolean;
   error: string | null;
+  /** facets API が失敗した場合 true。記事一覧は表示し、パネルに通知を表示する */
+  facetsError: boolean;
   /** タグパネルに表示するツリー（facets から構築） */
   tagTree: TagNode[];
   togglePanel: () => void;
@@ -102,6 +104,7 @@ export function TagFilterProvider({
   const [filteredTotalPages, setFilteredTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [facetsError, setFacetsError] = useState(false);
   const [facets, setFacets] = useState<TagFacet[]>(initialFacets);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -131,6 +134,7 @@ export function TagFilterProvider({
       setFetchedArticles(null);
       setFacets(initialFacetsRef.current);
       setError(null);
+      setFacetsError(false);
       return;
     }
 
@@ -152,18 +156,31 @@ export function TagFilterProvider({
       signal,
     });
 
-    // OR モードは「全タグ表示」のため initialFacets をそのまま使い、API を呼ばない
-    const facetsPromise =
+    // OR モードは「全タグ表示」のため initialFacets をそのまま使い、API を呼ばない。
+    // facets API が失敗した場合は null を返してエラーとして扱い、前回値を維持する。
+    const safeFacetsPromise: Promise<{ facets: TagFacet[] } | null> =
       mode === 'or'
         ? Promise.resolve({ facets: initialFacetsRef.current })
-        : getTagFacets(userName, type, { tags: fullPathTags, noCache: true, signal });
+        : getTagFacets(userName, type, { tags: fullPathTags, noCache: true, signal }).catch(
+            (err: unknown) => {
+              // AbortError は上位 catch に伝播させてリトライを防ぐ
+              if ((err as Error)?.name === 'AbortError') throw err;
+              return null;
+            },
+          );
 
-    Promise.all([listPromise, facetsPromise])
+    Promise.all([listPromise, safeFacetsPromise])
       .then(([listResult, facetsResult]) => {
         setFetchedArticles(listResult.articles);
         setTotalCount(listResult.totalCount);
         setFilteredTotalPages(listResult.totalPages);
-        setFacets(facetsResult.facets);
+        if (facetsResult !== null) {
+          setFacets(facetsResult.facets);
+          setFacetsError(false);
+        } else {
+          // facets 取得失敗: 前回値を維持してパネルに通知を表示する
+          setFacetsError(true);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -241,6 +258,7 @@ export function TagFilterProvider({
     filteredTotalPages,
     loading,
     error,
+    facetsError,
     tagTree,
     togglePanel: () => setPanelOpen((prev) => !prev),
     toggleTag: (path) => {
