@@ -60,9 +60,11 @@ kubectl exec -n tidb-cluster basic-tikv-0 -- sh -c \
 
 ```bash
 kubectl exec -n tidb-cluster basic-pd-0 -- sh -c '
-  /pd-ctl region --jq="length"
-  curl -s http://127.0.0.1:2379/pd/api/v1/stores | grep -E "region_count|region_size"'
+  /pd-ctl region --jq=".count"
+  curl -s http://127.0.0.1:2379/pd/api/v1/stores | grep -E "region_count|region_size|leader_count"'
 ```
+
+> `pd-ctl region` の出力は `{"count": N, "regions": [...]}` 形式。`--jq="length"` はトップレベルのキー数（常に 2）を返すので region 数には使えない。region 数は `.count`、リーダー偏りは stores 側の `leader_count` で見る（`region_count` はレプリカ数なので全 store で揃い、偏り判定には使えない）。
 
 実測: region はクラスタ全体で 5 個 / 約 24MB。500 万行分の region は GC・マージ済みで存在しない。
 

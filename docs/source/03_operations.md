@@ -166,6 +166,7 @@ kubectl -n tidb-cluster get pods -o wide
 worker と同じ手順でよい。以下の点だけ異なる。
 
 - 再起動中は kubectl が返らなくなるが正常。node1 の kubelet が上がると static pod（apiserver / etcd）が自動復旧し、kubectl も戻る
+- kubectl が戻ったら **`kubectl uncordon node1` から手順を再開する**。`kubectl get nodes -w` の切断で手順が中断されるため uncordon を忘れやすい。忘れても既存 Pod は動き続けるので気付けず、後日 Pod を作り直したとき（TiKV rolling restart 等）に `volume node affinity conflict` で Pending になって発覚する（実績: 2026-07-05）
 - アクセスの少ない時間帯に行う
 - `ts-tidb-public` の proxy Pod が node1 に載っている場合、退避は**必ず再起動前に**行う。apiserver も同時に停止するため、落ちてからでは他ノードへ退避できず、ブログ DB 経路が node1 復帰まで止まる
 - 万一 node1 のディスクが死ぬと etcd（クラスタ状態）を失う。TiDB のデータ自体は TiKV 3 レプリカなので無事
@@ -173,7 +174,7 @@ worker と同じ手順でよい。以下の点だけ異なる。
 ### 復帰確認
 
 ```bash
-kubectl get nodes                          # 全ノード Ready
+kubectl get nodes                          # 全ノード Ready。SchedulingDisabled が残っていたら uncordon 忘れ
 kubectl -n kube-system get pods            # control plane / cilium / coredns が Running
 kubectl -n tidb-cluster get pods -o wide   # PD / TiKV / TiDB が Running
 kubectl -n tailscale get pods -o wide      # tidb-public の proxy Pod が Running
