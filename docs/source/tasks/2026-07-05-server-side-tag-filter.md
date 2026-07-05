@@ -124,7 +124,7 @@ GROUP BY anc.anc_tag_id
 - [x] Phase C: blog-api 一覧 API に `tags` / `mode` 実装（タグ解決・子孫展開・AND/OR、kernel/adapter/api 各層 + ユニットテスト）
 - [x] Phase D: tag-facets API 新設（祖先ロールアップ集計、OpenAPI 定義）
 - [ ] Phase E: 50万件での性能検証（p95 目標達成を確認。未達ならインデックス / 集計テーブルを追加検討）
-- [ ] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
+- [x] Phase F: apps/web を API 駆動に切り替え（全件フェッチ廃止、絞り込み中のフェッチ + ローディング状態 + ページネーション、パネル初期ファセットの SSR 埋め込み）
 - [ ] Phase G: dev（blog_dev）E2E → 本番反映
 
 ## Phase B: ローカルベースライン計測結果（2026-07-05）
@@ -201,6 +201,30 @@ GROUP BY anc.anc_tag_id
 - **TiFlash**: 現段階では導入しない。絞り込み一覧はインデックス駆動の OLTP 型で TiKV で十分。唯一 OLAP 的な tags なし全体ファセット集計（150万行の GROUP BY + COUNT DISTINCT）も、低頻度（ISR 埋め込み）であり、目標未達時は集計テーブルの前計算（webhook 単一ライターのため upsert 内同期更新で整合性が自明）の方が安くて確実。MiniPC 3ノードに TiFlash レプリカを同居させるとメモリ・ディスク負担とリソース競合（2026-06-27 ベンチで観測）を悪化させるリスクの方が大きい。集計テーブルで賄えない ad-hoc な分析クエリが増えた時点で再検討する
 - **CDN**: API 前段に CloudFront を置けば組み合わせクエリもエッジキャッシュできるが、コストと構成変更が大きいため本タスクのスコープ外。必要になったら別起票
 - **検索（全文）との統合**: タグ絞り込みとキーワード検索の複合は将来課題。API のクエリパラメータ設計（`tags` + `q` が共存できる形）だけ意識しておく
+
+## Phase F: 実装メモ（2026-07-05）
+
+### 変更ファイル概要
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `apps/web/src/lib/api.ts` | `getArticlesByType` に `tags` / `mode` / `noCache` / `signal` オプションを追加。`getTagFacets` を新設（tag-facets エンドポイント呼び出し） |
+| `apps/web/src/lib/tagFilter.ts` | クライアントサイド集計の `matchesSelection` / `buildTagTree` を削除。API 応答（フルパス）からタグツリーを構築する `buildTagTreeFromFacets` を追加 |
+| `apps/web/src/lib/tagFilter.test.ts` | `buildTagTree` / `matchesSelection` のテストを削除。`buildTagTreeFromFacets` のテスト（6ケース）を追加 |
+| `apps/web/src/components/TagFilterProvider.tsx` | `articles` 全件 → `initialFacets` / `initialTotalPages` に変更。絞り込み中は一覧 API + facets API を AbortController 付き並列フェッチ。fetchedArticles / loading / error / filterPage / filteredTotalPages を Context に公開 |
+| `apps/web/src/components/TagFilterControls.tsx` | `matched.length` → `totalCount`（API からの件数）に変更 |
+| `apps/web/src/components/FilteredArticleList.tsx` | fetchedArticles によるレンダリングに切り替え。loading 時は opacity 低下 + "読み込み中…" テキスト表示。error 時は再試行ボタン表示。FilterPagination コンポーネントを追加 |
+| `apps/web/src/components/ArticleListView.tsx` | `perPage=all` 全件フェッチを廃止。`getArticlesByType`（現在ページ分）と `getTagFacets`（初期ファセット）を `Promise.all` で並列取得に変更 |
+| `tools/tidb-seeder/src/generate.ts` | root タグ名を `tech-${runTag}` / `misc-${runTag}` から `tech` / `misc` に修正（API が期待するフルパス形式に合わせる） |
+
+### 設計の選択ポイント
+
+- **`perPage=all` 廃止**: SSR で現在ページ分（`perPage=10`）のみ取得。全件 RSC ペイロードを排除し、501件超の silently 欠落も解消
+- **初期ファセットの SSR 埋め込み**: `TagFilterProvider` に `initialFacets` プロップとして渡す。タグパネルを開いた瞬間の API 呼び出し不要（ISR revalidate: 30s でキャッシュ）
+- **OR モード時はファセット API を呼ばない**: OR は選択で結果が広がるため全タグを表示する方針。`initialFacets` をそのまま使い、余分な API 呼び出しを省く
+- **AbortController**: `selected` / `mode` / `filterPage` が変わるたびに前のリクエストをキャンセル。連打時の UI 巻き戻しを防止
+- **URL 同期**: `?tags=rust,aws%2Flambda&mode=or&page=2` 形式（page=1 は省略）。pushState / popstate のみ使用（useSearchParams 不使用）
+- **ローカル計測（Docker TiDB, 500記事）**: 一覧 API 約 42ms、tag-facets API 約 35ms
 
 ## スコープ外
 

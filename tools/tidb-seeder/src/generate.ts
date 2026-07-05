@@ -184,8 +184,8 @@ export function makeTagTree(
     throw new Error(`--tags must be >= ${2 + minPerRoot * 2} for hierarchical generation`);
   }
 
-  const techRoot: TagRow = { id: uuid(), name: `tech-${runTag}`, parentId: null };
-  const miscRoot: TagRow = { id: uuid(), name: `misc-${runTag}`, parentId: null };
+  const techRoot: TagRow = { id: uuid(), name: 'tech', parentId: null };
+  const miscRoot: TagRow = { id: uuid(), name: 'misc', parentId: null };
   const tags: TagRow[] = [techRoot, miscRoot];
 
   // 残りタグを tech:misc = 7:3、各 root 内で level2:level3 = 4:6 に配分

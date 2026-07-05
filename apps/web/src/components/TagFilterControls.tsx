@@ -6,7 +6,7 @@ import { TAG_FILTER_PANEL_ID, useTagFilter } from '@/components/TagFilterProvide
 
 /** 一覧上部に置くタグパネル + 選択中バーのアイランド */
 export function TagFilterControls() {
-  const { panelOpen, selected, mode, matched, tagTree, toggleTag, changeMode, clear } =
+  const { panelOpen, selected, mode, totalCount, tagTree, toggleTag, changeMode, clear } =
     useTagFilter();
 
   return (
@@ -24,7 +24,7 @@ export function TagFilterControls() {
       <ActiveTagBar
         selected={selected}
         mode={mode}
-        hitCount={matched.length}
+        hitCount={totalCount}
         onRemoveTag={toggleTag}
         onClear={clear}
       />
