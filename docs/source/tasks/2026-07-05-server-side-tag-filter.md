@@ -302,21 +302,22 @@ TIDB_DATABASE=blog_test NEXT_PUBLIC_USER_NAME=testuser-cvtb-0 bun run dev
 
 `tag_article_counts` は blog_dev / blog_prd に未適用（適用済みなのは検証用 blog_test のみ）。Phase G は **DDL → バックフィル → blog-api デプロイ** の順を厳守する。新 facets API の tags なし分岐はテーブル前提のため、テーブルなしで新コードを先に出すと 500 になる。逆に DB 側の先行は旧コードがテーブルを参照しないため無害。
 
-### 1. blog_dev への適用
+### 1. DB への適用（blog_dev / blog_prd 共通）
 
 ```bash
 export TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
+export SCHEMA=blog_dev   # 本番適用時は blog_prd
 
-# DDL（${SCHEMA} を置換して適用。CREATE TABLE IF NOT EXISTS のため再実行可）
-sed 's/${SCHEMA}/blog_dev/g' tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql \
+# DDL（SQL 内の ${SCHEMA} プレースホルダを置換して適用。CREATE TABLE IF NOT EXISTS のため再実行可）
+sed "s/\${SCHEMA}/$SCHEMA/g" tools/dsql-cli/dsl-tidb/schema/06_tag_article_counts.sql \
   | mysql -h tidb.$TAILNET -P 4000 -u root
 
 # バックフィル（冪等: 全削除 + 再計算 INSERT。50万件クラスタ実測 4.0s、実データ規模なら一瞬）
-mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
+mysql -h tidb.$TAILNET -P 4000 -u root -D "$SCHEMA" \
   < tools/dsql-cli/dsl-tidb/backfill/backfill_tag_article_counts.sql
 
 # 妥当性確認（type ごとのタグ行数と記事数合計を目視）
-mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
+mysql -h tidb.$TAILNET -P 4000 -u root -D "$SCHEMA" \
   -e "SELECT \`type\`, COUNT(*) AS tag_rows, SUM(article_count) AS total FROM tag_article_counts GROUP BY \`type\`"
 ```
 
@@ -328,7 +329,7 @@ mysql -h tidb.$TAILNET -P 4000 -u root -D blog_dev \
 
 ### 3. blog_prd への適用と本番反映
 
-1. 手順 1. を `blog_dev` → `blog_prd` に置換して実行（main マージ前に実施）
+1. 手順 1. を `SCHEMA=blog_prd` にして再実行（main マージ前に実施）
 2. preview → main のマージ（Git Rules どおり人間が実施）→ prd 自動デプロイ
 3. デプロイ後にバックフィル再実行 + 本番スモーク（一覧 / タグ絞り込み1回 / facets / 記事詳細）
 
