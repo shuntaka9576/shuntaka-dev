@@ -7,18 +7,18 @@ targets:
 dependencies:
   apm:
     # AWS Agent Toolkit (12)
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cdk#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cloudformation#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-iam#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-observability#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/core-skills/aws-sdk-js-v3-usage#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/connecting-lambda-to-api-gateway#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/creating-api-gateway-stage#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/security-and-identity-skills/creating-secrets-using-best-practices#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/debugging-lambda-timeouts#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/networking-and-content-delivery-skills/routing-traffic-with-route53-and-cloudfront#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/setting-up-cloudwatch-alarm-notifications#7e471bf7154f2227de603b6e5bb6a5ce08148c98
-    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/troubleshooting-application-failures#7e471bf7154f2227de603b6e5bb6a5ce08148c98
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cdk#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-cloudformation#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-iam#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-observability#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/core-skills/aws-sdk-js-v3-usage#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/connecting-lambda-to-api-gateway#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/creating-api-gateway-stage#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/security-and-identity-skills/creating-secrets-using-best-practices#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/serverless-skills/debugging-lambda-timeouts#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/networking-and-content-delivery-skills/routing-traffic-with-route53-and-cloudfront#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/setting-up-cloudwatch-alarm-notifications#aea59f3570608a77c0b32c2ee1beee06222bad57
+    - aws/agent-toolkit-for-aws/skills/specialized-skills/operations-skills/troubleshooting-application-failures#aea59f3570608a77c0b32c2ee1beee06222bad57
     # vercel-labs (3)
     - vercel-labs/agent-skills/skills/composition-patterns#f8a72b9603728bb92a217a879b7e62e43ad76c81
     - vercel-labs/agent-skills/skills/react-best-practices#f8a72b9603728bb92a217a879b7e62e43ad76c81
