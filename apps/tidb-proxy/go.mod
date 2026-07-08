@@ -1,6 +1,6 @@
 module github.com/shuntaka9576/shuntaka-dev/tidb-proxy
 
-go 1.26.4
+go 1.26.5
 
 require (
 	go.opentelemetry.io/contrib/propagators/aws v1.44.0
