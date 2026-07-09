@@ -13,7 +13,7 @@
     ".legacy/**",
     "**/target/**",
     "**/__snapshots__/**",
-    "docs/source/incidents/**",
+    "docs/source/96_incidents/**",
     "**/storybook-static/**",
     "tools/dsql-cli/backup*/**",
     "tools/tidb-seeder/out/**",
