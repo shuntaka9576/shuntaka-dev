@@ -4,7 +4,7 @@
 - 調査日: 2026-07-04
 - 関連:
   - [OTel ボトルネック観測基盤](../../98_tasks/2026-07-03-otel-bottleneck-observability/index.md)（OTel Metrics 採用の経緯とコスト比較）
-  - [運用](../../01_開発ドキュメント/operations.md)（ダッシュボード・テレメトリ一覧・ハマりどころ）
+  - [運用](../../01_開発ドキュメント/03_operations.md)（ダッシュボード・テレメトリ一覧・ハマりどころ）
 - 参考:
   - [Introducing OpenTelemetry and PromQL support in Amazon CloudWatch (AWS Blog)](https://aws.amazon.com/blogs/mt/introducing-opentelemetry-promql-support-in-amazon-cloudwatch/)
   - [CloudWatch OpenTelemetry Metrics（公式ドキュメント）](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/metrics-otel-overview.html)
@@ -39,7 +39,7 @@ PromQL クエリは **1 リクエストの時間範囲が最大 7 日**（lookba
 
 temporality が cumulative のため、1 回だけ invoke されて消えた Lambda サンドボックスの系列（1 サンプルのみ）は `rate()` に反映されない。Classic の EMF ならデータポイント単位で必ず統計に現れるので、これは OTel 側を選んだことによる明確な劣化。
 
-現状は「リクエスト単位の悉皆データは X-Ray で見る」で回避している（[運用のハマりどころ](../../01_開発ドキュメント/operations.md)参照）が、X-Ray にはサンプリングと保持期間の制約があり完全な代替ではない。
+現状は「リクエスト単位の悉皆データは X-Ray で見る」で回避している（[運用のハマりどころ](../../01_開発ドキュメント/03_operations.md)参照）が、X-Ray にはサンプリングと保持期間の制約があり完全な代替ではない。
 
 ### 3. 従来のメトリクスコンソール・エコシステムに乗らない
 

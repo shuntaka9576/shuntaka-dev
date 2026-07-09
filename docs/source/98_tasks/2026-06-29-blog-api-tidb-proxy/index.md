@@ -624,7 +624,7 @@ CDK は **インフラの土台のみ** を作る。Task definition / Service �
 - [x] ECR lifecycle policy `maxImageCount: 1` を設定
 - [x] CDK stack に組み込み、`vitest run` で snapshot 確認 (`iac/aws/test/proxy.test.ts.snap`)
 - [ ] CDK deploy 実行、SSM Parameter Store に必要な値が出力されていることを確認
-- [ ] Tailscale auth key を SSM `/shared/shuntaka/tailscale/proxy-auth-key` に手動で格納（90 日 rotation 運用、手順は `docs/source/01_開発ドキュメント/development.md` を参照）
+- [ ] Tailscale auth key を SSM `/shared/shuntaka/tailscale/proxy-auth-key` に手動で格納（90 日 rotation 運用、手順は `docs/source/01_開発ドキュメント/01_development.md` を参照）
 
 ### タスク 2: ecspresso 設定ファイル作成 + 初回 deploy
 
@@ -711,7 +711,7 @@ scripts/deploy-tidb-proxy.sh
 #### チェックリスト
 
 - [x] `scripts/deploy-tidb-proxy.sh` で build + push + ecspresso deploy を 1 コマンド化
-- [x] `docs/source/01_開発ドキュメント/development.md` に運用手順を反映
+- [x] `docs/source/01_開発ドキュメント/01_development.md` に運用手順を反映
 
 ### タスク 4: dev Lambda を VPC 化 + HTTPS_PROXY 設定（先に dev で dual-run）
 

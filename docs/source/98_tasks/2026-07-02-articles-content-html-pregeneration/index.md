@@ -65,7 +65,7 @@ bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/$SCHEMA --dry-run
 bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/$SCHEMA
 ```
 
-生成結果が保存済みと同一の記事は UPDATE 自体がスキップされる。使い方の詳細は [content-html-backfill](../../01_開発ドキュメント/development.md#content-html-backfill) を参照。埋め戻し完了は以下で確認できる。
+生成結果が保存済みと同一の記事は UPDATE 自体がスキップされる。使い方の詳細は [content-html-backfill](../../01_開発ドキュメント/01_development.md#content-html-backfill) を参照。埋め戻し完了は以下で確認できる。
 
 ```bash
 mysql -h tidb.$TAILNET -P 4000 -u root -D $SCHEMA \

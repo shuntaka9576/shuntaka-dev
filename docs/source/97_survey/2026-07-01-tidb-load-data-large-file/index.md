@@ -2,7 +2,7 @@
 
 - 観測日: 2026-07-01
 - 対象: 検証用 self-hosted TiDB クラスタ (`blog_test` に seeder 出力を投入)
-- 関連: [tidb-seeder](../../01_開発ドキュメント/development.md#tidb-seeder), [`tools/tidb-seeder/`](https://github.com/shuntaka9576/shuntaka-dev/tree/main/tools/tidb-seeder), [`tools/dsql-cli/dsl-tidb/load.sh`](https://github.com/shuntaka9576/shuntaka-dev/blob/main/tools/dsql-cli/dsl-tidb/README.md)
+- 関連: [tidb-seeder](../../01_開発ドキュメント/01_development.md#tidb-seeder), [`tools/tidb-seeder/`](https://github.com/shuntaka9576/shuntaka-dev/tree/main/tools/tidb-seeder), [`tools/dsql-cli/dsl-tidb/load.sh`](https://github.com/shuntaka9576/shuntaka-dev/blob/main/tools/dsql-cli/dsl-tidb/README.md)
 
 ## 症状
 

@@ -45,7 +45,7 @@ bun run doc-gen
 
 旧生成物（`app.*.md`）は `--rm-dist` で削除される。設定ファイル名が `.tbls.yaml`（tbls のデフォルトは `.tbls.yml`）のため `-c` の明示が必要で、doc-gen スクリプトに含めてある。
 
-`02_database.md` の toctree は `db/README` を参照しており、再生成後もファイル名は変わらないため追随不要。tasks / survey 配下の過去記録に残る `app.*` 表記は当時の記録なので変更しない。
+`02_database.md` の toctree は `04_db/README` を参照しており、再生成後もファイル名は変わらないため追随不要。tasks / survey 配下の過去記録に残る `app.*` 表記は当時の記録なので変更しない。
 
 ## Phase C: DDL
 

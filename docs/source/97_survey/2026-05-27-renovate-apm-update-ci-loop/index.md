@@ -97,7 +97,7 @@ fi
 
 ## 運用上のトレードオフ
 
-`[skip ci]` 付き lockfile-sync commit に対しては CI / zizmor が走らない。preview ブランチの ruleset に zizmor の code_scanning ルールがあるため、PR の最新コミット（= lockfile-sync commit）が来ているとマージブロックされる。マージ前に手動で zizmor を再実行する必要がある（手順は `docs/source/01_開発ドキュメント/development.md` の Agents Skills セクション参照）。
+`[skip ci]` 付き lockfile-sync commit に対しては CI / zizmor が走らない。preview ブランチの ruleset に zizmor の code*scanning ルールがあるため、PR の最新コミット（= lockfile-sync commit）が来ているとマージブロックされる。マージ前に手動で zizmor を再実行する必要がある（手順は `docs/source/01*開発ドキュメント/01_development.md` の Agents Skills セクション参照）。
 
 ```bash
 gh workflow run zizmor.yaml --ref <PRブランチ名>

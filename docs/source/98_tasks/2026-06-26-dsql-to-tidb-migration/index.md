@@ -165,7 +165,7 @@ bash dsl-tidb/load.sh -d blog_dev -t ./backup -H tidb.$TAILNET
 前提:
 
 - 取り元 DSQL endpoint の SSM パラメータが `/prd/shuntaka/dsql/cluster-endpoint`、AWS 認証は prd への ssm:GetParameter / dsql:DbConnectAdmin 権限を持つプロファイル (`aws-vault exec <profile>`)
-- prd 用 SSM Parameter (`/prd/shuntaka/tailscale/*`) と gh variable (`TS_*_KEY_NAME --env prd`) は `docs/source/01_開発ドキュメント/development.md` の手順で投入済み (dev/prd 共通の Tailscale OAuth client を `for STAGE_NAME in dev prd` の形で両方の path に入れる)
+- prd 用 SSM Parameter (`/prd/shuntaka/tailscale/*`) と gh variable (`TS_*_KEY_NAME --env prd`) は `docs/source/01_開発ドキュメント/01_development.md` の手順で投入済み (dev/prd 共通の Tailscale OAuth client を `for STAGE_NAME in dev prd` の形で両方の path に入れる)
 - 取り込み先 TiDB のデータベース名は `blog_prd` (stage 名の long と一致、`blog_prod` ではない)
 - blog-api Lambda の `DATABASE_URL` は CDK の `blog-api-construct.ts` で `mysql://root@127.0.0.1:13306/blog_dev` がハードコードされている。prd デプロイ前に `blog_${stageName.long}` で stage 別に分岐するよう修正する (差分はタスク4 の実装記録に追記)
 - 旧 prd DSQL への書き込みを止めるため、GitHub App の Webhook を一時的に Active off にしてから export を行う (export 中に記事が書き込まれると TiDB との差分が発生する)
@@ -264,7 +264,7 @@ curl -sS -o /dev/null -w "HTTP %{http_code} time=%{time_total}s\n" \
 - [ ] `DSQL_CLUSTER_ENDPOINT` の Stack Output を削除
 - [ ] TiDB 接続情報を格納する Construct を追加
 - [ ] `DATABASE_URL`（`mysql://` 形式）に切替
-- [ ] `docs/source/01_開発ドキュメント/development.md` の「psql接続（DSQL）」「dsql-cli」節を TiDB 版に書き換え
+- [ ] `docs/source/01_開発ドキュメント/01_development.md` の「psql接続（DSQL）」「dsql-cli」節を TiDB 版に書き換え
 - [ ] `bunx dotenv -- cdk synth -c stageName=dev` がエラーなく通る
 
 ### 実装記録
@@ -283,11 +283,11 @@ TiDB は自宅 LAN (`192.168.4.0/22`) に置き、Tailscale 経由でアクセ�
 {
   "tagOwners": {
     "tag:aws-app": ["autogroup:admin"],
-    "tag:k8s":     ["autogroup:admin"]
+    "tag:k8s": ["autogroup:admin"]
   },
   "acls": [
     { "action": "accept", "src": ["autogroup:member"], "dst": ["192.168.4.0/22:*"] },
-    { "action": "accept", "src": ["tag:aws-app"],      "dst": ["192.168.4.0/22:4000"] },
+    { "action": "accept", "src": ["tag:aws-app"], "dst": ["192.168.4.0/22:4000"] },
     { "action": "accept", "src": ["autogroup:member"], "dst": ["tag:k8s:*"] }
   ]
 }
@@ -320,7 +320,7 @@ OAuth client は **`tag:aws-app` 用 / 他バッチ用** といった具合に *
 
 ### SSM Parameter Store への配置
 
-CDK の SSM パス規約 (`/<stage>/<project>/...`) と既存 GH App / Cloudinary パターン (path だけ env に渡し値は SSM 側) に揃え、3 つの parameter に分けて格納する。詳細手順は `docs/source/01_開発ドキュメント/development.md` 参照:
+CDK の SSM パス規約 (`/<stage>/<project>/...`) と既存 GH App / Cloudinary パターン (path だけ env に渡し値は SSM 側) に揃え、3 つの parameter に分けて格納する。詳細手順は `docs/source/01_開発ドキュメント/01_development.md` 参照:
 
 ```text
 /<stage>/shuntaka/tailscale/oauth-client-id      (SecureString)
@@ -383,7 +383,7 @@ A1 を採用する場合、`adapter/src/database/mod.rs` の `ensure_tailnet_rea
 ### チェックリスト
 
 - [x] Tailscale admin で OAuth client `blog-api-lambda` を作成 (Scopes: `auth_keys` write、Tags: `tag:aws-app`)
-- [x] `client_id` / `client_secret` / `tailnet_suffix` を SSM Parameter Store `/<stage>/shuntaka/tailscale/{oauth-client-id, oauth-client-secret, tailnet-suffix}` に SecureString / String で格納 (dev/prd 共通 OAuth client を両 stage の path に投入、詳細は `docs/source/01_開発ドキュメント/development.md`)
+- [x] `client_id` / `client_secret` / `tailnet_suffix` を SSM Parameter Store `/<stage>/shuntaka/tailscale/{oauth-client-id, oauth-client-secret, tailnet-suffix}` に SecureString / String で格納 (dev/prd 共通 OAuth client を両 stage の path に投入、詳細は `docs/source/01_開発ドキュメント/01_development.md`)
 - [x] `apps/blog-api/Dockerfile` を multi-stage 化し、tsnet-launcher バイナリ (Go) を同梱
 - [x] tsnet-launcher で SSM Parameter Store → OAuth token → auth key → `tsnet.Server.Up()` のチェーンを実装
 - [x] CDK で Lambda の env に `DATABASE_URL` (`mysql://root@127.0.0.1:13306/blog_${stageName.long}`) と `TS_OAUTH_CLIENT_ID_KEY_NAME` / `TS_OAUTH_CLIENT_SECRET_KEY_NAME` / `TS_TAILNET_SUFFIX_KEY_NAME` を注入
