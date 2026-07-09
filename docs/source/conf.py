@@ -23,6 +23,7 @@ html_theme_options = {
 myst_fence_as_directive = ["mermaid"]
 
 # MyST の追加記法 (取り消し線 / ::: 記法のアドモニション / 定義リスト)
+# cspell:ignore deflist
 myst_enable_extensions = ["strikethrough", "colon_fence", "deflist"]
 
 # H1〜H3 の見出しに自動 slug を付けて `foo.md#slug` のアンカー参照を有効にする
