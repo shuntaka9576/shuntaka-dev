@@ -121,6 +121,12 @@
       "description": "Group all APM dependency updates (apm.yml)",
       "matchFileNames": ["apm.yml"],
       "groupName": "apm"
+    },
+    {
+      "description": "apps/web の typescript は Next.js/Storybook が TS7(ネイティブ移植版) の Compiler API 非対応のため v6 系に固定",
+      "matchFileNames": ["apps/web/**"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
     }
   ]
 }
