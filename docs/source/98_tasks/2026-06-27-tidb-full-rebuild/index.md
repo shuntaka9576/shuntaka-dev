@@ -34,12 +34,12 @@
 | **CNI**                | Cilium (Helm)                | chart 1.16.3 / app 1.16.3                  |
 | **Storage**            | local-path-provisioner       | default StorageClass 設定                  |
 | **VPN / 公開**         | tailscale-operator (Helm)    | chart 1.98.4 / app v1.98.4                 |
-| **TiDB**               | TidbCluster (`spec.version`) | v8.1.0                                     |
+| **TiDB**               | TidbCluster (`spec.version`) | v8.5.7                                     |
 | **TiDB Operator**      | Helm + CRDs                  | v1.6.0                                     |
 | **kube-prom-stack**    | Helm                         | chart 87.3.0 / Prometheus Operator v0.92.0 |
-| **ng-monitoring**      | Pod image                    | pingcap/ng-monitoring:v8.1.0               |
+| **ng-monitoring**      | Pod image                    | pingcap/ng-monitoring:v8.5.7               |
 
-> Ubuntu / k8s / CNI / Tailscale Operator は本資料スコープ外 (残す側)。**TiDB 系と kube-prom-stack のバージョンを上げる時は本表とコマンド内のバージョン指定を同期させる**。とくに `kubectl create -f https://raw.../tidb-operator/v1.6.0/manifests/crd.yaml` と `helm install ... --version v1.6.0`、`manifests/tidb-cluster/tidb-cluster.yaml` の `spec.version: v8.1.0`、`manifests/monitoring/ng-monitoring/*.yaml` の image tag は **常に揃える**。
+> Ubuntu / k8s / CNI / Tailscale Operator は本資料スコープ外 (残す側)。**TiDB 系と kube-prom-stack のバージョンを上げる時は本表とコマンド内のバージョン指定を同期させる**。とくに `kubectl create -f https://raw.../tidb-operator/v1.6.0/manifests/crd.yaml` と `helm install ... --version v1.6.0`、`manifests/tidb-cluster/tidb-cluster.yaml` の `spec.version: v8.5.7`、`manifests/monitoring/ng-monitoring/*.yaml` の image tag は **常に揃える**。TiDB / ng-monitoring は 2026-07-10 に v8.1.0 → v8.5.7 へローリングアップグレード済み（`tasks/2026-07-10-tidb-cluster-upgrade` 参照）。
 
 ### 残存設定の前提チェック (再構築前に確認)
 
