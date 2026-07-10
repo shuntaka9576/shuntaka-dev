@@ -50,11 +50,28 @@ export function ProgressLink({
   );
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    onClick?.(e);
+
+    // 修飾キー / 中クリック / target="_blank" 等は現在のタブが遷移せず
+    // 別タブ・別ウィンドウで開くため、startProgress() を呼ぶとバーが完了せず残る。
+    // 同一タブでのクライアント遷移が実際に起きるクリックのときだけ開始する
+    const targetAttr = e.currentTarget.target;
+    if (
+      e.defaultPrevented ||
+      e.button !== 0 ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey ||
+      (targetAttr && targetAttr !== '_self')
+    ) {
+      return;
+    }
+
     const targetPath = typeof href === 'string' ? href : href.pathname;
     if (targetPath !== pathname) {
       startProgress();
     }
-    onClick?.(e);
   };
 
   return (
