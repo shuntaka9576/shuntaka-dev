@@ -290,6 +290,14 @@ aws athena get-query-results --query-execution-id <上の実行結果の QueryEx
 aws s3 ls s3://tidb-proxy-logs-$(aws sts get-caller-identity --query Account --output text)/firehose-errors/ --recursive
 ```
 
+よく使うクエリは Athena の Saved queries (WorkGroup `tidb-proxy-logs`) に CDK で登録済み。コンソールの Athena → Saved queries から実行できる。
+
+| Named Query              | 用途                                                                     |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `recent-activity`        | 直近のアクティビティ一覧 (ECS ヘルスチェックのノイズ除外)                |
+| `destination-summary-7d` | 直近7日の外部通信の宛先別サマリ (egress 監査、想定外の phone-home 検知)  |
+| `denied-or-error-access` | TCP_DENIED / HTTP 4xx・5xx の検出 (squid の egress 制限に触れた通信調査) |
+
 Fluent Bit の設定 (`apps/tidb-proxy/firelens/extra.conf` / `parsers.conf`) を変更した場合の反映手順。init プロセスはコンテナ起動時に一度だけ S3 から設定を取得するため、S3 更新だけでは反映されず、task def も変わらないため ecspresso の diff でも検知されない。明示的に task を再起動する。
 
 ```bash

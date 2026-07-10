@@ -218,7 +218,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
     }
 
     // ---- Athena WorkGroup ----
-    new athena.CfnWorkGroup(this, 'WorkGroup', {
+    const workGroup = new athena.CfnWorkGroup(this, 'WorkGroup', {
       name: config.athena.workGroupName,
       recursiveDeleteOption: true,
       workGroupConfiguration: {
@@ -235,6 +235,77 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         },
       },
     });
+
+    // ---- Athena Named Queries (よく使う検索の登録) ----
+    // いずれも実データに対して実行確認済み (2026-07-11)。
+    // ECS ヘルスチェック (nc -z, 127.0.0.1 から 30 秒ごと) が squid_access の
+    // ノイズ行になるため、client_ip でヘルスチェックを除外するのが基本形。
+    // forwarder 行は client_ip が NULL のため IS DISTINCT FROM で残す。
+    const namedQueries: { id: string; name: string; description: string; sql: string }[] = [
+      {
+        id: 'RecentActivityQuery',
+        name: 'recent-activity',
+        description:
+          '直近のアクティビティ (squid アクセス + forwarder イベント)。ECS ヘルスチェックのノイズを除外',
+        sql: [
+          'SELECT ts, log_type,',
+          "       coalesce(message, method || ' ' || url) AS event,",
+          '       status, duration_ms, bytes_in, bytes_out',
+          'FROM logs',
+          "WHERE client_ip IS DISTINCT FROM '127.0.0.1'",
+          'ORDER BY ts DESC',
+          'LIMIT 100',
+        ].join('\n'),
+      },
+      {
+        id: 'DestinationSummaryQuery',
+        name: 'destination-summary-7d',
+        description:
+          '直近7日の外部通信の宛先別サマリ (egress 監査用)。想定外の宛先への phone-home 検知に使う',
+        sql: [
+          'SELECT url AS destination,',
+          '       count(*) AS requests,',
+          '       count_if(status >= 400) AS errors,',
+          '       sum(bytes_in) AS bytes_in,',
+          '       sum(bytes_out) AS bytes_out,',
+          '       round(avg(duration_ms)) AS avg_ms,',
+          '       max(ts) AS last_seen',
+          'FROM logs',
+          "WHERE log_type = 'squid_access'",
+          "  AND client_ip <> '127.0.0.1'",
+          "  AND from_iso8601_timestamp(ts) > current_timestamp - interval '7' day",
+          'GROUP BY url',
+          'ORDER BY requests DESC',
+          'LIMIT 50',
+        ].join('\n'),
+      },
+      {
+        id: 'DeniedOrErrorAccessQuery',
+        name: 'denied-or-error-access',
+        description:
+          '拒否 (TCP_DENIED) と HTTP 4xx/5xx のアクセス検出。squid の egress 制限に引っかかった通信の調査用',
+        sql: [
+          'SELECT ts, client_ip, method, url, status, squid_status, user_agent',
+          'FROM logs',
+          "WHERE log_type = 'squid_access'",
+          "  AND client_ip <> '127.0.0.1'",
+          "  AND (status >= 400 OR squid_status LIKE 'TCP_DENIED%')",
+          'ORDER BY ts DESC',
+          'LIMIT 100',
+        ].join('\n'),
+      },
+    ];
+    for (const q of namedQueries) {
+      const namedQuery = new athena.CfnNamedQuery(this, q.id, {
+        name: q.name,
+        description: q.description,
+        database: config.glue.databaseName,
+        workGroup: config.athena.workGroupName,
+        queryString: q.sql,
+      });
+      // workGroup プロパティは名前の文字列参照のため、依存を明示する。
+      namedQuery.addDependency(workGroup);
+    }
 
     // ---- 既存 tidb-proxy タスクロールへの権限後付け ----
     // FireLens の kinesis_firehose / cloudwatch_logs 出力プラグインと init
