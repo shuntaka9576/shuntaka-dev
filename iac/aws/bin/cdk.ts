@@ -69,6 +69,15 @@ const mainStack = new MainStack(app, `${config.stageName.short}-${config.project
 mainStack.addDependency(globalDnsStack);
 mainStack.addDependency(tokyoCertificateStack);
 
+// Lambda 用環境変数が未設定の場合、main stack のデプロイだけをブロックする。
+// エラーは stack 単位に付くため、deploy-role 等の他スタックは .env なしの
+// ローカル環境でも synth / deploy できる。
+if (config.missingLambdaEnvVars.length > 0) {
+  cdk.Annotations.of(mainStack).addError(
+    `Lambda 用環境変数が未設定のため main stack はデプロイできません: ${config.missingLambdaEnvVars.join(', ')} (iac/aws/.env か環境変数で設定してください)`,
+  );
+}
+
 const oidcProviderStack = new OidcProviderStack(app, `${config.projectName.short}-oidc-provider`, {
   ssmOidcProviderArn: config.ssm.oidc.providerArn,
   env: {

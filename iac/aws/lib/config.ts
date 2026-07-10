@@ -82,6 +82,10 @@ interface AppParameter {
       cloudinaryApiSecretKeyName: string;
     };
   };
+  // 未設定の Lambda 用環境変数名。空でない場合、bin/cdk.ts が main stack に
+  // Annotations.addError を付けて main のデプロイだけをブロックする
+  // (deploy-role 等の他スタックはローカルで .env なしでもデプロイできるようにする)。
+  missingLambdaEnvVars: string[];
 }
 
 const commonParameters = {
@@ -101,8 +105,17 @@ const getCdkEnvVars = () => {
   });
 };
 
-const getLambdaEnvVars = () => {
-  return lambdaEnvSchema.parse({
+// Lambda (main stack) 用の環境変数を検証する。未設定でも throw せず placeholder で
+// 埋めて synth を通す。CDK は `cdk deploy <stack>` でも全スタックを synth するため、
+// ここで throw すると deploy-role 等の main と無関係なスタックまでローカルで
+// デプロイできなくなる。placeholder のまま main をデプロイする事故は、bin/cdk.ts の
+// Annotations.addError (missingLambdaEnvVars) が main stack 選択時に synth を
+// 失敗させることで防ぐ。
+const getLambdaEnvVars = (): {
+  values: z.infer<typeof lambdaEnvSchema>;
+  missing: string[];
+} => {
+  const parsed = lambdaEnvSchema.safeParse({
     GH_APP_ID: process.env.GH_APP_ID,
     GH_APP_SECRET_PEM_KEY_NAME: process.env.GH_APP_SECRET_PEM_KEY_NAME,
     GH_WEBHOOK_SECRET_KEY_NAME: process.env.GH_WEBHOOK_SECRET_KEY_NAME,
@@ -110,10 +123,28 @@ const getLambdaEnvVars = () => {
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET_KEY_NAME: process.env.CLOUDINARY_API_SECRET_KEY_NAME,
   });
+
+  if (parsed.success) {
+    return { values: parsed.data, missing: [] };
+  }
+
+  const missing = parsed.error.issues.map((issue) => issue.path.join('.'));
+  const placeholder = 'unset-local-placeholder';
+  return {
+    values: {
+      GH_APP_ID: process.env.GH_APP_ID ?? placeholder,
+      GH_APP_SECRET_PEM_KEY_NAME: process.env.GH_APP_SECRET_PEM_KEY_NAME ?? placeholder,
+      GH_WEBHOOK_SECRET_KEY_NAME: process.env.GH_WEBHOOK_SECRET_KEY_NAME ?? placeholder,
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ?? placeholder,
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ?? placeholder,
+      CLOUDINARY_API_SECRET_KEY_NAME: process.env.CLOUDINARY_API_SECRET_KEY_NAME ?? placeholder,
+    },
+    missing,
+  };
 };
 
 const stageConfig: {
-  [key in StageName]: Omit<AppParameter, 'cdkEnv' | 'ssm' | 'lambda'>;
+  [key in StageName]: Omit<AppParameter, 'cdkEnv' | 'ssm' | 'lambda' | 'missingLambdaEnvVars'>;
 } = {
   dev: {
     ...commonParameters,
@@ -299,14 +330,15 @@ export const getConfig = (stageName: string): AppParameter => {
     },
     lambda: {
       blogApi: {
-        githubAppId: lambdaEnvVars.GH_APP_ID,
-        githubAppSecretPemKeyName: lambdaEnvVars.GH_APP_SECRET_PEM_KEY_NAME,
-        githubWebhookSecretKeyName: lambdaEnvVars.GH_WEBHOOK_SECRET_KEY_NAME,
-        cloudinaryCloudName: lambdaEnvVars.CLOUDINARY_CLOUD_NAME,
-        cloudinaryApiKey: lambdaEnvVars.CLOUDINARY_API_KEY,
-        cloudinaryApiSecretKeyName: lambdaEnvVars.CLOUDINARY_API_SECRET_KEY_NAME,
+        githubAppId: lambdaEnvVars.values.GH_APP_ID,
+        githubAppSecretPemKeyName: lambdaEnvVars.values.GH_APP_SECRET_PEM_KEY_NAME,
+        githubWebhookSecretKeyName: lambdaEnvVars.values.GH_WEBHOOK_SECRET_KEY_NAME,
+        cloudinaryCloudName: lambdaEnvVars.values.CLOUDINARY_CLOUD_NAME,
+        cloudinaryApiKey: lambdaEnvVars.values.CLOUDINARY_API_KEY,
+        cloudinaryApiSecretKeyName: lambdaEnvVars.values.CLOUDINARY_API_SECRET_KEY_NAME,
       },
     },
+    missingLambdaEnvVars: lambdaEnvVars.missing,
   };
 };
 

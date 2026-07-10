@@ -101,11 +101,15 @@ export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void =
       reason:
         'tidb-proxy タスクロールが FireLens init プロセスで取得する Fluent Bit 設定ファイル群。firelens-config/ prefix 配下の GetObject のみに限定済み。',
     },
-    {
-      id: 'AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:s3:::cdk-hnb659fds-assets-123456789012-ap-northeast-1/*]',
+    // BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケット
+    // から設定ファイルを取得するための CDK 既定権限。finding の ARN はアカウント ID
+    // を含み、partition もテスト synth ではトークン (<AWS::Partition>)、実アカウント
+    // の synth ではリテラル (aws) になるため、stack の env から動的に両方 acknowledge する。
+    ...['<AWS::Partition>', 'aws'].map((partition) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::cdk-hnb659fds-assets-${stack.account}-${stack.region}/*]`,
       reason:
         'BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケットから設定ファイルを取得するための CDK 既定権限。',
-    },
+    })),
     {
       // cspell:disable-next-line -- CFN パラメータ論理 ID (自動生成トークン)
       id: 'AwsSolutions-IAM5[Resource::arn:aws:logs:<AWS::Region>:<AWS::AccountId>:log-group:<SsmParameterValuetidbproxyproxyloggroupnameC96584B6F00A464EAD1953AFF4B05118Parameter>:*]',
