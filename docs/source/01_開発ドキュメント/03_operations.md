@@ -4,15 +4,17 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 
 ## 症状別インデックス
 
-| 症状                           | 見る節                 |
-| ------------------------------ | ---------------------- |
-| API / ブログが遅い             | ボトルネック切り分け   |
-| グラフの意味を知りたい         | ダッシュボード         |
-| ダッシュボードにデータが出ない | テレメトリが出ないとき |
-| 誰が何を送っているか知りたい   | テレメトリ一覧         |
-| クエリの書き方を調べたい       | クエリリファレンス     |
-| 検索がヒットしない・表示が変   | ハマりどころ           |
-| MiniPC を再起動したい          | ノード再起動           |
+| 症状                                     | 見る節                 |
+| ---------------------------------------- | ---------------------- |
+| API / ブログが遅い                       | ボトルネック切り分け   |
+| グラフの意味を知りたい                   | ダッシュボード         |
+| ダッシュボードにデータが出ない           | テレメトリが出ないとき |
+| 誰が何を送っているか知りたい             | テレメトリ一覧         |
+| クエリの書き方を調べたい                 | クエリリファレンス     |
+| Lambda がどこへ外部通信したか調べたい    | クエリリファレンス     |
+| proxy のアクセス・エラーログを検索したい | クエリリファレンス     |
+| 検索がヒットしない・表示が変             | ハマりどころ           |
+| MiniPC を再起動したい                    | ノード再起動           |
 
 ## ボトルネック切り分け
 
@@ -182,6 +184,27 @@ curl -s https://api.shuntaka.dev/health/db # ブログ DB 経路の疎通
 ```
 
 ## クエリリファレンス
+
+### Athena（proxy アクセスログ / Iceberg）
+
+tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アクセスログ・forwarder イベント）が S3 上の Iceberg テーブル `tidb_proxy_logs.logs` に、WARN / ERROR・非 JSON 行が CloudWatch Logs `/ecs/tidb-proxy` に入る。設計は [tidb-proxy ログの S3/Iceberg 検索基盤](../98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md) を参照。
+
+よく使うクエリは Saved queries（WorkGroup `tidb-proxy-logs`）に CDK（`iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`）で登録済み。Athena コンソールで WorkGroup を `tidb-proxy-logs` に切り替えて Saved queries から実行する。
+
+| Named Query              | 用途                                                                      |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `recent-activity`        | 直近のアクティビティ一覧（ECS ヘルスチェックのノイズ除外）                |
+| `destination-summary-7d` | 直近7日の外部通信の宛先別サマリ（egress 監査、想定外の phone-home 検知）  |
+| `denied-or-error-access` | TCP_DENIED / HTTP 4xx・5xx の検出（squid の egress 制限に触れた通信調査） |
+
+いずれも時刻カラムは JST（`ts_jst` / `last_seen_jst`）で返す。
+
+自分でクエリを書くときの注意:
+
+- ECS ヘルスチェック（127.0.0.1 から 30 秒ごとの `nc -z`）が `squid_access` のノイズ行になる。`client_ip <> '127.0.0.1'` で除外し、forwarder 行（`client_ip` が NULL）も残す場合は `client_ip IS DISTINCT FROM '127.0.0.1'` を使う
+- `ts` は string（ISO8601 UTC）で保存されている。時刻演算は `from_iso8601_timestamp(ts)`、期間絞り込みは `from_iso8601_timestamp(ts) > current_timestamp - interval '7' day` の形
+- JST 表示は `format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')`
+- WARN / ERROR は Iceberg 側に入らない。障害調査は CloudWatch Logs の `fluentbit-warnerr-*` / `fluentbit-fallback-*` ストリームを見る
 
 ### X-Ray（CloudWatch > トレース）
 

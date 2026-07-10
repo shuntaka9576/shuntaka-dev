@@ -290,6 +290,8 @@ aws athena get-query-results --query-execution-id <上の実行結果の QueryEx
 aws s3 ls s3://tidb-proxy-logs-$(aws sts get-caller-identity --query Account --output text)/firehose-errors/ --recursive
 ```
 
+よく使うクエリは Athena の Saved queries (WorkGroup `tidb-proxy-logs`) に CDK で登録済み。日常のログ検索の使い方は [運用ドキュメント](03_operations.md) の「クエリリファレンス > Athena」を参照。
+
 Fluent Bit の設定 (`apps/tidb-proxy/firelens/extra.conf` / `parsers.conf`) を変更した場合の反映手順。init プロセスはコンテナ起動時に一度だけ S3 から設定を取得するため、S3 更新だけでは反映されず、task def も変わらないため ecspresso の diff でも検知されない。明示的に task を再起動する。
 
 ```bash

@@ -106,6 +106,7 @@ Fluent Bit 自体の RSS は 30〜60MB 程度（AWS の目安予約は 100〜250
   - パーティションなしで開始（string 列に `day` transform が適用できないため。量が増えたら `log_type` の identity パーティション等を検討）
 - **Firehose** `tidb-proxy-logs`: DirectPut、`appendOnly: true`、buffering 60s/64MB、失敗レコードのみ `firehose-errors/` へ (`s3BackupMode: FailedDataOnly`)
 - **Athena WorkGroup** `tidb-proxy-logs`: engine v3、結果出力 `athena-results/`
+- **Athena Named Queries**: よく使う3本を `CfnNamedQuery` で登録 (`recent-activity` / `destination-summary-7d` / `denied-or-error-access`)。ECS ヘルスチェック (127.0.0.1 から30秒ごとの `nc -z`) が squid_access のノイズ行になるため、`client_ip` での除外を基本形にしている
 - **タスクロールへの後付け権限**: `st-tidb-proxy` の SSM 出力 (`/tidb-proxy/proxy/task-role`) から `Role.fromRoleArn(..., { mutable: true })` でインポートし、`firehose:PutRecordBatch` / `s3:GetObject` (firelens-config) / `logs:CreateLogStream・PutLogEvents` を付与。`blog-api-construct.ts` が proxy SG に `addIngressRule` するのと同型のパターンで、稼働中の `st-tidb-proxy` は変更しない
 - **SSM 出力**: `/tidb-proxy/logs/delivery-stream-name`, `/tidb-proxy/logs/firelens-config-s3-arn-prefix` (ecspresso が参照)
 
