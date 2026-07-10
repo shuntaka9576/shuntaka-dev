@@ -478,6 +478,45 @@ E-5: tidb-cluster/tidb-pd, tidb-tidb, tidb-tikv の全 9 Pod が up = 1
 | アップグレード後にクエリプランが変わって遅くなった          | v8.5 系オプティマイザ変更                                   | Top SQL / スロークエリログで対象特定 → 97_survey の EXPLAIN 手順で再計測。必要なら SQL バインディングで固定                                                                 |
 | Dashboard の Top SQL が No Data                             | ng-monitoring とクラスタのバージョン不一致 / ngm 再登録失敗 | Phase D を流し直し、`kubectl -n tidb-cluster logs deploy/ng-monitoring` で self-register 成功を確認                                                                         |
 
+## 事後の気づき: TiDB Dashboard の履歴が Pod 再作成で消える
+
+アップグレード後、TiDB Dashboard の Top SQL / Continuous Profiling / スロークエリ / SQL Statements / Search Logs の履歴がすべて消えていた。調査の結果、消え方は 2 種類に分かれる。
+
+### Top SQL / Continuous Profiling — ng-monitoring の storage 設定不備（要修正）
+
+ng-monitoring の ConfigMap は保存先をトップレベルの `storage_path` キーで指定していたが、ng-monitoring が認識するのは `[storage]` セクションの `path` キー。
+
+```toml
+# 現状（無効なキー。デフォルトの相対パス "data" が使われる）
+storage_path = "/var/lib/ng-monitoring"
+
+# 正しい指定
+[storage]
+path = "/var/lib/ng-monitoring"
+```
+
+このため実データはコンテナ内の `/data`（`/data/tsdb` と `/data/docdb`）に書かれ続けており、永続化用の PVC（5Gi）は 2026-06-27 の構築以来一度も使われず空だった。つまり構築時から「Pod が再作成されるたびに Top SQL / Continuous Profiling の履歴が消える」状態で、今回のアップグレードの Pod 入れ替えで顕在化した。
+
+該当確認:
+
+```bash
+kubectl -n tidb-cluster exec deploy/ng-monitoring -- sh -c \
+  'ls /var/lib/ng-monitoring/; find / -maxdepth 4 \( -name docdb -o -name tsdb \) -type d 2>/dev/null'
+# → PVC 側（/var/lib/ng-monitoring）が空で、/data/tsdb と /data/docdb が存在すれば該当
+```
+
+修正は `cluster/manifests/monitoring/ng-monitoring/configmap.yaml` を `[storage]` セクション形式に直し、`kubectl apply -k cluster/manifests/monitoring/` 後に `kubectl -n tidb-cluster rollout restart deploy/ng-monitoring` で反映する（ConfigMap の変更だけでは Pod に反映されない）。**本タスクでは未対応。別タスクで対応する**。
+
+### その他の履歴 — 現構成では揮発が仕様
+
+| データ                        | 保存先                                    | Pod 再作成で                                                   |
+| ----------------------------- | ----------------------------------------- | -------------------------------------------------------------- |
+| スロークエリ履歴              | tidb Pod の `slowlog` volume（emptyDir）  | 消える                                                         |
+| SQL Statements                | TiDB メモリ内の statement summary         | 消える（`tidb_stmt_summary_enable_persistent` で永続化は可能） |
+| Search Logs の過去ログ        | pd-log / tikv-log / tidb ログ（emptyDir） | 消える                                                         |
+| Overview 等のメトリクスパネル | Prometheus（kube-prom-stack、PVC）        | 残る                                                           |
+| データ本体・システム変数      | TiKV / `mysql.*`（PV）                    | 残る                                                           |
+
 ## 参考
 
 - [Upgrade a TiDB Cluster on Kubernetes | TiDB Docs](https://docs.pingcap.com/tidb-in-kubernetes/stable/upgrade-a-tidb-cluster/)
@@ -500,3 +539,4 @@ E-5: tidb-cluster/tidb-pd, tidb-tidb, tidb-tikv の全 9 Pod が up = 1
 - D 実施: ng-monitoring を v8.5.7 に rollout、successfully rolled out
 - E 実施: バージョン v8.5.7 / 件数一致 / top_sql 維持 / ngm_state started / Prometheus 全 target UP / サイト 200 をすべて確認
 - F 実施: full-rebuild 手順書の構成バージョン表を v8.5.7 に同期。全フェーズ完了、ステータスを完了に変更
+- アップグレード後に TiDB Dashboard の履歴消失に気づき調査。Top SQL / Continuous Profiling は ng-monitoring の storage 設定不備でコンテナ内 `/data` に書かれており、PVC は構築以来未使用だったことが判明（「事後の気づき」参照）。ConfigMap の修正は別タスクで行う
