@@ -241,14 +241,18 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
     // ECS ヘルスチェック (nc -z, 127.0.0.1 から 30 秒ごと) が squid_access の
     // ノイズ行になるため、client_ip でヘルスチェックを除外するのが基本形。
     // forwarder 行は client_ip が NULL のため IS DISTINCT FROM で残す。
+    // ts は UTC (ISO8601) で保存しているため、表示は JST に変換して返す。
+    const tsJst =
+      "format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')";
     const namedQueries: { id: string; name: string; description: string; sql: string }[] = [
       {
         id: 'RecentActivityQuery',
         name: 'recent-activity',
         description:
-          '直近のアクティビティ (squid アクセス + forwarder イベント)。ECS ヘルスチェックのノイズを除外',
+          '直近のアクティビティ (squid アクセス + forwarder イベント)。ECS ヘルスチェックのノイズを除外。時刻は JST',
         sql: [
-          'SELECT ts, log_type,',
+          `SELECT ${tsJst} AS ts_jst,`,
+          '       log_type,',
           "       coalesce(message, method || ' ' || url) AS event,",
           '       status, duration_ms, bytes_in, bytes_out',
           'FROM logs',
@@ -261,7 +265,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         id: 'DestinationSummaryQuery',
         name: 'destination-summary-7d',
         description:
-          '直近7日の外部通信の宛先別サマリ (egress 監査用)。想定外の宛先への phone-home 検知に使う',
+          '直近7日の外部通信の宛先別サマリ (egress 監査用)。想定外の宛先への phone-home 検知に使う。時刻は JST',
         sql: [
           'SELECT url AS destination,',
           '       count(*) AS requests,',
@@ -269,7 +273,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
           '       sum(bytes_in) AS bytes_in,',
           '       sum(bytes_out) AS bytes_out,',
           '       round(avg(duration_ms)) AS avg_ms,',
-          '       max(ts) AS last_seen',
+          "       format_datetime(from_iso8601_timestamp(max(ts)) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss') AS last_seen_jst",
           'FROM logs',
           "WHERE log_type = 'squid_access'",
           "  AND client_ip <> '127.0.0.1'",
@@ -283,9 +287,10 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         id: 'DeniedOrErrorAccessQuery',
         name: 'denied-or-error-access',
         description:
-          '拒否 (TCP_DENIED) と HTTP 4xx/5xx のアクセス検出。squid の egress 制限に引っかかった通信の調査用',
+          '拒否 (TCP_DENIED) と HTTP 4xx/5xx のアクセス検出。squid の egress 制限に引っかかった通信の調査用。時刻は JST',
         sql: [
-          'SELECT ts, client_ip, method, url, status, squid_status, user_agent',
+          `SELECT ${tsJst} AS ts_jst,`,
+          '       client_ip, method, url, status, squid_status, user_agent',
           'FROM logs',
           "WHERE log_type = 'squid_access'",
           "  AND client_ip <> '127.0.0.1'",

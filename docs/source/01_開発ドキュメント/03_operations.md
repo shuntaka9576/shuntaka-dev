@@ -197,10 +197,13 @@ tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アク
 | `destination-summary-7d` | 直近7日の外部通信の宛先別サマリ（egress 監査、想定外の phone-home 検知）  |
 | `denied-or-error-access` | TCP_DENIED / HTTP 4xx・5xx の検出（squid の egress 制限に触れた通信調査） |
 
+いずれも時刻カラムは JST（`ts_jst` / `last_seen_jst`）で返す。
+
 自分でクエリを書くときの注意:
 
 - ECS ヘルスチェック（127.0.0.1 から 30 秒ごとの `nc -z`）が `squid_access` のノイズ行になる。`client_ip <> '127.0.0.1'` で除外し、forwarder 行（`client_ip` が NULL）も残す場合は `client_ip IS DISTINCT FROM '127.0.0.1'` を使う
-- `ts` は string（ISO8601 UTC）。時刻演算は `from_iso8601_timestamp(ts)`、期間絞り込みは `from_iso8601_timestamp(ts) > current_timestamp - interval '7' day` の形
+- `ts` は string（ISO8601 UTC）で保存されている。時刻演算は `from_iso8601_timestamp(ts)`、期間絞り込みは `from_iso8601_timestamp(ts) > current_timestamp - interval '7' day` の形
+- JST 表示は `format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')`
 - WARN / ERROR は Iceberg 側に入らない。障害調査は CloudWatch Logs の `fluentbit-warnerr-*` / `fluentbit-fallback-*` ストリームを見る
 
 ### X-Ray（CloudWatch > トレース）
