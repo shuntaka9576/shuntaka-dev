@@ -27,7 +27,7 @@ manifests/monitoring/
     ├── kustomization.yaml
     ├── configmap.yaml                 # TOML config (pd.endpoints / metric_storage / continuous_profiling)
     ├── pvc.yaml                       # local-path 5Gi
-    ├── deployment.yaml                # pingcap/ng-monitoring:v8.1.0 (single replica, Recreate)
+    ├── deployment.yaml                # pingcap/ng-monitoring:v8.5.7 (single replica, Recreate)
     └── service.yaml                   # ClusterIP :12020
 ```
 

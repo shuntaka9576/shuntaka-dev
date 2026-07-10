@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: ng-monitoring
-          image: pingcap/ng-monitoring:v8.1.0
+          image: pingcap/ng-monitoring:v8.5.7
           imagePullPolicy: IfNotPresent
           args:
             - --config=/etc/ng-monitoring/ng-monitoring.toml

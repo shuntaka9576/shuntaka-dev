@@ -4,7 +4,7 @@ metadata:
   name: basic
   namespace: tidb-cluster
 spec:
-  version: v8.1.0
+  version: v8.5.7
   timezone: UTC
   pvReclaimPolicy: Retain
   enableDynamicConfiguration: true
