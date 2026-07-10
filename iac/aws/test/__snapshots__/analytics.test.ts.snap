@@ -813,121 +813,89 @@ exports[`TidbProxyLogAnalyticsStack > snapshot 1`] = `
         "DatabaseName": "tidb_proxy_logs",
         "OpenTableFormatInput": {
           "IcebergInput": {
-            "IcebergTableInput": {
-              "Location": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "s3://",
-                    {
-                      "Ref": "LogAnalyticsLogsBucket18E6FEA3",
-                    },
-                    "/iceberg/logs",
-                  ],
-                ],
-              },
-              "Schema": {
-                "Fields": [
-                  {
-                    "Id": 1,
-                    "Name": "ts",
-                    "Required": true,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 2,
-                    "Name": "log_type",
-                    "Required": true,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 3,
-                    "Name": "level",
-                    "Required": true,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 4,
-                    "Name": "message",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 5,
-                    "Name": "client_ip",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 6,
-                    "Name": "method",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 7,
-                    "Name": "url",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 8,
-                    "Name": "http_version",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 9,
-                    "Name": "status",
-                    "Required": false,
-                    "Type": "int",
-                  },
-                  {
-                    "Id": 10,
-                    "Name": "bytes_in",
-                    "Required": false,
-                    "Type": "long",
-                  },
-                  {
-                    "Id": 11,
-                    "Name": "bytes_out",
-                    "Required": false,
-                    "Type": "long",
-                  },
-                  {
-                    "Id": 12,
-                    "Name": "duration_ms",
-                    "Required": false,
-                    "Type": "long",
-                  },
-                  {
-                    "Id": 13,
-                    "Name": "user_agent",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 14,
-                    "Name": "squid_status",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                  {
-                    "Id": 15,
-                    "Name": "hier_status",
-                    "Required": false,
-                    "Type": "string",
-                  },
-                ],
-                "SchemaId": 0,
-              },
-            },
             "MetadataOperation": "CREATE",
             "Version": "2",
           },
         },
         "TableInput": {
           "Name": "logs",
+          "StorageDescriptor": {
+            "Columns": [
+              {
+                "Name": "ts",
+                "Type": "string",
+              },
+              {
+                "Name": "log_type",
+                "Type": "string",
+              },
+              {
+                "Name": "level",
+                "Type": "string",
+              },
+              {
+                "Name": "message",
+                "Type": "string",
+              },
+              {
+                "Name": "client_ip",
+                "Type": "string",
+              },
+              {
+                "Name": "method",
+                "Type": "string",
+              },
+              {
+                "Name": "url",
+                "Type": "string",
+              },
+              {
+                "Name": "http_version",
+                "Type": "string",
+              },
+              {
+                "Name": "status",
+                "Type": "int",
+              },
+              {
+                "Name": "bytes_in",
+                "Type": "bigint",
+              },
+              {
+                "Name": "bytes_out",
+                "Type": "bigint",
+              },
+              {
+                "Name": "duration_ms",
+                "Type": "bigint",
+              },
+              {
+                "Name": "user_agent",
+                "Type": "string",
+              },
+              {
+                "Name": "squid_status",
+                "Type": "string",
+              },
+              {
+                "Name": "hier_status",
+                "Type": "string",
+              },
+            ],
+            "Location": {
+              "Fn::Join": [
+                "",
+                [
+                  "s3://",
+                  {
+                    "Ref": "LogAnalyticsLogsBucket18E6FEA3",
+                  },
+                  "/iceberg/logs",
+                ],
+              ],
+            },
+          },
+          "TableType": "EXTERNAL_TABLE",
         },
       },
       "Type": "AWS::Glue::Table",

@@ -93,40 +93,45 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
     // ts は Iceberg の timestamp 型ではなく string (ISO8601) にする。Firehose の
     // JSON -> timestamp 変換フォーマット要求に依存しないためで、Athena では
     // from_iso8601_timestamp(ts) で時刻演算する。パーティションは量が増えるまで
-    // 持たない (string 列に day transform は適用できない)。
+    // 持たない。
+    //
+    // Iceberg テーブルのメタデータは TableInput (Hive 形式) 側に書き、IcebergInput
+    // は MetadataOperation: CREATE のみとする。TableInput は CFN 上必須のため、
+    // icebergTableInput (Iceberg ネイティブスキーマ形式) と併用すると Glue の
+    // リソースハンドラが "Table metadata is expected only via TableInput or via
+    // IcebergTableInputProperties" で CREATE_FAILED になる (2026-07-11 の
+    // st-tidb-proxy-logs 初回デプロイで確認)。
     const glueTable = new glue.CfnTable(this, 'LogsTable', {
       catalogId: cdk.Aws.ACCOUNT_ID,
       databaseName: config.glue.databaseName,
       tableInput: {
         name: config.glue.tableName,
+        tableType: 'EXTERNAL_TABLE',
+        storageDescriptor: {
+          location: `s3://${this.bucket.bucketName}/iceberg/${config.glue.tableName}`,
+          columns: [
+            { name: 'ts', type: 'string' },
+            { name: 'log_type', type: 'string' },
+            { name: 'level', type: 'string' },
+            { name: 'message', type: 'string' },
+            { name: 'client_ip', type: 'string' },
+            { name: 'method', type: 'string' },
+            { name: 'url', type: 'string' },
+            { name: 'http_version', type: 'string' },
+            { name: 'status', type: 'int' },
+            { name: 'bytes_in', type: 'bigint' },
+            { name: 'bytes_out', type: 'bigint' },
+            { name: 'duration_ms', type: 'bigint' },
+            { name: 'user_agent', type: 'string' },
+            { name: 'squid_status', type: 'string' },
+            { name: 'hier_status', type: 'string' },
+          ],
+        },
       },
       openTableFormatInput: {
         icebergInput: {
           metadataOperation: 'CREATE',
           version: '2',
-          icebergTableInput: {
-            location: `s3://${this.bucket.bucketName}/iceberg/${config.glue.tableName}`,
-            schema: {
-              schemaId: 0,
-              fields: [
-                { id: 1, name: 'ts', type: 'string', required: true },
-                { id: 2, name: 'log_type', type: 'string', required: true },
-                { id: 3, name: 'level', type: 'string', required: true },
-                { id: 4, name: 'message', type: 'string', required: false },
-                { id: 5, name: 'client_ip', type: 'string', required: false },
-                { id: 6, name: 'method', type: 'string', required: false },
-                { id: 7, name: 'url', type: 'string', required: false },
-                { id: 8, name: 'http_version', type: 'string', required: false },
-                { id: 9, name: 'status', type: 'int', required: false },
-                { id: 10, name: 'bytes_in', type: 'long', required: false },
-                { id: 11, name: 'bytes_out', type: 'long', required: false },
-                { id: 12, name: 'duration_ms', type: 'long', required: false },
-                { id: 13, name: 'user_agent', type: 'string', required: false },
-                { id: 14, name: 'squid_status', type: 'string', required: false },
-                { id: 15, name: 'hier_status', type: 'string', required: false },
-              ],
-            },
-          },
         },
       },
     });
