@@ -14,7 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -70,7 +70,7 @@ func setupTelemetry(ctx context.Context, upstreamName string) (*telemetry, error
 			return nil, err
 		}
 		tel.shutdown = func(context.Context) error { return nil }
-		log.Printf("otel: disabled (%s not set)", envOtelEndpoint)
+		slog.Info("otel disabled", "reason", envOtelEndpoint+" not set")
 		return tel, nil
 	}
 
@@ -124,7 +124,7 @@ func setupTelemetry(ctx context.Context, upstreamName string) (*telemetry, error
 		return errors.Join(tracerProvider.Shutdown(ctx), meterProvider.Shutdown(ctx))
 	}
 
-	log.Printf("otel: enabled endpoint=%s service=%s", endpoint, serviceName)
+	slog.Info("otel enabled", "endpoint", endpoint, "service", serviceName)
 	return tel, nil
 }
 

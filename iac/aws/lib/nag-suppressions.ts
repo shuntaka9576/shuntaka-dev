@@ -39,6 +39,9 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::servicediscovery:*',
       'Action::cloudwatch:*',
       'Action::events:*',
+      'Action::glue:*',
+      'Action::firehose:*',
+      'Action::athena:*',
       'Resource::*',
     ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
@@ -70,6 +73,52 @@ export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
       id: 'AwsSolutions-IAM5[Resource::*]',
       reason:
         'ECS UpdateTaskProtection は対象 task が deploy 時に動的に決まるためリソース ARN を事前に絞れない。kms:Decrypt は SSM SecureString 復号用で default KMS key (alias/aws/ssm) のみに限定済み。X-Ray (PutTraceSegments 等) と cloudwatch:PutMetricData はリソースレベル制限非対応の API。',
+    },
+  ]);
+};
+
+export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void => {
+  const bucketWildcardReason =
+    'Firehose 配信ロールは iceberg/ (テーブルデータ) と firehose-errors/ (失敗レコード) の両 prefix へ、BucketDeployment / autoDeleteObjects の custom resource はバケット全体へオブジェクトキー動的にアクセスするため、bucket/* のワイルドカードを許容する。バケット自体がログ基盤専用。';
+  const customResourceLambdaReason =
+    'BucketDeployment (FireLens 設定の S3 同期) と autoDeleteObjects が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
+  acknowledgeRules(stack, [
+    {
+      id: 'AwsSolutions-S1',
+      reason:
+        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。バケットへの書き込み主体は Firehose / BucketDeployment / Athena に限定されている。',
+    },
+    ...[
+      'Action::s3:Abort*',
+      'Action::s3:DeleteObject*',
+      'Action::s3:GetBucket*',
+      'Action::s3:GetObject*',
+      'Action::s3:List*',
+      'Resource::<LogAnalyticsLogsBucket18E6FEA3.Arn>/*',
+    ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: bucketWildcardReason })),
+    {
+      id: 'AwsSolutions-IAM5[Resource::<LogAnalyticsLogsBucket18E6FEA3.Arn>/firelens-config/*]',
+      reason:
+        'tidb-proxy タスクロールが FireLens init プロセスで取得する Fluent Bit 設定ファイル群。firelens-config/ prefix 配下の GetObject のみに限定済み。',
+    },
+    {
+      id: 'AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:s3:::cdk-hnb659fds-assets-123456789012-ap-northeast-1/*]',
+      reason:
+        'BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケットから設定ファイルを取得するための CDK 既定権限。',
+    },
+    {
+      // cspell:disable-next-line -- CFN パラメータ論理 ID (自動生成トークン)
+      id: 'AwsSolutions-IAM5[Resource::arn:aws:logs:<AWS::Region>:<AWS::AccountId>:log-group:<SsmParameterValuetidbproxyproxyloggroupnameC96584B6F00A464EAD1953AFF4B05118Parameter>:*]',
+      reason:
+        'Fluent Bit の cloudwatch_logs 出力はタスク ID を含む log stream を動的に作るため、既存の /ecs/tidb-proxy ロググループ配下の stream ワイルドカードが必要。',
+    },
+    {
+      id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]',
+      reason: customResourceLambdaReason,
+    },
+    {
+      id: 'AwsSolutions-L1',
+      reason: customResourceLambdaReason,
     },
   ]);
 };

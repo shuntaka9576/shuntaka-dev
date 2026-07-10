@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import { TidbProxyLogAnalyticsStack } from '../lib/analytics/tidb-proxy-log-analytics-stack.js';
 import { MainStack } from '../lib/api/main-stack.js';
-import { getConfig, getProxyConfig } from '../lib/config.js';
+import { getConfig, getLogAnalyticsConfig, getProxyConfig } from '../lib/config.js';
 import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
@@ -10,6 +11,7 @@ import { applyNag } from '../lib/nag.js';
 import {
   applyDeployRoleSuppressions,
   applyMainStackSuppressions,
+  applyTidbProxyLogAnalyticsSuppressions,
   applyTidbProxySuppressions,
 } from '../lib/nag-suppressions.js';
 import { TidbProxyStack } from '../lib/proxy/tidb-proxy-stack.js';
@@ -107,7 +109,24 @@ const tidbProxyStack = new TidbProxyStack(
   },
 );
 
+// tidb-proxy のログ分析基盤も dev / prd 共用なので stageName prefix を付けない。
+// タスクロール等を st-tidb-proxy の SSM 出力から import するため依存を明示する。
+const logAnalyticsConfig = getLogAnalyticsConfig();
+const tidbProxyLogAnalyticsStack = new TidbProxyLogAnalyticsStack(
+  app,
+  `${config.projectName.short}-${logAnalyticsConfig.projectName}`,
+  {
+    logAnalyticsConfig,
+    env: {
+      account: config.cdkEnv.account,
+      region: REGIONS.TOKYO,
+    },
+  },
+);
+tidbProxyLogAnalyticsStack.addDependency(tidbProxyStack);
+
 applyNag(app);
 applyMainStackSuppressions(mainStack);
 applyDeployRoleSuppressions(deployRoleStack);
 applyTidbProxySuppressions(tidbProxyStack);
+applyTidbProxyLogAnalyticsSuppressions(tidbProxyLogAnalyticsStack);

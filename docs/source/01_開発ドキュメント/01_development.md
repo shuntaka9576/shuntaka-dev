@@ -243,7 +243,7 @@ scripts/deploy-tidb-proxy.sh
 gh workflow run deploy-tidb-proxy.yaml --ref preview
 ```
 
-tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `forwarder: pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
+tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
 
 ```bash
 aws ecs describe-services \
@@ -252,6 +252,49 @@ aws ecs describe-services \
   --query "services[0].{Status:status, Running:runningCount, Desired:desiredCount, Events:events[0:3]}"
 
 aws logs tail /ecs/tidb-proxy --follow --since 5m
+```
+
+tidb-proxy ログ分析スタックのデプロイ（dev / prd 共用、初回のみ）。S3 バケット / Glue Database・Iceberg テーブル / Firehose / Athena WorkGroup / SSM パラメータを作成し、FireLens (Fluent Bit) の設定ファイル (`apps/tidb-proxy/firelens/`) を S3 の `firelens-config/` に配置する。設計は `docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md` を参照。ecspresso が本スタックの SSM 出力を参照するため、`scripts/deploy-tidb-proxy.sh` より先にデプロイする。
+
+本スタックは Glue / Firehose / Athena を使うため、デプロイロールにこれらの権限が入る前の環境では、先に `${STAGE_NAME:0:1}-st-deploy-role` の再デプロイが必要（初回のみ）。
+
+```bash
+export STAGE_NAME=""
+# stageName はこのスタックでは使われないが getConfig() の評価に必要
+bunx dotenv -- cdk deploy \
+  -c stageName=${STAGE_NAME} \
+  st-tidb-proxy-logs \
+  --require-approval never
+
+# GitHub Actions から実行する場合 (Deploy ワークフローの stack 選択に含まれる)
+gh workflow run deploy.yaml --ref preview -f stageName=dev -f stack=st-tidb-proxy-logs
+```
+
+ログ振り分けの動作確認。INFO 系（squid アクセスログ・forwarder の INFO）は Firehose 経由で Iceberg テーブルに入り、WARN / ERROR と非 JSON 行（tsnet 内部ログ・squid cache_log）は CloudWatch Logs に残る。
+
+```bash
+# log-router の起動確認 (init プロセスの S3 取得失敗はここに出る)
+aws logs tail /ecs/tidb-proxy --since 10m --format short | grep log-router
+
+# WARN/ERROR (fluentbit-warnerr-*) とパース不能行 (fluentbit-fallback-*) の確認
+aws logs tail /ecs/tidb-proxy --since 10m --format short | grep -E "fluentbit-(warnerr|fallback)-"
+
+# Athena で INFO 系ログを検索 (WorkGroup: tidb-proxy-logs)
+aws athena start-query-execution \
+  --work-group tidb-proxy-logs \
+  --query-execution-context Database=tidb_proxy_logs \
+  --query-string "SELECT ts, log_type, level, method, url, status FROM logs ORDER BY ts DESC LIMIT 20"
+aws athena get-query-results --query-execution-id <上の実行結果の QueryExecutionId>
+
+# Firehose の配信失敗レコードが無いことを確認 (溜まる場合はスキーマ不一致)
+aws s3 ls s3://tidb-proxy-logs-$(aws sts get-caller-identity --query Account --output text)/firehose-errors/ --recursive
+```
+
+Fluent Bit の設定 (`apps/tidb-proxy/firelens/extra.conf` / `parsers.conf`) を変更した場合の反映手順。init プロセスはコンテナ起動時に一度だけ S3 から設定を取得するため、S3 更新だけでは反映されず、task def も変わらないため ecspresso の diff でも検知されない。明示的に task を再起動する。
+
+```bash
+bunx dotenv -- cdk deploy -c stageName=dev st-tidb-proxy-logs --require-approval never
+aws ecs update-service --cluster tidb-proxy --service tidb-proxy --force-new-deployment
 ```
 
 メインスタックのデプロイ
