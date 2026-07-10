@@ -21,5 +21,10 @@ local projectName = 'tidb-proxy';
       proxyAuthKeyParamName: '/shared/shuntaka/tailscale/proxy-auth-key',
       tailnetSuffix: '{{ ssm `/shared/shuntaka/tailscale/tailnet-suffix` }}',
     },
+    // st-tidb-proxy-logs スタック (lib/analytics/) の出力。FireLens のログ振り分け先。
+    logs: {
+      deliveryStreamName: '{{ ssm `/' + projectName + '/logs/delivery-stream-name` }}',
+      firelensConfigS3ArnPrefix: '{{ ssm `/' + projectName + '/logs/firelens-config-s3-arn-prefix` }}',
+    },
   },
 }

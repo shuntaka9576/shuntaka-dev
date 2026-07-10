@@ -203,6 +203,63 @@ export const getProxyConfig = (): ProxyParameter => {
   };
 };
 
+// tidb-proxy のログ分析基盤 (FireLens → Firehose → S3/Iceberg → Athena) も
+// dev / prd 共用のため stage 非依存。SSM は tidb-proxy 本体と同じ
+// `/tidb-proxy/...` 名前空間の `logs` 配下に出力する。設計は
+// docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md を参照。
+export interface LogAnalyticsParameter {
+  projectName: string;
+  glue: {
+    databaseName: string;
+    tableName: string;
+  };
+  athena: {
+    workGroupName: string;
+  };
+  firehose: {
+    deliveryStreamName: string;
+  };
+  ssm: {
+    // st-tidb-proxy スタックの出力を import する (読み取りのみ)
+    proxy: {
+      taskRole: string;
+      logGroupName: string;
+    };
+    // 本スタックの出力 (ecspresso task def が参照)
+    logs: {
+      deliveryStreamName: string;
+      firelensConfigS3ArnPrefix: string;
+    };
+  };
+}
+
+export const getLogAnalyticsConfig = (): LogAnalyticsParameter => {
+  const proxyProjectName = 'tidb-proxy';
+  return {
+    projectName: 'tidb-proxy-logs',
+    glue: {
+      databaseName: 'tidb_proxy_logs',
+      tableName: 'logs',
+    },
+    athena: {
+      workGroupName: 'tidb-proxy-logs',
+    },
+    firehose: {
+      deliveryStreamName: 'tidb-proxy-logs',
+    },
+    ssm: {
+      proxy: {
+        taskRole: `/${proxyProjectName}/proxy/task-role`,
+        logGroupName: `/${proxyProjectName}/proxy/log-group-name`,
+      },
+      logs: {
+        deliveryStreamName: `/${proxyProjectName}/logs/delivery-stream-name`,
+        firelensConfigS3ArnPrefix: `/${proxyProjectName}/logs/firelens-config-s3-arn-prefix`,
+      },
+    },
+  };
+};
+
 export const getConfig = (stageName: string): AppParameter => {
   if (!isEnv(stageName)) {
     throw new Error(`Not found environment key: ${stageName}`);

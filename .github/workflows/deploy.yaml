@@ -16,13 +16,14 @@ on:
           - dev
           - prd
       stack:
-        description: 'Deploy stack (all = st-tidb-proxy -> main の順で両方)'
+        description: 'Deploy stack (all = st-tidb-proxy -> st-tidb-proxy-logs -> main の順で全部)'
         required: true
         default: 'all'
         type: choice
         options:
           - all
           - st-tidb-proxy
+          - st-tidb-proxy-logs
           - main
 
 permissions: {}

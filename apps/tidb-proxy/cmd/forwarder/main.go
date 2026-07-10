@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -65,17 +65,18 @@ type forwarderConfig struct {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	setupLogger()
 
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Fatalf("loadConfig: %v", err)
+		fatal("loadConfig", "error", err)
 	}
-	log.Printf("config loaded: hostname=%s listen=%s target=%s stateDir=%s",
-		cfg.Hostname, cfg.ListenAddr, cfg.ForwardTarget, cfg.StateDir)
+	slog.Info("config loaded",
+		"hostname", cfg.Hostname, "listen", cfg.ListenAddr,
+		"target", cfg.ForwardTarget, "state_dir", cfg.StateDir)
 
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
-		log.Fatalf("mkdir state dir %s: %v", cfg.StateDir, err)
+		fatal("mkdir state dir", "dir", cfg.StateDir, "error", err)
 	}
 
 	ts := &tsnet.Server{
@@ -91,20 +92,20 @@ func main() {
 
 	tel, err := setupTelemetry(ctx, cfg.UpstreamName)
 	if err != nil {
-		log.Fatalf("setupTelemetry: %v", err)
+		fatal("setupTelemetry", "error", err)
 	}
 
 	if _, err := ts.Up(ctx); err != nil {
-		log.Fatalf("tsnet.Up: %v", err)
+		fatal("tsnet.Up", "error", err)
 	}
-	log.Printf("tsnet up: hostname=%s", cfg.Hostname)
+	slog.Info("tsnet up", "hostname", cfg.Hostname)
 
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
-		log.Fatalf("listen %s: %v", cfg.ListenAddr, err)
+		fatal("listen", "addr", cfg.ListenAddr, "error", err)
 	}
 	defer listener.Close()
-	log.Printf("forwarder: %s -> tailnet:%s", listener.Addr(), cfg.ForwardTarget)
+	slog.Info("forwarder listening", "listen", listener.Addr().String(), "target", cfg.ForwardTarget)
 
 	// ts.Dial は tsnet 内部 dialer 経由で netmap に居る peer の MagicDNS 名を解決する。
 	// ACL で tag:proxy -> tag:k8s (TiDB Operator Proxy) が許可されていれば
@@ -116,21 +117,47 @@ func main() {
 	prewarmCtx, prewarmCancel := context.WithTimeout(ctx, 10*time.Second)
 	if conn, err := ts.Dial(prewarmCtx, "tcp", cfg.ForwardTarget); err == nil {
 		_ = conn.Close()
-		log.Printf("forwarder: pre-warm dial ok")
+		slog.Info("pre-warm dial ok")
 	} else {
-		log.Printf("forwarder: pre-warm dial failed: %v", err)
+		slog.Warn("pre-warm dial failed", "error", err)
 	}
 	prewarmCancel()
 
 	<-ctx.Done()
-	log.Printf("shutdown signal received, exiting")
+	slog.Info("shutdown signal received, exiting")
 
 	// 溜まっている traces / metrics を送り切ってから終了する。
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	if err := tel.shutdown(shutdownCtx); err != nil {
-		log.Printf("otel shutdown: %v", err)
+		slog.Warn("otel shutdown", "error", err)
 	}
 	shutdownCancel()
+}
+
+// setupLogger は default logger を JSON (slog) に差し替える。
+// キー名は FireLens (Fluent Bit) の振り分けと Iceberg テーブルのスキーマに合わせて
+// ts / level / message に統一し、log_type=forwarder を全行に付与する。
+// tsnet 内部ログは標準 log (プレーンテキスト) のまま stderr に出るが、Fluent Bit の
+// JSON パースに失敗して CloudWatch Logs 側へフォールバックするので、それで良い。
+func setupLogger() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			switch a.Key {
+			case slog.TimeKey:
+				a.Key = "ts"
+			case slog.MessageKey:
+				a.Key = "message"
+			}
+			return a
+		},
+	})).With(slog.String("log_type", "forwarder"))
+	slog.SetDefault(logger)
+}
+
+// fatal は起動時の致命的エラーを ERROR で出してから終了する (log.Fatalf 相当)。
+func fatal(msg string, args ...any) {
+	slog.Error(msg, args...)
+	os.Exit(1)
 }
 
 func loadConfig() (*forwarderConfig, error) {
@@ -173,7 +200,7 @@ func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *t
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
-			log.Printf("forwarder accept: %v", err)
+			slog.Error("forwarder accept", "error", err)
 			return
 		}
 		go forwardConn(ts, conn, target, tel)
@@ -239,7 +266,7 @@ func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry) 
 			attribute.String("error.type", errType),
 		)
 		span.SetStatus(codes.Error, errType)
-		log.Printf("forwarder dial %s: %v", target, err)
+		slog.Warn("forwarder dial failed", "target", target, "error_type", errType, "error", err)
 		return
 	}
 	connectSpan.End()

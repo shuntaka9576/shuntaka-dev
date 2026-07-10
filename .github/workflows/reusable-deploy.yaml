@@ -6,7 +6,7 @@ on:
       stageName:
         required: true
         type: string
-      # デプロイ対象スタック: all | st-tidb-proxy | main
+      # デプロイ対象スタック: all | st-tidb-proxy | st-tidb-proxy-logs | main
       stack:
         required: false
         type: string
@@ -56,6 +56,27 @@ jobs:
         working-directory: iac/aws
         run: |
           bunx cdk deploy st-tidb-proxy -c "stageName=${STAGE_NAME}" --require-approval never
+        env:
+          STAGE_NAME: ${{ inputs.stageName }}
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_SECRET_PEM_KEY_NAME: ${{ vars.GH_APP_SECRET_PEM_KEY_NAME }}
+          GH_WEBHOOK_SECRET_KEY_NAME: ${{ vars.GH_WEBHOOK_SECRET_KEY_NAME }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
+
+      # dev / prd 共用の shared stack (tidb-proxy のログ分析基盤)。
+      # 依存の向き: st-tidb-proxy (SSM 出力) → 本スタック → deploy-tidb-proxy.yaml。
+      # 本スタックが作る SSM (/tidb-proxy/logs/...) を ecspresso が task def の
+      # render 時に参照するため、log-router 入り task def のデプロイより先に本
+      # スタックを適用しておく必要がある (逆依存は無い。task 稼働中でなくてよい)。
+      # FireLens 設定 (apps/tidb-proxy/firelens/) の S3 同期もここで行われる
+      # (稼働中 task への反映は force-new-deployment が別途必要)。
+      - name: CDK Deploy (st-tidb-proxy-logs)
+        if: inputs.stack == 'all' || inputs.stack == 'st-tidb-proxy-logs'
+        working-directory: iac/aws
+        run: |
+          bunx cdk deploy st-tidb-proxy-logs -c "stageName=${STAGE_NAME}" --require-approval never
         env:
           STAGE_NAME: ${{ inputs.stageName }}
           GH_APP_ID: ${{ secrets.GH_APP_ID }}

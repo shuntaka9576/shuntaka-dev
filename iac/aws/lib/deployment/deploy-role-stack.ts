@@ -87,6 +87,11 @@ export class DeployRoleStack extends cdk.Stack {
                 // probe) のため。上と同じ流儀で service wildcard。
                 'cloudwatch:*',
                 'events:*',
+                // tidb-proxy-logs stack (Glue Iceberg + Firehose + Athena) のため。
+                // 上と同じ流儀で service wildcard。
+                'glue:*',
+                'firehose:*',
+                'athena:*',
               ],
               resources: ['*'],
             }),

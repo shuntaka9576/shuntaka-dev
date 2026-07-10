@@ -1,0 +1,291 @@
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as cdk from 'aws-cdk-lib';
+import * as athena from 'aws-cdk-lib/aws-athena';
+import * as glue from 'aws-cdk-lib/aws-glue';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as firehose from 'aws-cdk-lib/aws-kinesisfirehose';
+import * as logs from 'aws-cdk-lib/aws-logs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+import { Construct } from 'constructs';
+import { type LogAnalyticsParameter } from '../config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// tidb-proxy のログ分析基盤。FireLens (Fluent Bit) が振り分けた INFO 系ログを
+// Firehose 経由で S3 上の Iceberg テーブルに蓄積し、Athena で検索する。
+// 設計は docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md を参照。
+//
+// 稼働中の st-tidb-proxy スタックには手を入れず、SSM 出力経由でタスクロールを
+// インポートして必要な権限を後付けする (blog-api-construct が proxy SG に
+// addIngressRule するのと同型のパターン)。
+export class TidbProxyLogAnalyticsConstruct extends Construct {
+  public readonly bucket: s3.Bucket;
+  public readonly deliveryStream: firehose.CfnDeliveryStream;
+
+  constructor(
+    scope: Construct,
+    id: string,
+    props: {
+      config: LogAnalyticsParameter;
+    },
+  ) {
+    super(scope, id);
+
+    const { config } = props;
+
+    // ---- S3 Bucket ----
+    // prefix で用途を分離する:
+    //   iceberg/         Iceberg テーブル本体。lifecycle rule は設定しない
+    //                    (Iceberg のマニフェストが参照するファイルを S3 側で
+    //                    blind に消すとメタデータ整合性が壊れるため。削減が
+    //                    必要になったら Athena の OPTIMIZE / VACUUM を先に実行)
+    //   firehose-errors/ Firehose 配信失敗レコード (デバッグ用途のみ)
+    //   athena-results/  Athena クエリ結果 (一時ファイル)
+    //   firelens-config/ Fluent Bit 設定 (BucketDeployment で git と同期)
+    // autoDeleteObjects は既存 ECR / LogGroup と同じ「個人ブログ用途で簡単に
+    // 畳める」方針の割り切り。cdk destroy でログ資産ごと消える点に注意。
+    this.bucket = new s3.Bucket(this, 'LogsBucket', {
+      bucketName: `${config.projectName}-${cdk.Aws.ACCOUNT_ID}`,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      lifecycleRules: [
+        {
+          id: 'expire-firehose-errors',
+          prefix: 'firehose-errors/',
+          expiration: cdk.Duration.days(30),
+        },
+        {
+          id: 'expire-athena-results',
+          prefix: 'athena-results/',
+          expiration: cdk.Duration.days(7),
+        },
+      ],
+    });
+
+    // ---- FireLens 設定の配置 ----
+    // aws-for-fluent-bit の init プロセスがタスク起動時に取得する。反映には
+    // タスクの再起動 (ecs update-service --force-new-deployment) が必要。
+    new s3deploy.BucketDeployment(this, 'FirelensConfigDeployment', {
+      sources: [
+        s3deploy.Source.asset(path.resolve(__dirname, '../../../../apps/tidb-proxy/firelens')),
+      ],
+      destinationBucket: this.bucket,
+      destinationKeyPrefix: 'firelens-config',
+      prune: true,
+    });
+
+    // ---- Glue Database + Iceberg Table ----
+    const glueDatabase = new glue.CfnDatabase(this, 'GlueDatabase', {
+      catalogId: cdk.Aws.ACCOUNT_ID,
+      databaseInput: {
+        name: config.glue.databaseName,
+      },
+    });
+
+    // スキーマは apps/tidb-proxy/firelens/extra.conf の Allowlist_key と揃える。
+    // ts は Iceberg の timestamp 型ではなく string (ISO8601) にする。Firehose の
+    // JSON -> timestamp 変換フォーマット要求に依存しないためで、Athena では
+    // from_iso8601_timestamp(ts) で時刻演算する。パーティションは量が増えるまで
+    // 持たない (string 列に day transform は適用できない)。
+    const glueTable = new glue.CfnTable(this, 'LogsTable', {
+      catalogId: cdk.Aws.ACCOUNT_ID,
+      databaseName: config.glue.databaseName,
+      tableInput: {
+        name: config.glue.tableName,
+      },
+      openTableFormatInput: {
+        icebergInput: {
+          metadataOperation: 'CREATE',
+          version: '2',
+          icebergTableInput: {
+            location: `s3://${this.bucket.bucketName}/iceberg/${config.glue.tableName}`,
+            schema: {
+              schemaId: 0,
+              fields: [
+                { id: 1, name: 'ts', type: 'string', required: true },
+                { id: 2, name: 'log_type', type: 'string', required: true },
+                { id: 3, name: 'level', type: 'string', required: true },
+                { id: 4, name: 'message', type: 'string', required: false },
+                { id: 5, name: 'client_ip', type: 'string', required: false },
+                { id: 6, name: 'method', type: 'string', required: false },
+                { id: 7, name: 'url', type: 'string', required: false },
+                { id: 8, name: 'http_version', type: 'string', required: false },
+                { id: 9, name: 'status', type: 'int', required: false },
+                { id: 10, name: 'bytes_in', type: 'long', required: false },
+                { id: 11, name: 'bytes_out', type: 'long', required: false },
+                { id: 12, name: 'duration_ms', type: 'long', required: false },
+                { id: 13, name: 'user_agent', type: 'string', required: false },
+                { id: 14, name: 'squid_status', type: 'string', required: false },
+                { id: 15, name: 'hier_status', type: 'string', required: false },
+              ],
+            },
+          },
+        },
+      },
+    });
+    glueTable.addDependency(glueDatabase);
+
+    // ---- Firehose (Direct PUT -> Iceberg) ----
+    const firehoseLogGroup = new logs.LogGroup(this, 'FirehoseLogGroup', {
+      logGroupName: `/aws/kinesisfirehose/${config.firehose.deliveryStreamName}`,
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const firehoseLogStream = new logs.LogStream(this, 'FirehoseLogStream', {
+      logGroup: firehoseLogGroup,
+      logStreamName: 'iceberg-delivery',
+    });
+
+    const firehoseRole = new iam.Role(this, 'FirehoseRole', {
+      roleName: `${config.projectName}-firehose`,
+      assumedBy: new iam.ServicePrincipal('firehose.amazonaws.com'),
+    });
+    firehoseRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['glue:GetDatabase', 'glue:GetTable', 'glue:GetTableVersions', 'glue:UpdateTable'],
+        resources: [
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:database/${config.glue.databaseName}`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${config.glue.databaseName}/${config.glue.tableName}`,
+        ],
+      }),
+    );
+    // iceberg/ へのデータ書き込みと firehose-errors/ への失敗レコード退避の両方。
+    this.bucket.grantReadWrite(firehoseRole);
+    firehoseRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:PutLogEvents'],
+        resources: [firehoseLogGroup.logGroupArn],
+      }),
+    );
+
+    this.deliveryStream = new firehose.CfnDeliveryStream(this, 'DeliveryStream', {
+      deliveryStreamName: config.firehose.deliveryStreamName,
+      deliveryStreamType: 'DirectPut',
+      deliveryStreamEncryptionConfigurationInput: {
+        keyType: 'AWS_OWNED_CMK',
+      },
+      icebergDestinationConfiguration: {
+        roleArn: firehoseRole.roleArn,
+        catalogConfiguration: {
+          catalogArn: `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog`,
+        },
+        destinationTableConfigurationList: [
+          {
+            destinationDatabaseName: config.glue.databaseName,
+            destinationTableName: config.glue.tableName,
+          },
+        ],
+        // insert-only のログ用途なので append-only (行更新の CDC 経路を持たない)。
+        appendOnly: true,
+        bufferingHints: {
+          intervalInSeconds: 60,
+          sizeInMBs: 64,
+        },
+        s3BackupMode: 'FailedDataOnly',
+        s3Configuration: {
+          bucketArn: this.bucket.bucketArn,
+          roleArn: firehoseRole.roleArn,
+          errorOutputPrefix: 'firehose-errors/',
+        },
+        cloudWatchLoggingOptions: {
+          enabled: true,
+          logGroupName: firehoseLogGroup.logGroupName,
+          logStreamName: firehoseLogStream.logStreamName,
+        },
+      },
+    });
+    this.deliveryStream.node.addDependency(glueTable);
+    // CfnDeliveryStream は roleArn の文字列参照だけでは Policy リソースへの依存が
+    // 張られず、権限が付く前に Firehose の作成時検証が走って失敗しうる。
+    const firehoseRoleDefaultPolicy = firehoseRole.node.tryFindChild('DefaultPolicy');
+    if (firehoseRoleDefaultPolicy !== undefined) {
+      this.deliveryStream.node.addDependency(firehoseRoleDefaultPolicy);
+    }
+
+    // ---- Athena WorkGroup ----
+    new athena.CfnWorkGroup(this, 'WorkGroup', {
+      name: config.athena.workGroupName,
+      recursiveDeleteOption: true,
+      workGroupConfiguration: {
+        enforceWorkGroupConfiguration: true,
+        publishCloudWatchMetricsEnabled: true,
+        engineVersion: {
+          selectedEngineVersion: 'Athena engine version 3',
+        },
+        resultConfiguration: {
+          outputLocation: `s3://${this.bucket.bucketName}/athena-results/`,
+          encryptionConfiguration: {
+            encryptionOption: 'SSE_S3',
+          },
+        },
+      },
+    });
+
+    // ---- 既存 tidb-proxy タスクロールへの権限後付け ----
+    // FireLens の kinesis_firehose / cloudwatch_logs 出力プラグインと init
+    // プロセスの S3 設定取得は、Execution Role ではなくタスクロールの資格情報
+    // (コンテナメタデータ経由) で AWS API を呼ぶ。
+    const taskRoleArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      config.ssm.proxy.taskRole,
+    );
+    const taskRole = iam.Role.fromRoleArn(this, 'ImportedTidbProxyTaskRole', taskRoleArn, {
+      mutable: true,
+    });
+    const proxyLogGroupName = ssm.StringParameter.valueForStringParameter(
+      this,
+      config.ssm.proxy.logGroupName,
+    );
+
+    taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['firehose:PutRecordBatch'],
+        resources: [this.deliveryStream.attrArn],
+      }),
+    );
+    taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['s3:GetObject'],
+        resources: [this.bucket.arnForObjects('firelens-config/*')],
+      }),
+    );
+    taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['s3:GetBucketLocation'],
+        resources: [this.bucket.bucketArn],
+      }),
+    );
+    taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:CreateLogStream', 'logs:DescribeLogStreams', 'logs:PutLogEvents'],
+        resources: [
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:${proxyLogGroupName}:*`,
+        ],
+      }),
+    );
+
+    // ---- SSM Parameters (ecspresso が参照) ----
+    new ssm.StringParameter(this, 'DeliveryStreamNameParam', {
+      parameterName: config.ssm.logs.deliveryStreamName,
+      stringValue: config.firehose.deliveryStreamName,
+    });
+    new ssm.StringParameter(this, 'FirelensConfigS3ArnPrefixParam', {
+      parameterName: config.ssm.logs.firelensConfigS3ArnPrefix,
+      stringValue: `${this.bucket.bucketArn}/firelens-config`,
+    });
+  }
+}

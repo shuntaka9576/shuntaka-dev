@@ -47,12 +47,51 @@ local ssmParams = import 'ssm-params.jsonnet';
         startPeriod: 60,
       },
       stopTimeout: 30,
+      // stdout/stderr を log-router (FireLens) に流し、level で CloudWatch Logs /
+      // Firehose (Iceberg) に振り分ける。設計は
+      // docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md を参照。
+      logConfiguration: {
+        logDriver: 'awsfirelens',
+      },
+      dependsOn: [
+        { containerName: 'log-router', condition: 'START' },
+      ],
+      readonlyRootFilesystem: false,
+    },
+    {
+      // FireLens (Fluent Bit) ログルーター。init タグイメージが起動時に S3 から
+      // Fluent Bit 設定 (apps/tidb-proxy/firelens/) を取得する。設定変更の反映は
+      // S3 更新 (cdk deploy st-tidb-proxy-logs) 後に force-new-deployment が必要。
+      // essential: true — ログ配送が死んだら task ごと再起動させる (entrypoint.sh
+      // が squid / forwarder を tini で相互監視するのと同じ思想)。
+      name: 'log-router',
+      image: 'public.ecr.aws/aws-observability/aws-for-fluent-bit:init-2.34.3',
+      essential: true,
+      firelensConfiguration: {
+        type: 'fluentbit',
+      },
+      environment: [
+        {
+          name: 'aws_fluent_bit_init_s3_1',
+          value: ssmParams.ssm.logs.firelensConfigS3ArnPrefix + '/extra.conf',
+        },
+        {
+          name: 'aws_fluent_bit_init_s3_2',
+          value: ssmParams.ssm.logs.firelensConfigS3ArnPrefix + '/parsers.conf',
+        },
+        // extra.conf 内の ${AWS_REGION} / ${CW_LOG_GROUP_NAME} /
+        // ${FIREHOSE_DELIVERY_STREAM} を展開するための値。
+        { name: 'AWS_REGION', value: ssmParams.region },
+        { name: 'CW_LOG_GROUP_NAME', value: ssmParams.ssm.proxy.logGroupName },
+        { name: 'FIREHOSE_DELIVERY_STREAM', value: ssmParams.ssm.logs.deliveryStreamName },
+      ],
+      // log-router 自身のログ (init の S3 取得失敗や設定エラーの調査用) は awslogs へ。
       logConfiguration: {
         logDriver: 'awslogs',
         options: {
           'awslogs-group': ssmParams.ssm.proxy.logGroupName,
           'awslogs-region': ssmParams.region,
-          'awslogs-stream-prefix': ssmParams.serviceName,
+          'awslogs-stream-prefix': 'log-router',
         },
       },
       readonlyRootFilesystem: false,
