@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Git Rules
 
-- PR のベースブランチは常に `preview`。`main` 向けの PR は作成しない
-- `main` へのマージは人間が行う
+- PR のベースブランチは常に `main`
+- 本番リリースは tagpr が作成するリリース PR（`tagpr` ラベル付き、CalVer タグ）のマージで行う。リリース PR のマージは人間が行う
 
 ## Security (Secret Leak Defense)
 
