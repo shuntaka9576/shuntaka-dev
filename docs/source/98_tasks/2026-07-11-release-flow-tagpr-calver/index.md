@@ -57,6 +57,16 @@ gh api --method PUT repos/shuntaka9576/shuntaka-dev/actions/permissions/workflow
 
 本 PR を preview ベースで作成し、人間が preview → main にマージする（preview 経由の最後のリリース）。この時点から main push は dev CDK デプロイに変わり、prd 自動デプロイは止まる（タグリリースが通るまでは deploy.yaml の手動 dispatch で prd をカバーできる）。
 
+初回はベースラインの CalVer タグを手動で打つ。バージョンタグが1つも無いと tagpr は現行バージョンを 0.0.0 とみなし、全履歴の PR からリリース PR 本文を生成して GitHub の上限 65536 文字を超え、`422 Validation Failed (body is too long)` で失敗する（`tagpr-from-0.0.0` ブランチが残骸として残る）。現在の main を初回リリースとみなすタグを打てば、以降はそこからの差分だけでリリース PR が作られる。
+
+```bash
+git tag 2026.0711.0 origin/main
+git push origin 2026.0711.0
+
+# 422 失敗時に残った作業ブランチの掃除
+git push origin --delete tagpr-from-0.0.0
+```
+
 default branch を main に切り替えて preview を削除する。ruleset `protect`（enforcement: active）が preview の deletion をブロックしているため、先に対象から preview を外す。`protect-preview` は `~DEFAULT_BRANCH` 参照のためルール自体は切り替えに自動追従する（zizmor の code_scanning ルールごと main に移る）が、名前が実態と合わなくなるため infra.yaml の宣言に合わせて `protect-main` にリネームする。
 
 ```bash
@@ -113,3 +123,5 @@ cd main && direnv allow .
 - Phase B: Actions ワークフロー権限を gh api で変更し、`can_approve_pull_request_reviews: true`（`default_workflow_permissions: read` は維持）を確認
 - live ruleset を調査。`protect` は manifest 宣言（disabled）と異なり active、`protect-preview` には手動追加の code_scanning（zizmor）ルールがあり直接 push をブロックする。preview 削除前に `protect` の対象から preview を外す手順を Phase C に追記し、infra.yaml の `protect` enforcement を active に同期
 - Songmu/tagpr の SHA ピンを v1 タグの annotated tag オブジェクト SHA で書いていたため zizmor の ref-version-mismatch が発生。v1.20.0 のコミット SHA（e84001b）に修正
+- カットオーバー実施（default branch 切替 → main へ code_scanning ルールが自動追従、以降 main への直接 push は不可で PR 経由に）
+- tagpr 初回実行がリリース PR 本文の 65536 文字上限超過（422）で失敗。タグ未作成のため全履歴から本文を生成したのが原因で、ベースラインタグ `2026.0711.0` を手動で打つ対処を Phase C に追記
