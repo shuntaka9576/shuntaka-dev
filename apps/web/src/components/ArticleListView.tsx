@@ -1,10 +1,10 @@
 import { ArticleCard } from '@/components/ArticleCard';
 import { BaseLayout } from '@/components/BaseLayout';
 import { FilteredArticleList } from '@/components/FilteredArticleList';
+import { FloatingTagFilter } from '@/components/FloatingTagFilter';
 import { PageReady } from '@/components/PageReady';
 import { Pagination } from '@/components/Pagination';
 import { TagFilterControls } from '@/components/TagFilterControls';
-import { TagFilterHeaderToggle } from '@/components/TagFilterHeaderToggle';
 import { TagFilterProvider } from '@/components/TagFilterProvider';
 import { getArticles, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE, USER_NAME } from '@/lib/constants';
@@ -36,11 +36,9 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
 
   if (error) {
     return (
-      <BaseLayout showTypeHeader currentTab="posts">
+      <BaseLayout showTypeHeader currentTab="posts" narrow>
         <main className="w-full">
-          <div className="max-w-[var(--layout-list-max)]">
-            <p className="text-[var(--color-danger-border)]">{error}</p>
-          </div>
+          <p className="text-[var(--color-danger-border)]">{error}</p>
           <PageReady />
         </main>
       </BaseLayout>
@@ -62,30 +60,30 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
       page={page}
       baseHref={baseHref}
     >
-      <BaseLayout showTypeHeader currentTab="posts" typeHeaderEnd={<TagFilterHeaderToggle />}>
-        <main className="w-full">
-          <div className="max-w-[var(--layout-list-max)]">
-            <TagFilterControls />
-            <FilteredArticleList userName={USER_NAME}>
-              {articles.length === 0 ? (
-                <p>No articles found.</p>
-              ) : (
-                <>
-                  {articles.map((article) => (
-                    <ArticleCard
-                      key={article.articleId}
-                      article={article}
-                      userName={USER_NAME}
-                      priority={priorityArticleIds.has(article.articleId)}
-                    />
-                  ))}
-                  <Pagination currentPage={page} totalPages={totalPages} baseHref={baseHref} />
-                </>
-              )}
-            </FilteredArticleList>
-          </div>
+      <BaseLayout showTypeHeader currentTab="posts" narrow>
+        {/* pb はフローティングタグバーとページネーションの重なりを避けるための余白 */}
+        <main className="w-full pb-24">
+          <TagFilterControls />
+          <FilteredArticleList userName={USER_NAME}>
+            {articles.length === 0 ? (
+              <p>No articles found.</p>
+            ) : (
+              <>
+                {articles.map((article) => (
+                  <ArticleCard
+                    key={article.articleId}
+                    article={article}
+                    userName={USER_NAME}
+                    priority={priorityArticleIds.has(article.articleId)}
+                  />
+                ))}
+                <Pagination currentPage={page} totalPages={totalPages} baseHref={baseHref} />
+              </>
+            )}
+          </FilteredArticleList>
           <PageReady />
         </main>
+        <FloatingTagFilter />
       </BaseLayout>
     </TagFilterProvider>
   );
