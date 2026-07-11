@@ -125,3 +125,4 @@ cd main && direnv allow .
 - Songmu/tagpr の SHA ピンを v1 タグの annotated tag オブジェクト SHA で書いていたため zizmor の ref-version-mismatch が発生。v1.20.0 のコミット SHA（e84001b）に修正
 - カットオーバー実施（default branch 切替 → main へ code_scanning ルールが自動追従、以降 main への直接 push は不可で PR 経由に）
 - tagpr 初回実行がリリース PR 本文の 65536 文字上限超過（422）で失敗。タグ未作成のため全履歴から本文を生成したのが原因で、ベースラインタグ `2026.0711.0` を手動で打つ対処を Phase C に追記
+- ベースラインタグ push 後、tagpr がリリース PR（Release for 2026.0711.1）を正常に作成。ただし自動生成の CHANGELOG.md に cspell 未知語（依存名・Renovate 由来の PR タイトル）が含まれ CI の spell-check が失敗するため、CHANGELOG.md を cspell の ignorePaths に追加

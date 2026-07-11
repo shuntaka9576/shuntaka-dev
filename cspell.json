@@ -19,7 +19,8 @@
     "tools/tidb-seeder/out/**",
     "**/go.mod",
     "**/go.sum",
-    "tools/dsql-cli/dsl-tidb/backfill/**"
+    "tools/dsql-cli/dsl-tidb/backfill/**",
+    "CHANGELOG.md"
   ],
   "language": "en",
   "words": [
