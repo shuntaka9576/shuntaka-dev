@@ -13,7 +13,7 @@
   ],
   "main": "index.js",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo dev storybook",
     "spell-check": "cspell lint . --cache --gitignore",
     "build": "turbo build",
     "type-check": "bun --filter '*' type-check",
