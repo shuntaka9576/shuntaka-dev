@@ -61,8 +61,9 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
       baseHref={baseHref}
     >
       <BaseLayout showTypeHeader currentTab="posts" narrow>
-        {/* pb はフローティングタグバーとページネーションの重なりを避けるための余白 */}
-        <main className="w-full pb-24">
+        {/* pb はフローティングタグバー（下端24px+高さ約44px）とページネーションの重なりを避けるための余白。
+            BaseLayout の footer 予約 58px と合算して確保する */}
+        <main className="w-full pb-8">
           <TagFilterControls />
           <FilteredArticleList userName={USER_NAME}>
             {articles.length === 0 ? (
