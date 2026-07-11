@@ -1,0 +1,64 @@
+name: Bundle Size Report
+description: PR と base を TURBOPACK_STATS 付きでビルドし、ルート別 First Load JS の差分を sticky コメントする
+
+inputs:
+  github-token:
+    description: 'sticky コメント投稿に使うトークン'
+    required: true
+  pr-number:
+    description: 'Pull Request 番号'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    # sitemap/feed がビルド時に記事一覧を取得するため、空データを返すスタブを立てる
+    # (API_BASE_URL のデフォルト http://localhost:8080 がそのままスタブを向く)
+    - name: Start API stub
+      shell: bash
+      run: |
+        bun "$GITHUB_ACTION_PATH/api-stub.ts" &
+        sleep 1
+        curl -sf http://localhost:8080/users/stub/articles > /dev/null
+
+    - name: Build PR branch
+      shell: bash
+      working-directory: apps/web
+      env:
+        TURBOPACK_STATS: '1'
+      run: bun run build
+
+    - name: Build base branch
+      shell: bash
+      working-directory: base
+      env:
+        TURBOPACK_STATS: '1'
+      run: |
+        bun install --frozen-lockfile
+        cd apps/web
+        bun run build
+
+    - name: Generate report
+      shell: bash
+      run: |
+        bun "$GITHUB_ACTION_PATH/report.ts" \
+          base/apps/web/.next/diagnostics/route-bundle-stats.json \
+          apps/web/.next/diagnostics/route-bundle-stats.json > report.md
+        cat report.md
+
+    - name: Post sticky comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+      run: |
+        marker='<!-- bundle-size-report -->'
+        existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+          --paginate --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -1)
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+            -f "body=$(cat report.md)"
+        else
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            -f "body=$(cat report.md)"
+        fi
