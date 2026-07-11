@@ -7,7 +7,6 @@ const baseArticle: ArticleSummary = {
   title: 'shuntaka.dev のデザインシステムを skill 化した',
   slug: 'design-system-as-skill',
   description: '',
-  type: 'tech',
   thumbnail: 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png',
   ogpUrl: '',
   tags: ['tech/claude-code', 'tech/frontend'],
@@ -64,8 +63,8 @@ export const NoPublishedAt: Story = {
 export const Filtering: Story = {
   args: {
     tags: [
-      { path: 'claude-code', matched: true },
-      { path: 'frontend', matched: false },
+      { path: 'tech/claude-code', matched: true },
+      { path: 'tech/frontend', matched: false },
     ],
   },
 };

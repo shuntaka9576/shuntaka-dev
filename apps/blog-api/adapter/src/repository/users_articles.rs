@@ -220,8 +220,8 @@ GROUP BY at2.article_id"#
 /// OR モード:  全タグ ID の子孫をまとめた単一 EXISTS 条件を生成する。
 ///
 /// 返り値: (cte_sql_body, where_conditions)
-///   AND: バインド順 → CTE 用 [tag_ids...], user_name, type, EXISTS 用 [tag_ids...]
-///   OR:  バインド順 → CTE 用 [tag_ids...], user_name, type
+///   AND: バインド順 → CTE 用 [tag_ids...], user_name, EXISTS 用 [tag_ids...]
+///   OR:  バインド順 → CTE 用 [tag_ids...], user_name
 fn build_list_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String, String) {
     let cte_in = (0..tag_ids.len())
         .map(|_| "?")
@@ -319,10 +319,9 @@ pub struct UsersArticlesRepositoryImpl {
 
 #[async_trait]
 impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
-    async fn find_published_by_user_name_and_type(
+    async fn find_published_by_user_name(
         &self,
         user_name: &str,
-        article_type: &ArticleType,
         tag_filter: Option<&TagFilter>,
         offset: u64,
         limit: u64,
@@ -371,16 +370,14 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                              a.status, a.`type`, a.published_at, a.created_at, a.updated_at\n\
                              FROM articles a\n\
                              WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
-                             AND a.status = 'published'\n  \
-                             AND a.`type` = ?\n\
+                             AND a.status = 'published'\n\
                              ORDER BY a.published_at DESC, a.article_id DESC\n\
                              LIMIT ? OFFSET ?"
                     .to_string();
                 let count = "SELECT COUNT(*)\n\
                               FROM articles a\n\
                               WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
-                              AND a.status = 'published'\n  \
-                              AND a.`type` = ?"
+                              AND a.status = 'published'"
                     .to_string();
                 (list, count)
             }
@@ -394,8 +391,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                      a.status, a.`type`, a.published_at, a.created_at, a.updated_at\n\
                      FROM articles a\n\
                      WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
-                     AND a.status = 'published'\n  \
-                     AND a.`type` = ?\n\
+                     AND a.status = 'published'\n\
                      {conds}\n\
                      ORDER BY a.published_at DESC, a.article_id DESC\n\
                      LIMIT ? OFFSET ?"
@@ -405,8 +401,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                      SELECT COUNT(*)\n\
                      FROM articles a\n\
                      WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
-                     AND a.status = 'published'\n  \
-                     AND a.`type` = ?\n\
+                     AND a.status = 'published'\n\
                      {conds}"
                 );
                 (list, count)
@@ -414,7 +409,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         };
 
         // 一覧クエリ Future を構築する
-        // バインド順: [cte_tag_ids...], user_name, type, [exists_tag_ids... (AND のみ)], limit, offset
+        // バインド順: [cte_tag_ids...], user_name, [exists_tag_ids... (AND のみ)], limit, offset
         let rows_future = {
             let mut q =
                 sqlx::query_as::<_, ArticleSummaryBaseRow>(sqlx::AssertSqlSafe(list_sql.as_str()));
@@ -423,7 +418,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                     q = q.bind(id.as_str());
                 }
             }
-            q = q.bind(user_name).bind(article_type.as_str());
+            q = q.bind(user_name);
             if let (Some(ids), Some(TagFilterMode::And)) = (&resolved_ids, filter_mode) {
                 for id in ids {
                     q = q.bind(id.as_str());
@@ -439,7 +434,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         };
 
         // カウントクエリ Future を構築する
-        // バインド順: [cte_tag_ids...], user_name, type, [exists_tag_ids... (AND のみ)]
+        // バインド順: [cte_tag_ids...], user_name, [exists_tag_ids... (AND のみ)]
         let count_future = {
             let mut q = sqlx::query_as::<_, (i64,)>(sqlx::AssertSqlSafe(count_sql.as_str()));
             if let Some(ids) = &resolved_ids {
@@ -447,7 +442,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                     q = q.bind(id.as_str());
                 }
             }
-            q = q.bind(user_name).bind(article_type.as_str());
+            q = q.bind(user_name);
             if let (Some(ids), Some(TagFilterMode::And)) = (&resolved_ids, filter_mode) {
                 for id in ids {
                     q = q.bind(id.as_str());
@@ -545,7 +540,6 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
     async fn find_tag_facets(
         &self,
         user_name: &str,
-        article_type: &ArticleType,
         tag_filter: Option<&TagFilter>,
     ) -> Result<TagFacetsResult, anyhow::Error> {
         let pool = self.db.pool();
@@ -584,20 +578,22 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         // タイムアウト時は呼び出し元がエラーとして扱う。
         let facets_sql = match &resolved_ids {
             None => {
-                // フィルタなし: tag_article_counts + tag_paths CTE でパス名を付けて返す
+                // フィルタなし: tag_article_counts + tag_paths CTE でパス名を付けて返す。
+                // tag_article_counts は (user_id, type, tag_id) 単位の前計算のため、
+                // type 横断の件数は SUM で合算する（スコープ2で type 列削除予定）。
                 r#"WITH RECURSIVE tag_paths AS (
     SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
     UNION ALL
     SELECT t.tag_id, CONCAT(tp.path, '/', t.name) FROM tags t
     JOIN tag_paths tp ON t.parent_tag_id = tp.tag_id
 )
-SELECT tp.path, tac.article_count AS cnt
+SELECT tp.path, CAST(SUM(tac.article_count) AS SIGNED) AS cnt
 FROM tag_article_counts tac
 JOIN tag_paths tp ON tp.tag_id = tac.tag_id
 WHERE tac.user_id = (SELECT user_id FROM users WHERE name = ?)
-  AND tac.`type` = ?
-  AND tac.article_count > 0
-ORDER BY tac.article_count DESC, tp.path ASC"#
+GROUP BY tac.tag_id, tp.path
+HAVING cnt > 0
+ORDER BY cnt DESC, tp.path ASC"#
                     .to_string()
             }
             Some(ids) => {
@@ -631,7 +627,6 @@ FROM (
     JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
     WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)
       AND a.status = 'published'
-      AND a.`type` = ?
     {filter_conds}
     GROUP BY ta.anc_tag_id
     HAVING cnt > 0
@@ -642,14 +637,14 @@ ORDER BY agg.cnt DESC, tp.path ASC"#
             }
         };
 
-        // バインド順: [cte_tag_ids...], user_name, type, [exists_tag_ids... (AND のみ)]
+        // バインド順: [cte_tag_ids...], user_name, [exists_tag_ids... (AND のみ)]
         let mut q = sqlx::query_as::<_, (String, i64)>(sqlx::AssertSqlSafe(facets_sql.as_str()));
         if let Some(ids) = &resolved_ids {
             for id in ids {
                 q = q.bind(id.as_str());
             }
         }
-        q = q.bind(user_name).bind(article_type.as_str());
+        q = q.bind(user_name);
         if let (Some(ids), Some(TagFilterMode::And)) = (&resolved_ids, filter_mode) {
             for id in ids {
                 q = q.bind(id.as_str());

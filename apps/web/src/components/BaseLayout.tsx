@@ -8,7 +8,7 @@ import { ToggleSwitch } from './ToggleSwitch';
 interface BaseLayoutProps {
   children: React.ReactNode;
   showTypeHeader?: boolean;
-  currentTab?: 'tech' | 'note' | 'about';
+  currentTab?: 'posts' | 'about';
   /** タブ行の右端に表示する要素（タグ絞り込みトグル等） */
   typeHeaderEnd?: React.ReactNode;
 }
@@ -22,9 +22,8 @@ export function BaseLayout({
   const pathname = usePathname();
 
   // Use currentTab if provided, otherwise fall back to pathname
-  const isTechActive =
-    currentTab === 'tech' || (!currentTab && (pathname === '/' || pathname === undefined));
-  const isNoteActive = currentTab === 'note' || (!currentTab && pathname === '/type/note');
+  const isPostsActive =
+    currentTab === 'posts' || (!currentTab && (pathname === '/' || pathname === undefined));
   const isAboutActive = currentTab === 'about' || (!currentTab && pathname === '/about');
   // NOTE: doneProgress()はここで呼ばない
   // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
@@ -44,7 +43,7 @@ export function BaseLayout({
         </div>
       </div>
 
-      {/* Type Header (tech/note/about) */}
+      {/* Type Header (posts/about) */}
       {showTypeHeader && (
         <nav
           className="sticky top-0 z-10 w-full border-b border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)]"
@@ -53,13 +52,8 @@ export function BaseLayout({
           <div className="mx-auto flex max-w-[var(--layout-max)] items-baseline justify-between px-8 max-sm:px-4 max-sm:pt-3">
             <div>
               <div className="inline-block mr-2">
-                <ProgressLink href="/" className={isTechActive ? tabActiveClass : ''}>
-                  tech
-                </ProgressLink>
-              </div>
-              <div className="inline-block mr-2">
-                <ProgressLink href="/type/note" className={isNoteActive ? tabActiveClass : ''}>
-                  note
+                <ProgressLink href="/" className={isPostsActive ? tabActiveClass : ''}>
+                  posts
                 </ProgressLink>
               </div>
               <div className="inline-block mr-2">

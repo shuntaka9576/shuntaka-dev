@@ -31,10 +31,11 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     return { title: 'Article Not Found' };
   }
 
-  const ogImage =
-    article.type === 'note'
-      ? 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png'
-      : (article.thumbnail ?? article.ogpUrl);
+  // 旧 type=note 相当。misc ルートのタグを持つ記事はサイト共通画像 + 小カードにする
+  const isMisc = article.tags.some((tag) => tag === 'misc' || tag.startsWith('misc/'));
+  const ogImage = isMisc
+    ? 'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png'
+    : (article.thumbnail ?? article.ogpUrl);
 
   return {
     title: article.title,
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       images: [{ url: ogImage }],
     },
     twitter: {
-      card: article.type === 'note' ? 'summary' : 'summary_large_image',
+      card: isMisc ? 'summary' : 'summary_large_image',
       images: [ogImage],
     },
   };

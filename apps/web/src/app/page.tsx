@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  return <ArticleListView type="tech" currentTab="tech" page={1} baseHref="/" />;
+  return <ArticleListView page={1} baseHref="/" />;
 }

@@ -6,28 +6,26 @@ import { Pagination } from '@/components/Pagination';
 import { TagFilterControls } from '@/components/TagFilterControls';
 import { TagFilterHeaderToggle } from '@/components/TagFilterHeaderToggle';
 import { TagFilterProvider } from '@/components/TagFilterProvider';
-import { getArticlesByType, getTagFacets } from '@/lib/api';
+import { getArticles, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE, USER_NAME } from '@/lib/constants';
 
 interface ArticleListViewProps {
-  type: 'tech' | 'note';
-  currentTab: 'tech' | 'note';
   page: number;
   baseHref: string;
 }
 
-export async function ArticleListView({ type, currentTab, page, baseHref }: ArticleListViewProps) {
-  let articles: Awaited<ReturnType<typeof getArticlesByType>>['articles'] = [];
+export async function ArticleListView({ page, baseHref }: ArticleListViewProps) {
+  let articles: Awaited<ReturnType<typeof getArticles>>['articles'] = [];
   let totalPages = 1;
   let initialFacets: Awaited<ReturnType<typeof getTagFacets>>['facets'] = [];
   let error: string | null = null;
 
   try {
-    // 現在ページの記事と type 全体のファセットを並列取得する
+    // 現在ページの記事と全体のファセットを並列取得する
     // perPage=all の全件フェッチはやめ、1ページ分のみ取得する
     const [pageResult, facetsResult] = await Promise.all([
-      getArticlesByType(USER_NAME, type, { page, perPage: ARTICLES_PER_PAGE }),
-      getTagFacets(USER_NAME, type),
+      getArticles(USER_NAME, { page, perPage: ARTICLES_PER_PAGE }),
+      getTagFacets(USER_NAME),
     ]);
     articles = pageResult.articles;
     totalPages = pageResult.totalPages;
@@ -38,7 +36,7 @@ export async function ArticleListView({ type, currentTab, page, baseHref }: Arti
 
   if (error) {
     return (
-      <BaseLayout showTypeHeader currentTab={currentTab}>
+      <BaseLayout showTypeHeader currentTab="posts">
         <main className="w-full">
           <div className="max-w-[var(--layout-list-max)]">
             <p className="text-[var(--color-danger-border)]">{error}</p>
@@ -59,14 +57,12 @@ export async function ArticleListView({ type, currentTab, page, baseHref }: Arti
   return (
     <TagFilterProvider
       userName={USER_NAME}
-      type={type}
-      tagRoot={type === 'tech' ? 'tech' : 'misc'}
       initialFacets={initialFacets}
       initialTotalPages={totalPages}
       page={page}
       baseHref={baseHref}
     >
-      <BaseLayout showTypeHeader currentTab={currentTab} typeHeaderEnd={<TagFilterHeaderToggle />}>
+      <BaseLayout showTypeHeader currentTab="posts" typeHeaderEnd={<TagFilterHeaderToggle />}>
         <main className="w-full">
           <div className="max-w-[var(--layout-list-max)]">
             <TagFilterControls />

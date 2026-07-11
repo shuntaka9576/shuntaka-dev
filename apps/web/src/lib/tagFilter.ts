@@ -1,7 +1,7 @@
 export type TagFilterMode = 'or' | 'and';
 
 export interface TagNode {
-  /** root プレフィックスを除いた相対パス（例: "aws", "aws/lambda"） */
+  /** フルパス表記のタグ（例: "tech", "tech/aws/lambda"） */
   path: string;
   /** 表示用の末尾セグメント（例: "lambda"） */
   label: string;
@@ -10,43 +10,23 @@ export interface TagNode {
   children: TagNode[];
 }
 
-/**
- * API のフルパスタグ（例: "tech/aws/lambda"）を現在タブの root（"tech" | "misc"）で
- * 相対パスに変換する。root 単独タグは絞り込み情報を持たないため除外し、
- * root が一致しないタグ（tech 記事に misc タグが付くケース）も UI に出さないため除外する。
- */
-export function toRelativeTags(tags: string[], root: string): string[] {
-  const prefix = `${root}/`;
-  return tags.filter((tag) => tag.startsWith(prefix)).map((tag) => tag.slice(prefix.length));
-}
-
-/** 祖先マッチ。選択タグ "aws" は記事タグ "aws/lambda" にもヒットする */
+/** 祖先マッチ。選択タグ "tech/aws" は記事タグ "tech/aws/lambda" にもヒットする */
 export function matchesTag(selected: string, tags: string[]): boolean {
   return tags.some((tag) => tag === selected || tag.startsWith(`${selected}/`));
 }
 
 /**
  * API の tag-facets レスポンス（path/count の配列、フルパス）からタグツリーを構築する。
- * root プレフィックス（例: "tech/"）を除去し、相対パスの TagNode[] を返す。
+ * ツリーの第1階層はルートタグ（例: "tech", "misc"）で、旧 type タブ相当の絞り込みになる。
  * count は API が祖先ロールアップ済みの値を返すためそのまま使用する。
  * 並び順は count 降順、同数はパス昇順。
  */
-export function buildTagTreeFromFacets(
-  facets: { path: string; count: number }[],
-  root: string,
-): TagNode[] {
-  const prefix = `${root}/`;
-
-  // root 配下のパスのみ抽出して相対パスに変換する
-  const relativeFacets = facets
-    .filter((f) => f.path.startsWith(prefix) && f.path.length > prefix.length)
-    .map((f) => ({ path: f.path.slice(prefix.length), count: f.count }));
-
+export function buildTagTreeFromFacets(facets: { path: string; count: number }[]): TagNode[] {
   const nodes = new Map<string, TagNode>();
   const roots: TagNode[] = [];
 
   // パス昇順でソートしてから処理することで、親が子より先に登録される
-  const sorted = [...relativeFacets].sort((a, b) => a.path.localeCompare(b.path));
+  const sorted = [...facets].sort((a, b) => a.path.localeCompare(b.path));
 
   for (const { path, count } of sorted) {
     const segments = path.split('/');

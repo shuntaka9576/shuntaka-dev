@@ -5,7 +5,6 @@ export interface Article {
   content: string;
   contentHtml?: string;
   description: string;
-  type: string | null;
   thumbnail: string | null;
   ogpUrl: string;
   /** フルパス表記のタグ（例: "tech/rust", "tech/aws/lambda"） */
@@ -20,7 +19,6 @@ export interface ArticleSummary {
   title: string;
   slug: string;
   description: string;
-  type: string | null;
   thumbnail: string | null;
   ogpUrl: string;
   /** フルパス表記のタグ（例: "tech/rust", "tech/aws/lambda"） */
@@ -82,19 +80,19 @@ function buildTagsQuery(tags: string[], mode?: 'and' | 'or'): string[] {
   return parts;
 }
 
-export async function getArticlesByType(
+export async function getArticles(
   userName: string,
-  type: 'tech' | 'note',
   opts: ArticlesQueryOptions = {},
 ): Promise<ArticlesPage> {
-  const queryParts: string[] = [`type=${encodeURIComponent(type)}`];
+  const queryParts: string[] = [];
   if (opts.page !== undefined) queryParts.push(`page=${opts.page}`);
   if (opts.perPage !== undefined) queryParts.push(`perPage=${opts.perPage}`);
   if (opts.tags && opts.tags.length > 0) {
     queryParts.push(...buildTagsQuery(opts.tags, opts.mode));
   }
 
-  const url = `${API_BASE_URL}/users/${userName}/articles?${queryParts.join('&')}`;
+  const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  const url = `${API_BASE_URL}/users/${userName}/articles${query}`;
   const fetchOpts = opts.noCache
     ? { cache: 'no-store' as const, signal: opts.signal }
     : { next: { revalidate: 30 }, signal: opts.signal };
@@ -110,19 +108,19 @@ export async function getArticlesByType(
 
 /**
  * tag-facets API を呼び出し、指定した絞り込み条件に対するタグファセット（タグ別記事数）を返す。
- * tags 省略時は type 全体の集計（パネル初期表示・SSR 埋め込み用）。
+ * tags 省略時は全公開記事の集計（パネル初期表示・SSR 埋め込み用）。
  */
 export async function getTagFacets(
   userName: string,
-  type: 'tech' | 'note',
   opts: TagFacetsOptions = {},
 ): Promise<TagFacetsResult> {
-  const queryParts: string[] = [`type=${encodeURIComponent(type)}`];
+  const queryParts: string[] = [];
   if (opts.tags && opts.tags.length > 0) {
     queryParts.push(...buildTagsQuery(opts.tags, opts.mode));
   }
 
-  const url = `${API_BASE_URL}/users/${userName}/articles/tag-facets?${queryParts.join('&')}`;
+  const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  const url = `${API_BASE_URL}/users/${userName}/articles/tag-facets${query}`;
   const fetchOpts = opts.noCache
     ? { cache: 'no-store' as const, signal: opts.signal }
     : { next: { revalidate: 30 }, signal: opts.signal };
