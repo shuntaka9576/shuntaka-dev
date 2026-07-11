@@ -1,0 +1,581 @@
+# Changelog
+
+## [2026.0711.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0711.0...2026.0711.1) - 2026-07-11
+
+- docs: カットオーバー手順に ruleset 変更を追記し protect の enforcement 宣言を実態に同期 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/602
+- docs: tagpr 初回導入時のベースラインタグ手順を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/603
+- chore: 自動生成の CHANGELOG.md を cspell 対象外に変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/605
+
+## [2026.0711.0](https://github.com/shuntaka9576/shuntaka-dev/commits/2026.0711.0) - 2026-07-11
+
+- chore(docs): add GitHub Actions workflow for GitHub Pages deployment by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/1
+- chore(deps): update github-actions (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/5
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/4
+- fix(deps): update root (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/8
+- chore(deps): update astral-sh/setup-uv action to v7.1.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/6
+- chore(deps): update rust crate jsonwebtoken to v10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/7
+- fix(deps): lock file maintenance apps/blog-api by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/10
+- perf(web): enable ISR for article pages with generateStaticParams by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/11
+- fix(renovate): correct package grouping rules by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/14
+- fix(renovate): disable lockFileMaintenance by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/16
+- fix(renovate): add rangeStrategy bump to update package.json versions by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/19
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/18
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/17
+- chore(deps): update pnpm to v10.27.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/15
+- fix(deps): update apps/blog-api by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/13
+- chore(deps): update node.js to v24.12.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/22
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/21
+- chore(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/24
+- fix(deps): update dependency sphinx to v9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/23
+- fix(deps): update tools/dsql-cli to ^3.954.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/25
+- fix(deps): update docs by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/20
+- chore(deps): update rust crate tracing to 0.1.44 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/26
+- fix(deps): update tools/dsql-cli to ^3.955.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/29
+- chore(deps): update dependency ruff to >=0.14.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/28
+- fix(deps): update dependency aws-cdk-lib to v2.234.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/27
+- fix(deps): update dependency aws-cdk-lib to v2.234.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/30
+- feat(markdown): add GitHub code embed support by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/32
+- feat(markdown): add code block filename header support by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/35
+- chore(deps): update pnpm to v10.28.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/33
+- feat(web): add copy button to code blocks by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/36
+- fix(deps): update rust crate ureq to 3.1.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/34
+- feat(markdown): add link card (OGP card) support by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/37
+- fix(deps): update apps/blog-api by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/38
+- chore(blog-api): pin Rust version to 1.88.0 for CI consistency by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/39
+- chore(renovate): schedule regular updates on weekends and enable instant vulnerability alerts by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/40
+- chore(deps): update rust crate axum to 0.8.8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/41
+- fix(deps): update tools/dsql-cli to ^3.956.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/31
+- feat(markdown): add X post embed support via oEmbed API by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/42
+- feat(rust): move cargo workspace to repo root for rust-analyzer support by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/44
+- fix(docker): move Dockerfile to repo root for workspace compatibility by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/45
+- fix(deps): update rust crate serde_json to 1.0.145 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/43
+- feat(ci): add setup-rust action to parse rust-toolchain.toml by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/46
+- refactor(ci): simplify setup-rust action to use rustup show by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/47
+- feat(blog-api): enhance logging to identify 500 error causes by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/48
+- chore(claude): add vercel react best practices skill by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/49
+- refactor(web): optimize images, fonts and SEO with Next.js by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/50
+- chore(deps): adopt pnpm catalog for shared dependencies by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/51
+- fix(deps): update dependency next to ^16.1.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/54
+- fix(deps): update tools/dsql-cli to ^3.958.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/56
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/57
+- chore(deps): bump urllib3 from 2.5.0 to 2.6.3 in /docs by @dependabot[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/59
+- chore(deps): bump starlette from 0.48.0 to 0.49.1 in /docs by @dependabot[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/58
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/60
+- ci: add workflow for auto-updating Cargo.lock on Renovate PRs by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/61
+- fix(deps): update rust crate serde_json to 1.0.148 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/62
+- feat(web): unify OGP image to hashi-light icon by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/63
+- chore(deps): update pnpm to v10.28.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/64
+- fix(deps): update dependency next to ^16.1.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/65
+- fix(deps): update dependency sphinx to >=9.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/66
+- fix(deps): update tools/dsql-cli to ^3.962.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/69
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/68
+- chore(deps): update rust crate reqwest to 0.13.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/67
+- chore: migrate from pnpm to bun package manager by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/73
+- chore(deps): update dependency @types/react to ^19.2.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/75
+- chore(ci): add node_modules cache for bun install by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/76
+- chore(deps): update dependency bun to v1.3.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/82
+- fix(deps): update docs by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/79
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/81
+- chore(deps): update dependency prettier to ^3.8.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/84
+- chore(deps): update dependency cspell to ^9.6.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/83
+- fix(ci): disable node_modules cache by default in setup-node action by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/85
+- chore(deps): update dependency turbo to ^2.7.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/86
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/87
+- chore(deps): update github-actions - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/88
+- chore(deps): update actions/cache action to v5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/91
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/90
+- chore(deps): update postgres docker tag to v18 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/92
+- fix(deps): update docs (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/93
+- refactor: migrate from biome to oxfmt + prettier by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/94
+- chore(deps): update node.js to v24.13.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/89
+- chore(deps): update rust crate uuid to 1.20.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/95
+- chore(deps): update dependency cspell to ^9.6.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/96
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/99
+- chore(deps): update dependency oxlint-tsgolint to ^0.11.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/97
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/98
+- chore(deps): update dependency lefthook to ^2.0.16 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/100
+- chore(deps): update dependency @types/react to ^19.2.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/101
+- fix(deps): update dependency next to ^16.1.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/102
+- chore(deps): update dependency bun to v1.3.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/103
+- chore(deps): update rust crate jsonwebtoken to 10.3.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/104
+- chore(deps): update dependency oxlint-tsgolint to ^0.11.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/105
+- chore(deps): update dependency @types/node to ^25.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/106
+- chore(deps): update dependency aws-cdk to ^2.1104.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/107
+- fix(deps): update tools/dsql-cli to ^3.978.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/109
+- chore(deps): update dependency turbo to ^2.8.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/108
+- fix(web): show default tab selection on SSR by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/110
+- chore(deps): update actions/cache action to v5.0.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/111
+- chore(deps): update dependency bun to v1.3.8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/112
+- chore(deps): update dependency oxlint-tsgolint to ^0.11.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/113
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/114
+- chore(deps): update dependency turbo to ^2.8.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/115
+- fix(deps): update dependency commander to ^14.0.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/116
+- chore(deps): update astral-sh/setup-uv action to v7.2.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/117
+- chore(deps): update dependency @types/node to ^25.2.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/118
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/119
+- fix(deps): update dependency aws-cdk-lib to ^2.237.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/120
+- chore(deps): update dependency cspell to ^9.6.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/121
+- fix(deps): update tools/dsql-cli to ^3.981.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/122
+- fix(deps): update dependency aws-cdk-lib to ^2.237.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/124
+- chore(deps): update dependency lefthook to ^2.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/125
+- fix(deps): update tools/dsql-cli to ^3.982.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/126
+- chore(deps): update dependency turbo to ^2.8.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/123
+- chore(deps): update dependency cspell to ^9.6.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/127
+- chore(deps): update dependency ruff to >=0.15.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/130
+- fix(deps): update tools/dsql-cli to ^3.983.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/131
+- fix(deps): update rust crate regex to 1.12.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/129
+- chore(deps): update dependency @types/react to ^19.2.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/128
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/132
+- chore(deps): update dependency @types/node to ^25.2.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/135
+- chore(deps): update dependency aws-cdk to ^2.1105.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/136
+- chore(deps): update dependency @types/react to ^19.2.13 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/134
+- fix(deps): update tools/dsql-cli to ^3.984.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/137
+- chore(deps): update aws-actions/configure-aws-credentials action to v6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/138
+- chore(deps): update python docker tag to v3.14.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/133
+- fix(deps): update tools/dsql-cli to ^3.985.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/140
+- fix(deps): update rust crate ureq to 3.2.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/139
+- chore(deps): update rust crate anyhow to 1.0.101 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/141
+- chore(deps): update astral-sh/setup-uv action to v7.3.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/142
+- chore(deps): update rust crate reqwest to 0.13.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/143
+- chore(deps): update dependency @types/node to ^25.2.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/144
+- chore(deps): update dependency oxlint-tsgolint to ^0.11.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/145
+- chore(deps): update dependency bun to v1.3.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/146
+- fix(deps): update tools/dsql-cli to ^3.986.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/148
+- fix(deps): update dependency aws-cdk-lib to ^2.238.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/147
+- chore(deps): update node.js to v24.13.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/151
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/152
+- fix(deps): update tools/dsql-cli to ^3.987.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/153
+- chore(deps): update dependency turbo to ^2.8.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/150
+- chore(deps): update dependency oxlint-tsgolint to ^0.12.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/154
+- chore(deps): update dependency @types/node to ^25.2.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/149
+- chore(deps): update dependency @types/react to ^19.2.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/155
+- chore(deps): update dependency turbo to ^2.8.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/156
+- fix(deps): update tools/dsql-cli to ^3.988.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/157
+- chore(deps): update dependency turbo to ^2.8.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/158
+- chore(deps): update dependency lefthook to ^2.1.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/159
+- chore(deps): update dependency aws-cdk to ^2.1106.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/160
+- chore(deps): update dependency oxlint-tsgolint to ^0.12.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/161
+- fix(deps): update tools/dsql-cli to ^3.989.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/164
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/163
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/162
+- fix(docker): update Rust version to 1.92 to match rust-toolchain.toml by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/165
+- chore(deps): update dependency rust to v1.93 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/166
+- chore(deps): update dependency rust to v1.93.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/167
+- chore(deps): update dependency oxlint-tsgolint to ^0.12.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/168
+- chore(deps): update dependency rust to v1.93.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/169
+- fix(deps): update tools/dsql-cli to ^3.990.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/170
+- chore(deps): update dependency turbo to ^2.8.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/171
+- chore(deps): update rust crate uuid to 1.21.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/173
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/175
+- fix(deps): update tools/dsql-cli to ^3.992.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/176
+- fix(deps): update dependency constructs to ^10.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/177
+- chore(deps): update dependency ruff to >=0.15.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/172
+- chore(deps): update dependency oxlint-tsgolint to ^0.14.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/174
+- chore(deps): update rust crate futures to 0.3.32 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/178
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/179
+- chore(deps): update dependency turbo to ^2.8.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/180
+- chore(deps): update apps/web to ^4.2.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/181
+- chore(deps): update rust crate aws-sdk-dsql to 1.52.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/182
+- fix(deps): update tools/dsql-cli to ^3.994.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/183
+- chore(deps): update dependency @types/node to ^25.3.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/184
+- chore(deps): update dependency oxlint-tsgolint to ^0.14.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/185
+- fix(deps): update dependency aws-cdk-lib to ^2.239.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/188
+- chore(deps): update rust crate aws-sdk-ssm to 1.105.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/187
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/186
+- chore(deps): update dependency oxlint-tsgolint to ^0.14.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/189
+- fix(deps): update tools/dsql-cli to ^3.995.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/190
+- chore(deps): update rust crate anyhow to 1.0.102 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/192
+- chore(deps): update dependency ruff to >=0.15.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/191
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/197
+- chore(deps): update dependency cspell to ^9.7.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/196
+- chore(deps): update rust crate aws-sdk-ssm to 1.106.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/193
+- chore(deps): update apps/web to ^4.2.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/194
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/195
+- fix(deps): update tools/dsql-cli to ^3.996.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/198
+- chore(deps): update dependency oxlint-tsgolint to ^0.15.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/200
+- chore(deps): update rust crate chrono to 0.4.44 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/199
+- fix(deps): update tools/dsql-cli to ^3.997.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/201
+- chore(deps): update node.js to v24.14.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/202
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/204
+- chore(deps): update dependency turbo to ^2.8.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/203
+- chore(deps): update dependency @types/node to ^25.3.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/205
+- chore(deps): update dependency aws-cdk to ^2.1108.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/206
+- fix(deps): update tools/dsql-cli to ^3.1000.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/207
+- chore(deps): update dependency bun to v1.3.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/208
+- chore(deps): update dependency ruff to >=0.15.4 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/209
+- chore(deps): update dependency turbo to ^2.8.12 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/210
+- chore(deps): update dependency @types/node to ^25.3.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/212
+- chore(deps): update astral-sh/setup-uv action to v7.3.1 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/211
+- chore(deps): update dependency @types/pg to ^8.18.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/213
+- chore(deps): update dependency oxlint-tsgolint to ^0.16.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/217
+- chore(deps): update dependency lefthook to ^2.1.2 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/214
+- fix(deps): update dependency aws-cdk-lib to ^2.241.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/216
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/224
+- chore(deps): update rust-toolchain by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/225
+- chore(deps): update dependency lefthook to ^2.1.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/219
+- chore(deps): update dependency turbo to ^2.8.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/220
+- chore(deps): update dependency aws-cdk to ^2.1109.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/223
+- fix(deps): update docs - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/222
+- chore(deps): update dependency @types/node to ^25.3.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/218
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/226
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/215
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/221
+- chore(deps): update dependency @types/node to ^25.4.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/229
+- fix(deps): update rust crate comrak to 0.51.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/233
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/227
+- chore(deps): update dependency turbo to ^2.8.16 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/228
+- fix(deps): update tools/dsql-cli to ^3.1006.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/230
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/231
+- chore(deps): update dependency lefthook to ^2.1.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/237
+- chore(deps): update dependency @types/node to ^25.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/239
+- chore(deps): update dependency turbo to ^2.8.17 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/240
+- chore(deps): update astral-sh/setup-uv action to v7.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/234
+- fix(deps): update tools/dsql-cli to ^3.1009.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/236
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/235
+- fix(deps): update apps/web to v2 (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/232
+- chore(deps): update oxlint monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/238
+- chore(deps): update dependency ruff to >=0.15.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/241
+- chore(deps): update oven-sh/setup-bun action to v2.2.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/242
+- fix(deps): update dependency next to ^16.1.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/246
+- fix(deps): update tools/dsql-cli to ^3.1010.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/245
+- chore(deps): update oxlint monorepo - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/244
+- chore(deps): update astral-sh/setup-uv action to v7.6.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/247
+- fix(deps): update tools/dsql-cli to ^3.1011.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/248
+- chore(deps): update dependency oxlint-tsgolint to ^0.17.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/243
+- chore(deps): update dependency oxlint-tsgolint to ^0.17.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/255
+- chore(deps): update actions/cache action to v5.0.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/254
+- chore(deps): update dependency bun to v1.3.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/253
+- fix(deps): update tools/dsql-cli to ^3.1013.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/252
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/251
+- chore(deps): update dependency turbo to ^2.8.20 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/249
+- chore(deps): update dependency turbo to ^2.8.20 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/256
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/250
+- chore: migrate oxc toolchain to vite-plus by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/258
+- fix(deps): update dependency next to ^16.2.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/262
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/264
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/263
+- chore(deps): update dependency ruff to >=0.15.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/261
+- feat: replace X embed widgets.js with react-tweet by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/265
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/267
+- fix(deps): update rust crate ureq to 3.3.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/266
+- chore(deps): update node.js to v24.14.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/272
+- chore(deps): update dependency vite-plus to ^0.1.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/271
+- fix(deps): update tools/dsql-cli to ^3.1016.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/270
+- chore(deps): update dependency aws-cdk to ^2.1113.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/269
+- chore(deps): update dependency typescript to v6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/268
+- fix(iac): migrate to moduleResolution node16 for TypeScript 6 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/274
+- fix(deps): update tools/dsql-cli to ^3.1017.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/275
+- chore(deps): update github-actions (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/276
+- fix(deps): update tools/dsql-cli to ^3.1018.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/279
+- chore(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/277
+- chore(deps): update dependency rust to v1.94.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/280
+- fix(deps): update dependency aws-cdk-lib to ^2.245.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/281
+- chore(deps): update dependency turbo to ^2.8.21 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/285
+- chore(deps): update dependency ruff to >=0.15.8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/282
+- fix(deps): update tools/dsql-cli to ^3.1019.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/283
+- chore(deps): update astral-sh/setup-uv action to v8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/286
+- chore(deps): update dependency turbo to ^2.9.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/288
+- chore(deps): update dependency aws-cdk to ^2.1115.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/287
+- fix(deps): update dependency next to ^16.2.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/293
+- chore(deps): update dependency vite-plus to ^0.1.15 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/292
+- chore(deps): update dependency turbo to ^2.9.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/291
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/290
+- fix(deps): update tools/dsql-cli to ^3.1021.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/289
+- chore(deps): update dependency cspell to v10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/301
+- chore(deps): update dependency turbo to ^2.9.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/299
+- chore(deps): update dependency ruff to >=0.15.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/297
+- fix(deps): update tools/dsql-cli to ^3.1024.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/295
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/294
+- chore(deps): update aws-actions/configure-aws-credentials action to v6.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/306
+- chore(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/304
+- chore(deps): update dependency turbo to ^2.9.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/305
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/307
+- chore(deps): update actions/upload-pages-artifact action to v5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/312
+- chore(deps): update dependency turbo to ^2.9.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/311
+- chore(deps): update dependency prettier to ^3.8.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/310
+- chore(deps): update python to >=3.14.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/309
+- fix(deps): update tools/dsql-cli to ^3.1029.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/303
+- chore(deps): update dependency vite-plus to ^0.1.16 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/302
+- chore(deps): update dependency @types/node to ^25.6.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/296
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/284
+- chore(deps): update docs by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/308
+- chore(deps): update dependency bun to v1.3.12 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/313
+- chore(deps): update dependency lefthook to ^2.1.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/300
+- chore(deps): update node.js to v24.15.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/322
+- fix(deps): update dependency next to ^16.2.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/321
+- chore(deps): update dependency lefthook to ^2.1.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/320
+- chore(deps): update rust crate axum to 0.8.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/319
+- chore(deps): update dependency vite-plus to ^0.1.18 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/318
+- chore(deps): update actions/cache action to v5.0.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/316
+- fix(deps): update tools/dsql-cli to ^3.1031.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/315
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/314
+- chore(deps): update dependency prettier to ^3.8.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/317
+- chore(deps): update dependency typescript to ^6.0.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/323
+- chore(deps): update rust crate tokio to 1.52.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/324
+- chore(deps): update dependency aws-cdk to ^2.1118.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/329
+- fix(deps): update tools/dsql-cli to ^3.1033.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/328
+- chore(deps): update astral-sh/setup-uv action to v8.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/327
+- chore(deps): update rust-toolchain by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/326
+- chore(deps): update dependency ruff to >=0.15.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/325
+- chore(deps): update dependency vite-plus to ^0.1.19 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/333
+- chore(deps): update apps/web to ^4.2.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/330
+- chore(deps): update actions/setup-node action to v6.4.0 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/331
+- chore(deps): update dependency bun to v1.3.13 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/332
+- feat(web): デザインシステム導入とセマンティックトークンへのリファクタ by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/336
+- fix(web): モバイル時の記事本文に左右パディングを付与 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/337
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/334
+- fix(deps): update tools/dsql-cli to ^3.1037.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/335
+- chore: 各 workspace に clean スクリプトを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/338
+- chore: デザインシステムを apps/web 配下に移管し Storybook 導入 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/342
+- chore(deps): update dependency turbo to ^2.9.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/345
+- refactor: DSQL 接続を aurora-dsql-sqlx-connector に置き換え by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/346
+- chore(deps): update dependency turbo to ^2.9.8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/347
+- fix(deps): update iac/aws - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/344
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/343
+- chore(deps): update dependency vite-plus to ^0.1.20 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/341
+- fix(deps): update tools/dsql-cli to ^3.1041.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/340
+- chore(deps): update dependency ruff to >=0.15.12 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/339
+- feat: apps/web のフォントを Gen Interface JP に置き換え by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/351
+- feat: who ページに hashi マスコットの動くアニメーションを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/352
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/348
+- chore(deps): update dependency turbo to ^2.9.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/349
+- fix(deps): update tools/dsql-cli to ^3.1043.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/350
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/353
+- chore(deps): update aws-actions/configure-aws-credentials action to v6.1.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/355
+- fix(deps): update tools/dsql-cli to ^3.1044.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/356
+- fix(deps): update dependency sphinxcontrib-mermaid to >=2.0.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/354
+- chore(aidd): Claude Code のプロジェクトスキルを vercel-labs/skills で管理 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/362
+- fix(deps): update dependency aws-cdk-lib to ^2.253.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/361
+- fix(deps): update tools/dsql-cli to ^3.1045.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/360
+- chore(deps): update dependency turbo to ^2.9.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/359
+- chore(deps): update dependency @types/node to ^25.6.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/358
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/357
+- feat: cdk-nag (AwsSolutions) を iac/aws に導入 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/363
+- chore: Claude Code skills を APM (Agent Package Manager) で管理 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/365
+- chore(deps): update dependency turbo to ^2.9.12 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/364
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/368
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/366
+- chore(deps): update aws/agent-toolkit-for-aws digest to 01fdfa8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/369
+- fix(deps): update tools/dsql-cli to ^3.1048.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/377
+- chore(deps): update dependency vite-plus to ^0.1.21 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/376
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/374
+- chore(deps): update python docker tag to v3.14.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/373
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/367
+- chore(deps): update aws/agent-toolkit-for-aws digest to 8bc62f2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/375
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/370
+- chore(deps): update aws/agent-toolkit-for-aws digest to 14780bf by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/381
+- chore: gh-infra 導入と開発ドキュメント整理 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/384
+- chore: gh-infra のラベル管理を authoritative 化して既定ラベルを整理 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/385
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/382
+- chore(deps): update dependency tsx to ^4.22.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/380
+- chore(deps): update dependency @types/node to ^25.8.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/371
+- fix(deps): update docs by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/372
+- chore(deps): update dependency bun to v1.3.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/378
+- chore(deps): update dependency turbo to ^2.9.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/379
+- chore(deps): update dependency tsx to ^4.22.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/387
+- feat: Claude Code 経由のシークレット漏洩防止を3層で導入 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/390
+- feat: apps/web のダークモード FOUC を解消 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/397
+- docs: ArticleCard の LCP 優先読み込みを実装 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/398
+- chore: cspell 辞書の単語表記を小文字に統一 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/399
+- chore(deps): update dependency vite-plus to ^0.1.22 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/396
+- chore(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/395
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/394
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/393
+- chore(deps): update dependency tsx to ^4.22.3 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/392
+- chore(deps): update dependency lefthook to ^2.1.8 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/391
+- fix: ダークモードでトグルノブが左端に張り付く問題を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/401
+- chore(deps): update node.js to v24.16.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/400
+- fix(deps): update tools/dsql-cli by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/389
+- chore(deps): update dependency @types/node to ^25.9.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/388
+- ci: Renovate 同期コミットを GitHub App トークンで push する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/403
+- chore(deps): update actions/create-github-app-token action to v3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/404
+- chore: shuntaka-dev-utils GitHub App のアイコン素材を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/406
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/386
+- ci: CI ワークフローを pull_request トリガー基盤に変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/407
+- chore(deps): update googlechrome/modern-web-guidance digest to 65d7f20 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/408
+- chore(deps): update vercel-labs/agent-skills digest to 18a2434 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/411
+- chore(deps): update apps/web to ^10.4.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/402
+- chore(deps): update dependency ruff to >=0.15.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/409
+- fix(deps): update tools/dsql-cli to ^3.1053.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/412
+- docs: sqlx 0.9 対応の upstream issue をサーベイで追跡 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/413
+- fix: react-tweet の描画エラーで記事ページが落ちる問題を ErrorBoundary でガード by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/414
+- fix: uv の default index に PyPI 本家を追加してミラー未同期パッケージを解決可能にする by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/416
+- chore(deps): update github/codeql-action action to v4.36.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/415
+- fix: apm の新スキルパス対応と Renovate workflow の lockfile 強制再生成 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/417
+- fix: Renovate APM Update ワークフローの CI 無限ループを防止 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/420
+- chore(deps): update googlechrome/modern-web-guidance digest to d0f7544 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/418
+- chore(deps): update vercel-labs/agent-skills digest to 1801156 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/422
+- chore(deps): update aws-actions/configure-aws-credentials action to v6.1.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/423
+- chore(deps): update dependency aws-cdk to ^2.1125.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/424
+- chore(deps): update aws-actions/configure-aws-credentials action to v6.1.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/431
+- chore(deps): update rust-toolchain by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/430
+- chore(deps): update dependency ruff to >=0.15.15 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/428
+- fix(deps): update tools/dsql-cli to ^3.1057.0 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/419
+- chore(deps): update dependency turbo to ^2.9.16 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/421
+- chore(deps): update dependency lefthook to ^2.1.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/426
+- fix(deps): update dependency commander to v15 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/429
+- chore(deps): update dependency vite-plus to ^0.1.23 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/425
+- fix(deps): update tools/dsql-cli to ^3.1058.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/438
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/440
+- fix: X カード描画と動画再生を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/444
+- chore(deps): update dependency @types/node to ^25.9.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/443
+- chore(deps): update github-actions to v4.36.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/442
+- fix(deps): update tools/dsql-cli to ^3.1068.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/439
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/437
+- chore(deps): update dependency vite-plus to ^0.1.24 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/435
+- chore(deps): update vercel-labs/agent-skills digest to 4ec6f84 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/434
+- chore(deps): update dependency tsx to ^4.22.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/433
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/445
+- chore(deps): update dependency prettier to ^3.8.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/446
+- chore(deps): update cspell monorepo to ^10.0.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/432
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/436
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/410
+- chore(deps): update turbo monorepo to ^2.9.18 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/450
+- chore(deps): update python docker tag to v3.14.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/449
+- chore(deps): update docs by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/448
+- feat: /who を /about にリネームしリダイレクトを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/459
+- chore(deps): update node.js to v24.17.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/458
+- chore(deps): update dependency vite-plus to ^0.2.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/457
+- fix(deps): update tools/dsql-cli to ^3.1071.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/456
+- chore(deps): update apps/web to ^10.4.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/455
+- chore(deps): update rust-workspace to 1.113.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/452
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/454
+- chore(deps): update apm to a9d1c70 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/453
+- chore(deps): update rust-workspace to 0.7.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/460
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/461
+- fix(deps): update tools/dsql-cli to ^3.1072.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/463
+- chore(deps): update github-actions to v7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/464
+- fix(deps): update tools/dsql-cli to ^8.22.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/465
+- fix(deps): update tools/dsql-cli to ^3.1073.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/469
+- chore(deps): update docs to >=0.15.18 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/468
+- feat: translate about page to English by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/470
+- chore(deps): update dependency @types/node to v26 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/467
+- chore(deps): update apm to 08025af by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/462
+- chore(deps): update github-actions (major) by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/477
+- chore(deps): update node.js to v24.18.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/475
+- chore(deps): update turbo monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/476
+- chore(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/474
+- chore(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/472
+- fix(deps): update tools/dsql-cli to ^3.1075.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/473
+- feat: add DSQL to TiDB migration plan by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/480
+- docs: add TiDB articles survey for 2026-06-28 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/483
+- docs: add Tailscale Lambda ephemeral pileup survey for 2026-06-29 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/484
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/482
+- chore(deps): update dependency prettier to ^3.9.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/481
+- chore(deps): update dependency @types/node to ^26.0.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/478
+- chore(deps): update dependency ruff to >=0.15.20 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/479
+- feat: migrate blog API from Tailscale to TiDB proxy by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/485
+- chore(deps): update alpine docker tag to v3.24 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/486
+- docs: add k8s cluster internals to architecture diagram by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/487
+- docs: アーキテクチャ図を更新 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/489
+- docs: add TiDB articles explain plan surveys for 2026-06-30 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/492
+- docs: update architecture diagram by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/494
+- docs: update architecture diagram by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/495
+- docs: fix selection drop ratio in TiDB explain plan survey by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/496
+- perf: 一覧 API の content 除外と複合インデックス追加 (articles Q1 最適化) by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/497
+- feat: Microsoft Clarity を導入 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/498
+- feat: 記事一覧にページネーションを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/499
+- perf: 記事一覧クエリの JOIN 分離 + 複合インデックスに article_id 追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/500
+- perf: 記事一覧クエリに USE_INDEX ヒントを追加（TiDB プラン分岐対策） by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/501
+- chore(deps): update rust to v1.96.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/502
+- chore(deps): update dependency turbo to ^2.10.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/493
+- chore(deps): update dependency aws-cdk to ^2.1129.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/505
+- chore: cdk deploy --express の性能検証用 workflow を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/506
+- feat: TiDB 検証用ダミーデータジェネレータ tidb-seeder を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/503
+- docs: TiDB block cache 実測結果を survey に追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/507
+- chore: 空になった refactors ドキュメントを削除 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/508
+- feat: k8sクラスタ管理を統合 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/509
+- docs: cluster 統合の残整合 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/510
+- docs: トップREADMEに構成図を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/511
+- chore(deps): update dependency @types/node to ^26.1.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/504
+- fix(deps): update tools/dsql-cli to ^3.1078.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/491
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/490
+- chore: benchmark-cdk-express workflow を削除 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/512
+- chore(deps): update dependency prettier to ^3.9.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/488
+- chore(deps): update apm to ff1dc6f by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/471
+- fix(deps): update dependency cdk-nag to v3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/451
+- chore(deps): update dependency vite to ^8.1.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/514
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/513
+- perf: 記事一覧の viewport prefetch を廃止し hover 時の単発 prefetch に変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/516
+- docs: TiDB 5M survey の TiKV/region 分布セクションに再現用コマンドを追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/517
+- chore(deps): update dependency vite-plus to ^0.2.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/519
+- feat: Lambda〜TiDB 経路の OTel 計装と CloudWatch 可観測性を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/523
+- perf: blog-api の syntect/Regex static 化・一覧 COUNT 並列化・gzip 圧縮・Cache-Control 付与 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/518
+- perf: 記事詳細のオンザフライ Markdown 変換を廃止し content_html を事前生成 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/520
+- fix: X-Ray セグメントの status 欠落と DB 接続先の localhost 表示を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/528
+- fix: X-Ray の http.response.status が 0 になる問題を修正（status を i64 で record） by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/529
+- docs: 可観測性の運用ページを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/525
+- docs: DROP TABLE 後も TiKV のメモリが下がらない件の調査結果と解放手順を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/530
+- docs: 運用ページにダッシュボード節を追加し PromQL 節を削除 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/531
+- fix(deps): update dependency mysql2 to ^3.22.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/527
+- chore(deps): update dependency wasm-pack to ^0.15.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/526
+- fix(deps): update tools/dsql-cli to ^3.1079.0 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/524
+- fix(deps): update dependency aws-cdk-lib to ^2.261.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/522
+- chore(deps): update dependency tsx to ^4.22.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/521
+- chore(deps): update aws/agent-toolkit-for-aws digest to 7e471bf by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/515
+- fix: ECS ヘルスチェック由来の proxy.error.count 偽エラーとトレースノイズを解消 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/534
+- docs: ダッシュボード表に各レイテンシへ何が含まれるかを追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/535
+- chore(deps): update dependency turbo to ^2.10.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/537
+- chore(deps): update github/codeql-action action to v4.36.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/533
+- docs: Continuous Profiling の docdb 優先仕様と API での有効化手順を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/538
+- docs: 運用ドキュメントにテレメトリ一覧を追加、アーキテクチャ図を更新 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/539
+- perf: react-tweet を遅延ロード化して記事ページの初期バンドルを削減 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/540
+- docs: CloudWatch OTel Metrics と Classic メトリクスの機能差分の調査メモを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/541
+- feat: 404/500ページにお辞儀マスコットSVGをインライン埋め込み by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/542
+- docs: 運用ドキュメントにMiniPCクラスタのノード再起動手順を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/543
+- ci: tidb-proxy の ecspresso デプロイを workflow_dispatch で実行できるワークフローを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/544
+- chore(deps): update kayac/ecspresso action to v2.8.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/545
+- chore(deps): update dependency tsx to ^4.23.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/536
+- fix: deploy-tidb-proxy ワークフローに environment: dev を指定して AWS_ACCOUNT_ID を解決可能にする by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/546
+- feat: add article tags by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/548
+- docs: backfill SQL の適用コマンドを実ファイルパスに修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/549
+- feat: 記事一覧にタグ絞り込みUIを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/550
+- feat: タグ絞り込みのサーバーサイド化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/551
+- docs: 運用ドキュメントに tag-facets ルートとタグ絞り込みの span 変化を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/552
+- docs: node1 再起動時の uncordon 忘れ対策を追記し pd-ctl region の --jq を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/553
+- fix(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/547
+- chore(deps): update dependency vitest to ^4.1.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/554
+- chore(deps): update aws/agent-toolkit-for-aws digest to aea59f3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/532
+- chore(deps): update astral-sh/setup-uv action to v8.3.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/556
+- chore(deps): update dependency turbo to ^2.10.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/557
+- fix(deps): update tools/dsql-cli to ^3.1080.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/558
+- chore(deps): update dependency typescript to v7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/567
+- chore(deps): update rust crate aws-sdk-ssm to 1.114.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/566
+- chore(deps): update dependency lefthook to ^2.1.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/565
+- chore(deps): update dependency @types/node to ^26.1.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/564
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/563
+- chore(deps): update go module directive to v1.26.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/562
+- fix(deps): update tools/dsql-cli to ^3.1083.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/561
+- chore(deps): update dependency vite-plus to ^0.2.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/559
+- fix(deps): update dependency mysql2 to ^3.22.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/560
+- chore(deps): update aws/agent-toolkit-for-aws digest to ff1481a by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/555
+- fix(deps): update dependency sphinxcontrib-mermaid to >=2.0.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/569
+- chore(deps): update apm by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/568
+- chore(deps): update dependency vite to ^8.1.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/570
+- refactor: restructure docs with 0x/9x numbering and one-entry-one-directory layout by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/573
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/572
+- fix: update README architecture image path after docs restructure by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/574
+- fix: 記事リンクを新しいタブで開くとローディングバーが止まらない問題を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/577
+- chore(deps): update rust-workspace by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/576
+- chore(deps): update dependency prettier to ^3.9.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/575
+- chore(deps): update rust to v1.97.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/578
+- docs: TiDB Dashboard の履歴が Pod 再作成で消える件の顛末を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/582
+- chore(deps): update apps/web to ^10.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/583
+- chore(deps): update dependency aws-cdk to ^2.1130.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/581
+- fix(deps): update tools/dsql-cli to ^3.1084.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/579
+- chore(deps): update aws/agent-toolkit-for-aws digest to 43e9d50 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/571
+- feat: tidb-proxy のログを FireLens で振り分け S3/Iceberg + Athena で検索可能にする by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/585
+- fix: st-tidb-proxy-logs の cdk-nag suppression がアカウントID固定で synth に失敗する問題を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/589
+- fix: Glue Iceberg テーブルのメタデータを TableInput 側に寄せて CREATE_FAILED を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/590
+- feat: tidb-proxy ログ分析用の Athena Named Query 3本を CDK で登録 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/591
+- fix(deps): update rust crate regex to 1.13.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/586
+- chore(deps): update dependency ruff to >=0.15.21 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/587
+- fix(deps): update tools/dsql-cli to ^3.1085.0 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/592
+- feat: tech/note タブを posts に統合し API から type 概念を廃止 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/594
+- docs: クラスタ構築手順 02_cluster.md を新設し開発ドキュメントを現行構成に同期 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/593
+- feat: ヘッダーを一覧と同じ中央カラムに揃えタグ絞り込みを IDE 風フローティングツリーに刷新 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/595
+- fix: API から type 参照を全廃し不正な type 値による記事一覧 500 を解消 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/596
+- feat: 404/500 ページの Story を追加し bun dev で Storybook も同時起動するように変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/597
+- fix: 記事一覧の下部余白を footer 予約分と合算し過剰な空白を解消 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/598
+- feat: フローティングタグパネルをスクロール・外側タップ・Escape で閉じるように変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/599
+- feat: リリースフローを tagpr (CalVer) + Vercel タグリリースに刷新し preview を廃止 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/600
