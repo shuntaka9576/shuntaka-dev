@@ -43,7 +43,7 @@ const links = [
 
 export default function AboutPage() {
   return (
-    <BaseLayout showTypeHeader currentTab="about">
+    <BaseLayout showTypeHeader currentTab="about" narrow>
       <main className="w-full">
         <div className="flex items-center gap-2 pb-2">
           <span>Shunichi Takahashi a.k.a shuntaka</span>

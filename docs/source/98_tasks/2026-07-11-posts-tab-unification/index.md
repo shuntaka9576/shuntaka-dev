@@ -70,3 +70,4 @@ bun run lint
 - 一覧クエリはインデックス `(user_id, status, type, published_at, article_id)` のプレフィックス `(user_id, status)` までしか効かず、published_at 順は Top-N ソートになる。現状の記事数では問題ないが、スコープ2でインデックスを張り替える
 - `/type/note` への旧リンクは 404 になる（意図的にリダイレクトを設定していない）
 - **デプロイ順は API → web**。旧 API は `type` 必須のため新 web を先に出すと一覧が 400 になる。逆（新 API + 旧 web）は `type` パラメータが無視されるだけで動く
+- フォローアップ: 旧タブの代替であるルートタグの発見性が低かったため、タグ UI を画面下部固定の `FloatingTagFilter`（IDE 風ツリー `TagFilterTree`）に刷新し、ヘッダー・タブ行・一覧を `BaseLayout narrow` で同一の中央カラムに揃えた。ヘッダーの tags トグルとインラインの `TagFilterPanel` は廃止

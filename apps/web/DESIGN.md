@@ -72,8 +72,8 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### 影 / elevation
 
-- 本番 CSS で実際に使う影は **1 つだけ**：`link-card:hover` の `--shadow-2`。
-- 4 段階の elevation トークン（`--shadow-0`…`--shadow-3`）は将来のモーダル / ポップオーバー用に予約済みだが、現状未使用。
+- 本番 CSS で実際に使う影は `link-card:hover` の `--shadow-2` と、フローティングタグ UI（トリガー `--shadow-2` / ポップオーバーパネル `--shadow-3`）のみ。
+- 4 段階の elevation トークン（`--shadow-0`…`--shadow-3`）のうち残りはモーダル用に予約。
 - **静止状態のカードに drop-shadow を追加しない.** システムは flat-by-default で読まれる。
 
 ### Motion
@@ -91,7 +91,8 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### レイアウトルール
 
-- 外側は `--layout-max` の単一カラム中央寄せ。記事一覧は `--layout-list-max` で内側を絞る。
+- 外側は `--layout-max` の単一カラム中央寄せ。記事一覧・about は `BaseLayout` の `narrow` でヘッダー・タブ行・本文を `--layout-list-max` の中央カラムに揃える（ロゴと一覧の左端が一致する）。
+- タグ絞り込みは画面下部中央の `FloatingTagFilter`（`position: fixed`）。アイコンのみの円形トリガー + IDE のファイルツリー風パネル（`TagFilterTree`、フォルダ/タグの stroke アイコン + チェブロン展開）。一覧側はフローティングバーとの重なりを避ける bottom padding を確保する。
 - 記事ページ = 左コンテンツ + `--layout-sidebar-w` 固定の右 TOC サイドバーを `flex justify-between` で並べる。`lg` 以下でサイドバーは折りたたまれる。
 - TOC の sticky オフセットは `top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5))` で計算する。マジックナンバー禁止。
 - フッターは `position: absolute; bottom: 0;` で body 下部に `--layout-footer-h` 分の余白を予約。ヘッダーは sticky **にしない**。
