@@ -171,7 +171,7 @@ const stageConfig: {
 };
 
 // tidb-proxy stack は dev / prd 共用のため stage 非依存。SSM Parameter Store
-// の path は task 文書 (docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md)
+// の path は task 文書 (docs/source/98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)
 // に揃えて `/tidb-proxy/...` 名前空間で扱う。
 export interface ProxyParameter {
   projectName: string;

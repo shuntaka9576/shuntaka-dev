@@ -46,10 +46,11 @@ secretlint と gitleaks は検出範囲が異なる（Slack Webhook / Anthropic 
 ```
 apps/
 ├── web/          # Next.js 16 フロントエンド (React 19, Tailwind CSS 4)
-└── blog-api/     # Rust/Axum バックエンドAPI (SQLx, PostgreSQL/DSQL)
+├── blog-api/     # Rust/Axum バックエンドAPI (SQLx, TiDB [MySQL互換])
+└── tidb-proxy/   # ECS Fargate 常駐プロキシ (Go tsnet で Tailnet 上の TiDB へ TCP 中継 + squid)
 
 tools/
-├── dsql-cli/     # TypeScript マイグレーションCLI (AWS DSQL対応)
+├── dsql-cli/     # 旧DSQL用CLI + DSQL→TiDB 移行ツール (dsl-tidb/)。旧DSQLは撤去待ち
 └── tidb-seeder/  # TiDB 用ダミーデータ TSV ジェネレータ (load.sh と組み合わせて使う)
 
 iac/
@@ -62,7 +63,7 @@ docs/             # Sphinx ドキュメント (Python/uv)
 
 ## Documentation
 
-環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_development.md` を参照。
+環境構築、デプロイ手順、ツールの詳細な使い方は `docs/source/01_開発ドキュメント/01_development.md` を参照。
 
 apps/web の作業時は `apps/web/CLAUDE.md` を参照（workspace 専用ガイド + ブランド仕様 `apps/web/DESIGN.md`）。
 
@@ -72,13 +73,14 @@ apps/web の作業時は `apps/web/CLAUDE.md` を参照（workspace 専用ガイ
 
 ### ルール: 必ず再現可能な手順を作ること
 
-クラスタに対してコマンドを実行した場合は `docs/source/tasks/` 配下の手順書に同期する。トラブルシュートをした場合は、解決時に内省し必要最小限のコマンドを同期すること。
+クラスタに対してコマンドを実行した場合は `docs/source/98_tasks/` 配下の手順書に同期する。トラブルシュートをした場合は、解決時に内省し必要最小限のコマンドを同期すること。
 
 ### 参照先
 
-- 物理機材・ソフトウェア構成: `docs/source/01_development.md` の「構成 > 必要機材」
-- 全消し→再構築手順: `docs/source/tasks/2026-06-27-tidb-full-rebuild.md`
-- 構築時の作業記録: `docs/source/tasks/`（2026-06-25〜2026-06-28 のクラスタ関連エントリ）
+- ゼロからの構築手順: `docs/source/01_開発ドキュメント/02_cluster.md`
+- 物理機材・ソフトウェア構成: `docs/source/01_開発ドキュメント/01_development.md` の「構成 > 必要機材」
+- 全消し→再構築手順: `docs/source/98_tasks/2026-06-27-tidb-full-rebuild/index.md`
+- 構築時の作業記録: `docs/source/98_tasks/`（2026-06-25〜2026-06-28 のクラスタ関連エントリ）
 - 実体: `cluster/manifests/`, `cluster/scripts/`
 
 ## Commands
@@ -111,60 +113,35 @@ cd iac/aws
 bunx dotenv -- cdk synth -c stageName=dev
 ```
 
-### dsql-cli (マイグレーション)
+### データベース接続 (TiDB)
+
+blog-api の接続先は自作クラスタ上の TiDB。ローカル開発は Tailnet 経由で dev DB (`blog_dev`) に直接繋がる（`apps/blog-api/Makefile.toml` が既定の DATABASE_URL を組み立てる。Tailscale ログインが前提）。
 
 ```bash
-cd tools/dsql-cli
-
-# ローカルPostgreSQL
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-
-# AWS DSQL
-bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
-bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
-```
-
-### ローカルDB起動
-
-```bash
-# ルートディレクトリで
-docker compose up -d postgres
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+mysql -h tidb.${TAILNET} -P 4000 -u root -p
 ```
 
 ## Tech Stack
 
 - **パッケージ管理**: Bun + Turbo
 - **フロントエンド**: Next.js 16, React 19, TypeScript 5
-- **バックエンド**: Rust (Axum, SQLx), AWS DSQL
+- **バックエンド**: Rust (Axum, SQLx), TiDB (自作k8sクラスタ上。本番 Lambda は tidb-proxy 経由、ローカル開発は Tailnet 直結)
 - **インフラ**: AWS CDK, Docker
 - **コード品質**: Vite+ (oxlint, oxfmt), Prettier (YAML), cspell
 
-## DSQL Constraints
+## Database (TiDB)
 
-AWS DSQLは以下をサポートしない：
+本番/開発の DB は自作 k8s クラスタ上の TiDB（MySQL 互換）。dev/prd の分離は database (`blog_dev` / `blog_prd`) とユーザー権限で行う。
 
-- `CREATE DATABASE` (postgres固定)
-- `CREATE FUNCTION` (plpgsql)
-- `CREATE TRIGGER`
-- `FOREIGN KEY` 制約
-- `ALTER TABLE ADD CONSTRAINT` （制限あり）
+- ローカル開発: Tailnet 経由で `mysql://root@tidb.<tailnet>:4000/blog_dev` に直結（`apps/blog-api/Makefile.toml` の既定値。`DATABASE_URL` で上書き可）
+- 本番 Lambda: VPC 内から tidb-proxy (ECS Fargate, `tidb-proxy.internal:13306`) 経由で接続
+- スキーマ DDL: `tools/dsql-cli/dsl-tidb/schema/`（`${SCHEMA}` 注入で blog_dev / blog_prd を共用、適用は `dsl-tidb/load.sh`）
+- 仮想リレーション（tbls の ER 図用）は `docs/.tbls.yaml` の `relations` で定義
 
-仮想リレーションは `.tbls.yaml` の `relations` で定義。
+### 旧 DSQL（撤去待ち）
 
-### スキーマ変更の方針
-
-DSQLではALTER TABLEに制限があるため、スキーマ変更は以下の手順で行う：
-
-1. `tools/dsql-cli/dsl/` 配下の元SQLファイルを直接修正
-2. `bun run drop` でスキーマ削除
-3. `bun run migrate` で再作成
-
-```bash
-cd tools/dsql-cli
-bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-```
+旧構成の AWS DSQL クラスタは残置されているが、現行の blog-api からは参照されない（`iac/aws/lib/api/main-stack.ts` 参照）。旧 DSQL の運用コマンドは `docs/source/01_開発ドキュメント/01_development.md` の「旧DSQL（撤去待ち）」を参照。
 
 ## Legacy Code Reference
 
@@ -206,19 +183,21 @@ bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgre
 
 ### DBスキーマドキュメント
 
+tbls 生成（`docs/` で `bun run doc-gen`、生成元は TiDB `blog_dev`）。
+
 ```
-docs/source/db/
-├── app.articles.md            # 記事テーブル
-├── app.articles_tags.md       # 記事-タグ関連
-├── app.users.md               # ユーザーテーブル
-├── app.roles.md               # ロールテーブル
-├── app.tags.md                # タグテーブル
+docs/source/01_開発ドキュメント/05_db/
+├── articles.md                # 記事テーブル
+├── articles_tags.md           # 記事-タグ関連
+├── users.md                   # ユーザーテーブル
+├── tags.md                    # タグテーブル
+├── tag_article_counts.md      # タグ別記事数
 └── schema.json                # スキーマJSON
 ```
 
 ### 移植時のマッピング
 
-| レガシー（DynamoDB）               | 新規（DSQL）              |
+| レガシー（DynamoDB）               | 新規（TiDB）              |
 | ---------------------------------- | ------------------------- |
 | `typePublishAt` ("type-timestamp") | `status` + `published_at` |
 | `type` (tech/note/life)            | `type` カラム             |

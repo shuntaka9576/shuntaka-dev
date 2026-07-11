@@ -54,4 +54,4 @@ bun run load \
 
 ## Documentation
 
-詳細な使い方は `docs/source/01_development.md` の「tidb-seeder」セクションを参照。コマンド変更時は同期すること。
+詳細な使い方は `docs/source/01_開発ドキュメント/01_development.md` の「tidb-seeder」セクションを参照。コマンド変更時は同期すること。

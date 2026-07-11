@@ -1,6 +1,6 @@
 ---
 paths:
-  - "docs/source/01_development.md"
+  - "docs/source/01_開発ドキュメント/01_development.md"
 ---
 
 ## スタイル

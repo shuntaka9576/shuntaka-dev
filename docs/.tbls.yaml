@@ -9,7 +9,7 @@ comments:
     columnComments:
       status: '記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)'
 
-docPath: source/db
+docPath: source/01_開発ドキュメント/05_db
 er:
   format: mermaid
   showColumnTypes:

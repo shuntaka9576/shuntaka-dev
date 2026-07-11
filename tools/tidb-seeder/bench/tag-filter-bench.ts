@@ -2,7 +2,7 @@
  * タグ絞り込み・ファセット集計のベースライン計測スクリプト。
  *
  * tidb-seeder で投入した blog_test に対して、サーバーサイドタグ絞り込み
- * （docs/source/tasks/2026-07-05-server-side-tag-filter.md）で想定している
+ * （docs/source/98_tasks/2026-07-05-server-side-tag-filter/index.md）で想定している
  * クエリ群を実行し、実行時間を出力する。
  *
  * 現行本番形（相関 GROUP_CONCAT でタグを1カラムに集約）は 50万件でページング
