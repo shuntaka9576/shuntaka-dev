@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_new::new;
 use kernel::model::article::{
-    Article, ArticleId, ArticleSummary, ArticleType, Content, ContentHtml, Description, Slug,
-    Status, TagFilter, TagFilterMode, Thumbnail, Title, UserId,
+    Article, ArticleId, ArticleSummary, Content, ContentHtml, Description, Slug, Status, TagFilter,
+    TagFilterMode, Thumbnail, Title, UserId,
 };
 use kernel::repository::users_articles::{
     ArticleSummaryPage, TagFacet, TagFacetsResult, UsersArticlesRepository,
@@ -30,8 +30,6 @@ struct ArticleSummaryBaseRow {
     thumbnail: Option<String>,
     description: String,
     status: String,
-    #[sqlx(rename = "type")]
-    article_type: Option<String>,
     published_at: Option<DateTime<Utc>>,
     created_at: Option<DateTime<Utc>>,
     updated_at: Option<DateTime<Utc>>,
@@ -46,11 +44,6 @@ impl TryFrom<ArticleSummaryBaseRow> for ArticleSummary {
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
         let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
-        let article_type = row
-            .article_type
-            .map(ArticleType::new)
-            .transpose()
-            .map_err(|e| anyhow::anyhow!("Invalid article type: {e}"))?;
 
         Ok(ArticleSummary::new(
             ArticleId::new(article_id),
@@ -60,7 +53,6 @@ impl TryFrom<ArticleSummaryBaseRow> for ArticleSummary {
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
-            article_type,
             Vec::new(), // タグは後からマージする
             row.published_at,
             row.created_at,
@@ -88,8 +80,6 @@ struct ArticleRow {
     thumbnail: Option<String>,
     description: String,
     status: String,
-    #[sqlx(rename = "type")]
-    article_type: Option<String>,
     /// GROUP_CONCAT したフルパス表記のタグ（カンマ区切り）。タグなしは NULL
     tag_names: Option<String>,
     published_at: Option<DateTime<Utc>>,
@@ -114,11 +104,6 @@ impl TryFrom<ArticleRow> for Article {
         let user_id = Uuid::parse_str(&row.user_id)
             .map_err(|e| anyhow::anyhow!("Invalid user_id UUID: {e}"))?;
         let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
-        let article_type = row
-            .article_type
-            .map(ArticleType::new)
-            .transpose()
-            .map_err(|e| anyhow::anyhow!("Invalid article type: {e}"))?;
 
         Ok(Article::new(
             ArticleId::new(article_id),
@@ -130,7 +115,6 @@ impl TryFrom<ArticleRow> for Article {
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
-            article_type,
             parse_tag_names(row.tag_names),
             row.published_at,
             row.created_at,
@@ -367,7 +351,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             None => {
                 let list = "SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */\n    \
                              a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,\n    \
-                             a.status, a.`type`, a.published_at, a.created_at, a.updated_at\n\
+                             a.status, a.published_at, a.created_at, a.updated_at\n\
                              FROM articles a\n\
                              WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
                              AND a.status = 'published'\n\
@@ -388,7 +372,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                     "{cte}\n\
                      SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */\n    \
                      a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,\n    \
-                     a.status, a.`type`, a.published_at, a.created_at, a.updated_at\n\
+                     a.status, a.published_at, a.created_at, a.updated_at\n\
                      FROM articles a\n\
                      WHERE a.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
                      AND a.status = 'published'\n\
@@ -511,7 +495,6 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 a.thumbnail,
                 a.description,
                 a.status,
-                a.`type`,
                 (SELECT GROUP_CONCAT(tp.path SEPARATOR ',')
                  FROM articles_tags at2
                  JOIN tag_paths tp ON at2.tag_id = tp.tag_id
@@ -579,8 +562,9 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         let facets_sql = match &resolved_ids {
             None => {
                 // フィルタなし: tag_article_counts + tag_paths CTE でパス名を付けて返す。
-                // tag_article_counts は (user_id, type, tag_id) 単位の前計算のため、
-                // type 横断の件数は SUM で合算する（スコープ2で type 列削除予定）。
+                // tag_article_counts の type 列は廃止済み概念（新規書き込みは定数 'all'）だが、
+                // 旧 per-type 行が残っている間も正しく合算できるよう SUM で読む
+                // （列自体の削除はスキーマクリーンアップ時）。
                 r#"WITH RECURSIVE tag_paths AS (
     SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
     UNION ALL

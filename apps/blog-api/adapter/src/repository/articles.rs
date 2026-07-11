@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_new::new;
 use kernel::model::article::{
-    Article, ArticleId, ArticleType, Content, ContentHtml, Description, Slug, Status, Thumbnail,
-    Title, UserId, normalize_tags, parse_tag_path,
+    Article, ArticleId, Content, ContentHtml, Description, Slug, Status, Thumbnail, Title, UserId,
+    normalize_tags, parse_tag_path,
 };
 use kernel::repository::articles::{ArticlesRepository, UpsertArticleInput, UpsertResult};
 use sqlx::FromRow;
@@ -31,8 +31,6 @@ struct ArticleRow {
     thumbnail: Option<String>,
     description: String,
     status: String,
-    #[sqlx(rename = "type")]
-    article_type: Option<String>,
     /// GROUP_CONCAT したフルパス表記のタグ（カンマ区切り）。タグなしは NULL
     tag_names: Option<String>,
     published_at: Option<DateTime<Utc>>,
@@ -51,12 +49,6 @@ impl TryFrom<ArticleRow> for Article {
 
         let status = Status::new(row.status).map_err(|e| anyhow::anyhow!("Invalid status: {e}"))?;
 
-        let article_type = row
-            .article_type
-            .map(ArticleType::new)
-            .transpose()
-            .map_err(|e| anyhow::anyhow!("Invalid article type: {e}"))?;
-
         // normalize_tags(書き込み時) と同じ sort 済み状態に揃えて差分比較を安定させる
         let mut tags: Vec<String> = row
             .tag_names
@@ -74,7 +66,6 @@ impl TryFrom<ArticleRow> for Article {
             row.thumbnail.map(Thumbnail::new),
             Description::new(row.description),
             status,
-            article_type,
             tags,
             row.published_at,
             row.created_at,
@@ -133,19 +124,22 @@ async fn sync_tags(
     Ok(())
 }
 
-/// (user_id, type) の tag_article_counts を DELETE + INSERT で再計算する。
+/// user 単位の tag_article_counts を DELETE + INSERT で再計算する。
 /// published 記事の articles_tags を祖先ロールアップして集計するため、
-/// status 変化・tags 変化・type 変化のいずれに対しても正しい結果になる。
+/// status 変化・tags 変化のいずれに対しても正しい結果になる。
 /// トランザクション内で呼ぶことで、articles / articles_tags の変更と原子的に反映される。
+///
+/// `type` カラムは廃止済みの概念だが、既存スキーマの PK (user_id, type, tag_id) が
+/// NOT NULL のため定数 'all' を入れる。読み取り側は type を横断して SUM するので、
+/// 旧 per-type 行が残っていても user 単位の DELETE で置き換わり整合する。
+/// カラム自体の削除はスキーマクリーンアップ時に行う。
 async fn sync_tag_article_counts(
     tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
     user_id: &str,
-    article_type: &str,
 ) -> Result<(), anyhow::Error> {
-    // 対象 (user_id, type) の既存集計を削除する
-    sqlx::query("DELETE FROM tag_article_counts WHERE user_id = ? AND `type` = ?")
+    // 対象 user の既存集計を削除する（旧 per-type 行も含めて全て）
+    sqlx::query("DELETE FROM tag_article_counts WHERE user_id = ?")
         .bind(user_id)
-        .bind(article_type)
         .execute(&mut **tx)
         .await?;
 
@@ -159,16 +153,15 @@ WITH RECURSIVE tag_ancestors AS (
     JOIN tags t ON t.tag_id = ta.anc_tag_id
     WHERE t.parent_tag_id IS NOT NULL
 )
-SELECT a.user_id, a.`type`, ta.anc_tag_id, COUNT(DISTINCT ats.article_id)
+SELECT a.user_id, 'all', ta.anc_tag_id, COUNT(DISTINCT ats.article_id)
 FROM articles a
 JOIN articles_tags ats ON ats.article_id = a.article_id
 JOIN tag_ancestors ta ON ta.leaf_tag_id = ats.tag_id
-WHERE a.user_id = ? AND a.`type` = ? AND a.status = 'published'
-GROUP BY a.user_id, a.`type`, ta.anc_tag_id"#;
+WHERE a.user_id = ? AND a.status = 'published'
+GROUP BY a.user_id, ta.anc_tag_id"#;
 
     sqlx::query(insert_sql)
         .bind(user_id)
-        .bind(article_type)
         .execute(&mut **tx)
         .await?;
 
@@ -209,7 +202,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 a.thumbnail,
                 a.description,
                 a.status,
-                a.`type`,
                 (SELECT GROUP_CONCAT(tp.path SEPARATOR ',')
                  FROM articles_tags at2
                  JOIN tag_paths tp ON at2.tag_id = tp.tag_id
@@ -252,11 +244,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
             Some(article) => {
                 let content_changed = article.content.as_str() != input.content;
                 let title_changed = article.title.as_str() != input.title;
-                let type_changed = article
-                    .article_type
-                    .as_ref()
-                    .map(|t| t.as_str() != input.article_type)
-                    .unwrap_or(true);
                 let thumbnail_changed =
                     article.thumbnail.as_ref().map(|t| t.as_str()) != input.thumbnail.as_deref();
                 let description_changed = input
@@ -274,7 +261,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
 
                 let article_changed = content_changed
                     || title_changed
-                    || type_changed
                     || thumbnail_changed
                     || description_changed
                     || status_changed;
@@ -289,21 +275,8 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
 
                 // tag_article_counts の再計算が必要な条件:
                 //   status 変化（published ↔ draft）→ カウント対象の増減
-                //   type 変化 → バケットの変更（旧 type と新 type の両方を再計算）
                 //   tags 変化 → 集計値の増減
-                let counts_affected = status_changed || type_changed || tags_changed;
-                let types_to_sync: Vec<String> = if counts_affected {
-                    let mut types = vec![input.article_type.clone()];
-                    if type_changed && let Some(old_type) = &article.article_type {
-                        let old = old_type.as_str().to_string();
-                        if old != input.article_type {
-                            types.push(old);
-                        }
-                    }
-                    types
-                } else {
-                    vec![]
-                };
+                let counts_affected = status_changed || tags_changed;
 
                 let mut tx = self.db.pool().begin().await?;
 
@@ -328,7 +301,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                             content_html = COALESCE(?, content_html),
                             thumbnail = ?,
                             description = ?,
-                            `type` = ?,
                             status = ?,
                             published_at = ?,
                             updated_at = ?
@@ -343,7 +315,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                             .bind(&input.content_html)
                             .bind(&input.thumbnail)
                             .bind(&new_description)
-                            .bind(&input.article_type)
                             .bind(new_status)
                             .bind(published_at)
                             .bind(now)
@@ -365,12 +336,12 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                     .await?;
                 }
 
-                // status / type / tags の変化がある場合、影響する type の集計を再計算する
-                for type_str in &types_to_sync {
+                // status / tags の変化がある場合、user 単位の集計を再計算する
+                if counts_affected {
                     observe_query(
                         "tag_article_counts_sync",
                         TAG_ARTICLE_COUNTS_SYNC_SQL,
-                        sync_tag_article_counts(&mut tx, &user_id_str, type_str),
+                        sync_tag_article_counts(&mut tx, &user_id_str),
                         |_| None,
                     )
                     .await?;
@@ -417,12 +388,11 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         content_html,
                         thumbnail,
                         description,
-                        `type`,
                         status,
                         published_at,
                         created_at,
                         updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     "#;
                 observe_query(
                     "article_insert",
@@ -436,7 +406,6 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                         .bind(&input.content_html)
                         .bind(&input.thumbnail)
                         .bind(&description)
-                        .bind(&input.article_type)
                         .bind(status)
                         .bind(published_at)
                         .bind(now)
@@ -460,7 +429,7 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 observe_query(
                     "tag_article_counts_sync",
                     TAG_ARTICLE_COUNTS_SYNC_SQL,
-                    sync_tag_article_counts(&mut tx, &user_id_str, &input.article_type),
+                    sync_tag_article_counts(&mut tx, &user_id_str),
                     |_| None,
                 )
                 .await?;
