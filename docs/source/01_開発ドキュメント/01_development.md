@@ -73,6 +73,13 @@ gh secret set VERCEL_ORG_ID --body "$(jq -r .orgId .vercel/project.json)"
 gh secret set VERCEL_PROJECT_ID --body "$(jq -r .projectId .vercel/project.json)"
 ```
 
+導入時はベースラインの CalVer タグを手動で打つ。バージョンタグが1つも無いと tagpr は全履歴からリリース PR 本文を生成し、GitHub の 65536 文字上限を超えて 422 で失敗する。
+
+```bash
+git tag <YYYY.0M0D.0 形式の当日タグ> origin/main
+git push origin <当日タグ>
+```
+
 ### GitHub App (Webhook)
 
 記事リポジトリへのpushで自動的に記事を更新するためのGitHub App設定。
