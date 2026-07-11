@@ -13,7 +13,6 @@ pub struct UpsertArticleInput {
     pub content_html: Option<String>,
     pub description: Option<String>,
     pub thumbnail: Option<String>,
-    pub article_type: String,
     pub should_publish: bool,
     /// フルパス表記のタグ（例: "rust", "aws/lambda"）。正規化は adapter 側で行う
     pub tags: Vec<String>,

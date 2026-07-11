@@ -171,41 +171,6 @@ impl Description {
     }
 }
 
-// 記事タイプ用のnewtype定義（バリデーション付き）
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ArticleType(String);
-
-impl ArticleType {
-    pub fn new(value: String) -> Result<Self, String> {
-        if Self::is_valid(&value) {
-            Ok(Self(value))
-        } else {
-            Err(format!("Invalid article type: {value}"))
-        }
-    }
-
-    pub fn tech() -> Self {
-        Self("tech".to_string())
-    }
-
-    pub fn note() -> Self {
-        Self("note".to_string())
-    }
-
-    pub fn is_valid(value: &str) -> bool {
-        matches!(value, "tech" | "note")
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn into_inner(self) -> String {
-        self.0
-    }
-}
-
 // ステータス用のnewtype定義（バリデーション付き）
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -343,7 +308,6 @@ pub struct ArticleSummary {
     pub thumbnail: Option<Thumbnail>,
     pub description: Description,
     pub status: Status,
-    pub article_type: Option<ArticleType>,
     pub tags: Vec<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
@@ -360,7 +324,6 @@ impl ArticleSummary {
         thumbnail: Option<Thumbnail>,
         description: Description,
         status: Status,
-        article_type: Option<ArticleType>,
         tags: Vec<String>,
         published_at: Option<DateTime<Utc>>,
         created_at: Option<DateTime<Utc>>,
@@ -374,7 +337,6 @@ impl ArticleSummary {
             thumbnail,
             description,
             status,
-            article_type,
             tags,
             published_at,
             created_at,
@@ -395,7 +357,6 @@ pub struct Article {
     pub thumbnail: Option<Thumbnail>,
     pub description: Description,
     pub status: Status,
-    pub article_type: Option<ArticleType>,
     pub tags: Vec<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
@@ -414,7 +375,6 @@ impl Article {
         thumbnail: Option<Thumbnail>,
         description: Description,
         status: Status,
-        article_type: Option<ArticleType>,
         tags: Vec<String>,
         published_at: Option<DateTime<Utc>>,
         created_at: Option<DateTime<Utc>>,
@@ -430,7 +390,6 @@ impl Article {
             thumbnail,
             description,
             status,
-            article_type,
             tags,
             published_at,
             created_at,

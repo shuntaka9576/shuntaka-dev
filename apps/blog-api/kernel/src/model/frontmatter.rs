@@ -1,11 +1,12 @@
 use serde::Deserialize;
 
 /// Markdown frontmatter structure
+///
+/// 旧 frontmatter の `type:` キーは廃止済み。serde は未知のキーを無視するため、
+/// `type:` が残っている既存記事もそのままパースできる（値は保存されない）。
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArticleFrontmatter {
     pub title: String,
-    #[serde(rename = "type")]
-    pub article_type: String,
     pub description: Option<String>,
     pub thumbnail: Option<String>,
     #[serde(default)]
@@ -76,7 +77,6 @@ This is the content.
         let (frontmatter, content) = ArticleFrontmatter::parse(markdown).unwrap();
 
         assert_eq!(frontmatter.title, "Test Article");
-        assert_eq!(frontmatter.article_type, "tech");
         assert_eq!(frontmatter.description, Some("A test article".to_string()));
         assert!(frontmatter.publish);
         assert_eq!(frontmatter.tags, vec!["rust", "api"]);

@@ -290,7 +290,6 @@ pub async fn handle_github_webhook(
                     content_html,
                     description: frontmatter.description,
                     thumbnail: frontmatter.thumbnail,
-                    article_type: frontmatter.article_type,
                     should_publish: frontmatter.publish,
                     tags: frontmatter.tags,
                 };
