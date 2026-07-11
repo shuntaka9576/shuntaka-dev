@@ -192,7 +192,7 @@ SHOW WARNINGS;
 ポイント:
 
 - `LOAD DATA LOCAL INFILE` … クライアント側ファイルをサーバに送る方式。`mysql --local-infile=1` でクライアントを起動し、TiDB 側の `local_infile=1` も必要。
-- LOAD DATA は TiDB では **1 ステートメント = 1 トランザクション**。`txn-total-size-limit`（デフォルト 100MB）を超える TSV を投入すると `ERROR 2013 Lost connection` で落ちる。TiDB v8+ の `SET SESSION tidb_dml_type = 'bulk'` は LOAD DATA には効かない（詳細: `docs/source/survey/2026-07-01-tidb-load-data-large-file.md`）。**seeder 側で `--rows-per-part 15000` を渡して 1 ファイル 90MB 前後に分割してから流す**のが唯一の robust な方法。
+- LOAD DATA は TiDB では **1 ステートメント = 1 トランザクション**。`txn-total-size-limit`（デフォルト 100MB）を超える TSV を投入すると `ERROR 2013 Lost connection` で落ちる。TiDB v8+ の `SET SESSION tidb_dml_type = 'bulk'` は LOAD DATA には効かない（詳細: `docs/source/97_survey/2026-07-01-tidb-load-data-large-file/index.md`）。**seeder 側で `--rows-per-part 15000` を渡して 1 ファイル 90MB 前後に分割してから流す**のが唯一の robust な方法。
 - `CHARACTER SET utf8mb4` … TSV を utf8mb4 として解釈。
 - `FIELDS TERMINATED BY '\t' ESCAPED BY '\\'` … PG TEXT エスケープ規則 (`\N`, `\t`, `\n`, `\r`, `\\`) と相互運用。
 - 直接カラム名で受けたフィールド (`user_id`/`name`/`email`) は `\N` が自動で NULL になる。

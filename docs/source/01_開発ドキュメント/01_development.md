@@ -106,7 +106,7 @@ aws ssm put-parameter \
   --value "your-api-secret"
 ```
 
-Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は `docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md` の「事前準備」を参照。
+Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md) の「事前準備」を参照。
 
 ```bash
 export TS_PROXY_AUTHKEY=""  # tskey-auth-... を貼り付け
@@ -211,7 +211,7 @@ usersテーブルにinstallation_idを登録。GitHub Appをリポジトリに�
 -- GitHub App設定画面 → Install App → インストール済みリポジトリをクリック
 -- URLの末尾の数字がinstallation_id (例: /installations/12345678)
 
-UPDATE app.users
+UPDATE blog_prd.users
 SET github_installation_id = 12345678
 WHERE name = 'shuntaka';
 ```
@@ -290,7 +290,7 @@ aws athena get-query-results --query-execution-id <上の実行結果の QueryEx
 aws s3 ls s3://tidb-proxy-logs-$(aws sts get-caller-identity --query Account --output text)/firehose-errors/ --recursive
 ```
 
-よく使うクエリは Athena の Saved queries (WorkGroup `tidb-proxy-logs`) に CDK で登録済み。日常のログ検索の使い方は [運用ドキュメント](03_operations.md) の「クエリリファレンス > Athena」を参照。
+よく使うクエリは Athena の Saved queries (WorkGroup `tidb-proxy-logs`) に CDK で登録済み。日常のログ検索の使い方は [運用ドキュメント](04_operations.md) の「クエリリファレンス > Athena」を参照。
 
 Fluent Bit の設定 (`apps/tidb-proxy/firelens/extra.conf` / `parsers.conf`) を変更した場合の反映手順。init プロセスはコンテナ起動時に一度だけ S3 から設定を取得するため、S3 更新だけでは反映されず、task def も変わらないため ecspresso の diff でも検知されない。明示的に task を再起動する。
 
@@ -311,20 +311,14 @@ bunx dotenv -- cdk deploy \
 
 完了したら、VercelとRoute53にAレコードの紐付けをしてください。
 
-DBマイグレーション
+DBセットアップ（TiDB）。blog-api が参照する database（`blog_prd` / `blog_dev`）とスキーマを自作クラスタ上の TiDB に作成する。クラスタ自体の構築は [クラスタ構築](02_cluster.md)、スキーマ DDL の詳細とレガシーデータの取り込みは `tools/dsql-cli/dsl-tidb/README.md` を参照。
 
 ```bash
-export STAGE_NAME=""
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 cd tools/dsql-cli
 
-export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
-  --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
-  --query "Parameter.Value" --output text)
-bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
-
-# 既存のデータを削除する場合
-# bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
+bash dsl-tidb/load.sh --database blog_prd --host tidb.${TAILNET} --password '<root-password>'
+bash dsl-tidb/load.sh --database blog_dev --host tidb.${TAILNET} --password '<root-password>'
 ```
 
 ### GitHub App (Utils)
@@ -368,19 +362,21 @@ zizmorをGitHub Code Scanningに連携し、GitHub Actionsのセキュリティ�
 # 依存関係のインストール
 bun install
 
-# PostgreSQL起動（全worktreeで共有）
-docker compose up -d postgres
-
-# DBマイグレーション（初回のみ）
-cd tools/dsql-cli
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-cd ../..
+# blog-api は既定で Tailnet 上の dev TiDB (blog_dev) に接続する
+# (apps/blog-api/Makefile.toml が DATABASE_URL を組み立てる。Tailscale ログインが前提)
+tailscale status | head -1
 
 # AWS資格情報の取得が必要
 aws-vault exec <プロファイル名>
 
 # dev server起動（Next.js + Rust API + Sphinx）
 bun run dev
+```
+
+別の DB に向けたい場合は `DATABASE_URL` を外から渡す（例: ローカル Docker TiDB の `blog_test`）。
+
+```bash
+DATABASE_URL=mysql://root@127.0.0.1:4100/blog_test bun run dev
 ```
 
 ### Agents SKillsの設定
@@ -431,7 +427,7 @@ apm install -t claude
 grep virtual_path apm.lock.yaml
 ```
 
-Renovate APM Update PR のマージ前は zizmor を手動トリガーする。`renovate-apm-update.yaml` の lockfile 同期コミットが `[skip ci]` 付きで push されるため、最新コミットの zizmor が走らずブランチ保護でブロックされる（背景は `docs/source/survey/2026-05-27-renovate-apm-update-ci-loop.md`）。
+Renovate APM Update PR のマージ前は zizmor を手動トリガーする。`renovate-apm-update.yaml` の lockfile 同期コミットが `[skip ci]` 付きで push されるため、最新コミットの zizmor が走らずブランチ保護でブロックされる（背景は [Renovate APM Update CI ループの調査](../97_survey/2026-05-27-renovate-apm-update-ci-loop/index.md)）。
 
 ```bash
 gh workflow run zizmor.yaml --ref <PRブランチ名>
@@ -559,9 +555,20 @@ wt merge
 
 ## 運用コマンド
 
-### psql接続（DSQL）
+### mysql接続（TiDB）
 
-SSMからエンドポイントを取得してDSQLに接続する方法。
+Tailnet 経由で TiDB に接続する方法。database は用途に応じて `blog_prd` / `blog_dev` を指定する。
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+mysql -h tidb.${TAILNET} -P 4000 -u root -p blog_prd
+```
+
+### 旧DSQL（撤去待ち）
+
+現行の blog-api は TiDB を参照しており、旧 DSQL クラスタは残置分。以下は残置分の確認・撤去作業でのみ使う。
+
+psql接続
 
 ```bash
 export STAGE_NAME=""
@@ -584,57 +591,21 @@ PGPASSWORD="$TOKEN" psql \
   --port 5432
 ```
 
-### dsql-cli
-
-PostgreSQLを起動
-
-```bash
-# ルートディレクトリで
-docker compose up -d postgres
-```
-
-マイグレーション実行
+dsql-cli によるスキーマ操作（旧 DSQL 向け。ローカル PostgreSQL 用の compose は撤去済みのため DSQL エンドポイントのみ）
 
 ```bash
 cd tools/dsql-cli
-# ローカル
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
 
-# DSQL
 export STAGE_NAME=""
 export DSQL_CLUSTER_ENDPOINT=$(aws ssm get-parameter \
   --name "/${STAGE_NAME}/shuntaka/dsql/cluster-endpoint" \
   --query "Parameter.Value" --output text)
+
 bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
-```
-
-スキーマ削除
-
-```bash
-cd tools/dsql-cli
-# ローカル
-bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-
-# DSQL
 bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
 ```
 
-DynamoDB→DSQLデータ変換
-
-```bash
-cd tools/dsql-cli
-
-# 本番データを変換（99_seed_data.sqlを生成）
-bun run convert --input ../../.legacy/dynamo/backup_prd-Article_20251229-083009.jsonl
-
-# ローカルDBに投入
-bun run drop --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-bun run migrate --endpoint postgresql://postgres:postgres@localhost:5433/postgres
-
-# DSQLに投入
-bun run drop --endpoint $DSQL_CLUSTER_ENDPOINT
-bun run migrate --endpoint $DSQL_CLUSTER_ENDPOINT
-```
+DSQL からの TSV エクスポートと TiDB への取り込み（`bun run export` / `dsl-tidb/load.sh`）は `tools/dsql-cli/dsl-tidb/README.md` を参照。
 
 ### tidb-seeder
 

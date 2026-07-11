@@ -10,7 +10,7 @@ import { Construct } from 'constructs';
 
 // CDK はインフラのスキャフォールド (cluster / ECR / IAM / LogGroup / SG / Cloud Map /
 // SSM Params) のみを作る。Task Definition と Service は ecspresso 側の責務。
-// task 文書 (docs/source/tasks/2026-06-29-blog-api-tidb-proxy.md) の責任分界に従う。
+// task 文書 (docs/source/98_tasks/2026-06-29-blog-api-tidb-proxy/index.md) の責任分界に従う。
 export class TidbProxyConstruct extends Construct {
   public readonly cluster: ecs.ICluster;
   public readonly ecrRepository: ecr.IRepository;

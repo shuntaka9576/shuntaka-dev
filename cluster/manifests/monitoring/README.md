@@ -2,15 +2,15 @@
 
 kube-prometheus-stack に TiDB クラスタを統合監視させるためのマニフェスト群。
 
-詳細な背景・移行手順・設計判断は `docs/source/tasks/2026-06-27-tidbmonitor-decommission.md` を参照。
-NgMonitoring (Top SQL / Continuous Profiling) の単体 Deployment 化は `docs/source/tasks/2026-06-27-ng-monitoring-standalone.md` を参照。
+詳細な背景・移行手順・設計判断は `docs/source/98_tasks/2026-06-27-tidbmonitor-decommission/index.md` を参照。
+NgMonitoring (Top SQL / Continuous Profiling) の単体 Deployment 化は `docs/source/98_tasks/2026-06-27-ng-monitoring-standalone/index.md` を参照。
 
 ## 構成
 
 ```
 manifests/monitoring/
 ├── kube-prom-stack-values.yaml        # kube-prometheus-stack の helm values (defaultDashboards OFF 含む)
-├── kustomization.yaml                 # ルート (下の 3 ディレクトリを集約)
+├── kustomization.yaml                 # ルート (下の 4 ディレクトリを集約)
 ├── podmonitors/                       # kube-prom-stack Prometheus が TiDB を scrape する設定
 │   ├── kustomization.yaml
 │   ├── pd.yaml                        # PD :2379/metrics
@@ -45,14 +45,15 @@ kube-prom-stack 同梱のデフォルトダッシュボード20+枚は `defaultD
 
 ```bash
 # kubeconfig は ~/.kube/config に設定済み前提 (Tailscale 経由で node1:6443 に到達)
+# パスはリポジトリルートから実行する想定
 
 # helm values (Grafana defaultDashboards OFF + sidecar 設定 + Prometheus selector 等)
 helm upgrade kube-prom-stack prometheus-community/kube-prometheus-stack \
   -n monitoring \
-  -f manifests/monitoring/kube-prom-stack-values.yaml
+  -f cluster/manifests/monitoring/kube-prom-stack-values.yaml
 
 # PodMonitor + PrometheusRule + ダッシュボード一括
-kubectl apply -k manifests/monitoring/
+kubectl apply -k cluster/manifests/monitoring/
 ```
 
 > 個別のダッシュボード JSON が 256KB を超えるとき (Grafana.com の大きいダッシュボードを取り込んだ場合等) は、通常 apply だと `last-applied-configuration` annotation 制限で `Too long` エラーになるので **`--server-side --force-conflicts`** を付ける。ConfigMap data の 1MB 制限内なら apply 自体は通る。
@@ -74,7 +75,7 @@ kubectl -n monitoring port-forward svc/kube-prom-stack-grafana 13000:80
 1. Grafana UI で編集 → Share → Export → "Export for sharing externally" を **オフ** にして JSON 保存
 2. `dashboards/<name>.json` として配置
 3. `dashboards/kustomization.yaml` の `configMapGenerator.files` に追記
-4. `kubectl apply -k manifests/monitoring/` で反映 (sidecar が自動ロード、大きい JSON は `--server-side --force-conflicts` を併用)
+4. `kubectl apply -k cluster/manifests/monitoring/` で反映 (sidecar が自動ロード、大きい JSON は `--server-side --force-conflicts` を併用)
 
 ### Grafana.com のダッシュボードを取り込むとき
 
@@ -95,7 +96,7 @@ jq -r '.panels[]?.type, (.panels[]?.panels[]?.type)' dashboards/<your-name>.json
 ## ダッシュボード削除
 
 1. `dashboards/<name>.json` と `dashboards/kustomization.yaml` のエントリを削除
-2. `kubectl apply -k manifests/monitoring/`
+2. `kubectl apply -k cluster/manifests/monitoring/`
 3. **`kubectl apply -k` は ConfigMap を消さない** ので明示削除:
    ```bash
    kubectl -n monitoring delete configmap dashboard-<name>

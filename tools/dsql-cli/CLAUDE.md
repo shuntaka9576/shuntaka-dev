@@ -40,4 +40,4 @@ AWS DSQLは以下をサポートしない：
 
 ## Documentation
 
-詳細な使い方は `docs/source/01_development.md` の「dsql-cli」セクションを参照。コマンド変更時は同期すること。
+詳細な使い方は `docs/source/01_開発ドキュメント/01_development.md` の「dsql-cli」セクションを参照。コマンド変更時は同期すること。
