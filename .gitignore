@@ -38,3 +38,5 @@ apm_modules/
 
 # tidb dump (本番データはコミットしない)
 /backup/
+.vercel
+.env*

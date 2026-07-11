@@ -1,0 +1,91 @@
+name: tagpr
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: tagpr
+  cancel-in-progress: false
+
+jobs:
+  tagpr:
+    name: tagpr
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # CalVer タグの push と GitHub Release 作成のため
+      pull-requests: write # リリース PR の作成・更新のため
+      issues: read # リリース PR のラベル参照のため
+    outputs:
+      tag: ${{ steps.tagpr.outputs.tag }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Run tagpr
+        id: tagpr
+        uses: Songmu/tagpr@e84001bd5dac8defa0c75b3913937d284a3b3660 # v1.20.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # GITHUB_TOKEN が打ったタグでは on: push: tags の別ワークフローが起動しないため、
+  # 本番デプロイはタグ作成と同一ワークフローの後続ジョブとして実行する
+  deploy-prd:
+    name: Deploy prd (CDK)
+    needs: tagpr
+    if: needs.tagpr.outputs.tag != ''
+    permissions:
+      id-token: write # AWS IAM Role に OIDC AssumeRole するため reusable workflow に継承
+      contents: read
+    concurrency:
+      group: deploy-prd # deploy.yaml の手動 dispatch (prd) と排他
+      cancel-in-progress: false
+    uses: ./.github/workflows/reusable-deploy.yaml
+    with:
+      stageName: prd
+      stack: all
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+
+  # API (CDK) → web (Vercel) の順で本番反映する
+  deploy-vercel:
+    name: Deploy Vercel (production)
+    needs: [tagpr, deploy-prd]
+    if: needs.tagpr.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # actions/checkout でリポジトリを取得するため
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ needs.tagpr.outputs.tag }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Vercel pull
+        run: bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Vercel build
+        run: bunx vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Vercel deploy
+        run: bunx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

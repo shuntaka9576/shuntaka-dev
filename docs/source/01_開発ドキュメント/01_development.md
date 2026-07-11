@@ -33,12 +33,14 @@
    - Preview: プレビュー用の値を設定
 5. Deploy
 
-| 設定項目          | 値                  |
-| ----------------- | ------------------- |
-| Production Branch | `main`              |
-| Preview           | `preview`           |
-| Root Directory    | `apps/web`          |
-| Framework         | Next.js（自動検出） |
+| 設定項目          | 値                          |
+| ----------------- | --------------------------- |
+| Production Branch | `main`                      |
+| Preview           | feature ブランチ（PR ごと） |
+| Root Directory    | `apps/web`                  |
+| Framework         | Next.js（自動検出）         |
+
+main への push では本番デプロイされない（`apps/web/vercel.json` の `git.deploymentEnabled` で無効化）。本番反映は CalVer タグ経由で行う（[リリース](#リリース)を参照）。
 
 | 変数名                              | 用途              | Production                 | Preview                     |
 | ----------------------------------- | ----------------- | -------------------------- | --------------------------- |
@@ -46,6 +48,30 @@
 | `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
 | `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                      |
 | `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                      |
+
+### リリース
+
+リリースは [tagpr](https://github.com/Songmu/tagpr) のリリース PR マージで行う。main へのマージごとに tagpr（`.github/workflows/tagpr.yaml`）がリリース PR を自動作成・追従し、マージすると CalVer タグ（例: `2026.0711.0`、形式は `.tagpr` で定義）と GitHub Release が作られ、同一ワークフローの後続ジョブが prd CDK → Vercel 本番の順にデプロイする。main push の自動デプロイは dev CDK のみ。
+
+tagpr が `GITHUB_TOKEN` で PR を作成できるよう、GitHub 設定の「Allow GitHub Actions to create and approve pull requests」を有効にしておく（`.github/infra.yaml` の `actions.can_approve_pull_requests: true` に対応。`gh infra apply` は ruleset の required status checks を消すため、この設定だけを gh api で変更する）。
+
+```bash
+gh api --method PUT repos/shuntaka9576/shuntaka-dev/actions/permissions/workflow \
+  -f default_workflow_permissions=read \
+  -F can_approve_pull_request_reviews=true
+```
+
+Vercel CLI デプロイ用のシークレットを登録する。トークンは <https://vercel.com/account/tokens> で発行し、orgId / projectId は `vercel link` が生成する `.vercel/project.json` から取得する。
+
+```bash
+cd apps/web
+bunx vercel link
+
+# トークンはシェル履歴に残さないよう対話プロンプトで貼り付ける
+gh secret set VERCEL_TOKEN
+gh secret set VERCEL_ORG_ID --body "$(jq -r .orgId .vercel/project.json)"
+gh secret set VERCEL_PROJECT_ID --body "$(jq -r .projectId .vercel/project.json)"
+```
 
 ### GitHub App (Webhook)
 
@@ -240,7 +266,7 @@ tidb-proxy コンテナ image の build & push と ecspresso deploy をまとめ
 scripts/deploy-tidb-proxy.sh
 
 # GitHub Actions から実行する場合
-gh workflow run deploy-tidb-proxy.yaml --ref preview
+gh workflow run deploy-tidb-proxy.yaml --ref main
 ```
 
 tidb-proxy task の動作確認。`runningCount: 1` かつ `events[0]` が `steady state` になり、ログに `Accepting HTTP Socket connections` と `pre-warm dial ok` が出れば成功。<https://login.tailscale.com/admin/machines> で `tidb-proxy` device が `tag:proxy` 付きで Connected (緑) になっているかも確認する。
@@ -267,7 +293,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 
 # GitHub Actions から実行する場合 (Deploy ワークフローの stack 選択に含まれる)
-gh workflow run deploy.yaml --ref preview -f stageName=dev -f stack=st-tidb-proxy-logs
+gh workflow run deploy.yaml --ref main -f stageName=dev -f stack=st-tidb-proxy-logs
 ```
 
 ログ振り分けの動作確認。INFO 系（squid アクセスログ・forwarder の INFO）は Firehose 経由で Iceberg テーブルに入り、WARN / ERROR と非 JSON 行（tsnet 内部ログ・squid cache_log）は CloudWatch Logs に残る。
@@ -473,7 +499,7 @@ brew install gitleaks
 shuntaka-dev/          # bare clone
 ├── .bare/             # git bare repository
 ├── .envrc             # 共通環境変数（秘匿情報等）
-├── preview/           # メインworktree（previewブランチ）
+├── main/              # メインworktree（mainブランチ）
 ├── feature-foo/       # 作業worktree（wt switchで自動作成）
 └── fix-bar/           # 作業worktree
 ```
@@ -484,7 +510,7 @@ bare clone環境では`core.hooksPath`が不正なパスを指している場合
 git config --local --unset core.hooksPath
 ```
 
-previewワークツリーの環境変数は、previewはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
+mainワークツリーの環境変数は、mainはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
 
 ```bash
 cat > .env.local <<'EOF'
@@ -505,7 +531,7 @@ direnv allow .
 
 ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。
 
-| 変数                   | 内容                      | preview（既定）         |
+| 変数                   | 内容                      | main（既定）            |
 | ---------------------- | ------------------------- | ----------------------- |
 | `WEB_PORT`             | Next.js devサーバーポート | 3000                    |
 | `API_PORT` / `PORT`    | Rust APIポート            | 8080                    |
@@ -541,7 +567,7 @@ bun run dev
 
 ```bash
 # 既存worktreeに切り替え
-wt switch preview
+wt switch main
 
 # worktree一覧（URLも表示）
 wt list
@@ -549,7 +575,7 @@ wt list
 # worktreeの削除
 wt remove feature/new-thing
 
-# previewブランチへマージ＆削除
+# mainブランチへマージ＆削除
 wt merge
 ```
 

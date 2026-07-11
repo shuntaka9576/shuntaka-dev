@@ -3,7 +3,6 @@ name: Deploy
 on:
   push:
     branches:
-      - preview
       - main
   workflow_dispatch:
     inputs:
@@ -29,7 +28,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: deploy-${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
+  group: deploy-${{ inputs.stageName || 'dev' }}
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +38,8 @@ jobs:
       contents: read
     uses: ./.github/workflows/reusable-deploy.yaml
     with:
-      stageName: ${{ inputs.stageName || (github.ref_name == 'main' && 'prd' || 'dev') }}
+      # main push は dev 固定。prd はタグリリース (tagpr.yaml) か手動 dispatch で行う
+      stageName: ${{ inputs.stageName || 'dev' }}
       # push トリガでは inputs が空なので all (従来挙動) になる
       stack: ${{ inputs.stack || 'all' }}
     secrets:

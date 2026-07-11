@@ -2,7 +2,7 @@ name: zizmor audit
 
 on:
   push:
-    branches: [preview, main]
+    branches: [main]
   pull_request:
     branches: ['**']
   workflow_dispatch:
