@@ -1,6 +1,6 @@
 # 運用
 
-blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・おかしい」が起きたときに、原因箇所を最短で切り分けるための手順と、MiniPC クラスタの定常メンテナンス手順。設計・デプロイ手順は [OTel ボトルネック観測基盤](../98_tasks/2026-07-03-otel-bottleneck-observability/index.md) を参照。
+blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・おかしい」が起きたときに、原因箇所を最短で切り分けるための手順と、MiniPC クラスタ・DB の定常メンテナンス手順。設計・デプロイ手順は [OTel ボトルネック観測基盤](../98_tasks/2026-07-03-otel-bottleneck-observability/index.md) を参照。
 
 ## 症状別インデックス
 
@@ -15,6 +15,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | proxy のアクセス・エラーログを検索したい | クエリリファレンス     |
 | 検索がヒットしない・表示が変             | ハマりどころ           |
 | MiniPC を再起動したい                    | ノード再起動           |
+| 本番 DB のバックアップ / dev への複製    | バックアップとリストア |
 
 ## ボトルネック切り分け
 
@@ -101,6 +102,45 @@ CloudWatch Dashboards の `d-st-observability`（dev）/ `p-st-observability`（
 | collector 疎通確認   | `aws logs tail /ecs/tidb-proxy --since 15m` で `otel-collector` prefix にエラーが無いこと                                                             |
 | 再デプロイ           | Deploy workflow の workflow_dispatch（`stack` = `all` / `st-tidb-proxy` / `main`）。forwarder / collector 設定の変更は `scripts/deploy-tidb-proxy.sh` |
 | 止める（コスト削減） | task def から `otel-collector` コンテナを外す（月 ~$1 が止まる）。アプリ側計装は `OTEL_EXPORTER_OTLP_ENDPOINT` 未設定なら no-op なので残してよい      |
+
+## バックアップとリストア
+
+本番 DB `blog_prd` の論理ダンプ取得と、開発 DB `blog_dev` への復元手順。dev / prd は同一 TiDB クラスタ上の database 分離なので、同じダンプを `-D` で流し込む先を変えるだけで環境間コピーになる。経緯とハマりどころ（mysqldump 8.x の `--single-transaction` が TiDB と非互換など）は [本番 TiDB (blog_prd) の論理ダンプ手順](../98_tasks/2026-07-05-tidb-prd-dump/index.md) を参照。
+
+前提は Tailscale ログイン済みであること（接続先 `tidb.<tailnet>:4000` を自動解決）。ローカルに `mysqldump` / `mysql` / `jq` が必要。
+
+### 本番バックアップ
+
+```bash
+# リポジトリルートで
+bun run dump:prd
+```
+
+- 出力は `backup/blog_prd-<timestamp>.sql`。`backup/` は gitignore 済み（本番データはコミットしない）
+- 最新ダンプへは `backup/blog_prd-latest.sql` の symlink が張られる
+- 実体は `scripts/dump-tidb.sh`。ダンプ末尾のフッター検証とテーブル別行数の表示まで行う
+- 任意の DB / 出力先を指定する場合は `./scripts/dump-tidb.sh --database blog_dev --out-dir /tmp`
+
+### 開発 (blog_dev) へのリストア
+
+ダンプは `CREATE DATABASE` / `USE` を含まない（DB 名を位置引数で渡している）ため、`-D` で復元先スキーマを自由に選べる。
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+# 本番データを dev へ
+mysql -h "tidb.${TAILNET}" -P 4000 -u root -D blog_dev < backup/blog_prd-latest.sql
+
+# 行数のサニティチェック
+mysql -h "tidb.${TAILNET}" -P 4000 -u root -D blog_dev \
+  -e "SELECT COUNT(*) AS articles FROM articles; SELECT COUNT(*) AS users FROM users;"
+```
+
+注意:
+
+- ダンプには `DROP TABLE IF EXISTS` が含まれるため、`blog_dev` の既存データはテーブルごと置き換わる
+- リストア先の DB 自体は存在している前提。無ければ先に `CREATE DATABASE blog_dev` を実行する
+- 同名リストア（`-D blog_prd`）も同じ形でできるが、本番を書き戻す操作なので実行前にダンプの中身と接続先を必ず確認する
 
 ## ノード再起動
 
