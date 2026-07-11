@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import type { ArticleSummary, TagFacet } from '@/lib/api';
-import { getArticlesByType, getTagFacets } from '@/lib/api';
+import { getArticles, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE } from '@/lib/constants';
 import {
   buildFilterQuery,
@@ -29,8 +29,6 @@ interface TagFilterContextValue {
   mode: TagFilterMode;
   /** 選択タグが1つ以上あるか */
   filtering: boolean;
-  /** タグのルート名（"tech" or "misc"）。FilteredArticleList でのタグ変換に使用 */
-  tagRoot: string;
   /** 絞り込み中の記事一覧。フィルタなし時は null（SSR の children を表示する） */
   fetchedArticles: ArticleSummary[] | null;
   /** API レスポンスの totalCount（ActiveTagBar のヒット件数表示用） */
@@ -65,10 +63,7 @@ export function useTagFilter(): TagFilterContextValue {
 
 interface TagFilterProviderProps {
   userName: string;
-  type: 'tech' | 'note';
-  /** タグのルート階層。tech タブ → "tech"、note タブ → "misc" */
-  tagRoot: string;
-  /** SSR 時に取得した type 全体のファセット（パネル初期表示用） */
+  /** SSR 時に取得した全体のファセット（パネル初期表示用） */
   initialFacets: TagFacet[];
   /** SSR 時の総ページ数（フィルタなし時の Pagination に渡す） */
   initialTotalPages: number;
@@ -95,8 +90,6 @@ interface TagFilterProviderProps {
  */
 export function TagFilterProvider({
   userName,
-  type,
-  tagRoot,
   initialFacets,
   page,
   baseHref,
@@ -152,11 +145,9 @@ export function TagFilterProvider({
     setLoading(true);
     setError(null);
 
-    // selected（相対パス）に root プレフィックスを付与してフルパスにする
-    const fullPathTags = selected.map((tag) => `${tagRoot}/${tag}`);
-
-    const listPromise = getArticlesByType(userName, type, {
-      tags: fullPathTags,
+    // selected はフルパスタグ（例: "tech/rust", "misc/gadget"）をそのまま保持している
+    const listPromise = getArticles(userName, {
+      tags: selected,
       mode,
       page: filterPage,
       perPage: ARTICLES_PER_PAGE,
@@ -169,7 +160,7 @@ export function TagFilterProvider({
     const safeFacetsPromise: Promise<{ facets: TagFacet[] } | null> =
       mode === 'or'
         ? Promise.resolve({ facets: initialFacetsRef.current })
-        : getTagFacets(userName, type, { tags: fullPathTags, noCache: true, signal }).catch(
+        : getTagFacets(userName, { tags: selected, noCache: true, signal }).catch(
             (err: unknown) => {
               // AbortError は上位 catch に伝播させてリトライを防ぐ
               if ((err as Error)?.name === 'AbortError') throw err;
@@ -199,9 +190,9 @@ export function TagFilterProvider({
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtering, selected, mode, filterPage, retryCount, userName, type, tagRoot]);
+  }, [filtering, selected, mode, filterPage, retryCount, userName]);
 
-  const tagTree = useMemo(() => buildTagTreeFromFacets(facets, tagRoot), [facets, tagRoot]);
+  const tagTree = useMemo(() => buildTagTreeFromFacets(facets), [facets]);
 
   // 絞り込み URL はタブの先頭ページ（baseHref）に載せる
   // 選択が空になったら SSR が表示していたページ URL に戻す
@@ -251,7 +242,6 @@ export function TagFilterProvider({
     selected,
     mode,
     filtering,
-    tagRoot,
     fetchedArticles,
     totalCount,
     filterPage,

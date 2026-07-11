@@ -5,32 +5,7 @@ import {
   matchesTag,
   parseModeParam,
   parseTagsParam,
-  toRelativeTags,
 } from './tagFilter';
-
-describe('toRelativeTags', () => {
-  test('root プレフィックスを除去する', () => {
-    expect(toRelativeTags(['tech/rust', 'tech/aws/lambda'], 'tech')).toEqual([
-      'rust',
-      'aws/lambda',
-    ]);
-  });
-
-  test('root 単独タグは除外する', () => {
-    expect(toRelativeTags(['tech', 'tech/rust'], 'tech')).toEqual(['rust']);
-  });
-
-  test('root が一致しないタグは除外する', () => {
-    expect(toRelativeTags(['misc/gadget', 'tech/rust'], 'tech')).toEqual(['rust']);
-  });
-
-  test('note タブは misc root で変換する', () => {
-    expect(toRelativeTags(['misc/gadget', 'misc/life/travel'], 'misc')).toEqual([
-      'gadget',
-      'life/travel',
-    ]);
-  });
-});
 
 describe('matchesTag', () => {
   test('完全一致でヒットする', () => {
@@ -51,73 +26,59 @@ describe('matchesTag', () => {
 });
 
 describe('buildTagTreeFromFacets', () => {
-  test('root プレフィックスを除去してツリーを構築する', () => {
+  test('ルートタグ（tech/misc）を第1階層としてツリーを構築する', () => {
     const facets = [
+      { path: 'tech', count: 5 },
       { path: 'tech/aws', count: 3 },
       { path: 'tech/aws/lambda', count: 2 },
-      { path: 'tech/rust', count: 3 },
+      { path: 'misc', count: 2 },
+      { path: 'misc/gadget', count: 2 },
     ];
-    const tree = buildTagTreeFromFacets(facets, 'tech');
+    const tree = buildTagTreeFromFacets(facets);
     expect(tree.map((n) => [n.path, n.count])).toEqual([
-      ['aws', 3],
-      ['rust', 3],
+      ['tech', 5],
+      ['misc', 2],
     ]);
-    expect(tree[0].children.map((n) => [n.path, n.count])).toEqual([['aws/lambda', 2]]);
+    expect(tree[0].children.map((n) => [n.path, n.count])).toEqual([['tech/aws', 3]]);
+    expect(tree[0].children[0].children.map((n) => n.path)).toEqual(['tech/aws/lambda']);
+    expect(tree[1].children.map((n) => n.path)).toEqual(['misc/gadget']);
   });
 
   test('count 降順・path 昇順で並べる', () => {
     const facets = [
-      { path: 'tech/rust', count: 5 },
-      { path: 'tech/go', count: 5 },
-      { path: 'tech/aws', count: 3 },
+      { path: 'rust', count: 5 },
+      { path: 'go', count: 5 },
+      { path: 'aws', count: 3 },
     ];
-    const tree = buildTagTreeFromFacets(facets, 'tech');
+    const tree = buildTagTreeFromFacets(facets);
     expect(tree.map((n) => n.path)).toEqual(['go', 'rust', 'aws']);
   });
 
-  test('root が一致しないパスは除外する', () => {
-    const facets = [
-      { path: 'misc/gadget', count: 2 },
-      { path: 'tech/rust', count: 5 },
-    ];
-    const tree = buildTagTreeFromFacets(facets, 'tech');
-    expect(tree).toHaveLength(1);
-    expect(tree[0].path).toBe('rust');
-  });
-
-  test('3階層のツリーを正しく構築する', () => {
+  test('親がファセットに含まれないパスはルートとして扱う', () => {
     const facets = [
       { path: 'tech/aws', count: 5 },
       { path: 'tech/aws/lambda', count: 3 },
-      { path: 'tech/aws/cdk', count: 2 },
     ];
-    const tree = buildTagTreeFromFacets(facets, 'tech');
+    const tree = buildTagTreeFromFacets(facets);
     expect(tree).toHaveLength(1);
-    expect(tree[0].path).toBe('aws');
-    expect(tree[0].count).toBe(5);
-    expect(tree[0].children.map((n) => [n.path, n.count])).toEqual([
-      ['aws/lambda', 3],
-      ['aws/cdk', 2],
-    ]);
+    expect(tree[0].path).toBe('tech/aws');
+    expect(tree[0].children.map((n) => n.path)).toEqual(['tech/aws/lambda']);
   });
 
-  test('子ノードの label は末尾セグメントになる', () => {
+  test('ノードの label は末尾セグメントになる', () => {
     const facets = [
+      { path: 'tech', count: 3 },
       { path: 'tech/aws', count: 3 },
       { path: 'tech/aws/lambda', count: 3 },
     ];
-    const tree = buildTagTreeFromFacets(facets, 'tech');
-    expect(tree[0].label).toBe('aws');
-    expect(tree[0].children[0].label).toBe('lambda');
+    const tree = buildTagTreeFromFacets(facets);
+    expect(tree[0].label).toBe('tech');
+    expect(tree[0].children[0].label).toBe('aws');
+    expect(tree[0].children[0].children[0].label).toBe('lambda');
   });
 
   test('空ファセットは空配列を返す', () => {
-    expect(buildTagTreeFromFacets([], 'tech')).toEqual([]);
-  });
-
-  test('root 配下のパスがなければ空配列を返す', () => {
-    const facets = [{ path: 'misc/gadget', count: 2 }];
-    expect(buildTagTreeFromFacets(facets, 'tech')).toEqual([]);
+    expect(buildTagTreeFromFacets([])).toEqual([]);
   });
 });
 

@@ -2,7 +2,6 @@
 
 import { ArticleCard } from '@/components/ArticleCard';
 import { useTagFilter } from '@/components/TagFilterProvider';
-import { toRelativeTags } from '@/lib/tagFilter';
 
 interface FilteredArticleListProps {
   userName: string;
@@ -96,7 +95,6 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
     mode,
     filterPage,
     filteredTotalPages,
-    tagRoot,
     changeMode,
     clear,
     setFilterPage,
@@ -178,18 +176,15 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
         </p>
       )}
       <div className={wrapperClass}>
-        {articles.map((article) => {
-          const relativeTags = toRelativeTags(article.tags ?? [], tagRoot);
-          return (
-            <ArticleCard
-              key={article.articleId}
-              article={article}
-              userName={userName}
-              priority={priorityArticleIds.has(article.articleId)}
-              tags={relativeTags.map((path) => ({ path, matched: isTagMatched(path) }))}
-            />
-          );
-        })}
+        {articles.map((article) => (
+          <ArticleCard
+            key={article.articleId}
+            article={article}
+            userName={userName}
+            priority={priorityArticleIds.has(article.articleId)}
+            tags={(article.tags ?? []).map((path) => ({ path, matched: isTagMatched(path) }))}
+          />
+        ))}
         <FilterPagination
           currentPage={filterPage}
           totalPages={filteredTotalPages}

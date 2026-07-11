@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getArticlesByType } from '@/lib/api';
+import { getArticles } from '@/lib/api';
 import { SITE_URL, USER_NAME } from '@/lib/constants';
 
 export const revalidate = 60;
@@ -9,12 +9,7 @@ function formatDate(date: Date): string {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [techPage, notePage] = await Promise.all([
-    getArticlesByType(USER_NAME, 'tech', { perPage: 'all' }),
-    getArticlesByType(USER_NAME, 'note', { perPage: 'all' }),
-  ]);
-
-  const articles = [...techPage.articles, ...notePage.articles];
+  const { articles } = await getArticles(USER_NAME, { perPage: 'all' });
 
   const articleUrls: MetadataRoute.Sitemap = articles.map((article) => ({
     url: `${SITE_URL}/${USER_NAME}/articles/${article.slug}`,

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticleListView } from '@/components/ArticleListView';
-import { getArticlesByType } from '@/lib/api';
+import { getArticles } from '@/lib/api';
 import { ARTICLES_PER_PAGE, SITE_URL, USER_NAME } from '@/lib/constants';
 
 interface PageProps {
@@ -25,14 +25,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function TechPaginationPage({ params }: PageProps) {
+export default async function PostsPaginationPage({ params }: PageProps) {
   const { page: rawPage } = await params;
   const page = parsePage(rawPage);
   if (page === null) notFound();
 
-  // ArticleListView と同じ perPage=all フェッチにして Next の fetch dedup を効かせる
-  const probe = await getArticlesByType(USER_NAME, 'tech', { perPage: 'all' });
+  // 範囲外ページ判定用の全件フェッチ。sitemap と同じ URL のため Next の fetch dedup が効く
+  const probe = await getArticles(USER_NAME, { perPage: 'all' });
   if (probe.articles.length <= (page - 1) * ARTICLES_PER_PAGE) notFound();
 
-  return <ArticleListView type="tech" currentTab="tech" page={page} baseHref="/" />;
+  return <ArticleListView page={page} baseHref="/" />;
 }

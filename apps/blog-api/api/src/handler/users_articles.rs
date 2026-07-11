@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderName, HeaderValue, header},
 };
 use infrastructure::cloudinary::client::{CloudinaryClient, CloudinaryClientImpl};
-use kernel::model::article::{ArticleType, TagFilter, TagFilterMode};
+use kernel::model::article::{TagFilter, TagFilterMode};
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
@@ -23,9 +23,6 @@ const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesQuery {
-    /// Article type to filter by (e.g. "tech" or "note")
-    #[serde(rename = "type")]
-    pub article_type: String,
     /// Page number (1-based, default 1)
     pub page: Option<u32>,
     /// Number of articles per page. Use "all" for maximum (capped at 500).
@@ -41,11 +38,8 @@ pub struct UsersArticlesQuery {
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersArticlesTagFacetsQuery {
-    /// Article type to aggregate facets for (e.g. "tech" or "note")
-    #[serde(rename = "type")]
-    pub article_type: String,
     /// Comma-separated full-path tags to pre-filter the article set before aggregation.
-    /// Omit to aggregate over all published articles of the given type.
+    /// Omit to aggregate over all published articles.
     pub tags: Option<String>,
     /// Tag filter mode for the pre-filter: "and" (default) or "or".
     pub mode: Option<String>,
@@ -67,8 +61,6 @@ pub struct ArticleResponse {
     pub content: String,
     pub content_html: String,
     pub description: String,
-    #[serde(rename = "type")]
-    pub article_type: Option<String>,
     pub thumbnail: Option<String>,
     pub ogp_url: String,
     /// フルパス表記のタグ（例: "rust", "aws/lambda"）
@@ -86,8 +78,6 @@ pub struct ArticleSummaryResponse {
     pub title: String,
     pub slug: String,
     pub description: String,
-    #[serde(rename = "type")]
-    pub article_type: Option<String>,
     pub thumbnail: Option<String>,
     pub ogp_url: String,
     /// フルパス表記のタグ（例: "rust", "aws/lambda"）
@@ -175,7 +165,7 @@ fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
     ),
     responses(
         (status = 200, description = "Article list retrieved successfully", body = UsersArticlesResponse),
-        (status = 400, description = "Invalid article type or perPage"),
+        (status = 400, description = "Invalid perPage"),
         (status = 500, description = "Internal server error")
     ),
     tag = "users_articles"
@@ -185,9 +175,6 @@ pub async fn get_users_articles(
     Path(name): Path<String>,
     Query(query): Query<UsersArticlesQuery>,
 ) -> Result<([(HeaderName, HeaderValue); 1], Json<UsersArticlesResponse>), AppError> {
-    let article_type = ArticleType::new(query.article_type)
-        .map_err(|_| AppError::bad_request("Invalid article type"))?;
-
     let page = query.page.unwrap_or(1).max(1);
     let per_page = parse_per_page(query.per_page.as_deref())?;
     let offset = (u64::from(page) - 1) * u64::from(per_page);
@@ -197,13 +184,7 @@ pub async fn get_users_articles(
 
     let result = registry
         .users_articles_repository()
-        .find_published_by_user_name_and_type(
-            &name,
-            &article_type,
-            tag_filter.as_ref(),
-            offset,
-            limit,
-        )
+        .find_published_by_user_name(&name, tag_filter.as_ref(), offset, limit)
         .await
         .map_err(|e| AppError::internal("Failed to find articles", e))?;
 
@@ -234,7 +215,6 @@ pub async fn get_users_articles(
                     title,
                     slug,
                     description: article.description.into_inner(),
-                    article_type: article.article_type.map(|t| t.into_inner()),
                     thumbnail: article.thumbnail.map(|t| t.into_inner()),
                     ogp_url,
                     tags: article.tags,
@@ -262,7 +242,6 @@ pub async fn get_users_articles(
     ),
     responses(
         (status = 200, description = "Tag facets retrieved successfully", body = TagFacetsResponse),
-        (status = 400, description = "Invalid article type"),
         (status = 500, description = "Internal server error")
     ),
     tag = "users_articles"
@@ -272,14 +251,11 @@ pub async fn get_users_articles_tag_facets(
     Path(name): Path<String>,
     Query(query): Query<UsersArticlesTagFacetsQuery>,
 ) -> Result<([(HeaderName, HeaderValue); 1], Json<TagFacetsResponse>), AppError> {
-    let article_type = ArticleType::new(query.article_type)
-        .map_err(|_| AppError::bad_request("Invalid article type"))?;
-
     let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
 
     let result = registry
         .users_articles_repository()
-        .find_tag_facets(&name, &article_type, tag_filter.as_ref())
+        .find_tag_facets(&name, tag_filter.as_ref())
         .await
         .map_err(|e| AppError::internal("Failed to find tag facets", e))?;
 
@@ -350,7 +326,6 @@ pub async fn get_users_article(
         content,
         content_html,
         description: article.description.into_inner(),
-        article_type: article.article_type.map(|t| t.into_inner()),
         thumbnail: article.thumbnail.map(|t| t.into_inner()),
         ogp_url,
         tags: article.tags,

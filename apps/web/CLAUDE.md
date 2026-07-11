@@ -32,7 +32,7 @@ shuntaka.dev の本番フロントエンド。Next.js 16 + React 19 + Tailwind C
 - UI に絵文字を入れない（mascot `ochaIcon` フルカラー SVG のみが視覚的アクセント）
 - 本文 line-height は `--lh-body`、見出し `--lh-heading`、リスト `--lh-list`（実値は `globals.css`）
 - 日付は常に `YYYY/MM/DD`
-- nav / tab ラベルは小文字（`tech`、`note`、`who?`）
+- nav / tab ラベルは小文字（`posts`、`about`）
 - Tailwind preset 色クラス（`bg-blue-500` 等）禁止 → CSS 変数を使う
 - インライン `style={{ color: '#…' }}` 禁止
 

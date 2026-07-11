@@ -51,11 +51,3 @@ export const LastPageOfMany: Story = {
     totalPages: 10,
   },
 };
-
-export const NoteBase: Story = {
-  args: {
-    baseHref: '/type/note',
-    currentPage: 3,
-    totalPages: 8,
-  },
-};
