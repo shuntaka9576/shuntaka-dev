@@ -1,11 +1,16 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { TagFilterTree } from '@/components/TagFilterTree';
 import { TAG_FILTER_PANEL_ID, useTagFilter } from '@/components/TagFilterProvider';
+
+/** パネルを閉じるまでに許容するページスクロール量 (px)。絞り込みによるレイアウトシフト分を吸収する */
+const SCROLL_CLOSE_THRESHOLD = 30;
 
 /**
  * 画面下部中央に固定表示するタグ絞り込み UI。
  * トリガーピルをタップするとファイルツリー風のタグパネルが上に展開する。
+ * 開いている間はページスクロール・パネル外タップ・Escape で閉じる。
  */
 export function FloatingTagFilter() {
   const {
@@ -14,16 +19,56 @@ export function FloatingTagFilter() {
     mode,
     filtering,
     totalCount,
+    fetchedArticles,
     tagTree,
     facetsError,
     togglePanel,
+    closePanel,
     toggleTag,
     changeMode,
     clear,
   } = useTagFilter();
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollBaseline = useRef(0);
+
+  // パネルを開いた時点と絞り込み結果の再描画時に基準位置を取り直す。
+  // タグ選択で一覧の高さが変わるとブラウザが scrollY を丸めることがあり、
+  // 基準を据え置くとその移動だけで閾値を超えてしまうため
+  useEffect(() => {
+    scrollBaseline.current = window.scrollY;
+  }, [panelOpen, fetchedArticles]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - scrollBaseline.current) > SCROLL_CLOSE_THRESHOLD) {
+        closePanel();
+      }
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) closePanel();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closePanel();
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [panelOpen, closePanel]);
+
   return (
-    <div className="fixed bottom-[calc(var(--space-5)+env(safe-area-inset-bottom))] left-1/2 z-20 flex w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 flex-col items-center">
+    <div
+      ref={containerRef}
+      className="fixed bottom-[calc(var(--space-5)+env(safe-area-inset-bottom))] left-1/2 z-20 flex w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 flex-col items-center"
+    >
       {panelOpen && (
         <div
           id={TAG_FILTER_PANEL_ID}

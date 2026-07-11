@@ -44,6 +44,7 @@ interface TagFilterContextValue {
   /** タグパネルに表示するツリー（facets から構築） */
   tagTree: TagNode[];
   togglePanel: () => void;
+  closePanel: () => void;
   toggleTag: (path: string) => void;
   changeMode: (mode: TagFilterMode) => void;
   clear: () => void;
@@ -237,6 +238,9 @@ export function TagFilterProvider({
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
+  // FloatingTagFilter の effect 依存に入るため参照を安定させる
+  const closePanel = useCallback(() => setPanelOpen(false), []);
+
   const value: TagFilterContextValue = {
     panelOpen,
     selected,
@@ -251,6 +255,7 @@ export function TagFilterProvider({
     facetsError,
     tagTree,
     togglePanel: () => setPanelOpen((prev) => !prev),
+    closePanel,
     toggleTag: (path) => {
       const next = selected.includes(path)
         ? selected.filter((t) => t !== path)
