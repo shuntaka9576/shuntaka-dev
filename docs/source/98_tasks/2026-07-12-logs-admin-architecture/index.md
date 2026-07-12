@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-12
 - 関連: [moments（旧称 logs）機能の構想と UI モック](../2026-07-12-logs-feature/index.md)
-- ステータス: 計画（実装未着手）
+- ステータス: フェーズ 0〜3 実装済み（フェーズ 3 はデプロイ未実施）。詳細は末尾の「経緯（実装ログ）」参照
 
 ## 決定事項
 
@@ -86,18 +86,19 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 
 ### 環境変数（admin-backend）
 
-| env                                          | 用途                                                                                      |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                               | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）            |
-| `ADMIN_USER_ID`                              | 投稿者の `users.user_id`（単一ユーザー運用のため固定値で渡す）                            |
-| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | access token 検証（issuer / client_id）と refresh / RevokeToken                           |
-| `COOKIE_SECRET_ID`                           | Cookie 暗号鍵の Secrets Manager シークレット ID。ローカルは `COOKIE_SECRET` で直接渡せる  |
-| `IMAGES_BUCKET_NAME`                         | presign 対象の images バケット                                                            |
-| `IMAGES_BASE_URL`                            | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                 |
-| `ORIGIN_ALLOWLIST`                           | CSRF チェックの Origin 許可リスト（カンマ区切り）                                         |
-| `DEV_INSECURE_COOKIES`                       | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                     |
-| `DEV_AUTH_BYPASS`                            | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）           |
-| `ADMIN_API_PORT`                             | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001） |
+| env                                               | 用途                                                                                                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                    | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）                                                                                                    |
+| `DEV_AUTH_BYPASS_USER`                            | `DEV_AUTH_BYPASS=1` 時に成り代わる `users.name`（既定 shuntaka。ローカル専用）                                                                                                    |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID`      | access token 検証（issuer / client_id）と refresh / RevokeToken                                                                                                                   |
+| `COOKIE_SECRET`                                   | Cookie 暗号鍵。本番は CDK が deploy 時に Secrets Manager から取り出して注入（VPC 内 Lambda から Secrets Manager へ届かないため）。`COOKIE_SECRET_ID` 経由の実行時取得も実装は残置 |
+| `HTTPS_PROXY` / `NO_PROXY` / `NODE_USE_ENV_PROXY` | 本番 Lambda の外部 HTTPS（Cognito API / JWKS）を squid 経由にする。AWS SDK は明示ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`（Node 22.15+）で proxy 対応                            |
+| `IMAGES_BUCKET_NAME`                              | presign 対象の images バケット                                                                                                                                                    |
+| `IMAGES_BASE_URL`                                 | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                                                                                                         |
+| `ORIGIN_ALLOWLIST`                                | CSRF チェックの Origin 許可リスト（カンマ区切り）                                                                                                                                 |
+| `DEV_INSECURE_COOKIES`                            | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                                                                                                             |
+| `DEV_AUTH_BYPASS`                                 | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）                                                                                                   |
+| `ADMIN_API_PORT`                                  | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001）                                                                                         |
 
 ひな形は `apps/admin-backend/.env.example`（`cp .env.example .env.local` で dev.ts が起動時に読む）。
 
@@ -136,6 +137,7 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`moments` (
 ```sql
 CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`admin_sessions` (
   `sid`           VARCHAR(64) NOT NULL,
+  `user_id`       CHAR(36)    NOT NULL,               -- ログイン時に users.name から解決した users.user_id
   `access_token`  TEXT        NOT NULL,
   `id_token`      TEXT        NOT NULL,
   `refresh_token` TEXT        NOT NULL,
@@ -164,7 +166,7 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 - **VirginiaCertificateStack**（us-east-1, 新設）: `admin.<fqdn>` + `images.<fqdn>` を SAN に持つ ACM 証明書 + SSM。CloudFront から参照（cross-region は SSM 経由 + `AwsCustomResource` 読み出しか `crossRegionReferences: true`）
 - **AdminStack**（ap-northeast-1, stage 単位 `{d,p}-st-admin`）
   - Cognito User Pool: self sign-up 無効・管理者 1 ユーザー手動作成・app client は public（secret なし）+ `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`。MFA (TOTP) は初期は入れない（必要になったら後付け）
-  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、Cookie 暗号鍵のシークレット ID（Secrets Manager で 48 文字を自動生成し Lambda に `grantRead`）、`ADMIN_USER_ID` / `IMAGES_BUCKET_NAME` / `IMAGES_BASE_URL` / `ORIGIN_ALLOWLIST`（一覧は「環境変数（admin-backend）」を参照）
+  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、`COOKIE_SECRET`（Secrets Manager で 48 文字を自動生成し、VPC 内から実行時に届かないため deploy 時に `AwsCustomResource` で取り出して注入）、`IMAGES_BUCKET_NAME` / `IMAGES_BASE_URL` / `ORIGIN_ALLOWLIST`、squid 経由の `HTTPS_PROXY` / `NO_PROXY` / `NODE_USE_ENV_PROXY=1`（一覧は「環境変数（admin-backend）」を参照）
   - API Gateway HTTP API（apigwv2）+ `HttpLambdaIntegration`（`{proxy+}` に ANY）。CloudFront `/api/*` behavior のオリジンに設定（キャッシュ無効 + `AllViewerExceptHostHeader`）
   - S3 ×2: SPA バケット（`BucketDeployment` で `apps/admin-web/dist` を投入）/ images バケット（CORS: admin オリジンの PUT）
   - CloudFront: エイリアス `admin.<fqdn>` / `images.<fqdn>` の 2 ドメイン + 上記 3 behavior。viewer-request の CloudFront Function（default と `/api/*` にアタッチ）で Host チェック（admin 以外 403。`/api/` 以下は素通し、それ以外は SPA fallback）。`/api/*` はキャッシュ無効 + `AllViewerExceptHostHeader`
@@ -181,8 +183,8 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 トークンをブラウザの storage に置く案（sessionStorage + Bearer）は **不採用**。HttpOnly Cookie のセッション方式にする。Cognito のトークン 3 本を Cookie に直接封入すると 4KB の Cookie 上限を超えうるため、**Cookie には暗号化したセッション ID（sid）のみを入れ、トークン実体は TiDB の `admin_sessions` に置く**。
 
 1. `/login` ページの自前フォーム → `amazon-cognito-identity-js` の `CognitoUser.authenticateUser`（USER_SRP_AUTH。パスワードは平文送信されない）
-2. 取得した access / id / refresh token を `POST /api/auth/login` へ渡す。backend が jose で検証 → セッションレコード（トークン一式 + 有効期限）を `admin_sessions` に保存し、`{ sid }` を seal（`iron-webcrypto`）した値を**暗号化 HttpOnly Cookie** で返す。ブラウザ側の storage にトークンは保持しない
-3. 以降の API 呼び出しは Cookie の自動送信のみ。ミドルウェアが Cookie を unseal → `admin_sessions` からトークンを引き、access token を jose で検証。失効間近ならサーバ側で refresh token により更新しレコードを上書き。unseal 失敗・レコード無し・refresh 失敗は 401 → `/login` へ
+2. 取得した access / id / refresh token を `POST /api/auth/login` へ渡す。backend が jose で検証し、access token の `username` claim を `users.name`（UNIQUE）へ突き合わせて `user_id` を解決（対応レコードが無い Cognito ユーザーは 401）→ セッションレコード（`user_id` + トークン一式 + 有効期限）を `admin_sessions` に保存し、`{ sid }` を seal（`iron-webcrypto`）した値を**暗号化 HttpOnly Cookie** で返す。ブラウザ側の storage にトークンは保持しない
+3. 以降の API 呼び出しは Cookie の自動送信のみ。ミドルウェアが Cookie を unseal → `admin_sessions` からトークンを引き、access token を jose で検証。失効間近ならサーバ側で refresh token により更新しレコードを上書き。unseal 失敗・レコード無し・refresh 失敗は 401 → `/login` へ。コンテンツはセッションレコードの `user_id` でスコープする（moments の一覧・作成・更新・削除すべて）
 4. FE ガード: `AuthGuard` コンポーネント（`GET /api/me` の session query。失敗時は `/login` へ置き換え遷移）。参照実装の流儀に合わせ `beforeLoad` ではなくコンポーネントラップ方式
 5. ログアウト: `POST /api/auth/logout` → セッションレコード削除 + Cognito `RevokeToken` + Cookie 削除
 6. CSRF: `SameSite=Lax` により cross-site の変更系リクエストには Cookie が送られない。保険として Origin allowlist + `X-Requested-With` 必須の簡易チェックを入れる
@@ -193,7 +195,7 @@ Cookie の属性（`hono/cookie` の `setCookie` / `getCookie` / `deleteCookie` 
 - `Secure`: 同フラグが立っていない限り常に true（`secure: !insecureCookies`）
 - `HttpOnly: true` / `SameSite=Lax` / `Path=/`
 - `maxAge` と seal の `ttl` は refresh token の TTL（30 日）に揃える
-- 暗号鍵: Secrets Manager のシークレット（CDK で 48 文字を自動生成し Lambda に `grantRead`。シークレット ID を env で渡す）。取得値はプロセス内でメモ化し、32 文字未満なら起動時エラー
+- 暗号鍵: Secrets Manager のシークレット（CDK で 48 文字を自動生成）。VPC 内 Lambda から実行時に Secrets Manager へ届かないため、deploy 時に `AwsCustomResource` で値を取り出し `COOKIE_SECRET` として注入する。値はプロセス内でメモ化し、32 文字未満なら起動時エラー
 
 ## 構築手順（チェックリスト）
 
@@ -278,8 +280,7 @@ TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 export DEV_AUTH_BYPASS=1
 export DEV_INSECURE_COOKIES=1
 export DATABASE_URL="mysql://root@tidb.$TAILNET:4000/blog_dev"
-export ADMIN_USER_ID=$(mysql -h "tidb.$TAILNET" -P 4000 -u root -N -B \
-  -e "SELECT user_id FROM blog_dev.users LIMIT 1;")
+export DEV_AUTH_BYPASS_USER=shuntaka
 export IMAGES_BASE_URL=https://images.shuntaka.tech
 # バケットはフェーズ 3 で作成するため、この時点では presign URL の生成のみ確認
 export IMAGES_BUCKET_NAME=dummy-images-bucket
@@ -339,17 +340,167 @@ bun run lint
 
 ### フェーズ 3: iac/aws + デプロイ
 
-- [ ] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` + `images.<fqdn>` の SAN 証明書 + SSM）
-- [ ] `lib/config.ts` に `domain.admin` / `domain.images` と SSM パス（virginia cert / cognito 出力）を追加
-- [ ] `lib/admin/admin-stack.ts`: Cognito User Pool（self sign-up 無効）+ SRP 用 public client
-- [ ] 同: admin-backend Lambda（`NodejsFunction`、VPC = tidb-proxy の SSM import、SG egress 13306/3128）+ Cookie 暗号鍵の Secrets Manager シークレット（自動生成 + `grantRead`）
-- [ ] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
-- [ ] 同: S3 ×2（SPA / images + CORS）、CloudFront（エイリアス admin / images の 2 ドメイン + 3 behavior + Host チェック付き SPA fallback CF Function + OAC）、Route53 A エイリアス ×2
-- [ ] `bin/cdk.ts` 配線 + cdk-nag suppressions + `test/admin.test.ts`
+- [x] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` + `images.<fqdn>` の SAN 証明書 + SSM。hosted zone ID は `lib/cross-region-ssm.ts` の `AwsCustomResource` で東京の SSM から読む）
+- [x] `lib/config.ts` に `domain.admin` / `domain.images` と SSM パス（virginia cert / cognito 出力）を追加
+- [x] `lib/admin/admin-stack.ts`: Cognito User Pool（self sign-up 無効、強パスワードポリシー、prd は deletionProtection + RETAIN）+ SRP 用 public client
+- [x] 同: admin-backend Lambda（`NodejsFunction` esbuild/ESM、VPC = tidb-proxy の SSM import、SG egress 13306/3128）+ Cookie 暗号鍵の Secrets Manager シークレット（自動生成。値は deploy 時に取り出して `COOKIE_SECRET` 注入）。外部 HTTPS（Cognito / JWKS）は squid 経由（AWS SDK は proxy ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`）
+- [x] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
+- [x] 同: S3 ×2（SPA / images + CORS。images は prd RETAIN、dev はローカル PUT 用に `http://localhost:*` も許可）、CloudFront（エイリアス admin / images の 2 ドメイン + 3 behavior + Host チェック付き SPA fallback CF Function + OAC、PRICE_CLASS_200）、Route53 A エイリアス ×2。SPA 資材は `BucketDeployment`（`apps/admin-web/dist` 不在時はこの stack のデプロイだけをブロック）
+- [x] `bin/cdk.ts` 配線（`{d,p}-st-virginia-cert` / `{d,p}-st-admin`）+ cdk-nag suppressions + `test/admin.test.ts`（NodejsFunction をモックした snapshot + nag 検証）。deploy-role に `cognito-idp:*` / `cloudfront:*` / `secretsmanager:*` を追加
 - [ ] dev デプロイ（admin.shuntaka.tech）→ `admin-create-user` で管理ユーザー作成
 - [ ] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映 → `images.shuntaka.tech` での画像配信（+ images ホストで default / `/api/*` が 403 になること）まで通し確認
-- [ ] GitHub Actions（既存 deploy-role / OIDC）に admin-web ビルド + デプロイを組み込み
+- [x] GitHub Actions（既存 deploy-role / OIDC）に admin-web ビルド + デプロイを組み込み（`reusable-deploy.yaml` の admin ステップ: virginia-cert → SSM から Cognito 出力を読んで admin-web ビルド → admin。初回は Cognito 出力が無いまま SPA が焼かれるため、スタック適用後にもう一度 admin をデプロイする）
 - [ ] `blog_prd` へ DDL 適用 → prd デプロイ（admin.shuntaka.dev）で通し確認
+
+#### デプロイ手順
+
+AWS 認証を通したシェル（aws-vault 等）で実行する。CI（`reusable-deploy.yaml` の admin ステップ）も同じ順序。
+
+##### 初回のみ: us-east-1 の CDK bootstrap
+
+CloudFront 用証明書スタックが us-east-1 に立つため、リージョン未 bootstrap なら先に実行する。
+
+```bash
+cd iac/aws
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+bunx cdk bootstrap "aws://${ACCOUNT_ID}/us-east-1"
+```
+
+##### dev デプロイ
+
+```bash
+cd iac/aws
+
+# 1. us-east-1 の証明書スタック（cross-region で東京の hosted zone ID を参照する）
+bunx cdk deploy d-st-virginia-cert -c stageName=dev --require-approval never
+
+# 2. admin-web をビルド（初回は Cognito 出力が無いので空のままでよい）
+POOL_ID=$(aws ssm get-parameter --name /dev/shuntaka/admin/user-pool-id --query 'Parameter.Value' --output text 2>/dev/null || echo '')
+CLIENT_ID=$(aws ssm get-parameter --name /dev/shuntaka/admin/user-pool-client-id --query 'Parameter.Value' --output text 2>/dev/null || echo '')
+(
+  cd ../../apps/admin-web
+  VITE_COGNITO_USER_POOL_ID="$POOL_ID" \
+    VITE_COGNITO_CLIENT_ID="$CLIENT_ID" \
+    VITE_IMAGES_BASE_URL=https://images.shuntaka.tech \
+    VITE_PREVIEW_BASE_URL=https://shuntaka.tech \
+    bun run build
+)
+
+# 3. admin スタック（Cognito / Lambda / API GW / S3×2 / CloudFront / Route53 / SPA 投入）
+bunx cdk deploy d-st-admin -c stageName=dev --require-approval never
+
+# 4. 初回のみ: Cognito 出力が SSM に出たので、実 ID を焼き込んで SPA を再デプロイ
+#    (手順 2 → 3 をもう一度実行する)
+```
+
+##### 管理ユーザー作成（初回のみ）
+
+username は `users.name` と一致させる（ログイン時に `users.name` → `user_id` を解決するため）。
+仮パスワードのままだと初回変更チャレンジが返りログインフォームは弾くので、`--permanent` で本パスワードを設定する。
+
+```bash
+POOL_ID=$(aws ssm get-parameter --name /dev/shuntaka/admin/user-pool-id --query 'Parameter.Value' --output text)
+aws cognito-idp admin-create-user \
+  --user-pool-id "$POOL_ID" \
+  --username shuntaka \
+  --message-action SUPPRESS
+aws cognito-idp admin-set-user-password \
+  --user-pool-id "$POOL_ID" \
+  --username shuntaka \
+  --password '<12 文字以上・大小英数記号>' \
+  --permanent
+```
+
+##### 通し確認
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://admin.shuntaka.tech/            # 200 (SPA)
+curl -s -o /dev/null -w '%{http_code}\n' https://admin.shuntaka.tech/api/me      # 401 (未ログイン)
+curl -s -o /dev/null -w '%{http_code}\n' https://images.shuntaka.tech/           # 403 (Host ガード)
+```
+
+ブラウザで https://admin.shuntaka.tech → SRP ログイン → 画像付き投稿 → 一覧表示 → `blog_dev.moments` への反映と `https://images.shuntaka.tech/images/moments/...` の配信を確認する。
+
+##### prd デプロイ
+
+```bash
+# DDL を blog_prd へ適用（Tailscale ログイン済みシェル）
+TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+for f in tools/dsql-cli/dsl-tidb/schema/07_moments.sql tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sql; do
+  sed 's|${SCHEMA}|blog_prd|g' "$f" | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
+done
+
+# デプロイは dev と同じ流れで stage / prefix / ドメインを差し替える
+#   d-st-virginia-cert → p-st-virginia-cert / d-st-admin → p-st-admin
+#   -c stageName=prd / SSM パスは /prd/... / VITE_* は images.shuntaka.dev, shuntaka.dev
+# 管理ユーザー作成・通し確認も同様 (admin.shuntaka.dev)
+```
+
+##### CI から実行する場合
+
+GitHub Actions の `Deploy` workflow を `workflow_dispatch` で `stack=admin` を選んで実行する（main push の `all` にも admin は含まれる）。初回だけ上記 4. の再デプロイが必要なのは同じ。
+
+###### GitHub 側の登録手順
+
+deploy workflow は `environment: <stageName>` で GitHub Environments（dev / prd）の secrets / variables を参照する。既存デプロイ（main スタック等）で Environments と以下は登録済みのため、**admin 用に新規で必要なのは Environment variable `SITE_FQDN` のみ**。
+
+| 種別     | 名前                                                                                           | 状態                                 |
+| -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------ |
+| secret   | `AWS_ACCOUNT_ID` / `GH_APP_ID` / `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY`                | 登録済み（main 用）                  |
+| variable | `GH_APP_SECRET_PEM_KEY_NAME` / `GH_WEBHOOK_SECRET_KEY_NAME` / `CLOUDINARY_API_SECRET_KEY_NAME` | 登録済み（main 用）                  |
+| variable | `SITE_FQDN`                                                                                    | **新規**。公開サイトの apex ドメイン |
+
+`SITE_FQDN` は admin-web ビルドの `VITE_IMAGES_BASE_URL`（`https://images.<SITE_FQDN>`）と `VITE_PREVIEW_BASE_URL`（`https://<SITE_FQDN>`）の組み立てに使う。
+
+- UI から: リポジトリの Settings → Environments → `dev`（/ `prd`）→ Environment variables → New variable
+- CLI から:
+
+```bash
+# 登録
+gh variable set SITE_FQDN --env dev --body shuntaka.tech
+gh variable set SITE_FQDN --env prd --body shuntaka.dev
+
+# 確認
+gh variable list --env dev
+gh variable list --env prd
+```
+
+Environments 自体が無い場合（新リポジトリ等）は先に作成する。
+
+```bash
+gh api -X PUT "repos/{owner}/{repo}/environments/dev"
+gh api -X PUT "repos/{owner}/{repo}/environments/prd"
+```
+
+実行したコマンド（リポジトリルートから。デプロイ以外の実装時分）:
+
+```bash
+# admin_sessions に user_id 列を追加（セッションは揮発データで dev は空のため再作成）
+TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+mysql -h "tidb.$TAILNET" -P 4000 -u root -N -B -e "SELECT COUNT(*) FROM blog_dev.admin_sessions;"  # 0 を確認
+mysql -h "tidb.$TAILNET" -P 4000 -u root -e "DROP TABLE blog_dev.admin_sessions;"
+sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sql \
+  | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
+mysql -h "tidb.$TAILNET" -P 4000 -u root -e "SHOW CREATE TABLE blog_dev.admin_sessions\G"
+cd docs && bun run doc-gen && cd ..
+bunx prettier --write "docs/source/01_開発ドキュメント/05_db/schema.json" "docs/source/01_開発ドキュメント/05_db/"*.md
+
+# admin-backend の proxy 対応依存
+cd apps/admin-backend && bun add https-proxy-agent @smithy/node-http-handler && cd ../..
+
+# iac/aws（NodejsFunction のローカルバンドル用 esbuild + テスト）
+cd iac/aws
+bun add -d esbuild
+bun run type-check
+bunx vitest run            # snapshot + cdk-nag 検証
+bun run test:update        # deploy-role への action 追加による snapshot 更新
+cd ../..
+
+# 整形と全体チェック
+bunx prettier --write .github/workflows/deploy.yaml .github/workflows/reusable-deploy.yaml
+bunx vp fmt iac/aws apps/admin-backend
+bun run lint
+```
 
 ### フェーズ 4: 公開側（shuntaka.dev の moments タブ）
 
@@ -380,9 +531,48 @@ bun run lint
 
 実装時に決める細目:
 
-- 投稿者 `user_id` の決め方（Cognito ログインユーザーと `users` レコードの対応。単一ユーザー運用のため env で固定 user_id を渡す想定）
+- ~~投稿者 `user_id` の決め方~~ → **決定**: env 固定は廃止。ログイン時に access token の `username` claim を `users.name`（UNIQUE）へ突き合わせて `user_id` を解決し `admin_sessions.user_id` に保存、以降の API はセッションの `user_id` でコンテンツをスコープする。Cognito ユーザーは `users.name` と同じ username で `admin-create-user` する
 - `DELETE /api/moments/:id` で S3 の orig / thumb も削除するか。presign 後に投稿確定せず離脱した孤児画像の扱い（実害がほぼないため初期は放置。気になれば S3 ライフサイクルで対応）
 - SPA デプロイ時のキャッシュ戦略（`index.html` を no-cache にするか、`BucketDeployment` の distribution 連携で invalidation を打つか）
 - `published_at` のタイムゾーン運用（UTC 保存 + 表示時 JST 変換。既存 articles の慣例に合わせる）
 
 なお EXIF（GPS 位置情報含む）は canvas 再エンコードで自動的に除去されるため、モバイル写真の位置情報漏れは設計上ケアされている。
+
+## 経緯（実装ログ）
+
+新しいセッションで作業を再開するためのコンテキスト。作業ブランチは `chore/adjustment-document`（PR #613、ベース main）。
+
+### コミット済み
+
+- `8329527` フェーズ 0: moments / admin_sessions の DDL 追加と `blog_dev` 適用、tbls ドキュメント生成
+- `43ebdd1` フェーズ 0 の実行コマンド全量を記録
+- `f8e6338` フェーズ 1: apps/admin-backend（Hono + Kysely）実装とローカル疎通
+
+### 未コミット（作業ツリーに存在）
+
+- **フェーズ 2 一式**: apps/admin-web（Vite + React 19 + TanStack Router + FSD + shadcn base-nova）。実装の流儀は `~/repos/github.com/shuntaka9576/test-pj/apps/frontend` を踏襲。lint / type / steiger グリーン
+- **フェーズ 3 一式**: iac/aws（VirginiaCertificateStack / AdminStack / cross-region-ssm / deploy-role 追記 / nag suppressions / test/admin.test.ts）、CI ワークフローの admin ステップ、admin-backend の proxy 対応（https-proxy-agent + @smithy/node-http-handler）
+- **認証のユーザー解決の設計変更**（下記）に伴う admin-backend 修正、`08_admin_sessions.sql` の `user_id` 列追加（blog_dev へは適用済み）、tbls 再生成分
+
+### 実装中に確定した設計変更（本文へ反映済み）
+
+- 一覧 cursor は `created_at + moment_id` → **`moment_id`（ULID）単独**へ変更
+- `ADMIN_USER_ID` の固定 env は**廃止**。ログイン時に access token の `username` → `users.name` で `user_id` を解決し `admin_sessions.user_id` に保存、API はセッションの `user_id` でスコープ
+- Cookie 暗号鍵は Secrets Manager 自動生成のまま、**deploy 時に値を取り出して `COOKIE_SECRET` 注入**（VPC 内 Lambda から実行時に Secrets Manager へ届かないため）
+- 本番 Lambda の外部 HTTPS（Cognito API / JWKS）は squid 経由（SDK は proxy ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`。squid は destination 制限なしのため設定変更不要）
+- dev サーバーのポートは wt.toml の hash_port（`ADMIN_API_PORT` / `ADMIN_WEB_PORT`）+ フォールバック 43001 / 43002。起動は root の `bun dev`（turbo）前提
+
+### ローカル開発のハマりどころ（既知）
+
+- `turbo dev` は起動時のパッケージグラフで固定されるため、ワークスペース追加後は dev セッションの再起動が必要
+- root `.env.local` は Vercel CLI に上書きされ wt.toml のポート定義が消えることがある（TODO 管理中の未解決課題）
+- amazon-cognito-identity-js は `global` 参照するため index.html に `window.global = window` のシムを入れてある
+- 画像アップロードの S3 PUT はバケット未作成のため未確認（presign URL 発行までは確認済み）。dev スタックのデプロイで解消する
+
+### 次のアクション
+
+1. 未コミット分のコミット（フェーズ 2 + 3。ユーザー指示があってから）
+2. dev デプロイ: `aws-vault` 認証のシェルで `iac/aws` から `bunx cdk deploy d-st-virginia-cert -c stageName=dev` → admin-web を VITE\_\* 付きでビルド → `bunx cdk deploy d-st-admin -c stageName=dev`（CI の admin ステップと同じ手順）
+3. `admin-create-user`（username は `users.name` と同じ `shuntaka`）→ `admin-set-user-password --permanent`
+4. 通し確認（CloudFront 経由 SRP ログイン → 画像付き投稿 → TiDB 反映 → images.shuntaka.tech 配信 / images ホストの 403）。ローカルからも dev Cognito 実接続で確認可能（環境変数の節を参照）
+5. `blog_prd` へ DDL 適用 → prd デプロイ → フェーズ 4（公開側 moments タブ）

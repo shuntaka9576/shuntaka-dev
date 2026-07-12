@@ -3,6 +3,7 @@
 -- 期限切れレコードはログイン時に掃除する (単一ユーザー運用のため cron は持たない)。
 CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`admin_sessions` (
   `sid`           VARCHAR(64) NOT NULL,
+  `user_id`       CHAR(36)    NOT NULL,               -- ログイン時に users.name から解決した users.user_id
   `access_token`  TEXT        NOT NULL,
   `id_token`      TEXT        NOT NULL,
   `refresh_token` TEXT        NOT NULL,

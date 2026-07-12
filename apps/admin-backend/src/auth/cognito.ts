@@ -3,6 +3,8 @@ import {
   InitiateAuthCommand,
   RevokeTokenCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { requireEnv } from '../env.js';
 
@@ -21,7 +23,18 @@ const getJwks = (): ReturnType<typeof createRemoteJWKSet> => {
 };
 
 const getCognito = (): CognitoIdentityProviderClient => {
-  cognito ??= new CognitoIdentityProviderClient({ region: region() });
+  if (cognito === undefined) {
+    // VPC 内 Lambda (NAT なし) では squid forward proxy 経由で外に出る。
+    // AWS SDK は HTTPS_PROXY を自動では見ないため明示的に渡す。
+    // jose の JWKS 取得 (global fetch) は Lambda env の NODE_USE_ENV_PROXY=1 で proxy を通す
+    const proxyUrl = process.env.HTTPS_PROXY;
+    cognito = new CognitoIdentityProviderClient({
+      region: region(),
+      ...(proxyUrl !== undefined && proxyUrl !== ''
+        ? { requestHandler: new NodeHttpHandler({ httpsAgent: new HttpsProxyAgent(proxyUrl) }) }
+        : {}),
+    });
+  }
   return cognito;
 };
 

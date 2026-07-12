@@ -1,20 +1,25 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
-import { isDevAuthBypass } from '../env.js';
+import { devAuthBypassUser, isDevAuthBypass } from '../env.js';
 import { refreshTokens, verifyAccessToken } from './cognito.js';
 import { readSessionSid } from './cookie.js';
 import { deleteSession, findSession, updateSessionTokens } from './session-store.js';
+import { resolveUserIdByName } from './user.js';
 
 // access token の残り寿命がこの閾値を切ったらサーバ側で refresh する
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-export type AppEnv = { Variables: { sid: string } };
+export type AppEnv = { Variables: { sid: string; userId: string } };
 
 const unauthorized = (): HTTPException => new HTTPException(401, { message: 'unauthorized' });
 
 export const sessionAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (isDevAuthBypass()) {
+    // ローカル dev 限定: DEV_AUTH_BYPASS_USER の users.name に成り代わる
+    const userId = await resolveUserIdByName(devAuthBypassUser());
+    if (userId === null) throw unauthorized();
     c.set('sid', 'dev-bypass');
+    c.set('userId', userId);
     await next();
     return;
   }
@@ -30,6 +35,8 @@ export const sessionAuth = createMiddleware<AppEnv>(async (c, next) => {
     throw unauthorized();
   }
   c.set('sid', sid);
+  // ログインユーザーの user_id はログイン時に解決してセッションに保存済み
+  c.set('userId', session.user_id);
   await next();
 });
 

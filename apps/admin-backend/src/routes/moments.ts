@@ -4,7 +4,6 @@ import type { Selectable } from 'kysely';
 import { ulid } from 'ulid';
 import { getDb } from '../db/client.js';
 import type { MomentsTable } from '../db/types.js';
-import { adminUserId } from '../env.js';
 import { imageUrl, thumbKey } from '../lib/images.js';
 import { createRouter } from '../lib/router.js';
 import { decodeCursor, encodeCursor } from '../schemas/cursor.js';
@@ -31,8 +30,16 @@ const toMomentDto = (row: Selectable<MomentsTable>) => ({
   updatedAt: row.updated_at.toISOString(),
 });
 
-const findMoment = async (momentId: string): Promise<Selectable<MomentsTable> | undefined> =>
-  getDb().selectFrom('moments').selectAll().where('moment_id', '=', momentId).executeTakeFirst();
+const findMoment = async (
+  momentId: string,
+  userId: string,
+): Promise<Selectable<MomentsTable> | undefined> =>
+  getDb()
+    .selectFrom('moments')
+    .selectAll()
+    .where('moment_id', '=', momentId)
+    .where('user_id', '=', userId)
+    .executeTakeFirst();
 
 const listRoute = createRoute({
   method: 'get',
@@ -90,7 +97,7 @@ export const momentRoutes = createRouter()
     let query = getDb()
       .selectFrom('moments')
       .selectAll()
-      .where('user_id', '=', adminUserId())
+      .where('user_id', '=', c.get('userId'))
       .orderBy('moment_id', 'desc')
       .limit(limit + 1);
     if (cursorRaw !== undefined) {
@@ -125,7 +132,7 @@ export const momentRoutes = createRouter()
       .insertInto('moments')
       .values({
         moment_id: momentId,
-        user_id: adminUserId(),
+        user_id: c.get('userId'),
         text: body.text,
         image_key: body.imageKey,
         fastener: body.fastener,
@@ -134,14 +141,14 @@ export const momentRoutes = createRouter()
         published_at: publishedAt,
       })
       .execute();
-    const row = await findMoment(momentId);
+    const row = await findMoment(momentId, c.get('userId'));
     if (row === undefined) throw new HTTPException(500, { message: 'failed to create moment' });
     return c.json(toMomentDto(row), 201);
   })
   .openapi(updateMomentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const current = await findMoment(id);
+    const current = await findMoment(id, c.get('userId'));
     if (current === undefined) throw new HTTPException(404, { message: 'moment not found' });
 
     const fastener = body.fastener ?? current.fastener;
@@ -173,7 +180,7 @@ export const momentRoutes = createRouter()
       })
       .where('moment_id', '=', id)
       .execute();
-    const row = await findMoment(id);
+    const row = await findMoment(id, c.get('userId'));
     if (row === undefined) throw new HTTPException(404, { message: 'moment not found' });
     return c.json(toMomentDto(row), 200);
   })
@@ -182,6 +189,7 @@ export const momentRoutes = createRouter()
     const result = await getDb()
       .deleteFrom('moments')
       .where('moment_id', '=', id)
+      .where('user_id', '=', c.get('userId'))
       .executeTakeFirst();
     if (result.numDeletedRows === 0n) {
       throw new HTTPException(404, { message: 'moment not found' });

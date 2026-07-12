@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import { AdminStack } from '../lib/admin/admin-stack.js';
 import { TidbProxyLogAnalyticsStack } from '../lib/analytics/tidb-proxy-log-analytics-stack.js';
 import { MainStack } from '../lib/api/main-stack.js';
 import { getConfig, getLogAnalyticsConfig, getProxyConfig } from '../lib/config.js';
@@ -7,17 +8,22 @@ import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
 import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
+import { VirginiaCertificateStack } from '../lib/dns/virginia-certificate-stack.js';
 import { applyNag } from '../lib/nag.js';
 import {
+  applyAdminStackSuppressions,
   applyDeployRoleSuppressions,
   applyMainStackSuppressions,
   applyTidbProxyLogAnalyticsSuppressions,
   applyTidbProxySuppressions,
+  applyVirginiaCertificateSuppressions,
 } from '../lib/nag-suppressions.js';
 import { TidbProxyStack } from '../lib/proxy/tidb-proxy-stack.js';
 
 const REGIONS = {
   TOKYO: 'ap-northeast-1',
+  // CloudFront 用 ACM 証明書は us-east-1 必須
+  VIRGINIA: 'us-east-1',
 } as const;
 
 const app = new cdk.App();
@@ -77,6 +83,49 @@ if (config.missingLambdaEnvVars.length > 0) {
     `Lambda 用環境変数が未設定のため main stack はデプロイできません: ${config.missingLambdaEnvVars.join(', ')} (iac/aws/.env か環境変数で設定してください)`,
   );
 }
+
+const virginiaCertificateStack = new VirginiaCertificateStack(
+  app,
+  `${config.stageName.short}-${config.projectName.short}-virginia-cert`,
+  {
+    fqdn: config.fqdn,
+    adminDomain: config.domain.admin,
+    imagesDomain: config.domain.images,
+    hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
+    hostedZoneParameterRegion: REGIONS.TOKYO,
+    certificateArnParameterName: config.ssm.virginia.certificateArn,
+    env: {
+      account: config.cdkEnv.account,
+      region: REGIONS.VIRGINIA,
+    },
+  },
+);
+virginiaCertificateStack.addDependency(globalDnsStack);
+
+const adminStack = new AdminStack(
+  app,
+  `${config.stageName.short}-${config.projectName.short}-admin`,
+  {
+    physicalPrefix: `${config.stageName.short}-${config.projectName.short}`,
+    stageName: config.stageName.long,
+    fqdn: config.fqdn,
+    adminDomain: config.domain.admin,
+    imagesDomain: config.domain.images,
+    databaseName: `blog_${config.stageName.long}`,
+    ssmParameters: {
+      globalDns: config.ssm.globalDns,
+      virginia: config.ssm.virginia,
+      admin: config.ssm.admin,
+      proxy: config.ssm.proxy,
+    },
+    env: {
+      account: config.cdkEnv.account,
+      region: REGIONS.TOKYO,
+    },
+  },
+);
+adminStack.addDependency(globalDnsStack);
+adminStack.addDependency(virginiaCertificateStack);
 
 const oidcProviderStack = new OidcProviderStack(app, `${config.projectName.short}-oidc-provider`, {
   ssmOidcProviderArn: config.ssm.oidc.providerArn,
@@ -139,3 +188,5 @@ applyMainStackSuppressions(mainStack);
 applyDeployRoleSuppressions(deployRoleStack);
 applyTidbProxySuppressions(tidbProxyStack);
 applyTidbProxyLogAnalyticsSuppressions(tidbProxyLogAnalyticsStack);
+applyVirginiaCertificateSuppressions(virginiaCertificateStack);
+applyAdminStackSuppressions(adminStack);

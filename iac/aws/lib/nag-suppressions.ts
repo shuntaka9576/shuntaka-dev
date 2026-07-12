@@ -42,6 +42,9 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::glue:*',
       'Action::firehose:*',
       'Action::athena:*',
+      'Action::cognito-idp:*',
+      'Action::cloudfront:*',
+      'Action::secretsmanager:*',
       'Resource::*',
     ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
@@ -122,6 +125,122 @@ export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void =
     },
     {
       id: 'AwsSolutions-L1',
+      reason: customResourceLambdaReason,
+    },
+  ]);
+};
+
+export const applyVirginiaCertificateSuppressions = (stack: cdk.Stack): void => {
+  const customResourceLambdaReason =
+    'AwsCustomResource (cross-region SSM 読み出し) が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
+  acknowledgeRules(stack, [
+    {
+      id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]',
+      reason: customResourceLambdaReason,
+    },
+    {
+      id: 'AwsSolutions-L1',
+      reason: customResourceLambdaReason,
+    },
+  ]);
+};
+
+export const applyAdminStackSuppressions = (stack: cdk.Stack): void => {
+  const customResourceLambdaReason =
+    'BucketDeployment / autoDeleteObjects / AwsCustomResource が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
+  const bucketDeploymentWildcardReason =
+    'BucketDeployment と autoDeleteObjects の custom resource はオブジェクトキーへ動的にアクセスするため bucket/* のワイルドカードを許容する (tidb-proxy-logs と同じ割り切り)。';
+  acknowledgeRules(stack, [
+    ...[
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
+    ].map((finding) => ({
+      id: `AwsSolutions-IAM4[${finding}]`,
+      reason:
+        'Lambda 実行ロールの CDK 既定 AWS 管理ポリシー。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セット。',
+    })),
+    {
+      id: 'AwsSolutions-L1',
+      reason:
+        'admin-api Lambda は admin-backend の開発対象ランタイムに合わせて Node.js 22 固定。custom resource Lambda は aws-cdk-lib 既定に従う。',
+    },
+    {
+      id: 'AwsSolutions-COG2',
+      reason:
+        '単一管理ユーザー運用のため MFA は初期は入れない (設計ドキュメントの決定事項)。SRP + 強パスワードポリシー (12 文字 + 4 種) + HttpOnly Cookie セッションで許容。',
+    },
+    {
+      id: 'AwsSolutions-COG3',
+      reason:
+        'Cognito advanced security (Plus feature plan) は単一ユーザー運用の管理画面にはコスト過剰のため使わない。',
+    },
+    {
+      id: 'AwsSolutions-SMG4',
+      reason:
+        'Cookie 暗号鍵の自動ローテーションは未対応 (ローテーションすると既存セッションが全て無効化される)。漏洩時は再デプロイで手動ローテーションする。',
+    },
+    {
+      id: 'AwsSolutions-CFR1',
+      reason: '個人用管理画面のため geo restriction は設けない。',
+    },
+    {
+      id: 'AwsSolutions-CFR2',
+      reason:
+        'TODO(別PR): CloudFront への WAF 導入を検討する。認証はアプリ層のセッション Cookie で行っており、単一ユーザー運用のため初期は持たない。',
+    },
+    {
+      id: 'AwsSolutions-CFR3',
+      reason:
+        '個人ブログ用途でアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。',
+    },
+    {
+      id: 'AwsSolutions-APIG1',
+      reason:
+        'TODO(別PR): HTTP API ステージのアクセスログを CloudWatch Logs に出力する設定を追加する。',
+    },
+    {
+      id: 'AwsSolutions-APIG4',
+      reason:
+        'HTTP API は {proxy+} ANY で Lambda にパススルーし、認証は Lambda 側のセッション Cookie (unseal + admin_sessions + jose 検証) で行う。CloudFront 経由以外の直叩きも Cookie が無ければ 401。',
+    },
+    {
+      id: 'AwsSolutions-S1',
+      reason:
+        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy-logs と同じ割り切り)。',
+    },
+    ...[
+      'Action::s3:Abort*',
+      'Action::s3:DeleteObject*',
+      'Action::s3:GetBucket*',
+      'Action::s3:GetObject*',
+      'Action::s3:List*',
+      'Resource::<SpaBucket48E1059F.Arn>/*',
+    ].map((finding) => ({
+      id: `AwsSolutions-IAM5[${finding}]`,
+      reason: bucketDeploymentWildcardReason,
+    })),
+    {
+      id: 'AwsSolutions-IAM5[Resource::<ImagesBucket1E86AFB2.Arn>/images/moments/*]',
+      reason:
+        'admin-api Lambda が presigned PUT URL の署名者として images/moments/ prefix 配下へ PutObject するための権限。key は投稿ごとに ULID で動的に決まるため prefix ワイルドカードが必要。',
+    },
+    {
+      id: 'AwsSolutions-IAM5[Resource::*]',
+      reason:
+        'BucketDeployment の custom resource が SPA 更新時に実行する cloudfront:CreateInvalidation はリソースレベル制限非対応の API。',
+    },
+    {
+      id: 'AwsSolutions-COG8',
+      reason:
+        'dev の User Pool は作り直し前提のため deletion protection を付けない (removalPolicy: DESTROY と整合)。prd は deletionProtection: true を設定済み。',
+    },
+    ...['<AWS::Partition>', 'aws'].map((partition) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::cdk-hnb659fds-assets-${stack.account}-${stack.region}/*]`,
+      reason:
+        'BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケットから SPA 資材を取得するための CDK 既定権限。',
+    })),
+    {
+      id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]',
       reason: customResourceLambdaReason,
     },
   ]);

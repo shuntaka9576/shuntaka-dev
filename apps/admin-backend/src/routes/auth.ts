@@ -14,6 +14,7 @@ import {
   deleteSession,
   findSession,
 } from '../auth/session-store.js';
+import { resolveUserIdByName } from '../auth/user.js';
 import { createRouter } from '../lib/router.js';
 
 const loginBodySchema = z.object({
@@ -44,16 +45,28 @@ const logoutRoute = createRoute({
 export const authRoutes = createRouter()
   .openapi(loginRoute, async (c) => {
     const { accessToken, idToken, refreshToken } = c.req.valid('json');
+    let username: unknown;
     try {
-      await verifyAccessToken(accessToken);
+      const payload = await verifyAccessToken(accessToken);
+      username = payload.username;
     } catch {
       throw new HTTPException(401, { message: 'invalid token' });
+    }
+    // ログインユーザーの user_id はここで一度だけ解決し、セッションレコードに保存する。
+    // users に対応レコードが無い Cognito ユーザーは拒否する
+    if (typeof username !== 'string' || username === '') {
+      throw new HTTPException(401, { message: 'invalid token' });
+    }
+    const userId = await resolveUserIdByName(username);
+    if (userId === null) {
+      throw new HTTPException(401, { message: 'unknown user' });
     }
     // 期限切れセッションはログイン時に掃除する
     await deleteExpiredSessions();
     const sid = randomBytes(32).toString('hex');
     await createSession({
       sid,
+      userId,
       accessToken,
       idToken,
       refreshToken,

@@ -8,6 +8,7 @@
 ```sql
 CREATE TABLE `admin_sessions` (
   `sid` varchar(64) NOT NULL,
+  `user_id` char(36) NOT NULL,
   `access_token` text NOT NULL,
   `id_token` text NOT NULL,
   `refresh_token` text NOT NULL,
@@ -25,6 +26,7 @@ CREATE TABLE `admin_sessions` (
 | Name          | Type        | Default              | Nullable | Extra Definition                                 | Children | Parents | Comment |
 | ------------- | ----------- | -------------------- | -------- | ------------------------------------------------ | -------- | ------- | ------- |
 | sid           | varchar(64) |                      | false    |                                                  |          |         |         |
+| user_id       | char(36)    |                      | false    |                                                  |          |         |         |
 | access_token  | text        |                      | false    |                                                  |          |         |         |
 | id_token      | text        |                      | false    |                                                  |          |         |         |
 | refresh_token | text        |                      | false    |                                                  |          |         |         |

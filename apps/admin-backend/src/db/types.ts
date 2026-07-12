@@ -21,6 +21,7 @@ export interface MomentsTable {
 // dsl-tidb/schema/08_admin_sessions.sql の手書き型
 export interface AdminSessionsTable {
   sid: string;
+  user_id: string;
   access_token: string;
   id_token: string;
   refresh_token: string;
@@ -29,7 +30,18 @@ export interface AdminSessionsTable {
   updated_at: ColumnType<Date, never, never>;
 }
 
+// 既存テーブル (dsl-tidb/schema/02_users.sql)。認証ユーザーの解決に参照のみ行う
+export interface UsersTable {
+  user_id: string;
+  name: string;
+  email: string;
+  github_installation_id: number | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
 export interface Database {
   moments: MomentsTable;
   admin_sessions: AdminSessionsTable;
+  users: UsersTable;
 }

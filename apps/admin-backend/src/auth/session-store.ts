@@ -6,6 +6,7 @@ export type AdminSession = Selectable<AdminSessionsTable>;
 
 export const createSession = async (input: {
   sid: string;
+  userId: string;
   accessToken: string;
   idToken: string;
   refreshToken: string;
@@ -15,6 +16,7 @@ export const createSession = async (input: {
     .insertInto('admin_sessions')
     .values({
       sid: input.sid,
+      user_id: input.userId,
       access_token: input.accessToken,
       id_token: input.idToken,
       refresh_token: input.refreshToken,
