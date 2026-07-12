@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Tailwind の font-* クラスも配信ウェイト (400/600) に寄せる。--fw-* トークンと同じマッピング */
+@theme {
+  --font-weight-light: 400;
+  --font-weight-normal: 400;
+  --font-weight-medium: 600;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 600;
+}
+
 :root {
   color-scheme: light dark;
 
@@ -81,12 +90,14 @@
   --lh-list: 1.7;
   --lh-body: 1.9;
 
-  /* Font weight */
-  --fw-light: 300;
+  /* Font weight
+     配信ウェイトは 400/600 の 2 本のみ (フォント転送量削減。DESIGN.md Typography 参照)。
+     セマンティックトークンは維持し、実値をどちらかに寄せる */
+  --fw-light: 400;
   --fw-regular: 400;
-  --fw-medium: 500;
+  --fw-medium: 600;
   --fw-semibold: 600;
-  --fw-bold: 700;
+  --fw-bold: 600;
 
   /* Mono font stack (sans is supplied by next/font: --font-roboto, --font-noto-sans-jp) */
   --font-mono:
