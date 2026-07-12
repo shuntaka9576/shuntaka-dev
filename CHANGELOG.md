@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.0712.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0711.1...2026.0712.0) - 2026-07-12
+
+- feat: エラー/404 ページを ErrorFallback に統一し、PR バンドルサイズレポートを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/608
+- feat: HashiBow 静的 SVG 化 + 記事ルート error.tsx 削除で First Load JS を削減 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/609
+- feat: フォント配信を 400/600 の 2 ウェイト + self-host CSS に最適化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/610
+
 ## [2026.0711.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0711.0...2026.0711.1) - 2026-07-11
 
 - docs: カットオーバー手順に ruleset 変更を追記し protect の enforcement 宣言を実態に同期 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/602
