@@ -9,7 +9,7 @@ import { requireEnv } from '../env.js';
 const userPoolId = (): string => requireEnv('COGNITO_USER_POOL_ID');
 const clientId = (): string => requireEnv('COGNITO_CLIENT_ID');
 // user pool ID は "<region>_<id>" 形式
-const region = (): string => userPoolId().split('_')[0];
+const region = (): string => userPoolId().split('_')[0] ?? '';
 const issuer = (): string => `https://cognito-idp.${region()}.amazonaws.com/${userPoolId()}`;
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;

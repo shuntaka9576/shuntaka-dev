@@ -70,34 +70,47 @@ iac/aws/lib/
 
 Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしない。CF Function を減らすため）。
 
-| Method / Path              | 内容                                                                                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/login`     | SRP で得たトークンを検証してセッションを保存し、暗号化 HttpOnly Cookie を発行（認証不要の唯一のルート）                                     |
-| `POST /api/auth/logout`    | セッション削除 + Cognito `RevokeToken` + Cookie 破棄                                                                                        |
-| `GET /api/me`              | セッション検証の疎通確認（FE の auth guard 用）                                                                                             |
-| `GET /api/moments`         | 一覧（draft 含む全 status、`moment_id` 降順）。cursor は `moment_id` 単独: ULID が時系列ソート可能なため並びが安定し、DATETIME(6) のマイクロ秒と JS Date のミリ秒の精度差による境界バグも避けられる                          |
-| `POST /api/moments`        | 作成。`{ text(≤180), imageKey, fastener('clip'\|'tape'), fastenerColor?, status('published'\|'draft'), publishedAt? }`                      |
-| `PATCH /api/moments/:id`   | 更新（draft → published の公開操作を含む。公開時に `published_at` 未指定なら現在時刻を設定）                                                |
-| `DELETE /api/moments/:id`  | 削除                                                                                                                                        |
-| `POST /api/images/presign` | presigned PUT URL を orig / thumb の 2 本発行。`{ contentType: 'image/webp', origLength, thumbLength }` → `{ imageKey, origUrl, thumbUrl }` |
+| Method / Path              | 内容                                                                                                                                                                                                |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`     | SRP で得たトークンを検証してセッションを保存し、暗号化 HttpOnly Cookie を発行（認証不要の唯一のルート）                                                                                             |
+| `POST /api/auth/logout`    | セッション削除 + Cognito `RevokeToken` + Cookie 破棄                                                                                                                                                |
+| `GET /api/me`              | セッション検証の疎通確認（FE の auth guard 用）                                                                                                                                                     |
+| `GET /api/moments`         | 一覧（draft 含む全 status、`moment_id` 降順）。cursor は `moment_id` 単独: ULID が時系列ソート可能なため並びが安定し、DATETIME(6) のマイクロ秒と JS Date のミリ秒の精度差による境界バグも避けられる |
+| `POST /api/moments`        | 作成。`{ text(≤180), imageKey, fastener('clip'\|'tape'), fastenerColor?, status('published'\|'draft'), publishedAt? }`                                                                              |
+| `PATCH /api/moments/:id`   | 更新（draft → published の公開操作を含む。公開時に `published_at` 未指定なら現在時刻を設定）                                                                                                        |
+| `DELETE /api/moments/:id`  | 削除                                                                                                                                                                                                |
+| `POST /api/images/presign` | presigned PUT URL を orig / thumb の 2 本発行。`{ contentType: 'image/webp', origLength, thumbLength }` → `{ imageKey, origUrl, thumbUrl }`                                                         |
 
 - バリデーションエラーは `OpenAPIHono` の `defaultHook` で 400 に統一
 - 認証ミドルウェア: セッション Cookie を unseal（sid）→ `admin_sessions` からトークンを取得し、access token を `jose` で検証（issuer / `token_use === 'access'` / `client_id`）。失効間近ならサーバ側で refresh してレコードを更新。加えて Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
 
 ### 環境変数（admin-backend）
 
-| env                                          | 用途                                                                                        |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                               | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）              |
-| `ADMIN_USER_ID`                              | 投稿者の `users.user_id`（単一ユーザー運用のため固定値で渡す）                              |
-| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | access token 検証（issuer / client_id）と refresh / RevokeToken                             |
-| `COOKIE_SECRET_ID`                           | Cookie 暗号鍵の Secrets Manager シークレット ID。ローカルは `COOKIE_SECRET` で直接渡せる    |
-| `IMAGES_BUCKET_NAME`                         | presign 対象の images バケット                                                              |
-| `IMAGES_BASE_URL`                            | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                   |
-| `ORIGIN_ALLOWLIST`                           | CSRF チェックの Origin 許可リスト（カンマ区切り）                                           |
-| `DEV_INSECURE_COOKIES`                       | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                       |
-| `DEV_AUTH_BYPASS`                            | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）             |
-| `ADMIN_API_PORT`                             | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001）   |
+| env                                          | 用途                                                                                      |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                               | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）            |
+| `ADMIN_USER_ID`                              | 投稿者の `users.user_id`（単一ユーザー運用のため固定値で渡す）                            |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | access token 検証（issuer / client_id）と refresh / RevokeToken                           |
+| `COOKIE_SECRET_ID`                           | Cookie 暗号鍵の Secrets Manager シークレット ID。ローカルは `COOKIE_SECRET` で直接渡せる  |
+| `IMAGES_BUCKET_NAME`                         | presign 対象の images バケット                                                            |
+| `IMAGES_BASE_URL`                            | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                 |
+| `ORIGIN_ALLOWLIST`                           | CSRF チェックの Origin 許可リスト（カンマ区切り）                                         |
+| `DEV_INSECURE_COOKIES`                       | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                     |
+| `DEV_AUTH_BYPASS`                            | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）           |
+| `ADMIN_API_PORT`                             | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001） |
+
+ひな形は `apps/admin-backend/.env.example`（`cp .env.example .env.local` で dev.ts が起動時に読む）。
+
+### 環境変数（admin-web）
+
+| env                                                    | 用途                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` | SRP ログイン（`amazon-cognito-identity-js`）                                   |
+| `VITE_IMAGES_BASE_URL`                                 | プレビューで開く画像公開 URL の組み立て                                        |
+| `VITE_PREVIEW_BASE_URL`                                | apps/web の `/moments/preview` を開くベース URL（例: `https://shuntaka.tech`） |
+| `ADMIN_WEB_PORT`                                       | Vite dev サーバーのポート（wt.toml が採番。既定 43002。shell env から参照）    |
+
+ひな形は `apps/admin-web/.env.example`（Vite が `.env.local` を自動で読む。`ADMIN_WEB_PORT` のみ shell env）。
 
 ## DB スキーマ（`dsl-tidb/schema/` に追加）
 
@@ -170,7 +183,7 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 1. `/login` ページの自前フォーム → `amazon-cognito-identity-js` の `CognitoUser.authenticateUser`（USER_SRP_AUTH。パスワードは平文送信されない）
 2. 取得した access / id / refresh token を `POST /api/auth/login` へ渡す。backend が jose で検証 → セッションレコード（トークン一式 + 有効期限）を `admin_sessions` に保存し、`{ sid }` を seal（`iron-webcrypto`）した値を**暗号化 HttpOnly Cookie** で返す。ブラウザ側の storage にトークンは保持しない
 3. 以降の API 呼び出しは Cookie の自動送信のみ。ミドルウェアが Cookie を unseal → `admin_sessions` からトークンを引き、access token を jose で検証。失効間近ならサーバ側で refresh token により更新しレコードを上書き。unseal 失敗・レコード無し・refresh 失敗は 401 → `/login` へ
-4. FE ガード: TanStack Router の `beforeLoad` で `GET /api/me` を確認
+4. FE ガード: `AuthGuard` コンポーネント（`GET /api/me` の session query。失敗時は `/login` へ置き換え遷移）。参照実装の流儀に合わせ `beforeLoad` ではなくコンポーネントラップ方式
 5. ログアウト: `POST /api/auth/logout` → セッションレコード削除 + Cognito `RevokeToken` + Cookie 削除
 6. CSRF: `SameSite=Lax` により cross-site の変更系リクエストには Cookie が送られない。保険として Origin allowlist + `X-Requested-With` 必須の簡易チェックを入れる
 
@@ -291,15 +304,38 @@ kill %1
 
 ### フェーズ 2: apps/admin-web（管理画面 SPA）
 
-- [ ] 雛形作成（Vite + React 19 + `@tanstack/router-plugin` + Tailwind CSS 4）、FSD ディレクトリ + steiger
-- [ ] shadcn/ui 初期化（`shared/ui/`）
-- [ ] `shared/api/`: `hc<AppType>`（workspace type import）+ fetch ラッパ（same-origin Cookie 送信 + `X-Requested-With` 付与、401 時 `/login` へ）
-- [ ] `features/auth/`: SRP ログインフォーム（`amazon-cognito-identity-js`）→ `POST /api/auth/login` で Cookie セッション確立、auth guard（`beforeLoad` で `/api/me`）、ログアウト
-- [ ] `entities/moment/`: モデル + TanStack Query の API 呼び出し
-- [ ] pages: `/login` / `/moments`（draft 含む一覧 + 公開 / 削除）/ `/moments/new`（TanStack Form + zod、180 字カウンタ、fastener / 色選択、draft / published 切替、プレビュー = apps/web の `/moments/preview` を新規タブで開く）
-- [ ] 画像圧縮（`createImageBitmap` + canvas → WebP。orig 長辺 1440px + thumb 長辺 640px の 2 サイズ）→ presign → S3 PUT ×2 の一連フロー
-- [ ] `vite.config.ts` の dev proxy（`/api` → `http://localhost:3001`）でローカル E2E（Cognito はフェーズ 3 の dev pool 構築後に接続）
-- [ ] `bun run check`（lint / spell / type-check）グリーン
+- [x] 雛形作成（Vite + React 19 + `@tanstack/router-plugin` + Tailwind CSS 4）、FSD ディレクトリ + steiger。
+- [x] shadcn/ui（`base-nova` スタイル = Base UI 版）を `shared/ui/` に配置。components.json を設置し、コンポーネントは参照プロジェクトから必要分（button / button-link / input / textarea / label / badge / card / skeleton）を移植
+- [x] `shared/api/`: `hc<AppType>`（workspace type import。admin-backend 側に `exports: "./src/app.ts"` を追加）。fetch ラッパは作らず `hc` の init に集約（Cookie 同送 + `X-Requested-With` 常時付与）。401 対応は `AuthGuard` が担う
+- [x] `features/auth/`: SRP ログインフォーム（`amazon-cognito-identity-js`。インメモリ storage を渡して localStorage にトークンを残さない）→ `POST /api/auth/login` で Cookie セッション確立、`AuthGuard`（`/api/me`。beforeLoad ではなくコンポーネントラップ方式）、ログアウト
+- [x] `entities/moment/`: RPC レスポンスから型導出（`InferResponseType`）+ TanStack Query（一覧は `infiniteQueryOptions` の cursor ページング）
+- [x] pages: `/login` / `/moments`（draft 含む一覧 + 公開 / 削除）/ `/moments/new`（TanStack Form + zod、180 字カウンタ、fastener トグル / テープ 4 色スウォッチ、draft / published 切替、プレビュー = apps/web の `/moments/preview` を新規タブで開く）
+- [x] 画像圧縮（`createImageBitmap`（EXIF 回転を反映）+ canvas → WebP。orig 長辺 1440px + thumb 長辺 640px の 2 サイズ）→ presign → S3 PUT ×2。プレビューと投稿で同一ファイルのアップロードは 1 回に抑制
+- [x] `vite.config.ts` の dev proxy（`/api` → `http://localhost:${ADMIN_API_PORT}`。prefix は剥がさない）+ dev ポート `ADMIN_WEB_PORT`（既定 43002）
+- [ ] ローカル E2E（root の `bun dev` で admin-web + admin-backend を起動。Cognito 実接続はフェーズ 3 の dev pool 構築後で、それまでは backend 側 `DEV_AUTH_BYPASS=1` で確認）
+- [x] lint / spell / type-check / steiger グリーン（root の `bun run lint` 一式通過）
+
+実行したコマンド（リポジトリルートから）:
+
+```bash
+# 依存導入
+cd apps/admin-web
+bun add react react-dom @tanstack/react-router @tanstack/react-query @tanstack/react-form \
+  zod hono amazon-cognito-identity-js @base-ui/react class-variance-authority clsx \
+  tailwind-merge tw-animate-css shadcn @fontsource-variable/geist
+bun add -d vite @vitejs/plugin-react @tanstack/router-plugin @tailwindcss/vite tailwindcss \
+  steiger @feature-sliced/steiger-plugin @types/react @types/react-dom
+
+# routeTree.gen.ts の生成込みでビルド → 型 → FSD 検査
+bunx vite build
+bun run type-check
+bunx steiger src
+cd ../..
+
+# 整形と全体チェック
+bunx vp fmt apps/admin-web apps/admin-backend
+bun run lint
+```
 
 ### フェーズ 3: iac/aws + デプロイ
 

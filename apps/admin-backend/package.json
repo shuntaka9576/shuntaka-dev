@@ -2,6 +2,9 @@
   "name": "@shuntaka-dev/admin-backend",
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/dev.ts",
     "build": "node build.mjs",
