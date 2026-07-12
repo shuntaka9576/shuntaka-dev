@@ -22,6 +22,12 @@ relations:
     parentTable: users
     parentColumns:
       - user_id
+  - table: moments
+    columns:
+      - user_id
+    parentTable: users
+    parentColumns:
+      - user_id
   - table: articles_tags
     columns:
       - article_id

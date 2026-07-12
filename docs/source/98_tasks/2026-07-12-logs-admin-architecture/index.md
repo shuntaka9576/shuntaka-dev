@@ -86,9 +86,9 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 ## DB スキーマ（`dsl-tidb/schema/` に追加）
 
 ```sql
-CREATE TABLE `${SCHEMA}`.`moments` (
-  `moment_id`      VARCHAR(26)  NOT NULL,               -- ULID
-  `user_id`        VARCHAR(36)  NOT NULL,
+CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`moments` (
+  `moment_id`      CHAR(26)     NOT NULL,               -- ULID (固定 26 文字)
+  `user_id`        CHAR(36)     NOT NULL,               -- users.user_id (CHAR(36)) に合わせる
   `text`           VARCHAR(180) NOT NULL,
   `image_key`      VARCHAR(255) NOT NULL,               -- orig の key。thumb は _thumb サフィックスで導出
   `fastener`       ENUM('clip','tape') NOT NULL DEFAULT 'clip',
@@ -105,7 +105,7 @@ CREATE TABLE `${SCHEMA}`.`moments` (
 セッション実体（Cognito トークン一式）は Cookie ではなく DB に置く（Cookie 4KB 上限対策 + 失効管理のため）。
 
 ```sql
-CREATE TABLE `${SCHEMA}`.`admin_sessions` (
+CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`admin_sessions` (
   `sid`           VARCHAR(64) NOT NULL,
   `access_token`  TEXT        NOT NULL,
   `id_token`      TEXT        NOT NULL,
@@ -172,9 +172,18 @@ Cookie の属性（`hono/cookie` の `setCookie` / `getCookie` / `deleteCookie` 
 
 ### フェーズ 0: DB スキーマ
 
-- [ ] `tools/dsql-cli/dsl-tidb/schema/07_moments.sql` / `08_admin_sessions.sql` を追加（本ドキュメントの DDL）
-- [ ] `load.sh` で `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.moments` で確認
-- [ ] `docs/.tbls.yaml` に `moments.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/moments.md` 生成）
+- [x] `tools/dsql-cli/dsl-tidb/schema/07_moments.sql` / `08_admin_sessions.sql` を追加（本ドキュメントの DDL）
+- [x] 新規 2 ファイルを `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.moments` / `blog_dev.admin_sessions` で確認。既存 DB では `04_articles.sql` の ALTER TABLE が非冪等で `load.sh` 全実行が途中で失敗するため、新規ファイルのみを同じ流儀で個別適用した（ゼロから構築する場合は従来どおり `load.sh`）
+
+  ```bash
+  cd tools/dsql-cli/dsl-tidb
+  TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+  for f in schema/07_moments.sql schema/08_admin_sessions.sql; do
+    sed 's|${SCHEMA}|blog_dev|g' "$f" | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
+  done
+  ```
+
+- [x] `docs/.tbls.yaml` に `moments.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/moments.md` / `05_db/admin_sessions.md` 生成）
 
 ### フェーズ 1: apps/admin-backend（Hono API）
 

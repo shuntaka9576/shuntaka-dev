@@ -10,7 +10,7 @@ CREATE TABLE `users` (
   `user_id` char(36) NOT NULL DEFAULT (uuid()),
   `name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
-  `github_installation_id` bigint(20) DEFAULT NULL,
+  `github_installation_id` bigint DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`user_id`) /*T![clustered_index] CLUSTERED */,
@@ -24,14 +24,14 @@ CREATE TABLE `users` (
 
 ## Columns
 
-| Name                   | Type         | Default              | Nullable | Extra Definition  | Children                                                            | Parents | Comment |
-| ---------------------- | ------------ | -------------------- | -------- | ----------------- | ------------------------------------------------------------------- | ------- | ------- |
-| user_id                | char(36)     | uuid()               | false    | DEFAULT_GENERATED | [articles](articles.md) [tag_article_counts](tag_article_counts.md) |         |         |
-| name                   | varchar(255) |                      | false    |                   |                                                                     |         |         |
-| email                  | varchar(255) |                      | false    |                   |                                                                     |         |         |
-| github_installation_id | bigint(20)   |                      | true     |                   |                                                                     |         |         |
-| created_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                     |         |         |
-| updated_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                     |         |         |
+| Name                   | Type         | Default              | Nullable | Extra Definition  | Children                                                                                  | Parents | Comment |
+| ---------------------- | ------------ | -------------------- | -------- | ----------------- | ----------------------------------------------------------------------------------------- | ------- | ------- |
+| user_id                | char(36)     | uuid()               | false    | DEFAULT_GENERATED | [articles](articles.md) [moments](moments.md) [tag_article_counts](tag_article_counts.md) |         |         |
+| name                   | varchar(255) |                      | false    |                   |                                                                                           |         |         |
+| email                  | varchar(255) |                      | false    |                   |                                                                                           |         |         |
+| github_installation_id | bigint       |                      | true     |                   |                                                                                           |         |         |
+| created_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                                           |         |         |
+| updated_at             | datetime(6)  | CURRENT_TIMESTAMP(6) | false    |                   |                                                                                           |         |         |
 
 ## Constraints
 
@@ -57,6 +57,7 @@ CREATE TABLE `users` (
 erDiagram
 
 "articles" }o--|| "users" : "Additional Relation"
+"moments" }o--|| "users" : "Additional Relation"
 "tag_article_counts" }o--|| "users" : "Additional Relation"
 
 "users" {
@@ -64,6 +65,10 @@ erDiagram
 }
 "articles" {
   char_36_ article_id PK
+  char_36_ user_id
+}
+"moments" {
+  char_26_ moment_id PK
   char_36_ user_id
 }
 "tag_article_counts" {
