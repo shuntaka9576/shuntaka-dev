@@ -174,6 +174,31 @@ lines.push(
   '    y-axis "KiB"',
   `    bar [${chartValues.map((v) => (v / 1024).toFixed(1)).join(', ')}]`,
   '```',
+);
+
+// treemap-beta は GitHub 側の Mermaid バージョン次第。未対応でもコードブロック表示に
+// 落ちるだけなので details に畳んで載せる
+if (splitAvailable) {
+  const treemapRoutes = routes.filter((route) => (pr.routeOnly.get(route) ?? 0) >= 102);
+  lines.push(
+    '',
+    '<details><summary>📐 Treemap (share of total unique JS, KiB)</summary>',
+    '',
+    '```mermaid',
+    'treemap-beta',
+    '"Total unique JS"',
+    `    "Shared (every route)": ${(pr.sharedBytes / 1024).toFixed(1)}`,
+    '    "Route-specific"',
+    ...treemapRoutes.map(
+      (route) => `        "${route}": ${((pr.routeOnly.get(route) ?? 0) / 1024).toFixed(1)}`,
+    ),
+    '```',
+    '',
+    '</details>',
+  );
+}
+
+lines.push(
   '',
   `> 🔴 ≥ +${formatKiB(ALERT_BYTES)} / 🟡 increased / 🟢 decreased / ⚪ within ±${formatKiB(NOISE_BYTES)}.`,
   "> Calculated from Turbopack's `route-bundle-stats.json` (uncompressed).",
