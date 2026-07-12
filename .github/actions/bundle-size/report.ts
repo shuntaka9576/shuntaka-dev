@@ -5,9 +5,12 @@
  * usage: bun .github/actions/bundle-size/report.ts <base-stats.json> <pr-stats.json>
  */
 
+import { dirname, join } from 'node:path';
+
 interface RouteStat {
   route: string;
   firstLoadUncompressedJsBytes: number;
+  firstLoadChunkPaths?: string[];
 }
 
 // 1 KiB 未満の変動はノイズとみなす。🔴 は明確なリグレッション検知用
@@ -29,6 +32,25 @@ function formatDiff(delta: number, baseBytes: number): string {
 async function loadStats(path: string): Promise<Map<string, number>> {
   const stats = (await Bun.file(path).json()) as RouteStat[];
   return new Map(stats.map((s) => [s.route, s.firstLoadUncompressedJsBytes]));
+}
+
+/**
+ * 全ルートのユニークな first-load チャンクの実ファイルサイズ合計。
+ * チャンクパスは ".next/static/chunks/..." 形式なので、stats JSON の位置
+ * (<root>/.next/diagnostics/route-bundle-stats.json) から <root> を逆算して解決する。
+ */
+async function totalUniqueChunkBytes(statsPath: string): Promise<number> {
+  const stats = (await Bun.file(statsPath).json()) as RouteStat[];
+  const root = join(dirname(statsPath), '..', '..');
+  const uniquePaths = new Set(stats.flatMap((s) => s.firstLoadChunkPaths ?? []));
+  let total = 0;
+  for (const chunkPath of uniquePaths) {
+    const file = Bun.file(join(root, chunkPath));
+    if (await file.exists()) {
+      total += file.size;
+    }
+  }
+  return total;
 }
 
 const [basePath, prPath] = process.argv.slice(2);
@@ -67,6 +89,25 @@ const rows = routes.map((route) => {
   const diff = Math.abs(delta) < NOISE_BYTES ? '—' : formatDiff(delta, baseBytes);
   return `| ${emoji} \`${route}\` | ${formatKiB(baseBytes)} | ${formatKiB(prBytes)} | ${diff} |`;
 });
+
+// 合計行: ルート間で共有されるチャンクを二重計上しないよう、ユニークなチャンク実ファイルの合計で出す
+const baseTotal = await totalUniqueChunkBytes(basePath);
+const prTotal = await totalUniqueChunkBytes(prPath);
+if (baseTotal > 0 && prTotal > 0) {
+  const delta = prTotal - baseTotal;
+  let emoji = '⚪';
+  if (delta >= ALERT_BYTES) {
+    emoji = '🔴';
+  } else if (delta >= NOISE_BYTES) {
+    emoji = '🟡';
+  } else if (delta <= -NOISE_BYTES) {
+    emoji = '🟢';
+  }
+  const diff = Math.abs(delta) < NOISE_BYTES ? '—' : formatDiff(delta, baseTotal);
+  rows.push(
+    `| ${emoji} **Total (unique chunks)** | **${formatKiB(baseTotal)}** | **${formatKiB(prTotal)}** | ${diff} |`,
+  );
+}
 
 // GitHub が Markdown 中の Mermaid をレンダリングするのを利用し、PR 側のサイズを棒グラフで可視化する
 const chartRoutes = routes.filter((route) => pr.has(route));
