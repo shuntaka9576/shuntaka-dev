@@ -168,22 +168,48 @@ Cookie の属性（`hono/cookie` の `setCookie` / `getCookie` / `deleteCookie` 
 
 ## 構築手順（チェックリスト）
 
-**進捗はこのチェックリストに同期する。** 1 ステップ完了ごとに `- [x]` に更新して commit に含める。手順や設計が変わった場合はチェックリストと本文の両方を直す。
+**進捗はこのチェックリストに同期する。** 1 ステップ完了ごとに `- [x]` に更新して commit に含める。手順や設計が変わった場合はチェックリストと本文の両方を直す。実行したコマンドは省略せず全量を各フェーズの「実行したコマンド」に記録する。
 
 ### フェーズ 0: DB スキーマ
 
 - [x] `tools/dsql-cli/dsl-tidb/schema/07_moments.sql` / `08_admin_sessions.sql` を追加（本ドキュメントの DDL）
-- [x] 新規 2 ファイルを `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.moments` / `blog_dev.admin_sessions` で確認。既存 DB では `04_articles.sql` の ALTER TABLE が非冪等で `load.sh` 全実行が途中で失敗するため、新規ファイルのみを同じ流儀で個別適用した（ゼロから構築する場合は従来どおり `load.sh`）
+- [x] 新規 2 ファイルを `blog_dev` へ適用し、`SHOW CREATE TABLE` で確認。既存 DB では `04_articles.sql` の ALTER TABLE が非冪等で `load.sh` 全実行が途中で失敗するため、新規ファイルのみを同じ流儀で個別適用した（ゼロから構築する場合は従来どおり `load.sh`）
+- [x] `docs/.tbls.yaml` に `moments.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/moments.md` / `05_db/admin_sessions.md` 生成）。生成物は prettier で整形してからコミットする（ルートの lint が `prettier --check '**/*.{json,yaml}'` で `schema.json` を検査するため必須。md の整形は必須ではないが既存スタイルに合わせる）
 
-  ```bash
-  cd tools/dsql-cli/dsl-tidb
-  TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
-  for f in schema/07_moments.sql schema/08_admin_sessions.sql; do
-    sed 's|${SCHEMA}|blog_dev|g' "$f" | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
-  done
-  ```
+実行したコマンド（リポジトリルートから。Tailscale ログイン済みが前提）:
 
-- [x] `docs/.tbls.yaml` に `moments.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/moments.md` / `05_db/admin_sessions.md` 生成）
+```bash
+# 接続確認
+TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+mysql -h "tidb.$TAILNET" -P 4000 -u root --connect-timeout=5 -N -B \
+  -e "SELECT VERSION(); SHOW TABLES FROM blog_dev;"
+
+# DDL 適用（新規 2 ファイルのみ。${SCHEMA} 置換は load.sh と同じ流儀）
+cd tools/dsql-cli/dsl-tidb
+for f in schema/07_moments.sql schema/08_admin_sessions.sql; do
+  sed 's|${SCHEMA}|blog_dev|g' "$f" | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
+done
+cd ../../..
+
+# 適用結果の確認
+mysql -h "tidb.$TAILNET" -P 4000 -u root \
+  -e "SHOW CREATE TABLE blog_dev.moments\G SHOW CREATE TABLE blog_dev.admin_sessions\G"
+
+# DB ドキュメント再生成（docs/.tbls.yaml へのリレーション追加後）
+cd docs && bun run doc-gen && cd ..
+
+# 生成物の整形（schema.json は lint 必須、md はスタイル合わせ）
+bunx prettier --write "docs/source/01_開発ドキュメント/05_db/schema.json" \
+  "docs/source/01_開発ドキュメント/05_db/"*.md
+
+# チェック
+bunx cspell --no-progress tools/dsql-cli/dsl-tidb/schema/07_moments.sql \
+  tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sql \
+  "docs/source/01_開発ドキュメント/05_db/moments.md" \
+  "docs/source/01_開発ドキュメント/05_db/admin_sessions.md" \
+  docs/.tbls.yaml
+bunx prettier --check docs/.tbls.yaml "docs/source/01_開発ドキュメント/05_db/schema.json"
+```
 
 ### フェーズ 1: apps/admin-backend（Hono API）
 
