@@ -7,6 +7,7 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-07-12 | [apps/web: フォント配信の最適化（HAR 分析: ウェイト削減 / 重複サブセット解消）](2026-07-12-web-font-delivery-optimization/index.md)                               |
 | 2026-07-12 | [apps/web: エラーフォールバック起因の First Load JS 削減（HashiBow 静的 SVG 化 + 記事ルート error.tsx 削除）](2026-07-12-web-error-fallback-bundle-size/index.md) |
 | 2026-07-11 | [リリースフロー刷新（preview 廃止 + tagpr CalVer + Vercel タグリリース）](2026-07-11-release-flow-tagpr-calver/index.md)                                          |
 | 2026-07-11 | [tech / note タブの posts 統合（type 概念の廃止 スコープ1）](2026-07-11-posts-tab-unification/index.md)                                                           |

@@ -29,20 +29,17 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### Typography
 
-- **本文 / 見出し:** [Gen Interface JP](https://gen.typesetting.jp/)（300 / 400 / 500 / 600 / 700 の 5 weight）。Inter（欧文）と Noto Sans JP（和文）を合成した OFL ライセンスの UI 書体で、欧文と和文を 1 ファミリーで賄う。jsDelivr CDN（`https://cdn.jsdelivr.net/npm/gen-interface-jp@<version>/{300,400,500,600,700}.css`）から読み込み、Google Fonts と同じ unicode-range サブセット化により必要な woff2 だけが動的にロードされる。CSS 上は `font-family: 'Gen Interface JP', …` として参照。
+- **本文 / 見出し:** [Gen Interface JP](https://gen.typesetting.jp/)（400 / 600 の 2 weight 配信）。Inter（欧文）と Noto Sans JP（和文）を合成した OFL ライセンスの UI 書体で、欧文と和文を 1 ファミリーで賄う。CSS は self-host（`public/fonts/gen-interface-jp/{400,600}.css`。woff2 の URL は jsDelivr CDN に書き換え済み）で、Google Fonts と同じ unicode-range サブセット化により必要な woff2 だけが動的にロードされる。CSS 上は `font-family: 'Gen Interface JP', …` として参照。配信ウェイトを 2 本に絞った経緯は `docs/source/98_tasks/2026-07-12-web-font-delivery-optimization` を参照（旧 5 weight 時代はフォントだけでページ転送量の 52% を占めていた）。
 - **Mono:** システムスタック（`ui-monospace, SFMono-Regular, …`）。
 - **スケール.** 9 段階の `--fs-display` / `--fs-h1` / `--fs-h2` / `--fs-h3` / `--fs-h4` / `--fs-body-lg` / `--fs-body` / `--fs-caption` / `--fs-code`。実値は `globals.css` と Storybook `Design System/Tokens` を参照。
-- **Weight ladder.** 5 段階のトークン `--fw-light` (300) / `--fw-regular` (400) / `--fw-medium` (500) / `--fw-semibold` (600) / `--fw-bold` (700)。要素ごとの割り当ては以下:
+- **Weight ladder.** 実配信は 400（text）/ 600（emphasis）の 2 段階。セマンティックトークンは 5 つのまま維持し、実値をどちらかに寄せている（`--fw-light` / `--fw-regular` → 400、`--fw-medium` / `--fw-semibold` / `--fw-bold` → 600。Tailwind の `font-*` クラスも `globals.css` の `@theme` で同じ値に上書き済み）。要素ごとの割り当ては以下:
 
-  | 要素                                                                                          | Weight                |
-  | --------------------------------------------------------------------------------------------- | --------------------- |
-  | body / `.prose p` / `.prose li` / `.prose blockquote` / `.prose code` / nav タブ / 一覧の日付 | 300 (`--fw-light`)    |
-  | `.prose h3`〜`.prose h6` / 一覧の記事タイトル                                                 | 400 (`--fw-regular`)  |
-  | `.prose h1`, `.prose h2` / Button                                                             | 500 (`--fw-medium`)   |
-  | `.link-card-title` / ロゴ「shuntaka.dev」                                                     | 600 (`--fw-semibold`) |
-  | `.article-title` / `strong`                                                                   | 700 (`--fw-bold`)     |
+  | 要素                                                                                                                               | Weight         |
+  | ---------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+  | body / `.prose p` / `.prose li` / `.prose blockquote` / `.prose code` / nav タブ / 一覧の日付 / `.prose h3`〜`h6` / 一覧のタイトル | 400 (text)     |
+  | `.prose h1`, `.prose h2` / Button / `.link-card-title` / ロゴ「shuntaka.dev」 / `.article-title` / `strong`                        | 600 (emphasis) |
 
-  body は Light で読み物寄り、見出しは 400–500 の細やかな段階で立ち上げる。最強調（700）は記事冒頭タイトルと `<strong>` のみで、見出しを含む他の要素は控えめに保つ。font-weight は数値リテラルではなく必ず `var(--fw-*)` または対応する Tailwind の `font-*` クラスで参照する。
+  ウェイトの段階は最小限に抑え、階層はサイズ（`--fs-*`）と色で立ち上げる。font-weight は数値リテラルではなく必ず `var(--fw-*)` または対応する Tailwind の `font-*` クラスで参照する（実値を 400/600 以外に増やさない）。
 
 - **行高.** 本文 `--lh-body`（読書体験のため大きめ）。見出し `--lh-heading`。リスト `--lh-list`。
 - **`em` と `px` を混ぜない.** タイポは `rem`、レイアウトは `px` またはレイアウトトークン。
@@ -159,7 +156,7 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ## 留意点
 
-- **フォント.** 本番は `apps/web/src/app/layout.tsx` の `<head>` に jsDelivr の `<link rel="stylesheet">` を 2 本（400 / 700）読み込ませている。書体名は `Gen Interface JP` で、`globals.css` の `body { font-family: 'Gen Interface JP', … }` から参照する。和文グリフの中身は Noto Sans JP（合成元）なので、CDN 障害時もシステムフォントスタックへフォールバックすれば見た目の劣化は最小限。
+- **フォント.** 本番は `apps/web/src/app/layout.tsx` の `<head>` に self-host の `<link rel="stylesheet">` を 2 本（`/fonts/gen-interface-jp/{400,600}.css`）読み込ませている。woff2 は CSS 内の URL 経由で jsDelivr CDN から取得（`preconnect` 維持）。書体名は `Gen Interface JP` で、`globals.css` の `body { font-family: 'Gen Interface JP', … }` から参照する。和文グリフの中身は Noto Sans JP（合成元）なので、CDN 障害時もシステムフォントスタックへフォールバックすれば見た目の劣化は最小限。
 - **Hiragino Sans (Figma) → Gen Interface JP（本番）.** Figma が macOS デフォルトの Hiragino Sans で表示するのは下書き確認用。本番は環境を問わず動く Gen Interface JP（和文は Noto Sans JP 合成）に統一する。
 - **Dark mode.** トークンは `<html>` の `[data-theme='dark']` で切り替わり、`ToggleSwitch` がそれを操作する。明示的な theme が保存されていないとき `prefers-color-scheme: dark` も尊重する。
 

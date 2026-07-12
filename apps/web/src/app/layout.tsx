@@ -9,9 +9,6 @@ import { NavigationProgressProvider } from '@/components/NavigationProgressProvi
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/constants';
 
-const GEN_INTERFACE_JP_VERSION = '0.1.7';
-const GEN_INTERFACE_JP_BASE = `https://cdn.jsdelivr.net/npm/gen-interface-jp@${GEN_INTERFACE_JP_VERSION}`;
-
 const OG_IMAGE_URL =
   'https://res.cloudinary.com/dkerzyk09/image/upload/v1767101809/blog/og/shuntaka.png';
 
@@ -69,12 +66,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_BOOT_SCRIPT }} />
       </head>
       <GoogleTagManager />
+      {/* フォント CSS は self-host (public/fonts/gen-interface-jp/)。woff2 は CSS 内の URL 経由で
+          jsDelivr CDN から取得するため preconnect は維持。配信ウェイトは 400/600 の 2 本
+          (経緯と再生成手順: docs/source/98_tasks/2026-07-12-web-font-delivery-optimization) */}
       <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/300.css`} precedence="default" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/400.css`} precedence="default" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/500.css`} precedence="default" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/600.css`} precedence="default" />
-      <link rel="stylesheet" href={`${GEN_INTERFACE_JP_BASE}/700.css`} precedence="default" />
+      <link rel="stylesheet" href="/fonts/gen-interface-jp/400.css" precedence="default" />
+      <link rel="stylesheet" href="/fonts/gen-interface-jp/600.css" precedence="default" />
       <body>
         <GoogleTagManagerNoscript />
         <ThemeProvider>
