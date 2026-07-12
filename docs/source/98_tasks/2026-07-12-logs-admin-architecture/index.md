@@ -1,24 +1,27 @@
-# logs 管理画面（admin.shuntaka.dev）のアーキテクチャ決定と実装計画
+# moments 管理画面（admin.shuntaka.dev）のアーキテクチャ決定と実装計画
 
 - 起票日: 2026-07-12
-- 関連: [logs 機能の構想と UI モック](../2026-07-12-logs-feature/index.md)
+- 関連: [moments（旧称 logs）機能の構想と UI モック](../2026-07-12-logs-feature/index.md)
 - ステータス: 計画（実装未着手）
 
 ## 決定事項
 
-logs の投稿用管理画面。Cloudflare Workers + R2 案は **廃案**（Workers custom domain に DNS ゾーン移管が必要なため）、オール AWS の CloudFront 構成に決定。
+moments（旧称 logs）の投稿用管理画面。Cloudflare Workers + R2 案は **廃案**（Workers custom domain に DNS ゾーン移管が必要なため）、オール AWS の CloudFront 構成に決定。
 
-| 論点        | 決定                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ドメイン    | prd: `admin.shuntaka.dev` / dev: `admin.shuntaka.tech`（`iac/aws/lib/config.ts` の fqdn に従い stage 単位）                                                                                                                                                                                                                                                                             |
-| 配信        | CloudFront 1 ディストリビューション。default → 管理画面 SPA（S3, OAC）/ `/api/*` → API Gateway HTTP API（→ VPC Lambda）/ `/images/*` → 画像 S3（OAC）                                                                                                                                                                                                                                   |
-| 管理画面 FE | React 19 + Vite + TanStack Router（file-based）/ Query / Form + zod + Tailwind CSS 4 + shadcn/ui + FSD 構成                                                                                                                                                                                                                                                                             |
-| API         | Hono（`@hono/zod-openapi` の `OpenAPIHono`）+ Hono RPC（`hc<AppType>` を workspace 型共有）+ `hono/aws-lambda`。Node.js 22 / ARM64 / esbuild バンドルの VPC Lambda                                                                                                                                                                                                                      |
-| TiDB 接続   | 既存 tidb-proxy VPC の private subnet に Lambda を配置し、`tidb-proxy.internal:13306` 経由で `blog_dev` / `blog_prd` に接続。外部 HTTPS は squid（3128）forward proxy 経由（blog-api と同じ SG パターン）                                                                                                                                                                               |
-| ORM         | **Kysely**（MySQL dialect + mysql2）。DDL は既存の `tools/dsql-cli/dsl-tidb/schema/`（`${SCHEMA}` 注入 + `load.sh`）流儀で管理し、Kysely はクエリビルダとして利用                                                                                                                                                                                                                       |
-| 認証        | Cognito User Pool + **USER_SRP_AUTH**（`amazon-cognito-identity-js`、SPA 内の自前ログインフォーム。Hosted UI は使わない）。トークンはブラウザに持たせず `POST /api/auth/login` で検証（`jose`）→ セッション実体は TiDB `admin_sessions` に保存し、**暗号化 HttpOnly Cookie**（本番 `__Host-session`, `Secure`, `SameSite=Lax`）にはセッション ID のみ格納。refresh はサーバ側で透過実行 |
-| OpenAPI     | `@hono/zod-openapi` の `createRoute` でスキーマ定義。`/openapi.json` + Scalar（`@scalar/hono-api-reference`）の `/doc` は **ローカル開発サーバ限定**                                                                                                                                                                                                                                    |
-| 画像        | クライアント側で圧縮（canvas → WebP）→ `/api` で presigned PUT URL 発行 → S3 へ直接 PUT → 配信は CloudFront `/images/*`（エッジキャッシュ）                                                                                                                                                                                                                                             |
+| 論点            | 決定                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 名称            | **moments**（旧称 logs から一新）。logs はシステムログ（tidb-proxy のログ分析基盤の Glue テーブル名も `logs`）と誤読されやすく、moments は WeChat Moments 等の先例があり英語圏にも直感的に伝わる。タブ / ルート / API パス / DB テーブル / コンポーネント名まで moments 系で統一する                                                                                                    |
+| ドメイン        | 管理画面 prd: `admin.shuntaka.dev` / dev: `admin.shuntaka.tech`、画像配信 prd: `images.shuntaka.dev` / dev: `images.shuntaka.tech`（いずれも `iac/aws/lib/config.ts` の fqdn に従い stage 単位。同一 CloudFront のエイリアス）                                                                                                                                                          |
+| 配信            | CloudFront 1 ディストリビューション（エイリアス: admin + images の 2 ドメイン）。default → 管理画面 SPA（S3, OAC）/ `/api/*` → API Gateway HTTP API（→ VPC Lambda）/ `/images/*` → 画像 S3（OAC）。default と `/api/*` は CF Function の Host チェックで admin 以外を 403（images ホストに管理画面・API を露出させない）                                                                |
+| 管理画面 FE     | React 19 + Vite + TanStack Router（file-based）/ Query / Form + zod + Tailwind CSS 4 + shadcn/ui + FSD 構成                                                                                                                                                                                                                                                                             |
+| API             | Hono（`@hono/zod-openapi` の `OpenAPIHono`）+ Hono RPC（`hc<AppType>` を workspace 型共有）+ `hono/aws-lambda`。Node.js 22 / ARM64 / esbuild バンドルの VPC Lambda                                                                                                                                                                                                                      |
+| TiDB 接続       | 既存 tidb-proxy VPC の private subnet に Lambda を配置し、`tidb-proxy.internal:13306` 経由で `blog_dev` / `blog_prd` に接続。外部 HTTPS は squid（3128）forward proxy 経由（blog-api と同じ SG パターン）                                                                                                                                                                               |
+| ORM             | **Kysely**（MySQL dialect + mysql2）。DDL は既存の `tools/dsql-cli/dsl-tidb/schema/`（`${SCHEMA}` 注入 + `load.sh`）流儀で管理し、Kysely はクエリビルダとして利用                                                                                                                                                                                                                       |
+| 認証            | Cognito User Pool + **USER_SRP_AUTH**（`amazon-cognito-identity-js`、SPA 内の自前ログインフォーム。Hosted UI は使わない）。トークンはブラウザに持たせず `POST /api/auth/login` で検証（`jose`）→ セッション実体は TiDB `admin_sessions` に保存し、**暗号化 HttpOnly Cookie**（本番 `__Host-session`, `Secure`, `SameSite=Lax`）にはセッション ID のみ格納。refresh はサーバ側で透過実行 |
+| OpenAPI         | `@hono/zod-openapi` の `createRoute` でスキーマ定義。`/openapi.json` + Scalar（`@scalar/hono-api-reference`）の `/doc` は **ローカル開発サーバ限定**                                                                                                                                                                                                                                    |
+| 画像            | クライアント側で圧縮（canvas → WebP。orig 長辺 1440px + 一覧用 thumb 長辺 640px の **2 サイズ**）→ `/api` で presigned PUT URL 発行 → S3 へ 2 本直接 PUT → 配信は `images.<fqdn>` の CloudFront `/images/*`（エッジキャッシュ）。DB には orig の `image_key` のみ保存（thumb は `_thumb` サフィックスで導出）し、URL は blog-api / admin が stage 設定から組み立てる                    |
+| draft / preview | `status`（published / draft）を初期から運用し、公開 API は published のみ返す。プレビューは apps/web の `/moments/preview`（query パラメータ駆動で `MomentCard` を 1 枚レンダリング、noindex）を admin から新規タブで開く。画像はアップロード済みの公開 URL、テキストは query で渡すため認証不要で本番同一の見た目を確認できる                                                          |
+| MFA             | Cognito MFA (TOTP) は初期は入れない（必要になったら後付け）                                                                                                                                                                                                                                                                                                                             |
 
 ## 構成図
 
@@ -26,19 +29,24 @@ logs の投稿用管理画面。Cloudflare Workers + R2 案は **廃案**（Work
 Browser (admin SPA)
   │ ① ログイン: Cognito USER_SRP_AUTH（public client）→ トークンを POST /api/auth/login へ
   │ ② API: 暗号化 HttpOnly セッション Cookie（__Host-session, SameSite=Lax）を自動送信
-  │ ③ 画像: presigned PUT で S3 直アップロード（アップロード前にクライアントで WebP 圧縮）
+  │ ③ 画像: presigned PUT で S3 直アップロード（クライアントで WebP 圧縮、orig / thumb の 2 サイズを 2 本 PUT）
   ▼
-CloudFront (admin.shuntaka.dev, ACM us-east-1)
-  ├─ default    → S3: admin SPA（OAC, CloudFront Function で SPA fallback）
+CloudFront ×1（エイリアス: admin.<fqdn> / images.<fqdn>、ACM us-east-1 は SAN で両ドメイン対応）
+  ├─ default    → S3: admin SPA（OAC）
   ├─ /api/*     → API Gateway HTTP API → Lambda
   │                 └ Hono + Kysely（VPC: tidb-proxy private subnet）
   │                     ├ tidb-proxy.internal:13306 →（Tailnet）→ TiDB blog_{stage}
   │                     └ squid :3128（外部 HTTPS が必要になった場合の forward proxy）
   └─ /images/*  → S3: images バケット（OAC, 長め TTL）
                      ▲ presigned PUT（クライアント直アップロード, CORS で admin オリジン許可）
+
+viewer-request の CloudFront Function（default と /api/* にアタッチ）:
+  Host が admin.<fqdn> 以外 → 403 / `/api/` 以下は素通し / それ以外は SPA fallback
 ```
 
-公開側（shuntaka.dev の logs タブ）は従来どおり blog-api（Rust, api.shuntaka.dev）から読む。画像 URL は `https://admin.shuntaka.dev/images/...` を返す（`<img>` 読み込みなので CORS 不要。公開コンテンツを admin ドメインで配ることに抵抗が出たら `images.shuntaka.dev` の別 A レコードを同 CloudFront に足すだけで分離可能）。
+画像の公開配信は `images.<fqdn>`（prd: `images.shuntaka.dev` / dev: `images.shuntaka.tech`）で行う。admin と同一 CloudFront のエイリアスだが、Host チェックにより images ホストで応答するのは `/images/*` のみ。
+
+公開側（shuntaka.dev の moments タブ）は従来どおり blog-api（Rust, api.shuntaka.dev）から読む。blog-api は DB の `image_key` と env `IMAGES_BASE_URL`（CDK が stage ごとに注入。prd: `https://images.shuntaka.dev` / dev: `https://images.shuntaka.tech`）から画像 URL を組み立てて返す。apps/web は `next/image` で表示するため `next.config.ts` の `images.remotePatterns` に images ドメインを追加する（optimizer がサーバサイドで fetch するので CORS は不要。CORS が必要なのはアップロードの PUT のみ）。admin SPA の一覧プレビューも同じ images URL を参照する。
 
 ## リポジトリ構成（追加分）
 
@@ -61,16 +69,16 @@ iac/aws/lib/
 
 Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしない。CF Function を減らすため）。
 
-| Method / Path              | 内容                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/login`     | SRP で得たトークンを検証してセッションを保存し、暗号化 HttpOnly Cookie を発行（認証不要の唯一のルート） |
-| `POST /api/auth/logout`    | セッション削除 + Cognito `RevokeToken` + Cookie 破棄                                                    |
-| `GET /api/me`              | セッション検証の疎通確認（FE の auth guard 用）                                                         |
-| `GET /api/logs`            | 一覧（cursor ページング: `published_at` + `log_id`）                                                    |
-| `POST /api/logs`           | 作成。`{ text(≤180), imageKey, fastener('clip'\|'tape'), fastenerColor?, publishedAt? }`                |
-| `PATCH /api/logs/:id`      | 更新                                                                                                    |
-| `DELETE /api/logs/:id`     | 削除                                                                                                    |
-| `POST /api/images/presign` | presigned PUT URL 発行。`{ contentType: 'image/webp', contentLength }` → `{ url, imageKey }`            |
+| Method / Path              | 内容                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`     | SRP で得たトークンを検証してセッションを保存し、暗号化 HttpOnly Cookie を発行（認証不要の唯一のルート）                                     |
+| `POST /api/auth/logout`    | セッション削除 + Cognito `RevokeToken` + Cookie 破棄                                                                                        |
+| `GET /api/me`              | セッション検証の疎通確認（FE の auth guard 用）                                                                                             |
+| `GET /api/moments`         | 一覧（draft 含む全 status。cursor ページング: `created_at` + `moment_id`。draft は `published_at` が NULL のため）                          |
+| `POST /api/moments`        | 作成。`{ text(≤180), imageKey, fastener('clip'\|'tape'), fastenerColor?, status('published'\|'draft'), publishedAt? }`                      |
+| `PATCH /api/moments/:id`   | 更新（draft → published の公開操作を含む。公開時に `published_at` 未指定なら現在時刻を設定）                                                |
+| `DELETE /api/moments/:id`  | 削除                                                                                                                                        |
+| `POST /api/images/presign` | presigned PUT URL を orig / thumb の 2 本発行。`{ contentType: 'image/webp', origLength, thumbLength }` → `{ imageKey, origUrl, thumbUrl }` |
 
 - バリデーションエラーは `OpenAPIHono` の `defaultHook` で 400 に統一
 - 認証ミドルウェア: セッション Cookie を unseal（sid）→ `admin_sessions` からトークンを取得し、access token を `jose` で検証（issuer / `token_use === 'access'` / `client_id`）。失効間近ならサーバ側で refresh してレコードを更新。加えて Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
@@ -78,19 +86,19 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 ## DB スキーマ（`dsl-tidb/schema/` に追加）
 
 ```sql
-CREATE TABLE `${SCHEMA}`.`logs` (
-  `log_id`         VARCHAR(26)  NOT NULL,               -- ULID
+CREATE TABLE `${SCHEMA}`.`moments` (
+  `moment_id`      VARCHAR(26)  NOT NULL,               -- ULID
   `user_id`        VARCHAR(36)  NOT NULL,
   `text`           VARCHAR(180) NOT NULL,
-  `image_key`      VARCHAR(255) NOT NULL,               -- images バケットの key
+  `image_key`      VARCHAR(255) NOT NULL,               -- orig の key。thumb は _thumb サフィックスで導出
   `fastener`       ENUM('clip','tape') NOT NULL DEFAULT 'clip',
   `fastener_color` ENUM('pink','blue','yellow','green') NULL,
   `status`         ENUM('published','draft') NOT NULL DEFAULT 'published',
-  `published_at`   DATETIME(6)  NULL,
+  `published_at`   DATETIME(6)  NULL,                   -- draft は NULL。公開時に設定
   `created_at`     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at`     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`log_id`),
-  KEY `idx_logs_feed` (`user_id`, `status`, `published_at`, `log_id`)
+  PRIMARY KEY (`moment_id`),
+  KEY `idx_moments_feed` (`user_id`, `status`, `published_at`, `moment_id`)
 );
 ```
 
@@ -116,22 +124,23 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 ## 画像アップロードフロー
 
 1. 管理画面（モバイル想定）で写真選択
-2. クライアントで圧縮: `createImageBitmap` + canvas で長辺 1440px / WebP q0.8 目安（正方形トリミングは閲覧側 `object-cover` に任せ、原比率のまま保存）
-3. `POST /api/images/presign` → `{ url, imageKey: 'images/logs/<ulid>.webp' }`
-4. S3 へ直接 PUT（バケット CORS で admin オリジンの PUT を許可、presign 時に contentLength 上限チェック）
-5. `POST /api/logs` に `imageKey` を渡して確定
-6. 配信は CloudFront `/images/*` → S3（OAC）。`Cache-Control: public, max-age=31536000, immutable`（key が ULID なので immutable でよい）
+2. クライアントで圧縮: `createImageBitmap` + canvas で orig（長辺 1440px / WebP q0.8 目安）と一覧用 thumb（長辺 640px）の 2 サイズを生成（正方形トリミングは閲覧側 `object-cover` に任せ、原比率のまま保存）
+3. `POST /api/images/presign` → `{ imageKey: 'images/moments/<ulid>.webp', origUrl, thumbUrl }`（thumb の key は `images/moments/<ulid>_thumb.webp` に固定導出）
+4. S3 へ 2 本直接 PUT（バケット CORS で admin オリジンの PUT を許可、presign 時に contentLength 上限チェック。両方成功してから次へ）
+5. `POST /api/moments` に `imageKey` と `status` を渡して確定
+6. 配信は `https://images.<fqdn>/images/moments/<ulid>.webp`（CloudFront `/images/*` → S3, OAC）。`Cache-Control: public, max-age=31536000, immutable`（key が ULID なので immutable でよい）。一覧は thumb（`<ulid>_thumb.webp`）、原寸表示は orig を参照。shuntaka.dev / admin のどちらから表示しても `<img>` タグ読み込み（apps/web は next/image optimizer のサーバサイド fetch）なので CORS 不要
 
 ## インフラ詳細（CDK）
 
-- **VirginiaCertificateStack**（us-east-1, 新設）: `admin.<fqdn>` の ACM 証明書 + SSM。CloudFront から参照（cross-region は SSM 経由 + `AwsCustomResource` 読み出しか `crossRegionReferences: true`）
+- **VirginiaCertificateStack**（us-east-1, 新設）: `admin.<fqdn>` + `images.<fqdn>` を SAN に持つ ACM 証明書 + SSM。CloudFront から参照（cross-region は SSM 経由 + `AwsCustomResource` 読み出しか `crossRegionReferences: true`）
 - **AdminStack**（ap-northeast-1, stage 単位 `{d,p}-st-admin`）
-  - Cognito User Pool: self sign-up 無効・管理者 1 ユーザー手動作成・app client は public（secret なし）+ `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`。MFA (TOTP) は任意で後付け
+  - Cognito User Pool: self sign-up 無効・管理者 1 ユーザー手動作成・app client は public（secret なし）+ `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`。MFA (TOTP) は初期は入れない（必要になったら後付け）
   - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、Cookie 暗号鍵のシークレット ID（Secrets Manager で 48 文字を自動生成し Lambda に `grantRead`）
   - API Gateway HTTP API（apigwv2）+ `HttpLambdaIntegration`（`{proxy+}` に ANY）。CloudFront `/api/*` behavior のオリジンに設定（キャッシュ無効 + `AllViewerExceptHostHeader`）
   - S3 ×2: SPA バケット（`BucketDeployment` で `apps/admin-web/dist` を投入）/ images バケット（CORS: admin オリジンの PUT）
-  - CloudFront: 上記 3 behavior + SPA fallback の CloudFront Function。`/api/*` はキャッシュ無効 + `AllViewerExceptHostHeader`
-  - Route53: `admin.<fqdn>` A エイリアス → CloudFront
+  - CloudFront: エイリアス `admin.<fqdn>` / `images.<fqdn>` の 2 ドメイン + 上記 3 behavior。viewer-request の CloudFront Function（default と `/api/*` にアタッチ）で Host チェック（admin 以外 403。`/api/` 以下は素通し、それ以外は SPA fallback）。`/api/*` はキャッシュ無効 + `AllViewerExceptHostHeader`
+  - Route53: `admin.<fqdn>` / `images.<fqdn>` の A エイリアス → 同一 CloudFront
+- 既存 main stack の blog-api Lambda に env `IMAGES_BASE_URL=https://images.<fqdn>` を追加（フェーズ 4 で moments API が `image_key` から画像 URL を組み立てるため）
 - GitHub Actions デプロイは既存 deploy-role（OIDC）に載せる
 
 ### 補足: Lambda Function URL + OAC 案の不採用
@@ -163,19 +172,19 @@ Cookie の属性（`hono/cookie` の `setCookie` / `getCookie` / `deleteCookie` 
 
 ### フェーズ 0: DB スキーマ
 
-- [ ] `tools/dsql-cli/dsl-tidb/schema/07_logs.sql` / `08_admin_sessions.sql` を追加（本ドキュメントの DDL）
-- [ ] `load.sh` で `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.logs` で確認
-- [ ] `docs/.tbls.yaml` に `logs.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/logs.md` 生成）
+- [ ] `tools/dsql-cli/dsl-tidb/schema/07_moments.sql` / `08_admin_sessions.sql` を追加（本ドキュメントの DDL）
+- [ ] `load.sh` で `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.moments` で確認
+- [ ] `docs/.tbls.yaml` に `moments.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/moments.md` 生成）
 
 ### フェーズ 1: apps/admin-backend（Hono API）
 
 - [ ] 雛形作成（package.json / tsconfig / turbo タスク配線: `dev` `build` `type-check` `test`）
 - [ ] 依存導入: `hono` `@hono/zod-openapi` `kysely` `mysql2` `jose` `iron-webcrypto`（Cookie の seal/unseal）`ulid` `@aws-sdk/client-s3` `@aws-sdk/s3-request-presigner` `@aws-sdk/client-cognito-identity-provider`（refresh / RevokeToken）`@aws-sdk/client-secrets-manager`（Cookie 暗号鍵）、dev: `@hono/node-server` `@scalar/hono-api-reference` `esbuild`
-- [ ] `src/db/`: Kysely セットアップ（`DATABASE_URL`、mysql2 pool）+ `types.ts`（logs / admin_sessions テーブルの手書き型）
+- [ ] `src/db/`: Kysely セットアップ（`DATABASE_URL`、mysql2 pool）+ `types.ts`（moments / admin_sessions テーブルの手書き型）
 - [ ] `src/auth/`: セッション Cookie（seal した sid のみ。本番 `__Host-session`、dev は env フラグで非 Secure に切替）の発行・復号 + `admin_sessions` ストア + jose による access token 検証ミドルウェア（issuer / `token_use` / `client_id`、失効間近のサーバ側 refresh + レコード更新）
 - [ ] `src/auth/`: Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
-- [ ] `src/schemas/`: zod スキーマ（`text` ≤ 180、fastener / fastenerColor の enum、cursor）
-- [ ] `src/routes/`: `auth`（login / logout）/ `me` / `logs`（GET 一覧 cursor・POST・PATCH・DELETE）/ `images`（presign）
+- [ ] `src/schemas/`: zod スキーマ（`text` ≤ 180、fastener / fastenerColor / status の enum、cursor）
+- [ ] `src/routes/`: `auth`（login / logout）/ `me` / `moments`（GET 一覧 draft 込み cursor・POST・PATCH（公開操作含む）・DELETE）/ `images`（presign。orig / thumb の 2 本発行）
 - [ ] `src/app.ts`: `basePath('/api')` + `defaultHook`（400 統一）+ `export type AppType`
 - [ ] `src/index.ts`: `hono/aws-lambda` の `handle` + esbuild バンドル（`build.mjs` → `dist/index.mjs`）
 - [ ] `src/dev.ts`: `@hono/node-server`（:3001）+ `/openapi.json` + Scalar `/doc`（dev 限定）
@@ -188,38 +197,58 @@ Cookie の属性（`hono/cookie` の `setCookie` / `getCookie` / `deleteCookie` 
 - [ ] shadcn/ui 初期化（`shared/ui/`）
 - [ ] `shared/api/`: `hc<AppType>`（workspace type import）+ fetch ラッパ（same-origin Cookie 送信 + `X-Requested-With` 付与、401 時 `/login` へ）
 - [ ] `features/auth/`: SRP ログインフォーム（`amazon-cognito-identity-js`）→ `POST /api/auth/login` で Cookie セッション確立、auth guard（`beforeLoad` で `/api/me`）、ログアウト
-- [ ] `entities/log/`: モデル + TanStack Query の API 呼び出し
-- [ ] pages: `/login` / `/logs`（一覧 + 削除）/ `/logs/new`（TanStack Form + zod、180 字カウンタ、fastener / 色選択）
-- [ ] 画像圧縮（`createImageBitmap` + canvas → WebP 長辺 1440px）→ presign → S3 PUT の一連フロー
+- [ ] `entities/moment/`: モデル + TanStack Query の API 呼び出し
+- [ ] pages: `/login` / `/moments`（draft 含む一覧 + 公開 / 削除）/ `/moments/new`（TanStack Form + zod、180 字カウンタ、fastener / 色選択、draft / published 切替、プレビュー = apps/web の `/moments/preview` を新規タブで開く）
+- [ ] 画像圧縮（`createImageBitmap` + canvas → WebP。orig 長辺 1440px + thumb 長辺 640px の 2 サイズ）→ presign → S3 PUT ×2 の一連フロー
 - [ ] `vite.config.ts` の dev proxy（`/api` → `http://localhost:3001`）でローカル E2E（Cognito はフェーズ 3 の dev pool 構築後に接続）
 - [ ] `bun run check`（lint / spell / type-check）グリーン
 
 ### フェーズ 3: iac/aws + デプロイ
 
-- [ ] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` 証明書 + SSM）
-- [ ] `lib/config.ts` に `domain.admin` と SSM パス（virginia cert / cognito 出力）を追加
+- [ ] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` + `images.<fqdn>` の SAN 証明書 + SSM）
+- [ ] `lib/config.ts` に `domain.admin` / `domain.images` と SSM パス（virginia cert / cognito 出力）を追加
 - [ ] `lib/admin/admin-stack.ts`: Cognito User Pool（self sign-up 無効）+ SRP 用 public client
 - [ ] 同: admin-backend Lambda（`NodejsFunction`、VPC = tidb-proxy の SSM import、SG egress 13306/3128）+ Cookie 暗号鍵の Secrets Manager シークレット（自動生成 + `grantRead`）
 - [ ] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
-- [ ] 同: S3 ×2（SPA / images + CORS）、CloudFront（3 behavior + SPA fallback CF Function + OAC）、Route53 A エイリアス
+- [ ] 同: S3 ×2（SPA / images + CORS）、CloudFront（エイリアス admin / images の 2 ドメイン + 3 behavior + Host チェック付き SPA fallback CF Function + OAC）、Route53 A エイリアス ×2
 - [ ] `bin/cdk.ts` 配線 + cdk-nag suppressions + `test/admin.test.ts`
 - [ ] dev デプロイ（admin.shuntaka.tech）→ `admin-create-user` で管理ユーザー作成
-- [ ] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映まで通し確認
+- [ ] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映 → `images.shuntaka.tech` での画像配信（+ images ホストで default / `/api/*` が 403 になること）まで通し確認
 - [ ] GitHub Actions（既存 deploy-role / OIDC）に admin-web ビルド + デプロイを組み込み
 - [ ] `blog_prd` へ DDL 適用 → prd デプロイ（admin.shuntaka.dev）で通し確認
 
-### フェーズ 4: 公開側（shuntaka.dev の logs タブ）
+### フェーズ 4: 公開側（shuntaka.dev の moments タブ）
 
-- [ ] blog-api（Rust）: `GET /users/{name}/logs`（cursor、published のみ）+ テスト
-- [ ] apps/web: `LogSummary` 型を `lib/api.ts` へ移設し `getLogs` 追加
-- [ ] apps/web: `/logs` ルート追加 + `BaseLayout` の `currentTab` union に `'logs'` を追加
-- [ ] `LogFeed` を実 API（cursor）に接続。画像 URL は admin ドメインの `/images/*`
-- [ ] `DESIGN.md` に logs の意図的例外（揺れアニメーション / 留め具の実物描写）を明記
+- [ ] apps/web: UI モックの `LogCard` / `LogFeed`（+ Story）を `MomentCard` / `MomentFeed` にリネーム
+- [ ] blog-api（Rust）: `GET /users/{name}/moments`（cursor、published のみ。`image_key` + env `IMAGES_BASE_URL` から `image_url` / `thumb_url` を組み立てて返す）+ テスト。iac 側で blog-api Lambda に env を追加
+- [ ] apps/web: `MomentSummary` 型を `lib/api.ts` へ移設し `getMoments` 追加
+- [ ] apps/web: `/moments` ルート追加 + `BaseLayout` の `currentTab` union に `'moments'` を追加
+- [ ] `MomentFeed` を実 API（cursor）に接続。一覧画像は `thumb_url` を使用（`next.config.ts` の `images.remotePatterns` に `images.shuntaka.dev` / `images.shuntaka.tech` を追加）
+- [ ] apps/web: `/moments/preview` ルート（query パラメータ img / text / fastener / color / date から `MomentCard` を 1 枚レンダリング。img は images ドメインのみ許可、noindex。admin のプレビューボタンから開く）
+- [ ] `DESIGN.md` に moments の意図的例外（揺れアニメーション / 留め具の実物描写）を明記
 - [ ] tagpr リリース
+
+## 料金見積り
+
+追加リソースの固定費は Secrets Manager（$0.40/月 × dev/prd の 2 シークレット）のみで、**合計 月 $1 未満**の見込み。
+
+- CloudFront / CloudFront Function: 無料枠（転送 1TB + 1,000 万リクエスト/月、Function 200 万実行/月）内
+- API Gateway HTTP API / Lambda (ARM64): 従量課金のみ。個人の管理操作 + ブログ閲覧規模では実質 $0
+- S3 ×2: orig + thumb で 1 投稿 ~0.3MB のため 1,000 投稿でも ~0.3GB ≒ $0.01/月
+- Cognito: 1 ユーザー（無料枠 10,000 MAU）で $0。ACM 証明書も無料
+- Route53: 既存 hosted zone に A レコード追加のみ（AWS リソースへのエイリアスクエリは無料）
+- VPC まわり: 既存 tidb-proxy（Fargate + squid）を流用するため増分なし。NAT Gateway は新設しない（Lambda からの AWS API 呼び出しも squid 経由）
+- 固定費をゼロにしたければ Cookie 暗号鍵を Secrets Manager から SSM Parameter Store の SecureString（standard パラメータは無料）へ置き換え可能。初期は CDK の自動生成 + rotation 余地を優先して Secrets Manager を採用
 
 ## 未決事項
 
-- 画像のサイズバリアント（一覧用サムネの縮小版を作るか。まずは 1 サイズで様子見）
-- Cognito MFA (TOTP) を初期から入れるか
-- `images.shuntaka.dev` への分離タイミング（公開画像を admin ドメインで配ることの是非）
-- logs の draft 運用（status を最初から使うか、published のみで始めるか）
+アーキテクチャ上の未決はなし。当初の論点はすべて決定済み（名称は moments へ一新 / 画像は orig + thumb の 2 サイズ / MFA は初期なし / 配信は `images.<fqdn>` を初期採用 / draft 運用あり + `/moments/preview` でプレビュー）。
+
+実装時に決める細目:
+
+- 投稿者 `user_id` の決め方（Cognito ログインユーザーと `users` レコードの対応。単一ユーザー運用のため env で固定 user_id を渡す想定）
+- `DELETE /api/moments/:id` で S3 の orig / thumb も削除するか。presign 後に投稿確定せず離脱した孤児画像の扱い（実害がほぼないため初期は放置。気になれば S3 ライフサイクルで対応）
+- SPA デプロイ時のキャッシュ戦略（`index.html` を no-cache にするか、`BucketDeployment` の distribution 連携で invalidation を打つか）
+- `published_at` のタイムゾーン運用（UTC 保存 + 表示時 JST 変換。既存 articles の慣例に合わせる）
+
+なお EXIF（GPS 位置情報含む）は canvas 再エンコードで自動的に除去されるため、モバイル写真の位置情報漏れは設計上ケアされている。
