@@ -8,6 +8,8 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     backgrounds: { disable: true },
+    // BaseLayout (ProgressLink) が useRouter / usePathname を使うため App Router をモックする
+    nextjs: { appDirectory: true },
   },
   decorators: [
     withThemeByDataAttribute({

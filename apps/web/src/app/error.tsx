@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@/components/Button';
-import { HashiBow } from '@/components/HashiBow';
+import { BaseLayout } from '@/components/BaseLayout';
+import { ErrorFallback } from '@/components/ErrorFallback';
 
 export default function GlobalError({
   error,
@@ -16,13 +16,8 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center">
-      <HashiBow width={139} height={159} className="mb-4" />
-      <h2 className="mb-4 text-xl font-bold">エラーが発生しました</h2>
-      <p className="mb-4 text-[var(--color-text-muted)]">{error.message}</p>
-      <Button variant="primary" onClick={() => reset()}>
-        再試行
-      </Button>
-    </div>
+    <BaseLayout>
+      <ErrorFallback onRetry={() => reset()} />
+    </BaseLayout>
   );
 }

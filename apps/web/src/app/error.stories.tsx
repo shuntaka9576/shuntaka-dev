@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import ArticleError from './[userName]/articles/[slug]/error';
 import GlobalError from './error';
 
+// 記事エラー ([userName]/articles/[slug]/error.tsx) も同じ ErrorFallback を描画するため、
+// ページ Story は BaseLayout との配線確認としてこの 1 本のみ。
+// 見た目の variant は Components/ErrorFallback を参照
 const meta = {
   title: 'Pages/Error',
   component: GlobalError,
@@ -19,13 +21,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Global: Story = {};
-
-export const Article: Story = {
-  render: (args) => <ArticleError {...args} />,
-  args: {
-    error: Object.assign(new Error('記事の取得中にエラーが発生しました'), {
-      digest: 'storybook',
-    }),
-  },
-};
+export const Default: Story = {};

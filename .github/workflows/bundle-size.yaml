@@ -1,0 +1,47 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'bun.lock'
+      - 'package.json'
+      - '.github/workflows/bundle-size.yaml'
+      - '.github/actions/bundle-size/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bundle-size:
+    name: Bundle Size
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout base
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+
+      - name: Setup node
+        uses: ./.github/actions/setup-node
+
+      - name: Bundle size report
+        uses: ./.github/actions/bundle-size
+        with:
+          github-token: ${{ github.token }}
+          pr-number: ${{ github.event.pull_request.number }}
