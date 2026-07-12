@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import GlobalError from './error';
 
-// 記事エラー ([userName]/articles/[slug]/error.tsx) も同じ ErrorFallback を描画するため、
+// 記事ルート専用の error.tsx は削除済みで、記事ページのエラーもこの root バウンダリが受ける。
 // ページ Story は BaseLayout との配線確認としてこの 1 本のみ。
 // 見た目の variant は Components/ErrorFallback を参照
 const meta = {
