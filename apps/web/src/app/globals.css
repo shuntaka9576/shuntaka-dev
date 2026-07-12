@@ -48,6 +48,13 @@
   --color-danger-bg: #eb6e9f36;
   --color-danger-border: #e4007f;
 
+  /* logs: マスキングテープの色（投稿ごとに管理画面で選ぶ想定）。半透明でテープの質感を出す */
+  --log-tape-plain: rgba(162, 177, 202, 0.35);
+  --log-tape-pink: rgba(240, 98, 146, 0.4);
+  --log-tape-blue: rgba(100, 181, 246, 0.4);
+  --log-tape-yellow: rgba(255, 213, 79, 0.45);
+  --log-tape-green: rgba(129, 199, 132, 0.4);
+
   /* Misc */
   --color-toggle-moon: #525457;
   --color-toggle-sun: #fff33f;
@@ -1172,4 +1179,84 @@ a:hover {
 .tweet-fallback:hover {
   color: var(--color-link-hover);
   border-color: var(--color-link-hover);
+}
+
+/* Log card (logs タブ): クリップに吊られたポラロイド風写真 */
+.log-photo {
+  --log-tilt: -2deg;
+  position: relative;
+  margin-top: 26px; /* クリップの飛び出し分 */
+  transform: rotate(var(--log-tilt));
+  transform-origin: 50% -8px; /* クリップのバネを支点に揺らす */
+}
+
+.log-photo--right {
+  --log-tilt: 1.5deg;
+}
+
+/* 留め具（クリップ / ピン / テープ）: 写真フレーム上辺の中央に重ねる */
+.log-fastener {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  color: var(--color-text-muted);
+}
+
+/* 木製クリップ（洗濯バサミの SVG、18x40）。バネより下の脚が写真の上辺を挟むように吊るす。
+   多色・落ち影は「UI サーフェスではなく実物の描写」としての意図的な例外。
+   バネ位置（viewBox y≈17）が .log-photo の transform-origin (-8px) と一致するよう top を決める */
+.log-clip {
+  top: -25px;
+}
+
+.log-tape {
+  top: -9px;
+  width: 56px;
+  height: 18px;
+  transform: translateX(-50%) rotate(-4deg);
+  background: var(--log-tape-plain);
+}
+
+.log-tape--pink {
+  background: var(--log-tape-pink);
+}
+
+.log-tape--blue {
+  background: var(--log-tape-blue);
+}
+
+.log-tape--yellow {
+  background: var(--log-tape-yellow);
+}
+
+.log-tape--green {
+  background: var(--log-tape-green);
+}
+
+.log-card:hover .log-photo {
+  animation: log-swing 1.6s var(--ease-out);
+}
+
+/* 風でふわっと揺れる程度の減衰振り子。派手にしない */
+@keyframes log-swing {
+  0%,
+  100% {
+    transform: rotate(var(--log-tilt));
+  }
+  30% {
+    transform: rotate(calc(var(--log-tilt) + 1.8deg));
+  }
+  60% {
+    transform: rotate(calc(var(--log-tilt) - 1deg));
+  }
+  82% {
+    transform: rotate(calc(var(--log-tilt) + 0.4deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-card:hover .log-photo {
+    animation: none;
+  }
 }

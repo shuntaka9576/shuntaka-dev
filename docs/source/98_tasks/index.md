@@ -7,6 +7,8 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-07-12 | [logs 管理画面（admin.shuntaka.dev）のアーキテクチャ決定と実装計画](2026-07-12-logs-admin-architecture/index.md)                                                  |
+| 2026-07-12 | [logs 機能（180字 + 写真必須の一文投稿）の構想と UI モック](2026-07-12-logs-feature/index.md)                                                                     |
 | 2026-07-12 | [apps/web: フォント配信の最適化（HAR 分析: ウェイト削減 / 重複サブセット解消）](2026-07-12-web-font-delivery-optimization/index.md)                               |
 | 2026-07-12 | [apps/web: エラーフォールバック起因の First Load JS 削減（HashiBow 静的 SVG 化 + 記事ルート error.tsx 削除）](2026-07-12-web-error-fallback-bundle-size/index.md) |
 | 2026-07-11 | [リリースフロー刷新（preview 廃止 + tagpr CalVer + Vercel タグリリース）](2026-07-11-release-flow-tagpr-calver/index.md)                                          |
