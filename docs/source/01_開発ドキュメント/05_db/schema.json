@@ -2,84 +2,6 @@
   "name": "blog_dev",
   "tables": [
     {
-      "name": "articles",
-      "type": "BASE TABLE",
-      "columns": [
-        {
-          "name": "article_id",
-          "type": "char(36)",
-          "nullable": false,
-          "default": "uuid()",
-          "extra_def": "DEFAULT_GENERATED"
-        },
-        { "name": "title", "type": "varchar(500)", "nullable": false },
-        { "name": "slug", "type": "varchar(255)", "nullable": false },
-        { "name": "user_id", "type": "char(36)", "nullable": false },
-        { "name": "content", "type": "longtext", "nullable": false },
-        { "name": "content_html", "type": "longtext", "nullable": true },
-        { "name": "thumbnail", "type": "text", "nullable": true },
-        { "name": "description", "type": "text", "nullable": false },
-        {
-          "name": "status",
-          "type": "varchar(20)",
-          "nullable": false,
-          "default": "draft",
-          "comment": "記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)"
-        },
-        { "name": "type", "type": "varchar(50)", "nullable": true },
-        { "name": "published_at", "type": "datetime(6)", "nullable": true },
-        {
-          "name": "created_at",
-          "type": "datetime(6)",
-          "nullable": false,
-          "default": "CURRENT_TIMESTAMP(6)"
-        },
-        {
-          "name": "updated_at",
-          "type": "datetime(6)",
-          "nullable": false,
-          "default": "CURRENT_TIMESTAMP(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_articles_user_status_type_published_at_id",
-          "def": "KEY idx_articles_user_status_type_published_at_id (user_id, status, type, published_at, article_id) USING BTREE",
-          "table": "articles",
-          "columns": ["user_id", "status", "type", "published_at", "article_id"]
-        },
-        {
-          "name": "PRIMARY",
-          "def": "PRIMARY KEY (article_id) USING BTREE",
-          "table": "articles",
-          "columns": ["article_id"]
-        },
-        {
-          "name": "uq_articles_slug",
-          "def": "UNIQUE KEY uq_articles_slug (slug) USING BTREE",
-          "table": "articles",
-          "columns": ["slug"]
-        }
-      ],
-      "constraints": [
-        {
-          "name": "PRIMARY",
-          "type": "PRIMARY KEY",
-          "def": "PRIMARY KEY (article_id)",
-          "table": "articles",
-          "columns": ["article_id"]
-        },
-        {
-          "name": "uq_articles_slug",
-          "type": "UNIQUE",
-          "def": "UNIQUE KEY uq_articles_slug (slug)",
-          "table": "articles",
-          "columns": ["slug"]
-        }
-      ],
-      "def": "CREATE TABLE `articles` (\n  `article_id` char(36) NOT NULL DEFAULT (uuid()),\n  `title` varchar(500) NOT NULL,\n  `slug` varchar(255) NOT NULL,\n  `user_id` char(36) NOT NULL,\n  `content` longtext NOT NULL,\n  `content_html` longtext DEFAULT NULL,\n  `thumbnail` text DEFAULT NULL,\n  `description` text NOT NULL,\n  `status` varchar(20) NOT NULL DEFAULT 'draft',\n  `type` varchar(50) DEFAULT NULL,\n  `published_at` datetime(6) DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`article_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_articles_slug` (`slug`),\n  KEY `idx_articles_user_status_type_published_at_id` (`user_id`,`status`,`type`,`published_at`,`article_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
-    },
-    {
       "name": "articles_tags",
       "type": "BASE TABLE",
       "columns": [
@@ -391,6 +313,84 @@
         }
       ],
       "def": "CREATE TABLE `admin_sessions` (\n  `sid` varchar(64) NOT NULL,\n  `access_token` text NOT NULL,\n  `id_token` text NOT NULL,\n  `refresh_token` text NOT NULL,\n  `expires_at` datetime(6) NOT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`sid`) /*T![clustered_index] CLUSTERED */\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+    },
+    {
+      "name": "articles",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "article_id",
+          "type": "char(36)",
+          "nullable": false,
+          "default": "uuid()",
+          "extra_def": "DEFAULT_GENERATED"
+        },
+        { "name": "title", "type": "varchar(500)", "nullable": false },
+        { "name": "slug", "type": "varchar(255)", "nullable": false },
+        { "name": "user_id", "type": "char(36)", "nullable": false },
+        { "name": "content", "type": "longtext", "nullable": false },
+        { "name": "content_html", "type": "longtext", "nullable": true },
+        { "name": "thumbnail", "type": "text", "nullable": true },
+        { "name": "description", "type": "text", "nullable": false },
+        {
+          "name": "status",
+          "type": "varchar(20)",
+          "nullable": false,
+          "default": "draft",
+          "comment": "記事のステータス: draft(下書き), review(レビュー待ち), scheduled(公開予約), published(公開済み), archived(アーカイブ済み)"
+        },
+        { "name": "type", "type": "varchar(50)", "nullable": true },
+        { "name": "published_at", "type": "datetime(6)", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)"
+        },
+        {
+          "name": "updated_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_articles_user_status_type_published_at_id",
+          "def": "KEY idx_articles_user_status_type_published_at_id (user_id, status, type, published_at, article_id) USING BTREE",
+          "table": "articles",
+          "columns": ["user_id", "status", "type", "published_at", "article_id"]
+        },
+        {
+          "name": "PRIMARY",
+          "def": "PRIMARY KEY (article_id) USING BTREE",
+          "table": "articles",
+          "columns": ["article_id"]
+        },
+        {
+          "name": "uq_articles_slug",
+          "def": "UNIQUE KEY uq_articles_slug (slug) USING BTREE",
+          "table": "articles",
+          "columns": ["slug"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PRIMARY",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (article_id)",
+          "table": "articles",
+          "columns": ["article_id"]
+        },
+        {
+          "name": "uq_articles_slug",
+          "type": "UNIQUE",
+          "def": "UNIQUE KEY uq_articles_slug (slug)",
+          "table": "articles",
+          "columns": ["slug"]
+        }
+      ],
+      "def": "CREATE TABLE `articles` (\n  `article_id` char(36) NOT NULL DEFAULT (uuid()),\n  `title` varchar(500) NOT NULL,\n  `slug` varchar(255) NOT NULL,\n  `user_id` char(36) NOT NULL,\n  `content` longtext NOT NULL,\n  `content_html` longtext DEFAULT NULL,\n  `thumbnail` text DEFAULT NULL,\n  `description` text NOT NULL,\n  `status` varchar(20) NOT NULL DEFAULT 'draft',\n  `type` varchar(50) DEFAULT NULL,\n  `published_at` datetime(6) DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`article_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_articles_slug` (`slug`),\n  KEY `idx_articles_user_status_type_published_at_id` (`user_id`,`status`,`type`,`published_at`,`article_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     }
   ],
   "relations": [
