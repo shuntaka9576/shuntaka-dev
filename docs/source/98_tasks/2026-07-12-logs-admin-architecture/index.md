@@ -131,15 +131,64 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 3. API 呼び出しは `Authorization: Bearer <access token>`。401 時は refresh token で `REFRESH_TOKEN_AUTH` → 再試行、失敗なら `/login` へ
 4. FE ガード: TanStack Router の `beforeLoad` で `GET /api/me` を確認（test-pj の auth-guard 相当）
 
-## 実装フェーズ
+## 構築手順（チェックリスト）
 
-| フェーズ | 内容                                                                                                                                                                                  | 検証                                                 |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 0        | `logs` DDL 追加（dsl-tidb/schema + load.sh で blog_dev へ適用）、docs の tbls 再生成                                                                                                  | `mysql` で DESC、`bun run doc-gen`                   |
-| 1        | `apps/admin-api`: Hono + Kysely + zod-openapi + jose。ローカルは Tailnet 直結の DATABASE_URL（blog-api の Makefile.toml と同じ流儀）で `@hono/node-server` 起動、Scalar `/doc` で確認 | `bun test` + Scalar から手動疎通                     |
-| 2        | `apps/admin`: Vite + TanStack + shadcn の SPA。ログイン（SRP）→ logs 一覧/作成/削除、画像圧縮 + presigned PUT                                                                         | Vite dev proxy でローカル E2E（Cognito は dev pool） |
-| 3        | `iac/aws`: VirginiaCertificateStack + AdminStack。dev（admin.shuntaka.tech）で通し確認 → prd                                                                                          | CloudFront 経由で SRP ログイン〜投稿まで             |
-| 4        | 公開側: blog-api（Rust）に `GET /users/{name}/logs`（cursor）追加、`apps/web` に `/logs` ルート + BaseLayout タブ + LogFeed 接続                                                      | Storybook モック → 実 API 置き換え                   |
+**進捗はこのチェックリストに同期する。** 1 ステップ完了ごとに `- [x]` に更新して commit に含める。手順や設計が変わった場合はチェックリストと本文の両方を直す。
+
+### フェーズ 0: DB スキーマ
+
+- [ ] `tools/dsql-cli/dsl-tidb/schema/07_logs.sql` を追加（本ドキュメントの DDL）
+- [ ] `load.sh` で `blog_dev` へ適用し、`SHOW CREATE TABLE blog_dev.logs` で確認
+- [ ] `docs/.tbls.yaml` に `logs.user_id → users` の仮想リレーションを追加し、`docs/` で `bun run doc-gen`（`05_db/logs.md` 生成）
+
+### フェーズ 1: apps/admin-backend（Hono API）
+
+- [ ] 雛形作成（package.json / tsconfig / turbo タスク配線: `dev` `build` `type-check` `test`）
+- [ ] 依存導入: `hono` `@hono/zod-openapi` `kysely` `mysql2` `jose` `ulid` `@aws-sdk/client-s3` `@aws-sdk/s3-request-presigner`、dev: `@hono/node-server` `@scalar/hono-api-reference` `esbuild`
+- [ ] `src/db/`: Kysely セットアップ（`DATABASE_URL`、mysql2 pool）+ `types.ts`（logs テーブルの手書き型）
+- [ ] `src/auth/`: Cognito access token 検証ミドルウェア（jose の `createRemoteJWKSet` + `jwtVerify`。issuer / `token_use` / `client_id` 検査）
+- [ ] `src/schemas/`: zod スキーマ（`text` ≤ 180、fastener / fastenerColor の enum、cursor）
+- [ ] `src/routes/`: `me` / `logs`（GET 一覧 cursor・POST・PATCH・DELETE）/ `images`（presign）
+- [ ] `src/app.ts`: `basePath('/api')` + `defaultHook`（400 統一）+ `export type AppType`
+- [ ] `src/index.ts`: `hono/aws-lambda` の `handle` + esbuild バンドル（`build.mjs` → `dist/index.mjs`）
+- [ ] `src/dev.ts`: `@hono/node-server`（:3001）+ `/openapi.json` + Scalar `/doc`（dev 限定）
+- [ ] unit テスト（バリデーション / cursor encode・decode）を `bun test` で
+- [ ] ローカル疎通: `DATABASE_URL=mysql://root@tidb.<tailnet>:4000/blog_dev` で起動し、Scalar から CRUD 一巡
+
+### フェーズ 2: apps/admin-web（管理画面 SPA）
+
+- [ ] 雛形作成（Vite + React 19 + `@tanstack/router-plugin` + Tailwind CSS 4）、FSD ディレクトリ + steiger
+- [ ] shadcn/ui 初期化（`shared/ui/`）
+- [ ] `shared/api/`: `hc<AppType>`（workspace type import）+ fetch ラッパ（`Authorization: Bearer` 付与、401 時 refresh → 再試行）
+- [ ] `features/auth/`: SRP ログインフォーム（`amazon-cognito-identity-js`）、トークン保持（メモリ + sessionStorage）、auth guard（`beforeLoad` で `/api/me`）
+- [ ] `entities/log/`: モデル + TanStack Query の API 呼び出し
+- [ ] pages: `/login` / `/logs`（一覧 + 削除）/ `/logs/new`（TanStack Form + zod、180 字カウンタ、fastener / 色選択）
+- [ ] 画像圧縮（`createImageBitmap` + canvas → WebP 長辺 1440px）→ presign → S3 PUT の一連フロー
+- [ ] `vite.config.ts` の dev proxy（`/api` → `http://localhost:3001`）でローカル E2E（Cognito はフェーズ 3 の dev pool 構築後に接続）
+- [ ] `bun run check`（lint / spell / type-check）グリーン
+
+### フェーズ 3: iac/aws + デプロイ
+
+- [ ] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` 証明書 + SSM）
+- [ ] `lib/config.ts` に `domain.admin` と SSM パス（virginia cert / cognito 出力）を追加
+- [ ] `lib/admin/admin-stack.ts`: Cognito User Pool（self sign-up 無効）+ SRP 用 public client
+- [ ] 同: admin-backend Lambda（`NodejsFunction`、VPC = tidb-proxy の SSM import、SG egress 13306/3128）
+- [ ] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
+- [ ] 同: S3 ×2（SPA / images + CORS）、CloudFront（3 behavior + SPA fallback CF Function + OAC）、Route53 A エイリアス
+- [ ] `bin/cdk.ts` 配線 + cdk-nag suppressions + `test/admin.test.ts`
+- [ ] dev デプロイ（admin.shuntaka.tech）→ `admin-create-user` で管理ユーザー作成
+- [ ] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映まで通し確認
+- [ ] GitHub Actions（既存 deploy-role / OIDC）に admin-web ビルド + デプロイを組み込み
+- [ ] `blog_prd` へ DDL 適用 → prd デプロイ（admin.shuntaka.dev）で通し確認
+
+### フェーズ 4: 公開側（shuntaka.dev の logs タブ）
+
+- [ ] blog-api（Rust）: `GET /users/{name}/logs`（cursor、published のみ）+ テスト
+- [ ] apps/web: `LogSummary` 型を `lib/api.ts` へ移設し `getLogs` 追加
+- [ ] apps/web: `/logs` ルート追加 + `BaseLayout` の `currentTab` union に `'logs'` を追加
+- [ ] `LogFeed` を実 API（cursor）に接続。画像 URL は admin ドメインの `/images/*`
+- [ ] `DESIGN.md` に logs の意図的例外（揺れアニメーション / 留め具の実物描写）を明記
+- [ ] tagpr リリース
 
 ## 未決事項
 
