@@ -63,7 +63,8 @@ iac/aws/lib/
 
 - パッケージ管理は本リポジトリの流儀（Bun workspaces + Turbo、Vite+ (oxlint/oxfmt)、cspell）に合わせる
 - `apps/admin-web` は `apps/admin-backend` を `workspace:*` で type-only import し、`hc<AppType>` で end-to-end 型共有
-- Vite dev proxy: `/api` → `http://localhost:3001`（本番は CloudFront が同じパス構造を再現）
+- Vite dev proxy: `/api` → `http://localhost:${ADMIN_API_PORT}`（本番は CloudFront が同じパス構造を再現）
+- `.config/wt.toml` に `ADMIN_API_PORT` / `ADMIN_WEB_PORT`（worktree ごとの hash_port）と post-remove の kill hook を追加済み。root の `bun run dev`（turbo dev）で admin-backend も起動する
 
 ## API 設計（初期エンドポイント）
 
@@ -74,7 +75,7 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 | `POST /api/auth/login`     | SRP で得たトークンを検証してセッションを保存し、暗号化 HttpOnly Cookie を発行（認証不要の唯一のルート）                                     |
 | `POST /api/auth/logout`    | セッション削除 + Cognito `RevokeToken` + Cookie 破棄                                                                                        |
 | `GET /api/me`              | セッション検証の疎通確認（FE の auth guard 用）                                                                                             |
-| `GET /api/moments`         | 一覧（draft 含む全 status。cursor ページング: `created_at` + `moment_id`。draft は `published_at` が NULL のため）                          |
+| `GET /api/moments`         | 一覧（draft 含む全 status、`moment_id` 降順）。cursor は `moment_id` 単独: ULID が時系列ソート可能なため並びが安定し、DATETIME(6) のマイクロ秒と JS Date のミリ秒の精度差による境界バグも避けられる                          |
 | `POST /api/moments`        | 作成。`{ text(≤180), imageKey, fastener('clip'\|'tape'), fastenerColor?, status('published'\|'draft'), publishedAt? }`                      |
 | `PATCH /api/moments/:id`   | 更新（draft → published の公開操作を含む。公開時に `published_at` 未指定なら現在時刻を設定）                                                |
 | `DELETE /api/moments/:id`  | 削除                                                                                                                                        |
@@ -82,6 +83,21 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 
 - バリデーションエラーは `OpenAPIHono` の `defaultHook` で 400 に統一
 - 認証ミドルウェア: セッション Cookie を unseal（sid）→ `admin_sessions` からトークンを取得し、access token を `jose` で検証（issuer / `token_use === 'access'` / `client_id`）。失効間近ならサーバ側で refresh してレコードを更新。加えて Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
+
+### 環境変数（admin-backend）
+
+| env                                          | 用途                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                               | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）              |
+| `ADMIN_USER_ID`                              | 投稿者の `users.user_id`（単一ユーザー運用のため固定値で渡す）                              |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | access token 検証（issuer / client_id）と refresh / RevokeToken                             |
+| `COOKIE_SECRET_ID`                           | Cookie 暗号鍵の Secrets Manager シークレット ID。ローカルは `COOKIE_SECRET` で直接渡せる    |
+| `IMAGES_BUCKET_NAME`                         | presign 対象の images バケット                                                              |
+| `IMAGES_BASE_URL`                            | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                   |
+| `ORIGIN_ALLOWLIST`                           | CSRF チェックの Origin 許可リスト（カンマ区切り）                                           |
+| `DEV_INSECURE_COOKIES`                       | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                       |
+| `DEV_AUTH_BYPASS`                            | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）             |
+| `ADMIN_API_PORT`                             | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001）   |
 
 ## DB スキーマ（`dsl-tidb/schema/` に追加）
 
@@ -135,7 +151,7 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 - **VirginiaCertificateStack**（us-east-1, 新設）: `admin.<fqdn>` + `images.<fqdn>` を SAN に持つ ACM 証明書 + SSM。CloudFront から参照（cross-region は SSM 経由 + `AwsCustomResource` 読み出しか `crossRegionReferences: true`）
 - **AdminStack**（ap-northeast-1, stage 単位 `{d,p}-st-admin`）
   - Cognito User Pool: self sign-up 無効・管理者 1 ユーザー手動作成・app client は public（secret なし）+ `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`。MFA (TOTP) は初期は入れない（必要になったら後付け）
-  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、Cookie 暗号鍵のシークレット ID（Secrets Manager で 48 文字を自動生成し Lambda に `grantRead`）
+  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、Cookie 暗号鍵のシークレット ID（Secrets Manager で 48 文字を自動生成し Lambda に `grantRead`）、`ADMIN_USER_ID` / `IMAGES_BUCKET_NAME` / `IMAGES_BASE_URL` / `ORIGIN_ALLOWLIST`（一覧は「環境変数（admin-backend）」を参照）
   - API Gateway HTTP API（apigwv2）+ `HttpLambdaIntegration`（`{proxy+}` に ANY）。CloudFront `/api/*` behavior のオリジンに設定（キャッシュ無効 + `AllViewerExceptHostHeader`）
   - S3 ×2: SPA バケット（`BucketDeployment` で `apps/admin-web/dist` を投入）/ images バケット（CORS: admin オリジンの PUT）
   - CloudFront: エイリアス `admin.<fqdn>` / `images.<fqdn>` の 2 ドメイン + 上記 3 behavior。viewer-request の CloudFront Function（default と `/api/*` にアタッチ）で Host チェック（admin 以外 403。`/api/` 以下は素通し、それ以外は SPA fallback）。`/api/*` はキャッシュ無効 + `AllViewerExceptHostHeader`
@@ -213,18 +229,65 @@ bunx prettier --check docs/.tbls.yaml "docs/source/01_開発ドキュメント/0
 
 ### フェーズ 1: apps/admin-backend（Hono API）
 
-- [ ] 雛形作成（package.json / tsconfig / turbo タスク配線: `dev` `build` `type-check` `test`）
-- [ ] 依存導入: `hono` `@hono/zod-openapi` `kysely` `mysql2` `jose` `iron-webcrypto`（Cookie の seal/unseal）`ulid` `@aws-sdk/client-s3` `@aws-sdk/s3-request-presigner` `@aws-sdk/client-cognito-identity-provider`（refresh / RevokeToken）`@aws-sdk/client-secrets-manager`（Cookie 暗号鍵）、dev: `@hono/node-server` `@scalar/hono-api-reference` `esbuild`
-- [ ] `src/db/`: Kysely セットアップ（`DATABASE_URL`、mysql2 pool）+ `types.ts`（moments / admin_sessions テーブルの手書き型）
-- [ ] `src/auth/`: セッション Cookie（seal した sid のみ。本番 `__Host-session`、dev は env フラグで非 Secure に切替）の発行・復号 + `admin_sessions` ストア + jose による access token 検証ミドルウェア（issuer / `token_use` / `client_id`、失効間近のサーバ側 refresh + レコード更新）
-- [ ] `src/auth/`: Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
-- [ ] `src/schemas/`: zod スキーマ（`text` ≤ 180、fastener / fastenerColor / status の enum、cursor）
-- [ ] `src/routes/`: `auth`（login / logout）/ `me` / `moments`（GET 一覧 draft 込み cursor・POST・PATCH（公開操作含む）・DELETE）/ `images`（presign。orig / thumb の 2 本発行）
-- [ ] `src/app.ts`: `basePath('/api')` + `defaultHook`（400 統一）+ `export type AppType`
-- [ ] `src/index.ts`: `hono/aws-lambda` の `handle` + esbuild バンドル（`build.mjs` → `dist/index.mjs`）
-- [ ] `src/dev.ts`: `@hono/node-server`（:3001）+ `/openapi.json` + Scalar `/doc`（dev 限定）
-- [ ] unit テスト（バリデーション / cursor encode・decode）を `bun test` で
-- [ ] ローカル疎通: `DATABASE_URL=mysql://root@tidb.<tailnet>:4000/blog_dev` で起動し、Scalar から CRUD 一巡
+- [x] 雛形作成（package.json / tsconfig / turbo タスク配線: `dev` `build` `type-check` `test`）
+- [x] 依存導入: `hono` `@hono/zod-openapi` `zod` `kysely` `mysql2` `jose` `iron-webcrypto`（Cookie の seal/unseal）`ulid` `@aws-sdk/client-s3` `@aws-sdk/s3-request-presigner` `@aws-sdk/client-cognito-identity-provider`（refresh / RevokeToken）`@aws-sdk/client-secrets-manager`（Cookie 暗号鍵）、dev: `@hono/node-server` `@scalar/hono-api-reference` `esbuild`
+- [x] `src/db/`: Kysely セットアップ（`DATABASE_URL`、mysql2 pool、`timezone: 'Z'`）+ `types.ts`（moments / admin_sessions テーブルの手書き型）
+- [x] `src/auth/`: セッション Cookie（seal した sid のみ。本番 `__Host-session`、dev は env フラグで非 Secure に切替）の発行・復号 + `admin_sessions` ストア + jose による access token 検証ミドルウェア（issuer / `token_use` / `client_id`、失効間近のサーバ側 refresh + レコード更新）
+- [x] `src/auth/`: Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
+- [x] `src/schemas/`: zod スキーマ（`text` ≤ 180、fastener / fastenerColor / status の enum、cursor、presign）
+- [x] `src/routes/`: `auth`（login / logout）/ `me` / `moments`（GET 一覧 draft 込み cursor・POST・PATCH（公開操作含む）・DELETE）/ `images`（presign。orig / thumb の 2 本発行）
+- [x] `src/app.ts`: `basePath('/api')` + `defaultHook`（400 統一）+ `export type AppType`。エラーは `HTTPException` → `onError` で JSON に統一
+- [x] `src/index.ts`: `hono/aws-lambda` の `handle` + esbuild バンドル（`build.mjs` → `dist/index.mjs`、約 2.2MB）
+- [x] `src/dev.ts`: `@hono/node-server`（`ADMIN_API_PORT`、既定 43001）+ `/api/openapi.json` + Scalar `/api/doc`（dev 限定。basePath 配下に生えるため実パスは `/api` 付き。素の `/` は `/api/doc` へリダイレクト）
+- [x] unit テスト（バリデーション / cursor encode・decode）を `bun test` で
+- [x] ローカル疎通: `blog_dev` 直結 + `DEV_AUTH_BYPASS=1`（Cognito はフェーズ 3 で構築のため）で起動し、Scalar 表示 + curl で draft 作成 → 公開 → 一覧 → presign → 削除 → 404 / 400 系まで一巡
+
+実行したコマンド（リポジトリルートから）:
+
+```bash
+# 依存導入
+cd apps/admin-backend
+bun add hono @hono/zod-openapi zod kysely mysql2 jose iron-webcrypto ulid \
+  @aws-sdk/client-s3 @aws-sdk/s3-request-presigner \
+  @aws-sdk/client-cognito-identity-provider @aws-sdk/client-secrets-manager
+bun add -d @hono/node-server @scalar/hono-api-reference esbuild
+
+# チェック
+bun run type-check && bun test src/ && bun run build
+cd ../..
+bunx vp fmt apps/admin-backend && bunx vp lint apps/admin-backend --deny-warnings
+bun run spell-check
+
+# ローカル疎通。Tailscale ログイン済み + AWS 認証を通したシェルで実行する
+# (presign の署名に AWS 資格情報を使う)
+TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+
+export DEV_AUTH_BYPASS=1
+export DEV_INSECURE_COOKIES=1
+export DATABASE_URL="mysql://root@tidb.$TAILNET:4000/blog_dev"
+export ADMIN_USER_ID=$(mysql -h "tidb.$TAILNET" -P 4000 -u root -N -B \
+  -e "SELECT user_id FROM blog_dev.users LIMIT 1;")
+export IMAGES_BASE_URL=https://images.shuntaka.tech
+# バケットはフェーズ 3 で作成するため、この時点では presign URL の生成のみ確認
+export IMAGES_BUCKET_NAME=dummy-images-bucket
+export ADMIN_API_PORT=43001
+
+# 起動はリポジトリルートから turbo 経由で行う（bun dev なら全 dev タスクごと起動する）
+bunx turbo dev --filter=@shuntaka-dev/admin-backend &
+
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:43001/api/doc         # 200
+MOMENT_ID=$(curl -s -X POST http://localhost:43001/api/moments -H 'content-type: application/json' \
+  -d '{"text":"疎通テスト","imageKey":"images/moments/01JZX3F4G5H6J7K8M9N0P1Q2R3.webp","fastener":"tape","fastenerColor":"pink","status":"draft"}' \
+  | jq -r '.momentId')
+echo "$MOMENT_ID"
+curl -s -X PATCH "http://localhost:43001/api/moments/$MOMENT_ID" \
+  -H 'content-type: application/json' -d '{"status":"published"}'               # publishedAt が現在時刻に
+curl -s 'http://localhost:43001/api/moments?limit=1'
+curl -s -X POST http://localhost:43001/api/images/presign -H 'content-type: application/json' \
+  -d '{"contentType":"image/webp","origLength":1000000,"thumbLength":100000}'   # orig / thumb の 2 URL
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "http://localhost:43001/api/moments/$MOMENT_ID"  # 204
+kill %1
+```
 
 ### フェーズ 2: apps/admin-web（管理画面 SPA）
 

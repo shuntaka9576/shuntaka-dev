@@ -9,6 +9,8 @@ NEXT_PUBLIC_SITE_URL=http://localhost:{{ ('web-' ~ branch) | hash_port }}
 NEXT_PUBLIC_API_URL=http://localhost:{{ ('api-' ~ branch) | hash_port }}
 PORT={{ ('api-' ~ branch) | hash_port }}
 DOCS_PORT={{ ('docs-' ~ branch) | hash_port }}
+ADMIN_API_PORT={{ ('admin-api-' ~ branch) | hash_port }}
+ADMIN_WEB_PORT={{ ('admin-web-' ~ branch) | hash_port }}
 ENVEOF
 """
 envrc = """
@@ -24,6 +26,8 @@ install = "bun install"
 [post-remove]
 kill-web = "lsof -ti :{{ ('web-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
 kill-api = "lsof -ti :{{ ('api-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+kill-admin-api = "lsof -ti :{{ ('admin-api-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+kill-admin-web = "lsof -ti :{{ ('admin-web-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
 
 [list]
 url = "http://localhost:{{ ('web-' ~ branch) | hash_port }}"
