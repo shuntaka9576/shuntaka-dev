@@ -14,7 +14,9 @@ export const client = hc<AppType>('/', {
   init: {
     // セッション Cookie (HttpOnly) を同送する
     credentials: 'same-origin',
-    // 変更系リクエストはバックエンドの CSRF チェックで X-Requested-With が必須
-    headers: { 'x-requested-with': 'XMLHttpRequest' },
   },
+  // 変更系リクエストはバックエンドの CSRF チェックで X-Requested-With が必須。
+  // init.headers に書くと fetch init が最後に spread され、hono/client が付与する
+  // Content-Type: application/json ごと上書きして消えるため headers オプションで渡す
+  headers: { 'x-requested-with': 'XMLHttpRequest' },
 });

@@ -49,7 +49,10 @@ export const authRoutes = createRouter()
     try {
       const payload = await verifyAccessToken(accessToken);
       username = payload.username;
-    } catch {
+    } catch (err) {
+      // 401 は Lambda にとって正常応答でログが残らないため、失敗理由
+      // (署名/クレーム不一致、JWKS 取得失敗、body 欠落など) をここで出す
+      console.error('login: access token verification failed', err);
       throw new HTTPException(401, { message: 'invalid token' });
     }
     // ログインユーザーの user_id はここで一度だけ解決し、セッションレコードに保存する。

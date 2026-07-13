@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-12
 - 関連: [moments（旧称 logs）機能の構想と UI モック](../2026-07-12-logs-feature/index.md)
-- ステータス: フェーズ 0〜3 実装済み（フェーズ 3 はデプロイ未実施）。詳細は末尾の「経緯（実装ログ）」参照
+- ステータス: フェーズ 0〜3 実装済み。dev の通し確認まで完了（2026-07-13。SRP ログイン → 画像付き投稿 → TiDB 反映 → images 配信）。ログイン障害 2 件の修正（「トラブルシュート」参照）は**未コミット**。残りは prd デプロイとフェーズ 4。詳細は末尾の「経緯（実装ログ）」参照
 
 ## 決定事項
 
@@ -347,14 +347,16 @@ bun run lint
 - [x] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
 - [x] 同: S3 ×2（SPA / images + CORS。images は prd RETAIN、dev はローカル PUT 用に `http://localhost:*` も許可）、CloudFront（エイリアス admin / images の 2 ドメイン + 3 behavior + Host チェック付き SPA fallback CF Function + OAC、PRICE_CLASS_200）、Route53 A エイリアス ×2。SPA 資材は `BucketDeployment`（`apps/admin-web/dist` 不在時はこの stack のデプロイだけをブロック）
 - [x] `bin/cdk.ts` 配線（`{d,p}-st-virginia-cert` / `{d,p}-st-admin`）+ cdk-nag suppressions + `test/admin.test.ts`（NodejsFunction をモックした snapshot + nag 検証）。deploy-role に `cognito-idp:*` / `cloudfront:*` / `secretsmanager:*` を追加
-- [ ] dev デプロイ（admin.shuntaka.tech）→ `admin-create-user` で管理ユーザー作成
-- [ ] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映 → `images.shuntaka.tech` での画像配信（+ images ホストで default / `/api/*` が 403 になること）まで通し確認
+- [x] dev デプロイ（admin.shuntaka.tech）→ `admin-create-user` で管理ユーザー作成
+- [x] CloudFront 経由で SRP ログイン → 画像付き投稿 → TiDB 反映 → `images.shuntaka.tech` での画像配信（+ images ホストで default / `/api/*` が 403 になること）まで通し確認（2026-07-13。途中で踏んだ障害 2 件は「トラブルシュート」参照）
 - [x] GitHub Actions（既存 deploy-role / OIDC）に admin-web ビルド + デプロイを組み込み（`reusable-deploy.yaml` の admin ステップ: virginia-cert → SSM から Cognito 出力を読んで admin-web ビルド → admin。初回は Cognito 出力が無いまま SPA が焼かれるため、スタック適用後にもう一度 admin をデプロイする）
 - [ ] `blog_prd` へ DDL 適用 → prd デプロイ（admin.shuntaka.dev）で通し確認
 
 #### デプロイ手順
 
 AWS 認証を通したシェル（aws-vault 等）で実行する。CI（`reusable-deploy.yaml` の admin ステップ）も同じ順序。
+
+cdk コマンドは `iac/aws` で実行する（リポジトリルートだと `--app is required` で失敗する）。`cdk deploy d-st-admin` は依存スタック（`d-st-global-dns` / `d-st-virginia-cert`）を自動で含めるため、手順 1 を省いて 3 だけ実行しても依存分が先に適用される（初回 dev 適用はこの形で実施。所要 約20分、大半は CloudFront distribution の作成待ち）。
 
 ##### 初回のみ: us-east-1 の CDK bootstrap
 
@@ -404,11 +406,18 @@ aws cognito-idp admin-create-user \
   --user-pool-id "$POOL_ID" \
   --username shuntaka \
   --message-action SUPPRESS
+
+# パスワード（12 文字以上・大小英数記号）は対話入力で環境変数へ取り込む
+# （コマンドラインに直書きするとシェル履歴に残るため。bash / zsh 共通）
+printf 'Password: '
+read -rs ADMIN_PASSWORD
+echo
 aws cognito-idp admin-set-user-password \
   --user-pool-id "$POOL_ID" \
   --username shuntaka \
-  --password '<12 文字以上・大小英数記号>' \
+  --password "$ADMIN_PASSWORD" \
   --permanent
+unset ADMIN_PASSWORD
 ```
 
 ##### 通し確認
@@ -567,12 +576,41 @@ bun run lint
 - `turbo dev` は起動時のパッケージグラフで固定されるため、ワークスペース追加後は dev セッションの再起動が必要
 - root `.env.local` は Vercel CLI に上書きされ wt.toml のポート定義が消えることがある（TODO 管理中の未解決課題）
 - amazon-cognito-identity-js は `global` 参照するため index.html に `window.global = window` のシムを入れてある
-- 画像アップロードの S3 PUT はバケット未作成のため未確認（presign URL 発行までは確認済み）。dev スタックのデプロイで解消する
+- 画像アップロードの S3 PUT は presign URL 発行までは確認済み。dev スタック適用でバケットは作成済みのため、残る検証は通し確認（次のアクション 5.）で行う
+
+### トラブルシュート: dev ログインが失敗する（2026-07-13 解消）
+
+ログイン失敗の裏に独立した障害が 2 つ重なっていた。
+
+#### 1. `blog_dev.admin_sessions` テーブル欠落で 500
+
+- 事象: admin.shuntaka.tech で SRP ログイン後の `POST /api/auth/login` が 500 `{"error":"internal_error"}`（画面上は未ログインの 401 に見える）
+- 原因: `blog_dev.admin_sessions` が存在しなかった。user_id 列追加時の「DROP → 再作成」のうち再作成が実際には反映されておらず、ログイン時の `deleteExpiredSessions()` が `ER_NO_SUCH_TABLE` で落ちていた
+- 調査: `aws logs tail /aws/lambda/d-st-admin-api --since 10m --format short` で `Table 'blog_dev.admin_sessions' doesn't exist` の ERROR を確認
+- 解消: DDL を再適用
+
+```bash
+TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sql \
+  | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
+```
+
+- 補足: `/api` を curl 等で直接叩いて検証する場合、変更系リクエストは `X-Requested-With` ヘッダーが必須で、`Origin` は allowlist 内か不送信であること（満たさないと CSRF ガードが 403 `{"error":"forbidden"}` を返す）
+
+#### 2. SPA からのみログインが 401 `invalid token`（hc の init.headers が Content-Type を消す）
+
+- 事象: curl / スクリプトからの `POST /api/auth/login` は 204 で成功するのに、SPA からは常に 401 `{"error":"invalid token"}`。Lambda にエラーログは一切出ない（401 は Lambda にとって正常応答で、catch も例外を握りつぶしていた）
+- 原因: `apps/admin-web/src/shared/api/index.ts` が `hc()` に `init: { headers: {...} }` を渡していた。hono/client は `fetch(url, { body, method, headers, ...opt.init })` と **init を最後に spread** するため、`init.headers` が自動付与の `Content-Type: application/json` を丸ごと上書きして消す。Content-Type の無い body は zod-openapi のバリデータ対象外となり `c.req.valid('json')` が空 → `verifyAccessToken(undefined)` → jose の `ERR_JWS_INVALID`（Compact JWS must be a string or Uint8Array）→ 401
+- 修正:
+  - `x-requested-with` を `init.headers` から `hc()` の `headers` オプションへ移動（Content-Type 付与前にマージされる正しい位置）
+  - `routes/auth.ts` の catch に `console.error` を追加。以降この系統の障害は Lambda ログの `login: access token verification failed ...` で一発診断できる
 
 ### 次のアクション
 
 1. 未コミット分のコミット（フェーズ 2 + 3。ユーザー指示があってから）
-2. dev デプロイ: `aws-vault` 認証のシェルで `iac/aws` から `bunx cdk deploy d-st-virginia-cert -c stageName=dev` → admin-web を VITE\_\* 付きでビルド → `bunx cdk deploy d-st-admin -c stageName=dev`（CI の admin ステップと同じ手順）
-3. `admin-create-user`（username は `users.name` と同じ `shuntaka`）→ `admin-set-user-password --permanent`
-4. 通し確認（CloudFront 経由 SRP ログイン → 画像付き投稿 → TiDB 反映 → images.shuntaka.tech 配信 / images ホストの 403）。ローカルからも dev Cognito 実接続で確認可能（環境変数の節を参照）
-5. `blog_prd` へ DDL 適用 → prd デプロイ → フェーズ 4（公開側 moments タブ）
+2. ~~dev デプロイ~~ → **初回適用済み**（2026-07-13）。`iac/aws` から `bunx cdk deploy d-st-admin -c stageName=dev --require-approval never` の 1 コマンドで実施（依存の d-st-global-dns / d-st-virginia-cert も自動適用）。疎通確認済み: `https://admin.shuntaka.tech/` 200 / `/api/me` 401 / `https://images.shuntaka.tech/` 403
+3. ~~初回のみの再デプロイ（デプロイ手順の 4.）~~ → **実施済み**（配信中の SPA JS に実 Pool ID / Client ID の焼き込みを確認）
+4. ~~`admin-create-user`~~ → **実施済み**（UserStatus CONFIRMED。username は `users.name` と同じ `shuntaka`）
+5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（moment_id `01KXCC6Y801QG2CDDW6QQY37TH`、下書き）は不要になったら管理画面から削除
+6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-backend の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
+7. `blog_prd` へ DDL 適用 → prd デプロイ → フェーズ 4（公開側 moments タブ）
