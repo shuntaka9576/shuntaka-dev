@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0713.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.0...2026.0713.1) - 2026-07-13
+
+- feat: moments の日付指定と曜日表示、公開側の日付順ソートに対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/619
+
 ## [2026.0713.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0712.0...2026.0713.0) - 2026-07-13
 
 - feat: 公開側 moments タブ（フェーズ 4）と admin の編集・下書きに戻す by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/614
