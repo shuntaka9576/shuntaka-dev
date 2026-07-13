@@ -22,7 +22,8 @@ moments の表示日付はこれまで `published_at` で、管理画面の日�
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | captured_at       | `DATETIME(6) NOT NULL`。表示・ソートに使う。クライアントが EXIF (`DateTimeOriginal` → `CreateDate`) → ファイル更新日時 → 現在時刻の順で補完して送る                   |
 | published_at      | 初回公開時刻の記録として存続。published へ遷移した時点でサーバーが打刻し、draft に戻しても保持（articles と同じ挙動）。表示・ソートには使わない                       |
-| EXIF 解析         | admin-web に `exifr` を追加。EXIF はタイムゾーンを持たないため端末ローカル TZ で解釈（国内撮影 + JST 端末なら実時刻と一致）                                           |
+| EXIF 解析         | admin-web に `exifr` を追加。EXIF はタイムゾーンを持たないため Date に変換せず、壁時計の文字列 (`YYYY-MM-DDTHH:mm:ss`) のまま全レイヤーで扱う                         |
+| タイムゾーン      | TZ 変換を一切しない。DATETIME も TZ なし型なので壁時計をそのまま保存し、web も TZ 変換せず表示する。海外撮影でも撮影地の時刻がそのまま出る                            |
 | 撮影時刻の編集    | できない。写真を差し替えたときのみ再補完して送る。公開/下書きの切替では変わらない                                                                                     |
 | feed インデックス | `(user_id, status, published_at, moment_id)` → `(user_id, status, captured_at, moment_id)` に張り替え                                                                 |
 | 公開 API カーソル | `<captured_at unix micros>_<moment_id>` に変更。moment_id (ULID) は作成順で撮影順と一致しないため複合が必須。DATETIME(6) はマイクロ秒精度でカーソルと正確に往復できる |
@@ -45,14 +46,14 @@ moments の表示日付はこれまで `published_at` で、管理画面の日�
 
 ### apps/admin-api
 
-- `createMomentBodySchema`: `capturedAt` (ISO 8601) を必須化。`updateMomentBodySchema`: optional
+- `createMomentBodySchema`: `capturedAt` (TZ なしローカル日時) を必須化。`updateMomentBodySchema`: optional
 - POST: `captured_at` は body から、`published_at` は published なら現在時刻・draft なら NULL
 - PATCH: `captured_at` は body にあるときのみ更新。`published_at` は published 遷移時に未打刻なら現在時刻、**draft に戻してもワイプしない**（従来の `status === 'draft'` で NULL にするロジックを削除）
 - レスポンスに `capturedAt` を追加、`publishedAt` は nullable のまま存続
 
 ### apps/blog-api
 
-- `kernel`: `MomentSummary.published_at` → `captured_at`。`find_published_by_user_name` のカーソル引数を `Option<&str>` → `Option<(DateTime<Utc>, &str)>` に変更
+- `kernel`: `MomentSummary.published_at` → `captured_at` (`NaiveDateTime`)。`find_published_by_user_name` のカーソル引数を `Option<&str>` → `Option<(NaiveDateTime, &str)>` に変更
 - `adapter`: 一覧 SQL を `ORDER BY m.captured_at DESC, m.moment_id DESC` + `(m.captured_at, m.moment_id) < (?, ?)` に単純化（COALESCE と行サブクエリを廃止）
 - `api` handler: カーソルの parse/encode（`<micros>_<moment_id>`）を追加しユニットテストで往復を検証。レスポンス `publishedAt` → `capturedAt`
 
@@ -100,6 +101,6 @@ bun run type-check
 
 ## 注意点 / 残課題
 
-- **EXIF のタイムゾーン**: `DateTimeOriginal` は TZ 情報を持たないため端末ローカル TZ で解釈する。海外で撮った写真は端末 TZ とのずれ分だけ時刻がずれる（個人ブログ用途として許容）
+- **captured_at は絶対時刻ではない**: TZ を持たない壁時計のため「何時間前」のような相対表示や他タイムスタンプとの比較には使えない。表示とソート専用（同日内の順序は撮影地の時刻順）
 - **EXIF がない写真**（スクリーンショット、他アプリからの保存など）はファイル更新日時にフォールバックする。ダウンロード画像だと更新日時 = 保存日時になるので、フォームの取得元ラベル（EXIF / ファイル更新日時）で確認できる
 - 公開 API のカーソル形式変更は互換性を壊すが、カーソルは opaque な受け渡しのみで永続化していない。CDN キャッシュ（max-age=60）中の旧カーソルは 400 になるが、web 側は追加読み込み失敗を静かに打ち切る実装のため実害なし

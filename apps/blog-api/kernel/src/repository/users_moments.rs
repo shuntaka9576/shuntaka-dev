@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 
 use crate::model::moment::MomentSummary;
 
@@ -11,7 +11,7 @@ pub trait UsersMomentsRepository: Send + Sync {
     async fn find_published_by_user_name(
         &self,
         user_name: &str,
-        before: Option<(DateTime<Utc>, &str)>,
+        before: Option<(NaiveDateTime, &str)>,
         limit: u64,
     ) -> Result<Vec<MomentSummary>, anyhow::Error>;
 }

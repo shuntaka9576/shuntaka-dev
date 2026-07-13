@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use derive_new::new;
 use kernel::model::moment::MomentSummary;
 use kernel::repository::users_moments::UsersMomentsRepository;
@@ -15,7 +15,8 @@ struct MomentSummaryRow {
     image_key: String,
     fastener: String,
     fastener_color: Option<String>,
-    captured_at: DateTime<Utc>,
+    // TZ なしの撮影ローカル日時 (DATETIME をそのまま受ける)
+    captured_at: NaiveDateTime,
 }
 
 impl From<MomentSummaryRow> for MomentSummary {
@@ -58,7 +59,7 @@ impl UsersMomentsRepository for UsersMomentsRepositoryImpl {
     async fn find_published_by_user_name(
         &self,
         user_name: &str,
-        before: Option<(DateTime<Utc>, &str)>,
+        before: Option<(NaiveDateTime, &str)>,
         limit: u64,
     ) -> Result<Vec<MomentSummary>, anyhow::Error> {
         let pool = self.db.pool();

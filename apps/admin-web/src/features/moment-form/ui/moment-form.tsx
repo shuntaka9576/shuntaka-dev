@@ -124,7 +124,7 @@ export function MomentForm({ moment }: MomentFormProps) {
 
   // 撮影時刻も同様に、新しいファイルがあれば EXIF から補完、未選択なら既存値を使う
   const resolveCapturedAt = async (): Promise<string | null> => {
-    if (file !== null) return (await ensureCapturedAt(file)).iso;
+    if (file !== null) return (await ensureCapturedAt(file)).naive;
     if (isEdit) return moment.capturedAt;
     return null;
   };
@@ -279,7 +279,7 @@ export function MomentForm({ moment }: MomentFormProps) {
         <p className="text-sm" data-testid="moment-form-captured-at">
           {file !== null
             ? captured !== null
-              ? `${formatDateTime(captured.iso)} (${capturedAtSourceLabels[captured.source]})`
+              ? `${formatDateTime(captured.naive)} (${capturedAtSourceLabels[captured.source]})`
               : '読み取り中…'
             : isEdit
               ? formatDateTime(moment.capturedAt)

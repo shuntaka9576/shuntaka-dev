@@ -57,10 +57,11 @@ export default async function MomentPreviewPage({ searchParams }: PreviewPagePro
     fastener === 'tape' ? FASTENER_COLORS.find((c) => c === rawColor) : undefined;
 
   const rawDate = first(params.date);
+  // capturedAt は TZ なしのローカル日時。フォールバックも同じ形式 (UTC 現在時刻) に揃える
   const capturedAt =
     rawDate !== undefined && !Number.isNaN(Date.parse(rawDate))
       ? rawDate
-      : new Date().toISOString();
+      : new Date().toISOString().slice(0, 19);
 
   const moment: MomentSummary = {
     momentId: 'preview',

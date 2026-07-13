@@ -25,7 +25,8 @@ const toMomentDto = (row: Selectable<MomentsTable>) => ({
   fastener: row.fastener,
   fastenerColor: row.fastener_color,
   status: row.status,
-  capturedAt: row.captured_at.toISOString(),
+  // timezone: 'Z' で読むため UTC フィールドがそのまま壁時計。Z を付けず TZ なしで返す
+  capturedAt: row.captured_at.toISOString().slice(0, 19),
   publishedAt: row.published_at?.toISOString() ?? null,
   createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString(),
@@ -150,7 +151,7 @@ export const momentRoutes = createRouter()
         fastener: body.fastener,
         fastener_color: body.fastenerColor ?? null,
         status: body.status,
-        captured_at: new Date(body.capturedAt),
+        captured_at: body.capturedAt,
         published_at: body.status === 'published' ? new Date() : null,
       })
       .execute();
@@ -188,8 +189,7 @@ export const momentRoutes = createRouter()
         fastener_color: fastenerColor,
         status,
         // 撮影時刻は写真差し替え時のみクライアントが送る。公開/下書きの切替では変わらない
-        captured_at:
-          body.capturedAt !== undefined ? new Date(body.capturedAt) : current.captured_at,
+        ...(body.capturedAt !== undefined ? { captured_at: body.capturedAt } : {}),
         published_at: publishedAt,
       })
       .where('moment_id', '=', id)

@@ -6,7 +6,7 @@ export const buildPreviewUrl = (input: {
   text: string;
   fastener: string;
   fastenerColor: string | null;
-  /** 撮影時刻 (ISO 8601) */
+  /** 撮影時刻 (TZ なしのローカル日時 YYYY-MM-DDTHH:mm:ss) */
   capturedAt: string;
 }): string => {
   const base = import.meta.env.VITE_PREVIEW_BASE_URL ?? '';

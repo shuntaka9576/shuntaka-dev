@@ -9,8 +9,10 @@ interface MomentCardProps {
 }
 
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  // 例: 2026/07/13(月) 14:30。サーバーの TZ に依存しないよう JST に固定する
+  // capturedAt は TZ なしの撮影ローカル日時。EXIF の壁時計を TZ 変換せずそのまま表示する。
+  // UTC として解釈し UTC のまま整形することで、SSR / ブラウザどちらの TZ にも依存しない
+  const date = new Date(`${dateString}Z`);
+  // 例: 2026/07/13(月) 14:30
   return date.toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
@@ -19,7 +21,7 @@ function formatDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Asia/Tokyo',
+    timeZone: 'UTC',
   });
 }
 

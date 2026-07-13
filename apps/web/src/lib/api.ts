@@ -79,7 +79,7 @@ export interface MomentSummary {
   imageUrl: string;
   /** 一覧表示用サムネイルの URL（長辺 640px） */
   thumbUrl: string;
-  /** 撮影時刻（EXIF 由来。管理画面がアップロード時に補完） */
+  /** 撮影時刻（EXIF 由来。TZ なしのローカル日時 YYYY-MM-DDTHH:mm:ss。壁時計のまま表示する） */
   capturedAt: string;
   /** 未指定は clip */
   fastener?: MomentFastener;

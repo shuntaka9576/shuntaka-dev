@@ -21,7 +21,7 @@ const baseMoment: MomentSummary = {
   momentId: 'moment-mock-01',
   text: '仕事帰り、いつもの交差点。信号を待つあいだの空が、今日はやけに広かった。',
   ...photo(IMG.valley),
-  capturedAt: '2026-07-12T21:30:00.000Z',
+  capturedAt: '2026-07-12T21:30:00',
 };
 
 const meta = {

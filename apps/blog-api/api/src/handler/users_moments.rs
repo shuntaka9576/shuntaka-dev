@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderName, HeaderValue, header},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime};
 use kernel::model::moment::MomentSummary;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,8 @@ pub struct MomentSummaryResponse {
     pub fastener: String,
     /// tape のみ有効。'pink' | 'blue' | 'yellow' | 'green'
     pub fastener_color: Option<String>,
-    /// 撮影時刻 (RFC 3339)。クライアントが EXIF から補完した値
+    /// 撮影時刻 (TZ なしのローカル日時 YYYY-MM-DDTHH:mm:ss)。
+    /// EXIF 同様に撮影地の壁時計として TZ 変換せず表示する
     pub captured_at: String,
 }
 
@@ -70,15 +71,17 @@ fn is_valid_moment_id(s: &str) -> bool {
         })
 }
 
-/// カーソル文字列 `<captured_at unix micros>_<moment_id>` を分解する。
-/// adapter 側でこのタプルとの比較だけでページングできるようにする
-fn parse_cursor(raw: &str) -> Option<(DateTime<Utc>, &str)> {
+/// カーソル文字列 `<captured_at micros>_<moment_id>` を分解する。
+/// adapter 側でこのタプルとの比較だけでページングできるようにする。
+/// captured_at は TZ なしの壁時計のため、micros は epoch からの経過ではなく
+/// 「壁時計を UTC とみなした値」として往復させる
+fn parse_cursor(raw: &str) -> Option<(NaiveDateTime, &str)> {
     let (micros_raw, moment_id) = raw.split_once('_')?;
     if !is_valid_moment_id(moment_id) {
         return None;
     }
     let micros: i64 = micros_raw.parse().ok()?;
-    let captured_at = DateTime::from_timestamp_micros(micros)?;
+    let captured_at = DateTime::from_timestamp_micros(micros)?.naive_utc();
     Some((captured_at, moment_id))
 }
 
@@ -87,7 +90,7 @@ fn parse_cursor(raw: &str) -> Option<(DateTime<Utc>, &str)> {
 fn encode_cursor(moment: &MomentSummary) -> String {
     format!(
         "{}_{}",
-        moment.captured_at.timestamp_micros(),
+        moment.captured_at.and_utc().timestamp_micros(),
         moment.moment_id
     )
 }
@@ -178,7 +181,7 @@ pub async fn get_users_moments(
                     thumb_url,
                     fastener: m.fastener,
                     fastener_color: m.fastener_color,
-                    captured_at: m.captured_at.to_rfc3339(),
+                    captured_at: m.captured_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
                 }
             })
             .collect(),
@@ -231,7 +234,9 @@ mod tests {
             image_key: "images/moments/a.webp".to_string(),
             fastener: "clip".to_string(),
             fastener_color: None,
-            captured_at: DateTime::from_timestamp_micros(1_752_300_000_123_456).unwrap(),
+            captured_at: DateTime::from_timestamp_micros(1_752_300_000_123_456)
+                .unwrap()
+                .naive_utc(),
         };
         let cursor = encode_cursor(&moment);
         let (captured_at, moment_id) = parse_cursor(&cursor).unwrap();
