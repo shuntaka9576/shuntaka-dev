@@ -40,3 +40,4 @@ apm_modules/
 /backup/
 .vercel
 .env*
+!.env.example

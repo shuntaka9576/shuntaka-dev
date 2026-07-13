@@ -92,6 +92,11 @@ export class DeployRoleStack extends cdk.Stack {
                 'glue:*',
                 'firehose:*',
                 'athena:*',
+                // admin stack (Cognito + CloudFront + Secrets Manager) のため。
+                // 上と同じ流儀で service wildcard。
+                'cognito-idp:*',
+                'cloudfront:*',
+                'secretsmanager:*',
               ],
               resources: ['*'],
             }),

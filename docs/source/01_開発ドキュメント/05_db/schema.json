@@ -80,6 +80,38 @@
       "def": "CREATE TABLE `articles` (\n  `article_id` char(36) NOT NULL DEFAULT (uuid()),\n  `title` varchar(500) NOT NULL,\n  `slug` varchar(255) NOT NULL,\n  `user_id` char(36) NOT NULL,\n  `content` longtext NOT NULL,\n  `content_html` longtext DEFAULT NULL,\n  `thumbnail` text DEFAULT NULL,\n  `description` text NOT NULL,\n  `status` varchar(20) NOT NULL DEFAULT 'draft',\n  `type` varchar(50) DEFAULT NULL,\n  `published_at` datetime(6) DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`article_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_articles_slug` (`slug`),\n  KEY `idx_articles_user_status_type_published_at_id` (`user_id`,`status`,`type`,`published_at`,`article_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     },
     {
+      "name": "articles_tags",
+      "type": "BASE TABLE",
+      "columns": [
+        { "name": "article_id", "type": "char(36)", "nullable": false },
+        { "name": "tag_id", "type": "char(36)", "nullable": false }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "def": "PRIMARY KEY (article_id, tag_id) USING BTREE",
+          "table": "articles_tags",
+          "columns": ["article_id", "tag_id"]
+        },
+        {
+          "name": "idx_articles_tags_tag_id",
+          "def": "KEY idx_articles_tags_tag_id (tag_id) USING BTREE",
+          "table": "articles_tags",
+          "columns": ["tag_id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PRIMARY",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (article_id, tag_id)",
+          "table": "articles_tags",
+          "columns": ["article_id", "tag_id"]
+        }
+      ],
+      "def": "CREATE TABLE `articles_tags` (\n  `article_id` char(36) NOT NULL,\n  `tag_id` char(36) NOT NULL,\n  PRIMARY KEY (`article_id`,`tag_id`) /*T![clustered_index] CLUSTERED */,\n  KEY `idx_articles_tags_tag_id` (`tag_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+    },
+    {
       "name": "tags",
       "type": "BASE TABLE",
       "columns": [
@@ -132,38 +164,6 @@
       "def": "CREATE TABLE `tags` (\n  `tag_id` char(36) NOT NULL DEFAULT (uuid()),\n  `name` varchar(255) NOT NULL,\n  `parent_tag_id` char(36) DEFAULT NULL,\n  PRIMARY KEY (`tag_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_tags_name` (`name`),\n  KEY `idx_tags_parent_tag_id` (`parent_tag_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     },
     {
-      "name": "articles_tags",
-      "type": "BASE TABLE",
-      "columns": [
-        { "name": "article_id", "type": "char(36)", "nullable": false },
-        { "name": "tag_id", "type": "char(36)", "nullable": false }
-      ],
-      "indexes": [
-        {
-          "name": "PRIMARY",
-          "def": "PRIMARY KEY (article_id, tag_id) USING BTREE",
-          "table": "articles_tags",
-          "columns": ["article_id", "tag_id"]
-        },
-        {
-          "name": "idx_articles_tags_tag_id",
-          "def": "KEY idx_articles_tags_tag_id (tag_id) USING BTREE",
-          "table": "articles_tags",
-          "columns": ["tag_id"]
-        }
-      ],
-      "constraints": [
-        {
-          "name": "PRIMARY",
-          "type": "PRIMARY KEY",
-          "def": "PRIMARY KEY (article_id, tag_id)",
-          "table": "articles_tags",
-          "columns": ["article_id", "tag_id"]
-        }
-      ],
-      "def": "CREATE TABLE `articles_tags` (\n  `article_id` char(36) NOT NULL,\n  `tag_id` char(36) NOT NULL,\n  PRIMARY KEY (`article_id`,`tag_id`) /*T![clustered_index] CLUSTERED */,\n  KEY `idx_articles_tags_tag_id` (`tag_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
-    },
-    {
       "name": "users",
       "type": "BASE TABLE",
       "columns": [
@@ -178,7 +178,7 @@
         { "name": "email", "type": "varchar(255)", "nullable": false },
         {
           "name": "github_installation_id",
-          "type": "bigint(20)",
+          "type": "bigint",
           "nullable": true
         },
         {
@@ -250,7 +250,7 @@
           "columns": ["github_installation_id"]
         }
       ],
-      "def": "CREATE TABLE `users` (\n  `user_id` char(36) NOT NULL DEFAULT (uuid()),\n  `name` varchar(255) NOT NULL,\n  `email` varchar(255) NOT NULL,\n  `github_installation_id` bigint(20) DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`user_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_users_name` (`name`),\n  UNIQUE KEY `uq_users_email` (`email`),\n  UNIQUE KEY `uq_users_github_installation_id` (`github_installation_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+      "def": "CREATE TABLE `users` (\n  `user_id` char(36) NOT NULL DEFAULT (uuid()),\n  `name` varchar(255) NOT NULL,\n  `email` varchar(255) NOT NULL,\n  `github_installation_id` bigint DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`user_id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `uq_users_name` (`name`),\n  UNIQUE KEY `uq_users_email` (`email`),\n  UNIQUE KEY `uq_users_github_installation_id` (`github_installation_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     },
     {
       "name": "tag_article_counts",
@@ -261,7 +261,7 @@
         { "name": "tag_id", "type": "char(36)", "nullable": false },
         {
           "name": "article_count",
-          "type": "bigint(20)",
+          "type": "bigint",
           "nullable": false,
           "default": "0"
         }
@@ -283,12 +283,130 @@
           "columns": ["user_id", "type", "tag_id"]
         }
       ],
-      "def": "CREATE TABLE `tag_article_counts` (\n  `user_id` char(36) NOT NULL,\n  `type` varchar(20) NOT NULL,\n  `tag_id` char(36) NOT NULL,\n  `article_count` bigint(20) NOT NULL DEFAULT '0',\n  PRIMARY KEY (`user_id`,`type`,`tag_id`) /*T![clustered_index] CLUSTERED */\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+      "def": "CREATE TABLE `tag_article_counts` (\n  `user_id` char(36) NOT NULL,\n  `type` varchar(20) NOT NULL,\n  `tag_id` char(36) NOT NULL,\n  `article_count` bigint NOT NULL DEFAULT '0',\n  PRIMARY KEY (`user_id`,`type`,`tag_id`) /*T![clustered_index] CLUSTERED */\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+    },
+    {
+      "name": "moments",
+      "type": "BASE TABLE",
+      "columns": [
+        { "name": "moment_id", "type": "char(26)", "nullable": false },
+        { "name": "user_id", "type": "char(36)", "nullable": false },
+        { "name": "text", "type": "varchar(180)", "nullable": false },
+        { "name": "image_key", "type": "varchar(255)", "nullable": false },
+        {
+          "name": "fastener",
+          "type": "enum('clip','tape')",
+          "nullable": false,
+          "default": "clip"
+        },
+        {
+          "name": "fastener_color",
+          "type": "enum('pink','blue','yellow','green')",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "enum('published','draft')",
+          "nullable": false,
+          "default": "published"
+        },
+        { "name": "published_at", "type": "datetime(6)", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)"
+        },
+        {
+          "name": "updated_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)",
+          "extra_def": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_moments_feed",
+          "def": "KEY idx_moments_feed (user_id, status, published_at, moment_id) USING BTREE",
+          "table": "moments",
+          "columns": ["user_id", "status", "published_at", "moment_id"]
+        },
+        {
+          "name": "PRIMARY",
+          "def": "PRIMARY KEY (moment_id) USING BTREE",
+          "table": "moments",
+          "columns": ["moment_id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PRIMARY",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (moment_id)",
+          "table": "moments",
+          "columns": ["moment_id"]
+        }
+      ],
+      "def": "CREATE TABLE `moments` (\n  `moment_id` char(26) NOT NULL,\n  `user_id` char(36) NOT NULL,\n  `text` varchar(180) NOT NULL,\n  `image_key` varchar(255) NOT NULL,\n  `fastener` enum('clip','tape') NOT NULL DEFAULT 'clip',\n  `fastener_color` enum('pink','blue','yellow','green') DEFAULT NULL,\n  `status` enum('published','draft') NOT NULL DEFAULT 'published',\n  `published_at` datetime(6) DEFAULT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`moment_id`) /*T![clustered_index] CLUSTERED */,\n  KEY `idx_moments_feed` (`user_id`,`status`,`published_at`,`moment_id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+    },
+    {
+      "name": "admin_sessions",
+      "type": "BASE TABLE",
+      "columns": [
+        { "name": "sid", "type": "varchar(64)", "nullable": false },
+        { "name": "user_id", "type": "char(36)", "nullable": false },
+        { "name": "access_token", "type": "text", "nullable": false },
+        { "name": "id_token", "type": "text", "nullable": false },
+        { "name": "refresh_token", "type": "text", "nullable": false },
+        { "name": "expires_at", "type": "datetime(6)", "nullable": false },
+        {
+          "name": "created_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)"
+        },
+        {
+          "name": "updated_at",
+          "type": "datetime(6)",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP(6)",
+          "extra_def": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "def": "PRIMARY KEY (sid) USING BTREE",
+          "table": "admin_sessions",
+          "columns": ["sid"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "PRIMARY",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (sid)",
+          "table": "admin_sessions",
+          "columns": ["sid"]
+        }
+      ],
+      "def": "CREATE TABLE `admin_sessions` (\n  `sid` varchar(64) NOT NULL,\n  `user_id` char(36) NOT NULL,\n  `access_token` text NOT NULL,\n  `id_token` text NOT NULL,\n  `refresh_token` text NOT NULL,\n  `expires_at` datetime(6) NOT NULL,\n  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),\n  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),\n  PRIMARY KEY (`sid`) /*T![clustered_index] CLUSTERED */\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     }
   ],
   "relations": [
     {
       "table": "articles",
+      "columns": ["user_id"],
+      "cardinality": "zero_or_more",
+      "parent_table": "users",
+      "parent_columns": ["user_id"],
+      "parent_cardinality": "exactly_one",
+      "def": "Additional Relation",
+      "virtual": true
+    },
+    {
+      "table": "moments",
       "columns": ["user_id"],
       "cardinality": "zero_or_more",
       "parent_table": "users",
@@ -340,7 +458,7 @@
   ],
   "driver": {
     "name": "mysql",
-    "database_version": "8.0.11-TiDB-v8.1.0",
+    "database_version": "8.0.11-TiDB-v8.5.7",
     "meta": { "dict": { "Functions": "Stored procedures and functions" } }
   }
 }

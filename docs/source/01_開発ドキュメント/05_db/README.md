@@ -5,10 +5,12 @@
 | Name                                        | Columns | Comment | Type       |
 | ------------------------------------------- | ------- | ------- | ---------- |
 | [articles](articles.md)                     | 13      |         | BASE TABLE |
-| [tags](tags.md)                             | 3       |         | BASE TABLE |
 | [articles_tags](articles_tags.md)           | 2       |         | BASE TABLE |
+| [tags](tags.md)                             | 3       |         | BASE TABLE |
 | [users](users.md)                           | 6       |         | BASE TABLE |
 | [tag_article_counts](tag_article_counts.md) | 4       |         | BASE TABLE |
+| [moments](moments.md)                       | 10      |         | BASE TABLE |
+| [admin_sessions](admin_sessions.md)         | 8       |         | BASE TABLE |
 
 ## Relations
 
@@ -16,6 +18,7 @@
 erDiagram
 
 "articles" }o--|| "users" : "Additional Relation"
+"moments" }o--|| "users" : "Additional Relation"
 "articles_tags" }o--|| "articles" : "Additional Relation"
 "articles_tags" }o--|| "tags" : "Additional Relation"
 "tag_article_counts" }o--|| "users" : "Additional Relation"
@@ -25,11 +28,11 @@ erDiagram
   char_36_ article_id PK
   char_36_ user_id
 }
-"tags" {
-  char_36_ tag_id PK
-}
 "articles_tags" {
   char_36_ article_id PK
+  char_36_ tag_id PK
+}
+"tags" {
   char_36_ tag_id PK
 }
 "users" {
@@ -39,6 +42,13 @@ erDiagram
   char_36_ user_id PK
   varchar_20_ type PK
   char_36_ tag_id PK
+}
+"moments" {
+  char_26_ moment_id PK
+  char_36_ user_id
+}
+"admin_sessions" {
+  varchar_64_ sid PK
 }
 ```
 

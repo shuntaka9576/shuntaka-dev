@@ -2,7 +2,8 @@
 
 - 起票日: 2026-07-12
 - 関連: [tech / note タブの posts 統合](../2026-07-11-posts-tab-unification/index.md)
-- ステータス: UI モック（Storybook）完了。API / 管理画面 / インフラ設計は未着手
+- ステータス: UI モック（Storybook）完了。API / 管理画面 / インフラ設計は [管理画面計画](../2026-07-12-logs-admin-architecture/index.md) で確定
+- 追記: 機能名は logs から **moments** に改名決定（logs はシステムログと誤読されやすいため。タブ / ルート / API / DB / コンポーネント名まで一新）。本文の logs / `LogCard` / `LogFeed` 表記は起票時点の名称で、コードのリネームは実装フェーズ 4 で行う
 
 ## 起票理由
 
@@ -36,7 +37,7 @@
 
 ## システム構成
 
-当初は「UI = Cloudflare Workers、画像 = R2、API = 共用 api.shuntaka.dev」を検討したが、Workers custom domain に DNS ゾーン移管が必要なため **廃案**。CloudFront ベースのオール AWS 構成（admin.shuntaka.dev = CloudFront + S3/Lambda Function URL、認証 = Cognito SRP、ORM = Kysely）に決定した。詳細は [logs 管理画面のアーキテクチャ決定と実装計画](../2026-07-12-logs-admin-architecture/index.md) を参照。
+当初は「UI = Cloudflare Workers、画像 = R2、API = 共用 api.shuntaka.dev」を検討したが、Workers custom domain に DNS ゾーン移管が必要なため **廃案**。CloudFront ベースのオール AWS 構成（admin.shuntaka.dev = CloudFront + S3 + API Gateway/Lambda、画像配信 = images.shuntaka.dev、認証 = Cognito SRP、ORM = Kysely）に決定した。詳細は [logs 管理画面のアーキテクチャ決定と実装計画](../2026-07-12-logs-admin-architecture/index.md) を参照。
 
 ## 未決事項
 

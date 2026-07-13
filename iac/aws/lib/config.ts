@@ -48,6 +48,8 @@ interface AppParameter {
   fqdn: string;
   domain: {
     api: string;
+    admin: string;
+    images: string;
   };
   ssm: {
     oidc: {
@@ -58,6 +60,13 @@ interface AppParameter {
     };
     tokyo: {
       certificateArn: string;
+    };
+    virginia: {
+      certificateArn: string;
+    };
+    admin: {
+      userPoolId: string;
+      userPoolClientId: string;
     };
     apiGateway: {
       apiUrl: string;
@@ -155,6 +164,8 @@ const stageConfig: {
     fqdn: 'shuntaka.tech',
     domain: {
       api: 'api.shuntaka.tech',
+      admin: 'admin.shuntaka.tech',
+      images: 'images.shuntaka.tech',
     },
   },
   prd: {
@@ -166,6 +177,8 @@ const stageConfig: {
     fqdn: 'shuntaka.dev',
     domain: {
       api: 'api.shuntaka.dev',
+      admin: 'admin.shuntaka.dev',
+      images: 'images.shuntaka.dev',
     },
   },
 };
@@ -314,6 +327,14 @@ export const getConfig = (stageName: string): AppParameter => {
       },
       tokyo: {
         certificateArn: `/${config.stageName.long}/${config.projectName.long}/tokyo/certificate-arn`,
+      },
+      // us-east-1 (CloudFront 用証明書) の SSM に書き出す。読み取りは cross-region
+      virginia: {
+        certificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/certificate-arn`,
+      },
+      admin: {
+        userPoolId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-id`,
+        userPoolClientId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-client-id`,
       },
       apiGateway: {
         apiUrl: `/${config.stageName.long}/${config.projectName.long}/api-gateway/api-url`,

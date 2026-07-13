@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>shuntaka.dev admin</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- amazon-cognito-identity-js が Node の global を参照するためのシム。
+         module スクリプトより先に評価される classic script で定義する -->
+    <script>
+      window.global = window;
+    </script>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>

@@ -6,7 +6,7 @@ on:
       stageName:
         required: true
         type: string
-      # デプロイ対象スタック: all | st-tidb-proxy | st-tidb-proxy-logs | main
+      # デプロイ対象スタック: all | st-tidb-proxy | st-tidb-proxy-logs | main | admin
       stack:
         required: false
         type: string
@@ -103,3 +103,32 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
+
+      # moments 管理画面 (Cognito + Lambda + CloudFront)。us-east-1 の証明書スタック →
+      # admin-web ビルド (Cognito 出力の SSM を参照。初回デプロイ時は空でビルドされるため、
+      # スタック適用後にもう一度 admin を deploy すると SPA に実値が焼き込まれる) → admin の順。
+      - name: CDK Deploy (admin)
+        if: inputs.stack == 'all' || inputs.stack == 'admin'
+        working-directory: iac/aws
+        run: |
+          case "$STAGE_NAME" in
+            prd) PREFIX=p ;;
+            *)   PREFIX=d ;;
+          esac
+          bunx cdk deploy "${PREFIX}-st-virginia-cert" -c "stageName=${STAGE_NAME}" --require-approval never
+          POOL_ID=$(aws ssm get-parameter --name "/${STAGE_NAME}/shuntaka/admin/user-pool-id" --query 'Parameter.Value' --output text 2>/dev/null || echo '')
+          CLIENT_ID=$(aws ssm get-parameter --name "/${STAGE_NAME}/shuntaka/admin/user-pool-client-id" --query 'Parameter.Value' --output text 2>/dev/null || echo '')
+          (
+            cd ../../apps/admin-web
+            VITE_COGNITO_USER_POOL_ID="$POOL_ID" \
+              VITE_COGNITO_CLIENT_ID="$CLIENT_ID" \
+              VITE_IMAGES_BASE_URL="https://images.${SITE_FQDN}" \
+              VITE_PREVIEW_BASE_URL="https://${SITE_FQDN}" \
+              bun run build
+          )
+          bunx cdk deploy "${PREFIX}-st-admin" -c "stageName=${STAGE_NAME}" --require-approval never
+        env:
+          STAGE_NAME: ${{ inputs.stageName }}
+          # 公開サイトの apex ドメイン。GitHub Environments (dev / prd) の
+          # Environment variable。dev: shuntaka.tech / prd: shuntaka.dev
+          SITE_FQDN: ${{ vars.SITE_FQDN }}

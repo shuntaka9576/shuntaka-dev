@@ -15,7 +15,7 @@ on:
           - dev
           - prd
       stack:
-        description: 'Deploy stack (all = st-tidb-proxy -> st-tidb-proxy-logs -> main の順で全部)'
+        description: 'Deploy stack (all = st-tidb-proxy -> st-tidb-proxy-logs -> main -> admin の順で全部)'
         required: true
         default: 'all'
         type: choice
@@ -24,6 +24,7 @@ on:
           - st-tidb-proxy
           - st-tidb-proxy-logs
           - main
+          - admin
 
 permissions: {}
 

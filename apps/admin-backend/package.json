@@ -1,0 +1,35 @@
+{
+  "name": "@shuntaka-dev/admin-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "build": "node build.mjs",
+    "test": "bun test src/",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1085.0",
+    "@aws-sdk/client-s3": "^3.1085.0",
+    "@aws-sdk/client-secrets-manager": "^3.1085.0",
+    "@aws-sdk/s3-request-presigner": "^3.1085.0",
+    "@hono/zod-openapi": "^1.4.0",
+    "@smithy/node-http-handler": "^4.9.5",
+    "hono": "^4.12.29",
+    "https-proxy-agent": "^9.1.0",
+    "iron-webcrypto": "^2.0.0",
+    "jose": "^6.2.3",
+    "kysely": "^0.29.3",
+    "mysql2": "^3.22.6",
+    "ulid": "^3.0.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^2.0.8",
+    "@scalar/hono-api-reference": "^0.11.9",
+    "esbuild": "^0.28.1"
+  }
+}
