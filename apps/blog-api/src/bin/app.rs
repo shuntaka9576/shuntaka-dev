@@ -4,8 +4,10 @@ use api::route::health::build_health_check_routers;
 use api::route::users_articles::build_users_articles_routers;
 use api::route::users_moments::build_users_moments_routers;
 use api::route::webhooks::build_webhooks_routers;
+use infrastructure::lambda::{LambdaSelfInvoker, SelfInvoker};
 use registry::{AppRegistry, WebhookConfig};
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use adapter::database::connect_database_with;
 use anyhow::{Error, Result};
@@ -72,7 +74,13 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         images_base_url: app_config.webhook.images_base_url,
     };
 
-    let registry = AppRegistry::new(pool, webhook_config).await;
+    // Lambda 上でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
+    // ローカル開発では None となり、webhook はインラインで処理される。
+    let self_invoker = LambdaSelfInvoker::from_env()
+        .await
+        .map(|invoker| Arc::new(invoker) as Arc<dyn SelfInvoker>);
+
+    let registry = AppRegistry::new(pool, webhook_config, self_invoker).await;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

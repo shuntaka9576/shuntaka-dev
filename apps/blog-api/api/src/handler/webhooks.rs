@@ -1,4 +1,6 @@
 use axum::{Json, body::Bytes, extract::State, http::HeaderMap};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use futures::future::join_all;
 use infrastructure::github::{GitHubAppClient, GitHubAppClientImpl, PushEvent};
 use infrastructure::webhook::verify_signature;
@@ -27,6 +29,19 @@ pub struct WebhookResponse {
     pub failed: Option<usize>,
 }
 
+pub const GITHUB_PUSH_ENVELOPE_KIND: &str = "github_push_webhook";
+
+/// 自己 Event invoke で受け渡す封筒。Lambda Web Adapter が非 HTTP イベントを
+/// AWS_LWA_PASS_THROUGH_PATH (POST /events) へ転送してくる。
+/// /events は API Gateway の {proxy+} 経由でも外部から到達できるため、
+/// 受信時と同じバイト列で署名を再検証できるよう body は base64 で保持する。
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GithubPushEnvelope {
+    pub kind: String,
+    pub signature: String,
+    pub body_b64: String,
+}
+
 #[derive(Debug)]
 struct ArticleProcessError {
     slug: String,
@@ -42,11 +57,59 @@ fn extract_branch_name(git_ref: &str) -> Option<String> {
         .map(|m| m.as_str().to_string())
 }
 
+/// push イベントを検証し、対象ブランチなら Some(PushEvent) を返す。
+/// 対象外 (push 以外・対象外ブランチ等) は Err ではなく Ok(None) 相当の
+/// skipped レスポンスを返せるよう、WebhookResponse を返す。
+fn screen_push_event(
+    event_type: &str,
+    parsed_body: serde_json::Value,
+) -> Result<Result<PushEvent, WebhookResponse>, AppError> {
+    if event_type != "push" {
+        return Ok(Err(WebhookResponse {
+            status: "skipped".to_string(),
+            message: Some(format!("Not a push event: {event_type}")),
+            processed: None,
+            succeeded: None,
+            failed: None,
+        }));
+    }
+
+    let push_event: PushEvent = serde_json::from_value(parsed_body)
+        .map_err(|e| AppError::bad_request_with("Invalid payload", e))?;
+
+    let branch_name = match extract_branch_name(&push_event.git_ref) {
+        Some(name) => name,
+        None => {
+            warn!("Invalid git ref: {}", push_event.git_ref);
+            return Ok(Err(WebhookResponse {
+                status: "skipped".to_string(),
+                message: Some(format!("Invalid git ref: {}", push_event.git_ref)),
+                processed: None,
+                succeeded: None,
+                failed: None,
+            }));
+        }
+    };
+
+    if !["main", "master"].contains(&branch_name.as_str()) {
+        info!("Skipping non-target branch: {}", branch_name);
+        return Ok(Err(WebhookResponse {
+            status: "skipped".to_string(),
+            message: Some(format!("Not a target branch: {branch_name}")),
+            processed: None,
+            succeeded: None,
+            failed: None,
+        }));
+    }
+
+    Ok(Ok(push_event))
+}
+
 #[utoipa::path(
     post,
     path = "/webhooks/github",
     responses(
-        (status = 200, description = "Webhook processed successfully", body = WebhookResponse),
+        (status = 200, description = "Webhook accepted or processed", body = WebhookResponse),
         (status = 400, description = "Invalid payload"),
         (status = 401, description = "Unauthorized - Invalid or missing signature"),
         (status = 404, description = "User not found"),
@@ -89,50 +152,106 @@ pub async fn handle_github_webhook(
 
     info!("Received GitHub webhook: event_type={}", event_type);
 
-    if event_type != "push" {
-        return Ok(Json(WebhookResponse {
-            status: "skipped".to_string(),
-            message: Some(format!("Not a push event: {event_type}")),
-            processed: None,
-            succeeded: None,
-            failed: None,
-        }));
-    }
-
-    // Parse as PushEvent
-    let push_event: PushEvent = serde_json::from_value(parsed_body)
-        .map_err(|e| AppError::bad_request_with("Invalid payload", e))?;
+    let push_event = match screen_push_event(event_type, parsed_body)? {
+        Ok(push_event) => push_event,
+        Err(skipped) => return Ok(Json(skipped)),
+    };
 
     info!(
         "Processing push event: ref={}, repo={}",
         push_event.git_ref, push_event.repository.full_name
     );
 
-    // Check branch
-    let branch_name = match extract_branch_name(&push_event.git_ref) {
-        Some(name) => name,
-        None => {
-            warn!("Invalid git ref: {}", push_event.git_ref);
-            return Ok(Json(WebhookResponse {
-                status: "skipped".to_string(),
-                message: Some(format!("Invalid git ref: {}", push_event.git_ref)),
+    // GitHub の webhook 配信タイムアウトは 10 秒固定のため、全記事スキャンを伴う
+    // 実処理は自己 Event invoke に逃がして即座に 200 を返す。
+    // ローカル開発 (Lambda 外) では invoker が無いので従来どおりインラインで処理する。
+    match registry.self_invoker() {
+        Some(invoker) => {
+            let envelope = GithubPushEnvelope {
+                kind: GITHUB_PUSH_ENVELOPE_KIND.to_string(),
+                signature: signature.to_string(),
+                body_b64: BASE64.encode(&body),
+            };
+            let payload = serde_json::to_vec(&envelope)
+                .map_err(|e| AppError::internal("Failed to serialize envelope", e))?;
+
+            invoker
+                .invoke_async(payload)
+                .await
+                .map_err(|e| AppError::internal("Failed to invoke self for async processing", e))?;
+
+            info!(
+                "Queued push event for async processing: ref={}, repo={}",
+                push_event.git_ref, push_event.repository.full_name
+            );
+
+            Ok(Json(WebhookResponse {
+                status: "accepted".to_string(),
+                message: Some("Queued for async processing".to_string()),
                 processed: None,
                 succeeded: None,
                 failed: None,
-            }));
+            }))
         }
+        None => process_push_event(&registry, push_event).await.map(Json),
+    }
+}
+
+/// 自己 Event invoke されたイベントの受け口 (Lambda Web Adapter の passthrough)。
+/// API Gateway 経由でも外部から到達できるため、封筒内の署名を必ず再検証する。
+pub async fn handle_lambda_events(
+    State(registry): State<AppRegistry>,
+    body: Bytes,
+) -> Result<Json<WebhookResponse>, AppError> {
+    let envelope: GithubPushEnvelope = serde_json::from_slice(&body)
+        .map_err(|e| AppError::bad_request_with("Invalid event payload", e))?;
+
+    if envelope.kind != GITHUB_PUSH_ENVELOPE_KIND {
+        return Err(AppError::bad_request(&format!(
+            "Unsupported event kind: {}",
+            envelope.kind
+        )));
+    }
+
+    let webhook_body = BASE64
+        .decode(&envelope.body_b64)
+        .map_err(|e| AppError::bad_request_with("Invalid base64 body", e))?;
+
+    let config = registry.webhook_config();
+    verify_signature(
+        &config.github_webhook_secret,
+        &webhook_body,
+        &envelope.signature,
+    )
+    .map_err(|e| {
+        warn!("Event signature verification failed: {}", e);
+        AppError::unauthorized("Invalid signature")
+    })?;
+
+    let parsed_body: serde_json::Value = serde_json::from_slice(&webhook_body)
+        .map_err(|e| AppError::bad_request_with("Invalid JSON", e))?;
+
+    // 封筒 kind が push を意味するので event_type は固定で通す
+    let push_event = match screen_push_event("push", parsed_body)? {
+        Ok(push_event) => push_event,
+        Err(skipped) => return Ok(Json(skipped)),
     };
 
-    if !["main", "master"].contains(&branch_name.as_str()) {
-        info!("Skipping non-target branch: {}", branch_name);
-        return Ok(Json(WebhookResponse {
-            status: "skipped".to_string(),
-            message: Some(format!("Not a target branch: {branch_name}")),
-            processed: None,
-            succeeded: None,
-            failed: None,
-        }));
-    }
+    info!(
+        "Processing async push event: ref={}, repo={}",
+        push_event.git_ref, push_event.repository.full_name
+    );
+
+    process_push_event(&registry, push_event).await.map(Json)
+}
+
+/// push イベントの実処理。articles ディレクトリの全 markdown を取得して upsert する。
+/// GitHub の配信タイムアウトを気にしなくてよい経路 (自己 invoke / ローカル) で呼ばれる。
+async fn process_push_event(
+    registry: &AppRegistry,
+    push_event: PushEvent,
+) -> Result<WebhookResponse, AppError> {
+    let config = registry.webhook_config();
 
     // Create GitHub client using app PEM embedded at deploy time.
     let github_client = GitHubAppClientImpl::new(
@@ -199,7 +318,7 @@ pub async fn handle_github_webhook(
     let mut failed = 0;
     let mut errors: Vec<ArticleProcessError> = vec![];
 
-    for fetch_result in fetch_results {
+    for (file_path, fetch_result) in file_paths.iter().zip(fetch_results) {
         processed += 1;
 
         match fetch_result {
@@ -313,7 +432,7 @@ pub async fn handle_github_webhook(
             Err(e) => {
                 failed += 1;
                 errors.push(ArticleProcessError {
-                    slug: "unknown".to_string(),
+                    slug: file_path.clone(),
                     error: format!("Failed to fetch content: {e}"),
                 });
             }
@@ -333,11 +452,11 @@ pub async fn handle_github_webhook(
         processed, succeeded, failed
     );
 
-    Ok(Json(WebhookResponse {
+    Ok(WebhookResponse {
         status: "success".to_string(),
         message: None,
         processed: Some(processed),
         succeeded: Some(succeeded),
         failed: Some(failed),
-    }))
+    })
 }

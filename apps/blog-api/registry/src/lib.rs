@@ -8,6 +8,7 @@ use adapter::{
         users_moments::UsersMomentsRepositoryImpl,
     },
 };
+use infrastructure::lambda::SelfInvoker;
 use kernel::repository::{
     articles::ArticlesRepository, health::HealthCheckRepository, users::UsersRepository,
     users_articles::UsersArticlesRepository, users_moments::UsersMomentsRepository,
@@ -36,10 +37,16 @@ pub struct AppRegistry {
     articles_repository: Arc<dyn ArticlesRepository>,
     users_repository: Arc<dyn UsersRepository>,
     webhook_config: WebhookConfig,
+    /// Lambda 実行環境でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
+    self_invoker: Option<Arc<dyn SelfInvoker>>,
 }
 
 impl AppRegistry {
-    pub async fn new(pool: ConnectionPool, webhook_config: WebhookConfig) -> Self {
+    pub async fn new(
+        pool: ConnectionPool,
+        webhook_config: WebhookConfig,
+        self_invoker: Option<Arc<dyn SelfInvoker>>,
+    ) -> Self {
         let health_check_repository = Arc::new(HealthCheckRepositoryImpl::new(pool.clone()));
         let users_articles_repository = Arc::new(UsersArticlesRepositoryImpl::new(pool.clone()));
         let users_moments_repository = Arc::new(UsersMomentsRepositoryImpl::new(pool.clone()));
@@ -53,6 +60,7 @@ impl AppRegistry {
             articles_repository,
             users_repository,
             webhook_config,
+            self_invoker,
         }
     }
 
@@ -78,5 +86,9 @@ impl AppRegistry {
 
     pub fn webhook_config(&self) -> &WebhookConfig {
         &self.webhook_config
+    }
+
+    pub fn self_invoker(&self) -> Option<Arc<dyn SelfInvoker>> {
+        self.self_invoker.clone()
     }
 }

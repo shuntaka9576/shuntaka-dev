@@ -271,6 +271,7 @@
     "rocksdb",
     "rsplit",
     "rstest",
+    "rustc",
     "rustls",
     "rustup",
     "ryzen",

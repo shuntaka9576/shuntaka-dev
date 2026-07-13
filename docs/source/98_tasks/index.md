@@ -8,6 +8,7 @@
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
 | 2026-07-14 | [moments の日付を EXIF 撮影時刻 (captured_at) に移行](2026-07-14-moments-exif-captured-at/index.md)                                                               |
+| 2026-07-13 | [GitHub webhook の非同期化（自己 Event invoke で 10 秒配信タイムアウトを回避）](2026-07-13-webhook-async-self-invoke/index.md)                                    |
 | 2026-07-12 | [logs 管理画面（admin.shuntaka.dev）のアーキテクチャ決定と実装計画](2026-07-12-logs-admin-architecture/index.md)                                                  |
 | 2026-07-12 | [logs 機能（180字 + 写真必須の一文投稿）の構想と UI モック](2026-07-12-logs-feature/index.md)                                                                     |
 | 2026-07-12 | [apps/web: フォント配信の最適化（HAR 分析: ウェイト削減 / 重複サブセット解消）](2026-07-12-web-font-delivery-optimization/index.md)                               |

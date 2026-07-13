@@ -818,6 +818,7 @@ exports[`MainStack > snapshot 1`] = `
     },
     "BlogAPIWebApiLambda34B678B7": {
       "DependsOn": [
+        "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71",
         "BlogAPIWebApiLambdaServiceRole5C77D6FD",
       ],
       "Properties": {
@@ -830,6 +831,7 @@ exports[`MainStack > snapshot 1`] = `
         "Environment": {
           "Variables": {
             "AWS_LWA_INVOKE_MODE": "response_stream",
+            "AWS_LWA_PASS_THROUGH_PATH": "/events",
             "CLOUDINARY_API_KEY": "test-api-key",
             "CLOUDINARY_API_SECRET": {
               "Fn::GetAtt": [
@@ -937,6 +939,38 @@ exports[`MainStack > snapshot 1`] = `
         ],
       },
       "Type": "AWS::IAM::Role",
+    },
+    "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":lambda:ap-northeast-1:123456789012:function:dev-tp-blog-api",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71",
+        "Roles": [
+          {
+            "Ref": "BlogAPIWebApiLambdaServiceRole5C77D6FD",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "DsqlCluster": {
       "Properties": {
