@@ -1,13 +1,17 @@
 name: Sync preview branch
 
-# main の内容を preview ブランチへミラーする。
+# main の内容を preview ブランチへミラーし、Vercel の Deploy Hook でビルドを起動する。
 # Vercel は shuntaka.tech (Preview 環境) をブランチ preview に割り当てているため、
-# main push → preview 更新 → shuntaka.tech へ自動デプロイになる。
+# main push → preview 更新 + Deploy Hook → shuntaka.tech へ反映になる。
+# API での ref 更新は push イベントの commits が空になり Vercel がビルドを
+# スキップするため、Deploy Hook の明示起動が必要 (ref 更新だけでは反映されない)。
 # 本番 (shuntaka.dev) は tagpr のタグリリース (deploy-vercel --prod) でのみ更新する。
 on:
   push:
     branches:
       - main
+  # 手動での再同期用
+  workflow_dispatch:
 
 permissions: {}
 
@@ -22,11 +26,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # ref 更新は API で行う (checkout 不要 + persist-credentials を避ける)。
-          # API 経由でも push イベントが発火し Vercel の GitHub App が反応する
+          # ref 更新は API で行う (checkout 不要 + persist-credentials を避ける)
           if ! gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/preview" \
             -f "sha=${GITHUB_SHA}" -F force=true; then
             # preview ブランチ未作成の初回のみ作成する
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f "ref=refs/heads/preview" -f "sha=${GITHUB_SHA}"
           fi
+
+      - name: Trigger Vercel deploy for preview branch
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_PREVIEW_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::warning::VERCEL_PREVIEW_DEPLOY_HOOK が未設定のため Vercel ビルドをスキップ"
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
+          echo "Deploy Hook を起動した"
