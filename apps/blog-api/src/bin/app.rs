@@ -2,6 +2,7 @@ use api::observability::observe_request;
 use api::route::build_swagger_router;
 use api::route::health::build_health_check_routers;
 use api::route::users_articles::build_users_articles_routers;
+use api::route::users_moments::build_users_moments_routers;
 use api::route::webhooks::build_webhooks_routers;
 use registry::{AppRegistry, WebhookConfig};
 use std::net::{Ipv4Addr, SocketAddr};
@@ -68,6 +69,7 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         cloudinary_api_key: app_config.webhook.cloudinary_api_key,
         cloudinary_api_secret: app_config.webhook.cloudinary_api_secret,
         ogp_public_id: app_config.webhook.ogp_public_id,
+        images_base_url: app_config.webhook.images_base_url,
     };
 
     let registry = AppRegistry::new(pool, webhook_config).await;
@@ -80,6 +82,7 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
     let app = Router::new()
         .merge(build_health_check_routers())
         .merge(build_users_articles_routers())
+        .merge(build_users_moments_routers())
         .merge(build_webhooks_routers())
         .merge(build_swagger_router())
         // route_layer なので MatchedPath (app.route) が取れる。

@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
         hostname: 'res.cloudinary.com',
         pathname: '/dkerzyk09/**',
       },
+      // moments の写真配信ドメイン（prd / dev）
+      {
+        protocol: 'https',
+        hostname: 'images.shuntaka.dev',
+        pathname: '/images/moments/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.shuntaka.tech',
+        pathname: '/images/moments/**',
+      },
     ],
   },
   experimental: {

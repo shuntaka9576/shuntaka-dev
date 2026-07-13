@@ -17,6 +17,7 @@ export class MainStack extends cdk.Stack {
       fqdn: string;
       domain: {
         api: string;
+        images: string;
       };
       ssmParameters: {
         globalDns: {
@@ -113,6 +114,7 @@ export class MainStack extends cdk.Stack {
       physicalPrefix,
       stageName: props.stageName.long,
       domain: props.domain.api,
+      imagesBaseUrl: `https://${props.domain.images}`,
       hostedZone,
       certificate: tokyoCertificate,
       // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。

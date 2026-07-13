@@ -2,11 +2,12 @@
 
 import Image from 'next/image';
 import { useEffect, useRef } from 'react';
-import { LogCard, type LogSummary } from './LogCard';
+import type { MomentSummary } from '@/lib/api';
+import { MomentCard } from './MomentCard';
 
-interface LogFeedProps {
-  logs: LogSummary[];
-  /** まだ読み込める log が残っているか。false で末尾マーカー（ochaIcon）を表示 */
+interface MomentFeedProps {
+  moments: MomentSummary[];
+  /** まだ読み込める moment が残っているか。false で末尾マーカー（ochaIcon）を表示 */
   hasMore: boolean;
   /** 追加読み込み中か（スケルトンの表示制御） */
   loading: boolean;
@@ -14,13 +15,13 @@ interface LogFeedProps {
   onLoadMore: () => void;
 }
 
-function LogCardSkeleton({ tilt }: { tilt: 'left' | 'right' }) {
+function MomentCardSkeleton({ tilt }: { tilt: 'left' | 'right' }) {
   return (
     <div
       className="flex animate-pulse items-center gap-7 py-7 max-sm:gap-4 max-sm:py-5"
       aria-hidden="true"
     >
-      <div className={`log-photo shrink-0 ${tilt === 'right' ? 'log-photo--right' : ''}`}>
+      <div className={`moment-photo shrink-0 ${tilt === 'right' ? 'moment-photo--right' : ''}`}>
         <div className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-1.5 pb-0">
           <div className="aspect-square w-40 bg-[var(--color-border-subtle)] max-sm:w-28" />
           <div className="flex justify-center py-1.5">
@@ -36,7 +37,7 @@ function LogCardSkeleton({ tilt }: { tilt: 'left' | 'right' }) {
   );
 }
 
-export function LogFeed({ logs, hasMore, loading, onLoadMore }: LogFeedProps) {
+export function MomentFeed({ moments, hasMore, loading, onLoadMore }: MomentFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,13 +59,17 @@ export function LogFeed({ logs, hasMore, loading, onLoadMore }: LogFeedProps) {
 
   return (
     <section role="feed" aria-busy={loading}>
-      {logs.map((log, index) => (
-        <LogCard key={log.logId} log={log} tilt={index % 2 === 0 ? 'left' : 'right'} />
+      {moments.map((moment, index) => (
+        <MomentCard
+          key={moment.momentId}
+          moment={moment}
+          tilt={index % 2 === 0 ? 'left' : 'right'}
+        />
       ))}
       {loading && (
         <>
-          <LogCardSkeleton tilt={logs.length % 2 === 0 ? 'left' : 'right'} />
-          <LogCardSkeleton tilt={logs.length % 2 === 0 ? 'right' : 'left'} />
+          <MomentCardSkeleton tilt={moments.length % 2 === 0 ? 'left' : 'right'} />
+          <MomentCardSkeleton tilt={moments.length % 2 === 0 ? 'right' : 'left'} />
         </>
       )}
       {hasMore ? (

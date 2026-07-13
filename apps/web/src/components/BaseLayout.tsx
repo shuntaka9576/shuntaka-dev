@@ -8,7 +8,7 @@ import { ToggleSwitch } from './ToggleSwitch';
 interface BaseLayoutProps {
   children: React.ReactNode;
   showTypeHeader?: boolean;
-  currentTab?: 'posts' | 'about';
+  currentTab?: 'posts' | 'moments' | 'about';
   /** ヘッダー・タブ行・本文を記事一覧と同じ --layout-list-max のカラムに揃える */
   narrow?: boolean;
 }
@@ -24,6 +24,7 @@ export function BaseLayout({
   // Use currentTab if provided, otherwise fall back to pathname
   const isPostsActive =
     currentTab === 'posts' || (!currentTab && (pathname === '/' || pathname === undefined));
+  const isMomentsActive = currentTab === 'moments' || (!currentTab && pathname === '/moments');
   const isAboutActive = currentTab === 'about' || (!currentTab && pathname === '/about');
   // NOTE: doneProgress()はここで呼ばない
   // loading.tsxもBaseLayoutを使用するため、スケルトン表示時に完了してしまう
@@ -60,6 +61,11 @@ export function BaseLayout({
               <div className="inline-block mr-2">
                 <ProgressLink href="/" className={isPostsActive ? tabActiveClass : ''}>
                   posts
+                </ProgressLink>
+              </div>
+              <div className="inline-block mr-2">
+                <ProgressLink href="/moments" className={isMomentsActive ? tabActiveClass : ''}>
+                  moments
                 </ProgressLink>
               </div>
               <div className="inline-block mr-2">

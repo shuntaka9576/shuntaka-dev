@@ -1,4 +1,4 @@
-export { momentKeys, momentListInfiniteQuery } from './api/queries';
+export { momentKeys, momentListInfiniteQuery, momentQuery } from './api/queries';
 export {
   type Fastener,
   type FastenerColor,

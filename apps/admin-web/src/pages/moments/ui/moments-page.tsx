@@ -12,6 +12,7 @@ import { client } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { ButtonLink } from '@/shared/ui/button-link';
 import { Skeleton } from '@/shared/ui/skeleton';
 
 export function MomentsPage() {
@@ -25,6 +26,20 @@ export function MomentsPage() {
         json: { status: 'published' },
       });
       if (!res.ok) throw new Error('公開に失敗しました');
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: momentKeys.all });
+    },
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: async (momentId: string) => {
+      const res = await client.api.moments[':id'].$patch({
+        param: { id: momentId },
+        json: { status: 'draft' },
+      });
+      if (!res.ok) throw new Error('下書きに戻せませんでした');
       return res.json();
     },
     onSuccess: async () => {
@@ -61,7 +76,7 @@ export function MomentsPage() {
   }
 
   const moments = listQuery.data.pages.flatMap((page) => page.items);
-  const mutationError = publishMutation.error ?? deleteMutation.error;
+  const mutationError = publishMutation.error ?? unpublishMutation.error ?? deleteMutation.error;
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,6 +97,7 @@ export function MomentsPage() {
               key={moment.momentId}
               moment={moment}
               onPublish={() => publishMutation.mutate(moment.momentId)}
+              onUnpublish={() => unpublishMutation.mutate(moment.momentId)}
               onDelete={() => {
                 if (window.confirm('この投稿を削除しますか？')) {
                   deleteMutation.mutate(moment.momentId);
@@ -89,6 +105,7 @@ export function MomentsPage() {
               }}
               isMutating={
                 (publishMutation.isPending && publishMutation.variables === moment.momentId) ||
+                (unpublishMutation.isPending && unpublishMutation.variables === moment.momentId) ||
                 (deleteMutation.isPending && deleteMutation.variables === moment.momentId)
               }
             />
@@ -112,11 +129,13 @@ export function MomentsPage() {
 function MomentRow({
   moment,
   onPublish,
+  onUnpublish,
   onDelete,
   isMutating,
 }: {
   moment: Moment;
   onPublish: () => void;
+  onUnpublish: () => void;
   onDelete: () => void;
   isMutating: boolean;
 }) {
@@ -146,11 +165,30 @@ function MomentRow({
         </div>
       </div>
       <div className="flex shrink-0 flex-col gap-2">
-        {moment.status === 'draft' && (
+        {moment.status === 'draft' ? (
           <Button size="xs" onClick={onPublish} disabled={isMutating} data-testid="moment-publish">
             公開する
           </Button>
+        ) : (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={onUnpublish}
+            disabled={isMutating}
+            data-testid="moment-unpublish"
+          >
+            下書きに戻す
+          </Button>
         )}
+        <ButtonLink
+          size="xs"
+          variant="outline"
+          to="/moments/$momentId/edit"
+          params={{ momentId: moment.momentId }}
+          data-testid="moment-edit"
+        >
+          編集
+        </ButtonLink>
         <Button
           size="xs"
           variant="destructive"

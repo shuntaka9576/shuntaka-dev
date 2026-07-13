@@ -1,28 +1,9 @@
 import Image from 'next/image';
 import { memo } from 'react';
+import type { MomentSummary } from '@/lib/api';
 
-/** 写真の留め具（壁に貼るイメージ）。投稿時に管理画面で選ぶ想定 */
-export type LogFastener = 'clip' | 'tape';
-
-/** 留め具の色（tape のみ有効）。未指定は半透明グレー */
-export type LogFastenerColor = 'pink' | 'blue' | 'yellow' | 'green';
-
-/** log 1 件分のサマリ。API 実装時に lib/api.ts へ移動する想定 */
-export interface LogSummary {
-  logId: string;
-  /** 180 文字以内の一文 */
-  text: string;
-  /** 必須。R2 配信の写真 URL を想定 */
-  imageUrl: string;
-  publishedAt: string;
-  /** 未指定は clip */
-  fastener?: LogFastener;
-  /** tape のみ有効。clip は木の色固定 */
-  fastenerColor?: LogFastenerColor;
-}
-
-interface LogCardProps {
-  log: LogSummary;
+interface MomentCardProps {
+  moment: MomentSummary;
   /** 写真の傾き方向。一覧では index の偶奇で交互に渡してスクラップブック感を出す */
   tilt?: 'left' | 'right';
 }
@@ -40,7 +21,7 @@ function formatDate(dateString: string): string {
 function ClothespinIcon() {
   return (
     <svg
-      className="log-fastener log-clip"
+      className="moment-fastener moment-clip"
       width="18"
       height="40"
       viewBox="0 0 18 40"
@@ -84,34 +65,35 @@ function ClothespinIcon() {
   );
 }
 
-export const LogCard = memo(function LogCard({ log, tilt = 'left' }: LogCardProps) {
-  const fastener = log.fastener ?? 'clip';
-  const colorClass = log.fastenerColor ? ` log-tape--${log.fastenerColor}` : '';
+export const MomentCard = memo(function MomentCard({ moment, tilt = 'left' }: MomentCardProps) {
+  const fastener = moment.fastener ?? 'clip';
+  const colorClass = moment.fastenerColor ? ` moment-tape--${moment.fastenerColor}` : '';
 
   return (
-    <article className="log-card group flex items-center gap-7 py-7 max-sm:gap-4 max-sm:py-5">
-      <div className={`log-photo shrink-0 ${tilt === 'right' ? 'log-photo--right' : ''}`}>
+    <article className="moment-card group flex items-center gap-7 py-7 max-sm:gap-4 max-sm:py-5">
+      <div className={`moment-photo shrink-0 ${tilt === 'right' ? 'moment-photo--right' : ''}`}>
         {/* 留め具（clip = 木製クリップ / tape = マスキングテープ）。実物っぽさ優先で描画 */}
         {fastener === 'clip' ? (
           <ClothespinIcon />
         ) : (
-          <div className={`log-fastener log-tape${colorClass}`} aria-hidden="true" />
+          <div className={`moment-fastener moment-tape${colorClass}`} aria-hidden="true" />
         )}
         <figure className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-1.5 pb-0 transition-shadow duration-[var(--motion-base)] group-hover:shadow-[var(--shadow-2)]">
+          {/* 表示は 160px 四方のため一覧は thumb（長辺 640px）で足りる */}
           <Image
-            src={log.imageUrl}
-            alt={log.text}
+            src={moment.thumbUrl}
+            alt={moment.text}
             width={480}
             height={480}
             className="aspect-square w-40 object-cover max-sm:w-28"
             loading="lazy"
           />
           <figcaption className="py-1.5 text-center text-xs text-[var(--color-text-muted)]">
-            {formatDate(log.publishedAt)}
+            {formatDate(moment.publishedAt)}
           </figcaption>
         </figure>
       </div>
-      <p className="min-w-0 flex-1 text-base leading-[var(--lh-body)]">{log.text}</p>
+      <p className="min-w-0 flex-1 text-base leading-[var(--lh-body)]">{moment.text}</p>
     </article>
   );
 });

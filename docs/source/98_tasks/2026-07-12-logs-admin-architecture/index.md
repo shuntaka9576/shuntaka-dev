@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-12
 - 関連: [moments（旧称 logs）機能の構想と UI モック](../2026-07-12-logs-feature/index.md)
-- ステータス: フェーズ 0〜3 実装済み。dev の通し確認まで完了（2026-07-13。SRP ログイン → 画像付き投稿 → TiDB 反映 → images 配信）。ログイン障害 2 件の修正（「トラブルシュート」参照）は**未コミット**。残りは prd デプロイとフェーズ 4。詳細は末尾の「経緯（実装ログ）」参照
+- ステータス: フェーズ 0〜3 実装・dev / prd デプロイ・通し確認まで完了（2026-07-13）。フェーズ 4（公開側 moments タブ）も実装済み（ブランチ `feat/moments-public`、**未コミット**）。残りは tagpr リリース。詳細は末尾の「経緯（実装ログ）」参照
 
 ## 決定事項
 
@@ -540,14 +540,17 @@ bun run lint
 
 ### フェーズ 4: 公開側（shuntaka.dev の moments タブ）
 
-- [ ] apps/web: UI モックの `LogCard` / `LogFeed`（+ Story）を `MomentCard` / `MomentFeed` にリネーム
-- [ ] blog-api（Rust）: `GET /users/{name}/moments`（cursor、published のみ。`image_key` + env `IMAGES_BASE_URL` から `image_url` / `thumb_url` を組み立てて返す）+ テスト。iac 側で blog-api Lambda に env を追加
-- [ ] apps/web: `MomentSummary` 型を `lib/api.ts` へ移設し `getMoments` 追加
-- [ ] apps/web: `/moments` ルート追加 + `BaseLayout` の `currentTab` union に `'moments'` を追加
-- [ ] `MomentFeed` を実 API（cursor）に接続。一覧画像は `thumb_url` を使用（`next.config.ts` の `images.remotePatterns` に `images.shuntaka.dev` / `images.shuntaka.tech` を追加）
-- [ ] apps/web: `/moments/preview` ルート（query パラメータ img / text / fastener / color / date から `MomentCard` を 1 枚レンダリング。img は images ドメインのみ許可、noindex。admin のプレビューボタンから開く）
-- [ ] `DESIGN.md` に moments の意図的例外（揺れアニメーション / 留め具の実物描写）を明記
+- [x] apps/web: UI モックの `LogCard` / `LogFeed`（+ Story）を `MomentCard` / `MomentFeed` にリネーム（Story タイトル / CSS クラス `moment-*` / CSS 変数 / keyframes まで一新）
+- [x] blog-api（Rust）: `GET /users/{name}/moments`（cursor、published のみ。`image_key` + env `IMAGES_BASE_URL` から `image_url` / `thumb_url` を組み立てて返す）+ 単体テスト。iac 側で blog-api Lambda に env を追加（`domain.images` から組み立て、snapshot 更新済み）。cursor は admin と同じ moment_id（ULID）単独・`moment_id DESC` 順で、値は素の momentId（base64 化しない）。limit は 1〜50（default 20）、`limit+1` 件取得方式
+- [x] apps/web: `MomentSummary` 型を `lib/api.ts` へ移設し `getMoments` 追加（`thumbUrl` を含む）
+- [x] apps/web: `/moments` ルート追加 + `BaseLayout` の `currentTab` union に `'moments'` を追加（タブ並びは posts / moments / about）
+- [x] `MomentFeed` を実 API（cursor）に接続（server で 1 ページ目 → `MomentsInfiniteFeed`（client）が cursor で継ぎ足し。追加読み込み失敗時はフィードを打ち切り）。一覧画像は `thumb_url` を使用（`next.config.ts` の `images.remotePatterns` に `images.shuntaka.dev` / `images.shuntaka.tech` を追加）
+- [x] apps/web: `/moments/preview` ルート（query パラメータ img / text / fastener / color / date から `MomentCard` を 1 枚レンダリング。img は https + images ドメイン + `/images/moments/` パスのみ許可、noindex）
+- [x] `DESIGN.md` に moments の意図的例外（揺れアニメーション / 留め具の実物描写）を明記（3 セクション構成・タブ小文字表記も更新）
+- [x] 追加要望（2026-07-13）: admin に**編集**と**下書きに戻す**を実装。admin-backend に `GET /moments/:id`（編集フォームの初期値用）を追加し、admin-web は一覧の published 行に「下書きに戻す」（`PATCH status: draft`。published_at は backend が NULL に揃える）、全行に「編集」導線、`/moments/:id/edit` の編集ページ（`MomentForm` を編集モード拡張。画像差し替えは任意で、未選択なら既存 imageKey を維持。clip へ変更時は fastenerColor: null を明示送信）
 - [ ] tagpr リリース
+
+フェーズ 4 の動作確認（2026-07-13）: ローカルで blog-api を dev DB に向けて起動し、`GET /users/shuntaka/moments` が published のみ返すこと（draft は除外）、レスポンス形式（camelCase、orig/thumb URL、RFC3339）、不正 cursor / limit=0 が 400 になることを確認。`cargo clippy -D warnings` / `cargo test` / root `bun run lint`（10 タスク）/ `next build` すべてグリーン。
 
 ## 料金見積り
 
@@ -640,4 +643,5 @@ sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sq
 4. ~~`admin-create-user`~~ → **実施済み**（UserStatus CONFIRMED。username は `users.name` と同じ `shuntaka`）
 5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（下書き 1 件）は不要になったら管理画面から削除
 6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-backend の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
-7. ~~`blog_prd` へ DDL 適用~~（2026-07-13 適用済み。moments / admin_sessions の 7 テーブル構成を確認）→ 本 PR マージ後に prd デプロイ（「prd デプロイ」の GitHub Actions 手順。初回は 2 回 dispatch）→ フェーズ 4（公開側 moments タブ）
+7. ~~`blog_prd` へ DDL 適用 → prd デプロイ~~ → **完了**（2026-07-13。admin.shuntaka.dev で確認済み。初回は Cognito 焼き込みのため 2 回 dispatch した）
+8. ~~フェーズ 4（公開側 moments タブ）~~ → **実装済み**（2026-07-13、ブランチ `feat/moments-public`。チェックリストはフェーズ 4 の節を参照）。残りはコミット → PR → main マージ（= dev への blog-api / web デプロイ）→ tagpr リリースで本番反映

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { LogCard, type LogSummary } from './LogCard';
+import type { MomentSummary } from '@/lib/api';
+import { MomentCard } from './MomentCard';
 
 // モック写真（Unsplash）。square crop で取得する
 const IMG = {
@@ -12,19 +13,22 @@ const IMG = {
   cat: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=720&h=720&fit=crop&q=70',
 };
 
-// log = 180 文字以内の一文 + 写真必須の投稿
-const baseLog: LogSummary = {
-  logId: 'log-mock-01',
+// モックでは orig / thumb とも同じ URL を使う
+const photo = (url: string) => ({ imageUrl: url, thumbUrl: url });
+
+// moment = 180 文字以内の一文 + 写真必須の投稿
+const baseMoment: MomentSummary = {
+  momentId: 'moment-mock-01',
   text: '仕事帰り、いつもの交差点。信号を待つあいだの空が、今日はやけに広かった。',
-  imageUrl: IMG.valley,
+  ...photo(IMG.valley),
   publishedAt: '2026-07-12T21:30:00.000Z',
 };
 
 const meta = {
-  title: 'Components/LogCard',
-  component: LogCard,
+  title: 'Components/MomentCard',
+  component: MomentCard,
   args: {
-    log: baseLog,
+    moment: baseMoment,
   },
   decorators: [
     // 本番の一覧カラム（BaseLayout narrow の --layout-list-max）と同じ幅に載せる
@@ -37,7 +41,7 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-} satisfies Meta<typeof LogCard>;
+} satisfies Meta<typeof MomentCard>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -48,24 +52,24 @@ export const Default: Story = {};
 export const FastenerVariants: Story = {
   render: (args) => (
     <div>
-      <LogCard {...args} log={{ ...baseLog, fastener: 'clip' }} />
-      <LogCard
+      <MomentCard {...args} moment={{ ...baseMoment, fastener: 'clip' }} />
+      <MomentCard
         {...args}
-        log={{
-          ...baseLog,
-          logId: 'log-mock-05',
-          imageUrl: IMG.coffee,
+        moment={{
+          ...baseMoment,
+          momentId: 'moment-mock-05',
+          ...photo(IMG.coffee),
           fastener: 'tape',
           fastenerColor: 'yellow',
         }}
         tilt="right"
       />
-      <LogCard
+      <MomentCard
         {...args}
-        log={{
-          ...baseLog,
-          logId: 'log-mock-04',
-          imageUrl: IMG.forest,
+        moment={{
+          ...baseMoment,
+          momentId: 'moment-mock-04',
+          ...photo(IMG.forest),
           fastener: 'tape',
         }}
       />
@@ -78,13 +82,13 @@ export const TapeColors: Story = {
   render: (args) => (
     <div>
       {(['pink', 'blue', 'yellow', 'green', undefined] as const).map((fastenerColor, i) => (
-        <LogCard
+        <MomentCard
           {...args}
           key={fastenerColor ?? 'plain'}
-          log={{
-            ...baseLog,
-            logId: `tape-${fastenerColor ?? 'plain'}`,
-            imageUrl: Object.values(IMG)[i % 6],
+          moment={{
+            ...baseMoment,
+            momentId: `tape-${fastenerColor ?? 'plain'}`,
+            ...photo(Object.values(IMG)[i % 6]),
             fastener: 'tape',
             fastenerColor,
           }}
@@ -103,11 +107,11 @@ export const TiltRight: Story = {
 
 export const ShortText: Story = {
   args: {
-    log: {
-      ...baseLog,
-      logId: 'log-mock-02',
+    moment: {
+      ...baseMoment,
+      momentId: 'moment-mock-02',
       text: '波の音だけの朝。',
-      imageUrl: IMG.beach,
+      ...photo(IMG.beach),
     },
   },
 };
@@ -115,11 +119,11 @@ export const ShortText: Story = {
 // text はちょうど 180 文字（上限いっぱい）
 export const MaxLength: Story = {
   args: {
-    log: {
-      ...baseLog,
-      logId: 'log-mock-03',
+    moment: {
+      ...baseMoment,
+      momentId: 'moment-mock-03',
       text: 'デプロイが終わった深夜三時、ベランダに出て冷たい空気を吸い込んだ。街はもう眠っていて、信号だけが律儀に色を変え続けている。誰にも見られなくても動き続けるものが、この世界にはたくさんあるのだと思ったら、自分の書いたコードが今も静かにリクエストを捌いていることが、ほんの少しだけ誇らしくなった。明日もきっと同じように夜は更けて、同じように新しい朝が来るのだと思う。',
-      imageUrl: IMG.nightCity,
+      ...photo(IMG.nightCity),
     },
   },
 };

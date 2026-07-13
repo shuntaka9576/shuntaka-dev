@@ -36,6 +36,7 @@ describe('MainStack', () => {
       fqdn: 'example.com',
       domain: {
         api: 'api.example.com',
+        images: 'images.example.com',
       },
       ssmParameters: {
         globalDns: {

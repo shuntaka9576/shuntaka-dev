@@ -29,6 +29,8 @@ export class BlogAPIConstruct extends Construct {
       physicalPrefix: string;
       stageName: string;
       domain: string;
+      /** moments 画像の配信ベース URL（例: https://images.shuntaka.dev） */
+      imagesBaseUrl: string;
       hostedZone: route53.IHostedZone;
       certificate: acm.ICertificate;
       databaseName: string;
@@ -192,6 +194,7 @@ export class BlogAPIConstruct extends Construct {
         CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
         CLOUDINARY_API_SECRET: cloudinaryApiSecret,
+        IMAGES_BASE_URL: props.imagesBaseUrl,
       },
     });
 
