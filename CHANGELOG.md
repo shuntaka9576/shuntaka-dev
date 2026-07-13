@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0713.3](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.2...2026.0713.3) - 2026-07-13
+
+- feat: moments の日付指定を廃止し EXIF 由来の撮影時刻 captured_at に移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/626
+
 ## [2026.0713.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.1...2026.0713.2) - 2026-07-13
 
 - chore(deps): update dependency tsx to ^4.23.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/621
