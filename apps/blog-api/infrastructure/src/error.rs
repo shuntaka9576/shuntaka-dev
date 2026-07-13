@@ -34,6 +34,12 @@ pub enum CloudinaryError {
 }
 
 #[derive(Error, Debug)]
+pub enum LambdaInvokeError {
+    #[error("Lambda invoke failed: {0}")]
+    Sdk(String),
+}
+
+#[derive(Error, Debug)]
 pub enum WebhookError {
     #[error("Missing X-Hub-Signature-256 header")]
     MissingSignature,

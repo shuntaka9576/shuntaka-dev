@@ -10,6 +10,7 @@ path = "src/bin/app.rs"
 [dependencies]
 adapter.workspace = true
 api.workspace = true
+infrastructure.workspace = true
 registry.workspace = true
 shared.workspace = true
 anyhow.workspace = true

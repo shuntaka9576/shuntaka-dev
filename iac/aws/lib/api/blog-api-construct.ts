@@ -179,6 +179,10 @@ export class BlogAPIConstruct extends Construct {
       securityGroups: [lambdaSg],
       environment: {
         AWS_LWA_INVOKE_MODE: 'response_stream',
+        // 自己 Event invoke のペイロードを LWA がアプリの POST /events へ転送する
+        // （デフォルト値だが挙動を明示するため宣言）。GitHub webhook の実処理を
+        // 非同期化して GitHub 側の 10 秒配信タイムアウトを回避する
+        AWS_LWA_PASS_THROUGH_PATH: '/events',
         DATABASE_URL: `mysql://root@${proxyDnsName}:13306/${props.databaseName}?ssl-mode=PREFERRED`,
         HTTPS_PROXY: proxyHttpUrl,
         HTTP_PROXY: proxyHttpUrl,
@@ -200,6 +204,24 @@ export class BlogAPIConstruct extends Construct {
 
     webApiLambda.role?.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
+    );
+
+    // webhook の実処理を自分自身へ Event invoke で逃がすための権限。
+    // 経路は squid (HTTPS_PROXY) の CONNECT トンネル経由で Lambda API に到達する。
+    // grantInvoke(自身) だと Function ⇔ DefaultPolicy の循環依存になるため、
+    // 固定の物理関数名から ARN を組み立てて参照を切る
+    webApiLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        resources: [
+          cdk.Stack.of(this).formatArn({
+            service: 'lambda',
+            resource: 'function',
+            resourceName: `${props.physicalPrefix}-blog-api`,
+            arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+          }),
+        ],
+      }),
     );
 
     const restApi = new RestApi(this, 'RestApi', {

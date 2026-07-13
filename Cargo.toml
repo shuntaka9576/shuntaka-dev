@@ -43,6 +43,9 @@ uuid = { version = "1.23.4", features = ["serde", "v4"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 aws-config = "1.9.0"
 aws-sdk-ssm = "1.115.0"
+aws-sdk-lambda = "1.133.0"
+aws-smithy-http-client = { version = "1.2.0", features = ["rustls-aws-lc"] }
+aws-smithy-runtime-api = "1.13.0"
 tower-http = { version = "0.7.0", features = ["cors", "trace", "compression-gzip"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
