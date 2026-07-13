@@ -31,7 +31,8 @@ impl From<MomentSummaryRow> for MomentSummary {
     }
 }
 
-// ULID は時系列ソート可能なため moment_id 単独の降順で新しい順になる。
+// 表示順は published_at の降順（管理画面で日付を過去に変更できるため、作成順の
+// ULID ではなく日付で並べる）。同時刻は moment_id 降順でタイブレークする。
 // published_at は publish 時に必ず設定されるが、NULL の異常データでも
 // 落ちないよう created_at にフォールバックする
 const LIST_SQL: &str = "SELECT m.moment_id, m.text, m.image_key, m.fastener, m.fastener_color,\n    \
@@ -39,16 +40,21 @@ const LIST_SQL: &str = "SELECT m.moment_id, m.text, m.image_key, m.fastener, m.f
      FROM moments m\n\
      WHERE m.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
      AND m.status = 'published'\n\
-     ORDER BY m.moment_id DESC\n\
+     ORDER BY published_at DESC, m.moment_id DESC\n\
      LIMIT ?";
 
+// カーソルは前ページ末尾の moment_id のまま受け、その行の (published_at, moment_id) を
+// 行サブクエリで引いてタプル比較する（API 契約を変えずに日付順ページングにする）。
+// カーソル行が削除済みの場合はサブクエリが空 → 比較が NULL になり空ページで打ち切られる
 const LIST_SQL_WITH_CURSOR: &str = "SELECT m.moment_id, m.text, m.image_key, m.fastener, m.fastener_color,\n    \
      COALESCE(m.published_at, m.created_at) AS published_at\n\
      FROM moments m\n\
      WHERE m.user_id = (SELECT user_id FROM users WHERE name = ?)\n  \
      AND m.status = 'published'\n  \
-     AND m.moment_id < ?\n\
-     ORDER BY m.moment_id DESC\n\
+     AND (COALESCE(m.published_at, m.created_at), m.moment_id) < (\n    \
+     SELECT COALESCE(c.published_at, c.created_at), c.moment_id\n    \
+     FROM moments c WHERE c.moment_id = ?)\n\
+     ORDER BY published_at DESC, m.moment_id DESC\n\
      LIMIT ?";
 
 #[derive(new)]

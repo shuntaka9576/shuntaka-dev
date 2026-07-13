@@ -10,10 +10,13 @@ interface MomentCardProps {
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
+  // 例: 2026/07/13(月)。サーバーの TZ に依存しないよう JST に固定する
   return date.toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+    weekday: 'short',
+    timeZone: 'Asia/Tokyo',
   });
 }
 

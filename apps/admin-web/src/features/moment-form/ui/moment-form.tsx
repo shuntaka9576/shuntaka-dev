@@ -17,6 +17,7 @@ import {
 import { client } from '@/shared/api';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Textarea } from '@/shared/ui/textarea';
 
@@ -35,6 +36,17 @@ const swatchClasses: Record<FastenerColor, string> = {
   green: 'bg-green-300',
 };
 
+/** publishedAt (ISO) を <input type="date"> 用のローカル日付 YYYY-MM-DD に変換 */
+const toDateInputValue = (iso: string | null): string => {
+  if (iso === null) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** 選択日のローカル 0 時を publishedAt として送る */
+const toPublishedAtIso = (date: string): string => new Date(`${date}T00:00:00`).toISOString();
+
 interface MomentFormProps {
   /** 指定すると編集モード。省略時は新規投稿 */
   moment?: Moment;
@@ -52,6 +64,9 @@ export function MomentForm({ moment }: MomentFormProps) {
     moment?.fastenerColor ?? null,
   );
   const [status, setStatus] = useState<MomentStatus>(moment?.status ?? 'published');
+  // 写真の下に表示される日付。編集では現在の publishedAt、新規は未選択 (= 投稿時の日時)
+  const initialPublishedDate = toDateInputValue(moment?.publishedAt ?? null);
+  const [publishedDate, setPublishedDate] = useState(initialPublishedDate);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -144,6 +159,10 @@ export function MomentForm({ moment }: MomentFormProps) {
               // clip へ変更した場合などに残った色をサーバー側でも確実に消す
               fastenerColor: fastener === 'tape' ? fastenerColor : null,
               status,
+              // 日付を変更したときだけ送る (未変更なら既存の時刻を保持)
+              ...(publishedDate !== '' && publishedDate !== initialPublishedDate
+                ? { publishedAt: toPublishedAtIso(publishedDate) }
+                : {}),
             },
           });
         } else {
@@ -153,6 +172,8 @@ export function MomentForm({ moment }: MomentFormProps) {
             fastener,
             ...(fastenerColor !== null ? { fastenerColor } : {}),
             status,
+            // 未選択ならサーバー側で現在時刻になる
+            ...(publishedDate !== '' ? { publishedAt: toPublishedAtIso(publishedDate) } : {}),
           });
         }
       } catch (err) {
@@ -175,6 +196,7 @@ export function MomentForm({ moment }: MomentFormProps) {
         text: form.state.values.text,
         fastener,
         fastenerColor,
+        date: publishedDate !== '' ? publishedDate : null,
       });
       window.open(url, '_blank', 'noopener');
     } catch (err) {
@@ -216,6 +238,21 @@ export function MomentForm({ moment }: MomentFormProps) {
             className="max-h-64 w-fit rounded-md border object-contain"
           />
         )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="moment-published-date">日付 (写真の下に表示)</Label>
+        <Input
+          id="moment-published-date"
+          type="date"
+          className="w-fit"
+          value={publishedDate}
+          onChange={(e) => setPublishedDate(e.target.value)}
+          data-testid="moment-form-published-date"
+        />
+        <p className="text-xs text-muted-foreground">
+          {isEdit ? '変更するとその日付で表示されます' : '未選択なら投稿した日付になります'}
+        </p>
       </div>
 
       <form.Field
