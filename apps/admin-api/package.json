@@ -1,5 +1,5 @@
 {
-  "name": "@shuntaka-dev/admin-backend",
+  "name": "@shuntaka-dev/admin-api",
   "version": "0.1.0",
   "type": "module",
   "exports": {

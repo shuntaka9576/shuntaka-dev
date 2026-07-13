@@ -195,9 +195,9 @@ export class AdminStack extends cdk.Stack {
 
     const adminApiLambda = new nodejs.NodejsFunction(this, 'AdminApiLambda', {
       functionName: `${props.physicalPrefix}-admin-api`,
-      entry: path.resolve(__dirname, '../../../../apps/admin-backend/src/index.ts'),
+      entry: path.resolve(__dirname, '../../../../apps/admin-api/src/index.ts'),
       depsLockFilePath: path.resolve(__dirname, '../../../../bun.lock'),
-      runtime: lambda.Runtime.NODEJS_22_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       architecture: lambda.Architecture.ARM_64,
       memorySize: 512,
       // API Gateway HTTP API のタイムアウト上限 (30 秒) に合わせる
@@ -213,7 +213,7 @@ export class AdminStack extends cdk.Stack {
       securityGroups: [adminApiSg],
       bundling: {
         format: nodejs.OutputFormat.ESM,
-        target: 'node22',
+        target: 'node24',
         minify: true,
         // ESM バンドル内の CJS 依存 (mysql2 等) の require を解決する shim
         banner:

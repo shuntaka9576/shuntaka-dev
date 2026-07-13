@@ -10,7 +10,7 @@
 
 ## ブランドコンテキスト
 
-shuntaka.dev は、日本人ソフトウェアエンジニアの個人テックブログ。**posts**、**about** の 2 セクション構成（記事の分類はタグ階層 `tech/` / `misc/` が担う）で、記事は Markdown で書かれサーバーサイド（Rust + comrak + syntect）で HTML に変換される。読書体験で重視するのは：
+shuntaka.dev は、日本人ソフトウェアエンジニアの個人テックブログ。**posts**、**moments**、**about** の 3 セクション構成（記事の分類はタグ階層 `tech/` / `misc/` が担う。moments は 180 字 + 写真必須の一文投稿）で、記事は Markdown で書かれサーバーサイド（Rust + comrak + syntect）で HTML に変換される。読書体験で重視するのは：
 
 - 派手な装飾より **長文の読みやすさ**
 - 写真ではなく **コードブロック・リンクカード・埋め込み** を視覚の中心に
@@ -47,7 +47,7 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### ラベル / 表記
 
-- **大文字小文字.** タブラベルとサイトタイトルは小文字（`posts`, `about`, `shuntaka.dev`）。記事内見出しを Title Case にしない。
+- **大文字小文字.** タブラベルとサイトタイトルは小文字（`posts`, `moments`, `about`, `shuntaka.dev`）。記事内見出しを Title Case にしない。
 - **日付.** 常に `YYYY/MM/DD`（例: `2021/03/12`）。記事タイムスタンプは `MM/DD HH:mm YYYY`。
 - **絵文字.** プロダクト UI に絵文字を入れない。あたたかみはマスコット (`ochaIcon`、フルカラー SVG) が担う。
 
@@ -85,6 +85,14 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 - **Focus-visible.** 全要素共通の `outline: 2px solid var(--color-accent); outline-offset: 2px;` を `globals.css` で `a`、`button`、`[role="button"]`、input、summary に当てる。アクセシビリティの基盤。
 - **Active.** ボタンは `filter: brightness(90%)`。
 - **Disabled.** `opacity: 0.5; pointer-events: none;` + `aria-disabled="true"`。
+
+### moments の意図的例外
+
+moments（180 字 + 写真必須の一文投稿）は写真が主役の情緒的なサーフェスとして、`MomentCard` / `MomentFeed` に限り以下だけ基本ルールから意図的に外れる：
+
+- **揺れアニメーション.** hover の「1 プロパティを 1 段階」から外れ、留め具を支点にした減衰振り子で写真がふわっと揺れる（`moment-swing`）。`prefers-reduced-motion` では無効。
+- **留め具の実物描写.** 木製クリップ / マスキングテープは「UI サーフェスではなく現実にある物の描写」として、グラデーション・落ち影・多色（木肌 + 金属バネ等）を許容する。
+- 上記以外は従来どおり：カード自体はフラット（影は hover 時の `--shadow-2` のみ）、UI サーフェスのグラデーション禁止・静止カードの drop-shadow 禁止は維持、アクセント色は使わない。
 
 ### レイアウトルール
 

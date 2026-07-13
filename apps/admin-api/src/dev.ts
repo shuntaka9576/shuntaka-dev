@@ -29,5 +29,5 @@ devApp.route('/', app);
 const port = Number(process.env.ADMIN_API_PORT ?? 43001);
 
 serve({ fetch: devApp.fetch, port }, (info) => {
-  console.log(`admin-backend dev server: http://localhost:${info.port}/api/doc`);
+  console.log(`admin-api dev server: http://localhost:${info.port}/api/doc`);
 });

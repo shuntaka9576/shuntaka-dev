@@ -64,6 +64,42 @@ export interface TagFacetsOptions {
   signal?: AbortSignal;
 }
 
+/** 写真の留め具（壁に貼るイメージ）。投稿時に管理画面で選ぶ */
+export type MomentFastener = 'clip' | 'tape';
+
+/** 留め具の色（tape のみ有効）。未指定は半透明グレー */
+export type MomentFastenerColor = 'pink' | 'blue' | 'yellow' | 'green';
+
+/** moment（180 文字以内の一文 + 写真必須の投稿）1 件分のサマリ */
+export interface MomentSummary {
+  momentId: string;
+  /** 180 文字以内の一文 */
+  text: string;
+  /** orig 画像の URL（images.<fqdn> 配信） */
+  imageUrl: string;
+  /** 一覧表示用サムネイルの URL（長辺 640px） */
+  thumbUrl: string;
+  publishedAt: string;
+  /** 未指定は clip */
+  fastener?: MomentFastener;
+  /** tape のみ有効。clip は木の色固定 */
+  fastenerColor?: MomentFastenerColor | null;
+}
+
+export interface MomentsPage {
+  moments: MomentSummary[];
+  /** 次ページ取得用カーソル。null で末尾 */
+  nextCursor: string | null;
+}
+
+export interface MomentsQueryOptions {
+  cursor?: string;
+  limit?: number;
+  /** true にすると ISR キャッシュを使わず常に最新を取得する（クライアントサイドフェッチ用） */
+  noCache?: boolean;
+  signal?: AbortSignal;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 /**
@@ -129,6 +165,33 @@ export async function getTagFacets(
 
   if (!res.ok) {
     throw new Error(`Failed to fetch tag facets: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * 公開 moments を新しい順に取得する（カーソルページング）。
+ * 初回は cursor なし、以降はレスポンスの nextCursor を渡して継ぎ足す。
+ */
+export async function getMoments(
+  userName: string,
+  opts: MomentsQueryOptions = {},
+): Promise<MomentsPage> {
+  const queryParts: string[] = [];
+  if (opts.cursor !== undefined) queryParts.push(`cursor=${encodeURIComponent(opts.cursor)}`);
+  if (opts.limit !== undefined) queryParts.push(`limit=${opts.limit}`);
+
+  const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  const url = `${API_BASE_URL}/users/${userName}/moments${query}`;
+  const fetchOpts = opts.noCache
+    ? { cache: 'no-store' as const, signal: opts.signal }
+    : { next: { revalidate: 30 }, signal: opts.signal };
+
+  const res = await fetch(url, fetchOpts);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch moments: ${res.status}`);
   }
 
   return res.json();

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useCallback, useState } from 'react';
-import type { LogSummary } from './LogCard';
-import { LogFeed } from './LogFeed';
+import type { MomentSummary } from '@/lib/api';
+import { MomentFeed } from './MomentFeed';
 import { ToggleSwitch } from './ToggleSwitch';
 
 const TEXTS = [
@@ -31,14 +31,17 @@ const FASTENERS = ['clip', 'tape', 'clip', 'tape'] as const;
 const FASTENER_COLORS = ['pink', 'yellow', undefined, 'blue', 'green'] as const;
 
 // 新しい順に 1.5 日ずつ遡る決定的なモックデータ。留め具は投稿ごとに選ばれる想定で混在させる
-function mockLog(index: number): LogSummary {
+function mockMoment(index: number): MomentSummary {
   const publishedAt = new Date(
     Date.UTC(2026, 6, 12, 21, 30) - index * 36 * 60 * 60 * 1000,
   ).toISOString();
+  const imageUrl = `https://images.unsplash.com/${IMAGES[index % IMAGES.length]}?w=720&h=720&fit=crop&q=70`;
   return {
-    logId: `mock-log-${index}`,
+    momentId: `mock-moment-${index}`,
     text: TEXTS[index % TEXTS.length],
-    imageUrl: `https://images.unsplash.com/${IMAGES[index % IMAGES.length]}?w=720&h=720&fit=crop&q=70`,
+    imageUrl,
+    // モックでは orig / thumb とも同じ URL を使う
+    thumbUrl: imageUrl,
     publishedAt,
     fastener: FASTENERS[index % FASTENERS.length],
     fastenerColor: FASTENER_COLORS[index % FASTENER_COLORS.length],
@@ -48,32 +51,32 @@ function mockLog(index: number): LogSummary {
 const PAGE_SIZE = 6;
 const TOTAL = 30;
 
-// posts のページネーションと異なり logs は無限スクロール。
+// posts のページネーションと異なり moments は無限スクロール。
 // 本番では onLoadMore が API のカーソルページングを叩く
 function InfiniteFeedDemo() {
-  const [logs, setLogs] = useState<LogSummary[]>(() =>
-    Array.from({ length: PAGE_SIZE }, (_, i) => mockLog(i)),
+  const [moments, setMoments] = useState<MomentSummary[]>(() =>
+    Array.from({ length: PAGE_SIZE }, (_, i) => mockMoment(i)),
   );
   const [loading, setLoading] = useState(false);
-  const hasMore = logs.length < TOTAL;
+  const hasMore = moments.length < TOTAL;
 
   const loadMore = useCallback(() => {
     setLoading(true);
     setTimeout(() => {
-      setLogs((prev) => [
+      setMoments((prev) => [
         ...prev,
-        ...Array.from({ length: PAGE_SIZE }, (_, i) => mockLog(prev.length + i)),
+        ...Array.from({ length: PAGE_SIZE }, (_, i) => mockMoment(prev.length + i)),
       ]);
       setLoading(false);
     }, 900);
   }, []);
 
-  return <LogFeed logs={logs} hasMore={hasMore} loading={loading} onLoadMore={loadMore} />;
+  return <MomentFeed moments={moments} hasMore={hasMore} loading={loading} onLoadMore={loadMore} />;
 }
 
-// BaseLayout に logs タブを足したときの見た目のモック。
-// 実装時は BaseLayout の currentTab union に 'logs' を追加する
-function LogsPageMock() {
+// BaseLayout に moments タブを足したときの見た目のモック。
+// 実装時は BaseLayout の currentTab union に 'moments' を追加する
+function MomentsPageMock() {
   const widthClass = 'max-w-[calc(var(--layout-list-max)+4rem)]';
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
@@ -90,7 +93,7 @@ function LogsPageMock() {
           <div>
             <div className="mr-2 inline-block">posts</div>
             <div className="mr-2 inline-block border-b-2 border-[var(--color-text)] pb-0.5">
-              logs
+              moments
             </div>
             <div className="mr-2 inline-block">about</div>
           </div>
@@ -104,8 +107,8 @@ function LogsPageMock() {
 }
 
 const meta = {
-  title: 'Components/LogFeed',
-  component: LogFeed,
+  title: 'Components/MomentFeed',
+  component: MomentFeed,
   decorators: [
     (Story) => (
       <div className="mx-auto w-[var(--layout-list-max)] max-w-[90vw]">
@@ -113,7 +116,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof LogFeed>;
+} satisfies Meta<typeof MomentFeed>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -121,7 +124,7 @@ type Story = StoryObj<typeof meta>;
 // スクロールすると 900ms の擬似レイテンシでページが継ぎ足される
 export const InfiniteScroll: Story = {
   args: {
-    logs: [],
+    moments: [],
     hasMore: true,
     loading: false,
     onLoadMore: () => {},
@@ -131,32 +134,32 @@ export const InfiniteScroll: Story = {
 
 export const LoadingSkeleton: Story = {
   args: {
-    logs: Array.from({ length: 2 }, (_, i) => mockLog(i)),
+    moments: Array.from({ length: 2 }, (_, i) => mockMoment(i)),
     hasMore: true,
     loading: true,
     onLoadMore: () => {},
   },
 };
 
-// 末尾に到達すると ochaIcon で静かに終わる
+// 末尾に到達すると追加読み込みが止まる (締めはフッターの ochaIcon が担う)
 export const EndOfFeed: Story = {
   args: {
-    logs: Array.from({ length: 3 }, (_, i) => mockLog(i)),
+    moments: Array.from({ length: 3 }, (_, i) => mockMoment(i)),
     hasMore: false,
     loading: false,
     onLoadMore: () => {},
   },
 };
 
-// posts / logs / about タブを含むページ全体のイメージ
-export const LogsPage: Story = {
+// posts / moments / about タブを含むページ全体のイメージ
+export const MomentsPage: Story = {
   args: {
-    logs: [],
+    moments: [],
     hasMore: true,
     loading: false,
     onLoadMore: () => {},
   },
-  render: () => <LogsPageMock />,
+  render: () => <MomentsPageMock />,
   parameters: {
     layout: 'fullscreen',
   },

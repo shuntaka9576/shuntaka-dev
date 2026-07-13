@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   type Fastener,
   type FastenerColor,
+  type Moment,
   type MomentStatus,
   fastenerColorOptions,
   fastenerOptions,
@@ -25,6 +26,7 @@ import { uploadImages } from '../lib/upload-image';
 import { MOMENT_TEXT_MAX, momentFormSchema } from '../model/schema';
 
 type CreateMomentInput = InferRequestType<typeof client.api.moments.$post>['json'];
+type UpdateMomentInput = InferRequestType<(typeof client.api.moments)[':id']['$patch']>['json'];
 
 const swatchClasses: Record<FastenerColor, string> = {
   pink: 'bg-pink-300',
@@ -33,15 +35,23 @@ const swatchClasses: Record<FastenerColor, string> = {
   green: 'bg-green-300',
 };
 
-export function MomentForm() {
+interface MomentFormProps {
+  /** 指定すると編集モード。省略時は新規投稿 */
+  moment?: Moment;
+}
+
+export function MomentForm({ moment }: MomentFormProps) {
+  const isEdit = moment !== undefined;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [file, setFile] = useState<File | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [fastener, setFastener] = useState<Fastener>('clip');
-  const [fastenerColor, setFastenerColor] = useState<FastenerColor | null>(null);
-  const [status, setStatus] = useState<MomentStatus>('published');
+  const [fastener, setFastener] = useState<Fastener>(moment?.fastener ?? 'clip');
+  const [fastenerColor, setFastenerColor] = useState<FastenerColor | null>(
+    moment?.fastenerColor ?? null,
+  );
+  const [status, setStatus] = useState<MomentStatus>(moment?.status ?? 'published');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -77,6 +87,13 @@ export function MomentForm() {
     return imageKey;
   };
 
+  // 編集では画像の差し替えは任意。新しいファイル未選択なら既存の imageKey を使う
+  const resolveImageKey = async (): Promise<string | null> => {
+    if (file !== null) return ensureUploaded(file);
+    if (isEdit) return moment.imageKey;
+    return null;
+  };
+
   const createMutation = useMutation({
     mutationFn: async (json: CreateMomentInput) => {
       const res = await client.api.moments.$post({ json });
@@ -89,23 +106,55 @@ export function MomentForm() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (input: { momentId: string; json: UpdateMomentInput }) => {
+      const res = await client.api.moments[':id'].$patch({
+        param: { id: input.momentId },
+        json: input.json,
+      });
+      if (!res.ok) throw new Error('更新に失敗しました');
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: momentKeys.all });
+      await navigate({ to: '/moments' });
+    },
+  });
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
   const form = useForm({
-    defaultValues: { text: '' },
+    defaultValues: { text: moment?.text ?? '' },
     onSubmit: async ({ value }) => {
       setSubmitError(null);
-      if (file === null) {
-        setSubmitError('写真を選択してください');
-        return;
-      }
       try {
-        const imageKey = await ensureUploaded(file);
-        await createMutation.mutateAsync({
-          text: value.text.trim(),
-          imageKey,
-          fastener,
-          ...(fastenerColor !== null ? { fastenerColor } : {}),
-          status,
-        });
+        const imageKey = await resolveImageKey();
+        if (imageKey === null) {
+          setSubmitError('写真を選択してください');
+          return;
+        }
+        const text = value.text.trim();
+        if (isEdit) {
+          await updateMutation.mutateAsync({
+            momentId: moment.momentId,
+            json: {
+              text,
+              imageKey,
+              fastener,
+              // clip へ変更した場合などに残った色をサーバー側でも確実に消す
+              fastenerColor: fastener === 'tape' ? fastenerColor : null,
+              status,
+            },
+          });
+        } else {
+          await createMutation.mutateAsync({
+            text,
+            imageKey,
+            fastener,
+            ...(fastenerColor !== null ? { fastenerColor } : {}),
+            status,
+          });
+        }
       } catch (err) {
         setSubmitError(err instanceof Error ? err.message : '送信に失敗しました');
       }
@@ -114,13 +163,13 @@ export function MomentForm() {
 
   const handlePreview = async () => {
     setSubmitError(null);
-    if (file === null) {
-      setSubmitError('写真を選択してください');
-      return;
-    }
     setIsPreviewing(true);
     try {
-      const imageKey = await ensureUploaded(file);
+      const imageKey = await resolveImageKey();
+      if (imageKey === null) {
+        setSubmitError('写真を選択してください');
+        return;
+      }
       const url = buildPreviewUrl({
         imageKey,
         text: form.state.values.text,
@@ -135,6 +184,9 @@ export function MomentForm() {
     }
   };
 
+  // 新しいファイル選択中はそのプレビュー、編集で未選択なら現在の画像
+  const previewSrc = objectUrl ?? moment?.imageUrl ?? null;
+
   return (
     <form
       className="flex flex-col gap-6"
@@ -146,7 +198,9 @@ export function MomentForm() {
       }}
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="moment-image">写真 (必須)</Label>
+        <Label htmlFor="moment-image">
+          {isEdit ? '写真 (変更する場合のみ選択)' : '写真 (必須)'}
+        </Label>
         <input
           id="moment-image"
           type="file"
@@ -155,10 +209,10 @@ export function MomentForm() {
           data-testid="moment-form-image"
           onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
         />
-        {objectUrl !== null && (
+        {previewSrc !== null && (
           <img
-            src={objectUrl}
-            alt="選択した写真のプレビュー"
+            src={previewSrc}
+            alt={objectUrl !== null ? '選択した写真のプレビュー' : '現在の写真'}
             className="max-h-64 w-fit rounded-md border object-contain"
           />
         )}
@@ -275,17 +329,25 @@ export function MomentForm() {
           type="button"
           variant="outline"
           onClick={() => void handlePreview()}
-          disabled={isPreviewing || createMutation.isPending}
+          disabled={isPreviewing || isSubmitting}
           data-testid="moment-form-preview"
         >
           {isPreviewing ? 'アップロード中…' : 'プレビュー'}
         </Button>
         <Button
           type="submit"
-          disabled={createMutation.isPending || isPreviewing}
+          disabled={isSubmitting || isPreviewing}
           data-testid="moment-form-submit"
         >
-          {createMutation.isPending ? '投稿中…' : status === 'draft' ? '下書き保存' : '投稿する'}
+          {isEdit
+            ? isSubmitting
+              ? '更新中…'
+              : '更新する'
+            : isSubmitting
+              ? '投稿中…'
+              : status === 'draft'
+                ? '下書き保存'
+                : '投稿する'}
         </Button>
       </div>
     </form>

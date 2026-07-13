@@ -6,7 +6,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node22',
+  target: 'node24',
   minify: true,
   // mysql2 が optional dependency の cardinal を try/catch 内で require するため除外
   external: ['cardinal'],

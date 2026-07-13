@@ -162,7 +162,7 @@ export const applyAdminStackSuppressions = (stack: cdk.Stack): void => {
     {
       id: 'AwsSolutions-L1',
       reason:
-        'admin-api Lambda は admin-backend の開発対象ランタイムに合わせて Node.js 22 固定。custom resource Lambda は aws-cdk-lib 既定に従う。',
+        'admin-api Lambda は開発対象ランタイム (.node-version) に合わせて Node.js 24 固定。custom resource Lambda は aws-cdk-lib 既定に従う。',
     },
     {
       id: 'AwsSolutions-COG2',

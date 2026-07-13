@@ -53,6 +53,18 @@ const listRoute = createRoute({
   },
 });
 
+const getMomentRoute = createRoute({
+  method: 'get',
+  path: '/moments/{id}',
+  request: { params: momentIdParamSchema },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: momentSchema } },
+      description: 'moment 1 件 (編集フォームの初期値用)',
+    },
+  },
+});
+
 const createMomentRoute = createRoute({
   method: 'post',
   path: '/moments',
@@ -117,6 +129,12 @@ export const momentRoutes = createRouter()
       },
       200,
     );
+  })
+  .openapi(getMomentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const row = await findMoment(id, c.get('userId'));
+    if (row === undefined) throw new HTTPException(404, { message: 'moment not found' });
+    return c.json(toMomentDto(row), 200);
   })
   .openapi(createMomentRoute, async (c) => {
     const body = c.req.valid('json');

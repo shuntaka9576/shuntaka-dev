@@ -14,6 +14,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedMomentsIndexRouteImport } from './routes/_authed.moments.index'
 import { Route as AuthedMomentsNewRouteImport } from './routes/_authed.moments.new'
+import { Route as AuthedMomentsMomentIdEditRouteImport } from './routes/_authed.moments.$momentId.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -39,18 +40,26 @@ const AuthedMomentsNewRoute = AuthedMomentsNewRouteImport.update({
   path: '/moments/new',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedMomentsMomentIdEditRoute =
+  AuthedMomentsMomentIdEditRouteImport.update({
+    id: '/moments/$momentId/edit',
+    path: '/moments/$momentId/edit',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/moments/new': typeof AuthedMomentsNewRoute
   '/moments/': typeof AuthedMomentsIndexRoute
+  '/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/moments/new': typeof AuthedMomentsNewRoute
   '/moments': typeof AuthedMomentsIndexRoute
+  '/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,12 +68,14 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authed/moments/new': typeof AuthedMomentsNewRoute
   '/_authed/moments/': typeof AuthedMomentsIndexRoute
+  '/_authed/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/moments/new' | '/moments/'
+  fullPaths:
+    '/' | '/login' | '/moments/new' | '/moments/' | '/moments/$momentId/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/moments/new' | '/moments'
+  to: '/' | '/login' | '/moments/new' | '/moments' | '/moments/$momentId/edit'
   id:
     | '__root__'
     | '/'
@@ -72,6 +83,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authed/moments/new'
     | '/_authed/moments/'
+    | '/_authed/moments/$momentId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,17 +129,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMomentsNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/moments/$momentId/edit': {
+      id: '/_authed/moments/$momentId/edit'
+      path: '/moments/$momentId/edit'
+      fullPath: '/moments/$momentId/edit'
+      preLoaderRoute: typeof AuthedMomentsMomentIdEditRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
   AuthedMomentsNewRoute: typeof AuthedMomentsNewRoute
   AuthedMomentsIndexRoute: typeof AuthedMomentsIndexRoute
+  AuthedMomentsMomentIdEditRoute: typeof AuthedMomentsMomentIdEditRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedMomentsNewRoute: AuthedMomentsNewRoute,
   AuthedMomentsIndexRoute: AuthedMomentsIndexRoute,
+  AuthedMomentsMomentIdEditRoute: AuthedMomentsMomentIdEditRoute,
 }
 
 const AuthedRouteWithChildren =

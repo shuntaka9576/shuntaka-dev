@@ -18,6 +18,7 @@ use utoipa::OpenApi;
         handler::users_articles::get_users_articles,
         handler::users_articles::get_users_articles_tag_facets,
         handler::users_articles::get_users_article,
+        handler::users_moments::get_users_moments,
         handler::webhooks::handle_github_webhook,
     ),
     components(
@@ -27,12 +28,15 @@ use utoipa::OpenApi;
             handler::users_articles::UsersArticlesResponse,
             handler::users_articles::TagFacetEntry,
             handler::users_articles::TagFacetsResponse,
+            handler::users_moments::MomentSummaryResponse,
+            handler::users_moments::UsersMomentsResponse,
             handler::webhooks::WebhookResponse,
         )
     ),
     tags(
         (name = "health", description = "Health check endpoints"),
         (name = "users_articles", description = "User articles endpoints"),
+        (name = "users_moments", description = "User moments endpoints"),
         (name = "webhooks", description = "Webhook endpoints")
     )
 )]
