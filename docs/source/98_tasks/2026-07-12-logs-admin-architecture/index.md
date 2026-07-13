@@ -611,6 +611,6 @@ sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sq
 2. ~~dev デプロイ~~ → **初回適用済み**（2026-07-13）。`iac/aws` から `bunx cdk deploy d-st-admin -c stageName=dev --require-approval never` の 1 コマンドで実施（依存の d-st-global-dns / d-st-virginia-cert も自動適用）。疎通確認済み: `https://admin.shuntaka.tech/` 200 / `/api/me` 401 / `https://images.shuntaka.tech/` 403
 3. ~~初回のみの再デプロイ（デプロイ手順の 4.）~~ → **実施済み**（配信中の SPA JS に実 Pool ID / Client ID の焼き込みを確認）
 4. ~~`admin-create-user`~~ → **実施済み**（UserStatus CONFIRMED。username は `users.name` と同じ `shuntaka`）
-5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（moment_id `01KXCC6Y801QG2CDDW6QQY37TH`、下書き）は不要になったら管理画面から削除
+5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（下書き 1 件）は不要になったら管理画面から削除
 6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-backend の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
 7. `blog_prd` へ DDL 適用 → prd デプロイ → フェーズ 4（公開側 moments タブ）
