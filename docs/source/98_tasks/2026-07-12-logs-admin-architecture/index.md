@@ -480,10 +480,10 @@ gh run watch "$(gh run list --workflow Deploy --branch "$BRANCH" --limit 1 --jso
 
 公開 web は AWS ではなく Vercel 配信のため、Deploy workflow の対象外。
 
-- **dev（shuntaka.tech）**: Vercel がドメインを **git ブランチ `preview`** に割り当てているため、main への push で `sync-preview.yaml` が `preview` ブランチを main の HEAD に追従させ（API で ref 更新。初回はブランチ自動作成）、Vercel が自動デプロイする
+- **dev（shuntaka.tech）**: main への push で `deploy-preview.yaml` が Vercel CLI デプロイ（tagpr の production 版と同じ手順の preview 版。既存の `VERCEL_*` secrets を流用）を実行し、デプロイ URL へ `shuntaka.tech` を直接エイリアスする。手動再実行は workflow_dispatch
 - **prd（shuntaka.dev）**: tagpr のタグリリース（`tagpr.yaml` の deploy-vercel ジョブ、`vercel deploy --prod`）でのみ更新。`vercel.json` で main の git デプロイは無効化してあり、main push が本番に直行しない
 - 注意: shuntaka.tech は dev 確認用のためアクセス制限を有効にしている（閲覧は所有者のみ）
-- 注意: `preview` ブランチはマシン管理のミラーのため**ブランチ保護は付けない**（force 更新が前提。全ブランチ対象の ruleset を作る場合は `preview` を除外する）
+- 補足: 旧方式（`sync-preview.yaml` で `preview` ブランチへ ref をミラーし Vercel の git 連携でビルド）は、API の ref 更新が commits 空の push イベントになり Vercel がビルドをスキップするため 1 日で廃止。origin の `preview` ブランチと Vercel 側のドメインのブランチ割り当ては不要になったので手動で片付ける
 
 ###### GitHub 側の登録手順
 
