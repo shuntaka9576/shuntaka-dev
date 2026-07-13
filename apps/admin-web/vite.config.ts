@@ -5,7 +5,7 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// wt.toml が worktree ごとに hash_port で採番する (未設定時は admin-backend の 43001 と対の 43002)
+// wt.toml が worktree ごとに hash_port で採番する (未設定時は admin-api の 43001 と対の 43002)
 const port = Number(process.env.ADMIN_WEB_PORT ?? 43002);
 const apiPort = Number(process.env.ADMIN_API_PORT ?? 43001);
 
@@ -29,7 +29,7 @@ export default defineConfig({
   server: {
     port,
     proxy: {
-      // admin-backend は basePath('/api') を持つため prefix は剥がさずそのまま転送する
+      // admin-api は basePath('/api') を持つため prefix は剥がさずそのまま転送する
       // (本番 CloudFront も同じパス構造)
       '/api': {
         target: `http://localhost:${apiPort}`,

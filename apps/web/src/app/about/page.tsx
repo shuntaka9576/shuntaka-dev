@@ -81,6 +81,15 @@ export default function AboutPage() {
             <p>Cloudflare</p>
           </div>
         </div>
+        <div className="pt-4">
+          <div>Site Policy</div>
+          <div className="p-2 text-sm text-[var(--color-text-muted)]">
+            <p>
+              本サイトはアクセス解析のため Google Analytics / Microsoft Clarity / Vercel Analytics
+              を使用しています。
+            </p>
+          </div>
+        </div>
         <PageReady />
       </main>
     </BaseLayout>

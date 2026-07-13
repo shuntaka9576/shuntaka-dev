@@ -1,13 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useRef } from 'react';
 import type { MomentSummary } from '@/lib/api';
 import { MomentCard } from './MomentCard';
 
 interface MomentFeedProps {
   moments: MomentSummary[];
-  /** まだ読み込める moment が残っているか。false で末尾マーカー（ochaIcon）を表示 */
+  /** まだ読み込める moment が残っているか。false で追加読み込みを止める */
   hasMore: boolean;
   /** 追加読み込み中か（スケルトンの表示制御） */
   loading: boolean;
@@ -72,13 +71,8 @@ export function MomentFeed({ moments, hasMore, loading, onLoadMore }: MomentFeed
           <MomentCardSkeleton tilt={moments.length % 2 === 0 ? 'right' : 'left'} />
         </>
       )}
-      {hasMore ? (
-        <div ref={sentinelRef} className="h-px" />
-      ) : (
-        <div className="flex justify-center py-8">
-          <Image src="/assets/ochaIcon.svg" alt="" width={22} height={22} />
-        </div>
-      )}
+      {/* 末尾マーカーは置かない (フッターの ochaIcon が締めを担う) */}
+      {hasMore && <div ref={sentinelRef} className="h-px" />}
     </section>
   );
 }

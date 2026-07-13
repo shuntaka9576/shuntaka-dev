@@ -18,8 +18,8 @@
         "vite-plus": "^0.2.4",
       },
     },
-    "apps/admin-backend": {
-      "name": "@shuntaka-dev/admin-backend",
+    "apps/admin-api": {
+      "name": "@shuntaka-dev/admin-api",
       "version": "0.1.0",
       "dependencies": {
         "@aws-sdk/client-cognito-identity-provider": "^3.1085.0",
@@ -49,7 +49,7 @@
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@fontsource-variable/geist": "^5.2.9",
-        "@shuntaka-dev/admin-backend": "workspace:*",
+        "@shuntaka-dev/admin-api": "workspace:*",
         "@tanstack/react-form": "^1.33.1",
         "@tanstack/react-query": "^5.101.2",
         "@tanstack/react-router": "^1.170.17",
@@ -959,7 +959,7 @@
 
     "@secretlint/walker": ["@secretlint/walker@13.0.2", "", { "dependencies": { "ignore": "^7.0.5", "picomatch": "^4.0.4" } }, "sha512-9GtWeTb763Ilr/nbRzdFidfZTBtbNEsz/BKrilgqLpKR9EqSWe9eYWDQaLIYb4PddIhwOgHuahRrX2BYATNcLQ=="],
 
-    "@shuntaka-dev/admin-backend": ["@shuntaka-dev/admin-backend@workspace:apps/admin-backend"],
+    "@shuntaka-dev/admin-api": ["@shuntaka-dev/admin-api@workspace:apps/admin-api"],
 
     "@shuntaka-dev/admin-web": ["@shuntaka-dev/admin-web@workspace:apps/admin-web"],
 

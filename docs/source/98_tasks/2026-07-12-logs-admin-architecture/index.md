@@ -14,7 +14,7 @@ moments（旧称 logs）の投稿用管理画面。Cloudflare Workers + R2 案�
 | ドメイン        | 管理画面 prd: `admin.shuntaka.dev` / dev: `admin.shuntaka.tech`、画像配信 prd: `images.shuntaka.dev` / dev: `images.shuntaka.tech`（いずれも `iac/aws/lib/config.ts` の fqdn に従い stage 単位。同一 CloudFront のエイリアス）                                                                                                                                                          |
 | 配信            | CloudFront 1 ディストリビューション（エイリアス: admin + images の 2 ドメイン）。default → 管理画面 SPA（S3, OAC）/ `/api/*` → API Gateway HTTP API（→ VPC Lambda）/ `/images/*` → 画像 S3（OAC）。default と `/api/*` は CF Function の Host チェックで admin 以外を 403（images ホストに管理画面・API を露出させない）                                                                |
 | 管理画面 FE     | React 19 + Vite + TanStack Router（file-based）/ Query / Form + zod + Tailwind CSS 4 + shadcn/ui + FSD 構成                                                                                                                                                                                                                                                                             |
-| API             | Hono（`@hono/zod-openapi` の `OpenAPIHono`）+ Hono RPC（`hc<AppType>` を workspace 型共有）+ `hono/aws-lambda`。Node.js 22 / ARM64 / esbuild バンドルの VPC Lambda                                                                                                                                                                                                                      |
+| API             | Hono（`@hono/zod-openapi` の `OpenAPIHono`）+ Hono RPC（`hc<AppType>` を workspace 型共有）+ `hono/aws-lambda`。Node.js 24 / ARM64 / esbuild バンドルの VPC Lambda                                                                                                                                                                                                                      |
 | TiDB 接続       | 既存 tidb-proxy VPC の private subnet に Lambda を配置し、`tidb-proxy.internal:13306` 経由で `blog_dev` / `blog_prd` に接続。外部 HTTPS は squid（3128）forward proxy 経由（blog-api と同じ SG パターン）                                                                                                                                                                               |
 | ORM             | **Kysely**（MySQL dialect + mysql2）。DDL は既存の `tools/dsql-cli/dsl-tidb/schema/`（`${SCHEMA}` 注入 + `load.sh`）流儀で管理し、Kysely はクエリビルダとして利用                                                                                                                                                                                                                       |
 | 認証            | Cognito User Pool + **USER_SRP_AUTH**（`amazon-cognito-identity-js`、SPA 内の自前ログインフォーム。Hosted UI は使わない）。トークンはブラウザに持たせず `POST /api/auth/login` で検証（`jose`）→ セッション実体は TiDB `admin_sessions` に保存し、**暗号化 HttpOnly Cookie**（本番 `__Host-session`, `Secure`, `SameSite=Lax`）にはセッション ID のみ格納。refresh はサーバ側で透過実行 |
@@ -54,7 +54,7 @@ viewer-request の CloudFront Function（default と /api/* にアタッチ）:
 apps/
 ├── admin-web/      # 管理画面 SPA (Vite + React 19, FSD)
 │   └── src/{app,pages,widgets,features,entities,shared}/
-├── admin-backend/  # Hono + Kysely (esbuild → Lambda, dev は @hono/node-server)
+├── admin-api/  # Hono + Kysely (esbuild → Lambda, dev は @hono/node-server)
 │   └── src/{routes,db,auth,schemas}/ + dev.ts（Scalar /doc はここだけ）
 iac/aws/lib/
 ├── dns/virginia-certificate-stack.ts   # us-east-1 ACM（CloudFront 用。新設）
@@ -62,9 +62,9 @@ iac/aws/lib/
 ```
 
 - パッケージ管理は本リポジトリの流儀（Bun workspaces + Turbo、Vite+ (oxlint/oxfmt)、cspell）に合わせる
-- `apps/admin-web` は `apps/admin-backend` を `workspace:*` で type-only import し、`hc<AppType>` で end-to-end 型共有
+- `apps/admin-web` は `apps/admin-api` を `workspace:*` で type-only import し、`hc<AppType>` で end-to-end 型共有
 - Vite dev proxy: `/api` → `http://localhost:${ADMIN_API_PORT}`（本番は CloudFront が同じパス構造を再現）
-- `.config/wt.toml` に `ADMIN_API_PORT` / `ADMIN_WEB_PORT`（worktree ごとの hash_port）と post-remove の kill hook を追加済み。root の `bun run dev`（turbo dev）で admin-backend も起動する
+- `.config/wt.toml` に `ADMIN_API_PORT` / `ADMIN_WEB_PORT`（worktree ごとの hash_port）と post-remove の kill hook を追加済み。root の `bun run dev`（turbo dev）で admin-api も起動する
 
 ## API 設計（初期エンドポイント）
 
@@ -84,7 +84,7 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 - バリデーションエラーは `OpenAPIHono` の `defaultHook` で 400 に統一
 - 認証ミドルウェア: セッション Cookie を unseal（sid）→ `admin_sessions` からトークンを取得し、access token を `jose` で検証（issuer / `token_use === 'access'` / `client_id`）。失効間近ならサーバ側で refresh してレコードを更新。加えて Origin allowlist + `X-Requested-With` の簡易 CSRF チェック
 
-### 環境変数（admin-backend）
+### 環境変数（admin-api）
 
 | env                                               | 用途                                                                                                                                                                              |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -100,7 +100,7 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 | `DEV_AUTH_BYPASS`                                 | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）                                                                                                   |
 | `ADMIN_API_PORT`                                  | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001）                                                                                         |
 
-ひな形は `apps/admin-backend/.env.example`（`cp .env.example .env.local` で dev.ts が起動時に読む）。
+ひな形は `apps/admin-api/.env.example`（`cp .env.example .env.local` で dev.ts が起動時に読む）。
 
 ### 環境変数（admin-web）
 
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`admin_sessions` (
 
 期限切れレコードはログイン時に掃除する（単一ユーザー運用のため cron は持たない）。
 
-Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.ts`）。件数・変更頻度的に codegen は入れない。
+Kysely の型はスキーマから手書き（`apps/admin-api/src/db/types.ts`）。件数・変更頻度的に codegen は入れない。
 
 ## 画像アップロードフロー
 
@@ -166,7 +166,7 @@ Kysely の型はスキーマから手書き（`apps/admin-backend/src/db/types.t
 - **VirginiaCertificateStack**（us-east-1, 新設）: `admin.<fqdn>` + `images.<fqdn>` を SAN に持つ ACM 証明書 + SSM。CloudFront から参照（cross-region は SSM 経由 + `AwsCustomResource` 読み出しか `crossRegionReferences: true`）
 - **AdminStack**（ap-northeast-1, stage 単位 `{d,p}-st-admin`）
   - Cognito User Pool: self sign-up 無効・管理者 1 ユーザー手動作成・app client は public（secret なし）+ `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`。MFA (TOTP) は初期は入れない（必要になったら後付け）
-  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、`COOKIE_SECRET`（Secrets Manager で 48 文字を自動生成し、VPC 内から実行時に届かないため deploy 時に `AwsCustomResource` で取り出して注入）、`IMAGES_BUCKET_NAME` / `IMAGES_BASE_URL` / `ORIGIN_ALLOWLIST`、squid 経由の `HTTPS_PROXY` / `NO_PROXY` / `NODE_USE_ENV_PROXY=1`（一覧は「環境変数（admin-backend）」を参照）
+  - admin-api Lambda: `NodejsFunction`（esbuild, Node 22, ARM64）。VPC 配置は blog-api-construct と同じ SSM import（`/tidb-proxy/vpc/*`, `/tidb-proxy/proxy/sg-id`）+ Lambda SG（egress 13306/3128）。env: `DATABASE_URL=mysql://root@tidb-proxy.internal:13306/blog_{stage}`、Cognito の pool/client ID、`COOKIE_SECRET`（Secrets Manager で 48 文字を自動生成し、VPC 内から実行時に届かないため deploy 時に `AwsCustomResource` で取り出して注入）、`IMAGES_BUCKET_NAME` / `IMAGES_BASE_URL` / `ORIGIN_ALLOWLIST`、squid 経由の `HTTPS_PROXY` / `NO_PROXY` / `NODE_USE_ENV_PROXY=1`（一覧は「環境変数（admin-api）」を参照）
   - API Gateway HTTP API（apigwv2）+ `HttpLambdaIntegration`（`{proxy+}` に ANY）。CloudFront `/api/*` behavior のオリジンに設定（キャッシュ無効 + `AllViewerExceptHostHeader`）
   - S3 ×2: SPA バケット（`BucketDeployment` で `apps/admin-web/dist` を投入）/ images バケット（CORS: admin オリジンの PUT）
   - CloudFront: エイリアス `admin.<fqdn>` / `images.<fqdn>` の 2 ドメイン + 上記 3 behavior。viewer-request の CloudFront Function（default と `/api/*` にアタッチ）で Host チェック（admin 以外 403。`/api/` 以下は素通し、それ以外は SPA fallback）。`/api/*` はキャッシュ無効 + `AllViewerExceptHostHeader`
@@ -242,7 +242,7 @@ bunx cspell --no-progress tools/dsql-cli/dsl-tidb/schema/07_moments.sql \
 bunx prettier --check docs/.tbls.yaml "docs/source/01_開発ドキュメント/05_db/schema.json"
 ```
 
-### フェーズ 1: apps/admin-backend（Hono API）
+### フェーズ 1: apps/admin-api（Hono API）
 
 - [x] 雛形作成（package.json / tsconfig / turbo タスク配線: `dev` `build` `type-check` `test`）
 - [x] 依存導入: `hono` `@hono/zod-openapi` `zod` `kysely` `mysql2` `jose` `iron-webcrypto`（Cookie の seal/unseal）`ulid` `@aws-sdk/client-s3` `@aws-sdk/s3-request-presigner` `@aws-sdk/client-cognito-identity-provider`（refresh / RevokeToken）`@aws-sdk/client-secrets-manager`（Cookie 暗号鍵）、dev: `@hono/node-server` `@scalar/hono-api-reference` `esbuild`
@@ -261,7 +261,7 @@ bunx prettier --check docs/.tbls.yaml "docs/source/01_開発ドキュメント/0
 
 ```bash
 # 依存導入
-cd apps/admin-backend
+cd apps/admin-api
 bun add hono @hono/zod-openapi zod kysely mysql2 jose iron-webcrypto ulid \
   @aws-sdk/client-s3 @aws-sdk/s3-request-presigner \
   @aws-sdk/client-cognito-identity-provider @aws-sdk/client-secrets-manager
@@ -270,7 +270,7 @@ bun add -d @hono/node-server @scalar/hono-api-reference esbuild
 # チェック
 bun run type-check && bun test src/ && bun run build
 cd ../..
-bunx vp fmt apps/admin-backend && bunx vp lint apps/admin-backend --deny-warnings
+bunx vp fmt apps/admin-api && bunx vp lint apps/admin-api --deny-warnings
 bun run spell-check
 
 # ローカル疎通。Tailscale ログイン済み + AWS 認証を通したシェルで実行する
@@ -287,7 +287,7 @@ export IMAGES_BUCKET_NAME=dummy-images-bucket
 export ADMIN_API_PORT=43001
 
 # 起動はリポジトリルートから turbo 経由で行う（bun dev なら全 dev タスクごと起動する）
-bunx turbo dev --filter=@shuntaka-dev/admin-backend &
+bunx turbo dev --filter=@shuntaka-dev/admin-api &
 
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:43001/api/doc         # 200
 MOMENT_ID=$(curl -s -X POST http://localhost:43001/api/moments -H 'content-type: application/json' \
@@ -307,13 +307,13 @@ kill %1
 
 - [x] 雛形作成（Vite + React 19 + `@tanstack/router-plugin` + Tailwind CSS 4）、FSD ディレクトリ + steiger。
 - [x] shadcn/ui（`base-nova` スタイル = Base UI 版）を `shared/ui/` に配置。components.json を設置し、コンポーネントは参照プロジェクトから必要分（button / button-link / input / textarea / label / badge / card / skeleton）を移植
-- [x] `shared/api/`: `hc<AppType>`（workspace type import。admin-backend 側に `exports: "./src/app.ts"` を追加）。fetch ラッパは作らず `hc` の init に集約（Cookie 同送 + `X-Requested-With` 常時付与）。401 対応は `AuthGuard` が担う
+- [x] `shared/api/`: `hc<AppType>`（workspace type import。admin-api 側に `exports: "./src/app.ts"` を追加）。fetch ラッパは作らず `hc` の init に集約（Cookie 同送 + `X-Requested-With` 常時付与）。401 対応は `AuthGuard` が担う
 - [x] `features/auth/`: SRP ログインフォーム（`amazon-cognito-identity-js`。インメモリ storage を渡して localStorage にトークンを残さない）→ `POST /api/auth/login` で Cookie セッション確立、`AuthGuard`（`/api/me`。beforeLoad ではなくコンポーネントラップ方式）、ログアウト
 - [x] `entities/moment/`: RPC レスポンスから型導出（`InferResponseType`）+ TanStack Query（一覧は `infiniteQueryOptions` の cursor ページング）
 - [x] pages: `/login` / `/moments`（draft 含む一覧 + 公開 / 削除）/ `/moments/new`（TanStack Form + zod、180 字カウンタ、fastener トグル / テープ 4 色スウォッチ、draft / published 切替、プレビュー = apps/web の `/moments/preview` を新規タブで開く）
 - [x] 画像圧縮（`createImageBitmap`（EXIF 回転を反映）+ canvas → WebP。orig 長辺 1440px + thumb 長辺 640px の 2 サイズ）→ presign → S3 PUT ×2。プレビューと投稿で同一ファイルのアップロードは 1 回に抑制
 - [x] `vite.config.ts` の dev proxy（`/api` → `http://localhost:${ADMIN_API_PORT}`。prefix は剥がさない）+ dev ポート `ADMIN_WEB_PORT`（既定 43002）
-- [ ] ローカル E2E（root の `bun dev` で admin-web + admin-backend を起動。Cognito 実接続はフェーズ 3 の dev pool 構築後で、それまでは backend 側 `DEV_AUTH_BYPASS=1` で確認）
+- [ ] ローカル E2E（root の `bun dev` で admin-web + admin-api を起動。Cognito 実接続はフェーズ 3 の dev pool 構築後で、それまでは backend 側 `DEV_AUTH_BYPASS=1` で確認）
 - [x] lint / spell / type-check / steiger グリーン（root の `bun run lint` 一式通過）
 
 実行したコマンド（リポジトリルートから）:
@@ -334,7 +334,7 @@ bunx steiger src
 cd ../..
 
 # 整形と全体チェック
-bunx vp fmt apps/admin-web apps/admin-backend
+bunx vp fmt apps/admin-web apps/admin-api
 bun run lint
 ```
 
@@ -343,7 +343,7 @@ bun run lint
 - [x] `lib/dns/virginia-certificate-stack.ts`（us-east-1、`admin.<fqdn>` + `images.<fqdn>` の SAN 証明書 + SSM。hosted zone ID は `lib/cross-region-ssm.ts` の `AwsCustomResource` で東京の SSM から読む）
 - [x] `lib/config.ts` に `domain.admin` / `domain.images` と SSM パス（virginia cert / cognito 出力）を追加
 - [x] `lib/admin/admin-stack.ts`: Cognito User Pool（self sign-up 無効、強パスワードポリシー、prd は deletionProtection + RETAIN）+ SRP 用 public client
-- [x] 同: admin-backend Lambda（`NodejsFunction` esbuild/ESM、VPC = tidb-proxy の SSM import、SG egress 13306/3128）+ Cookie 暗号鍵の Secrets Manager シークレット（自動生成。値は deploy 時に取り出して `COOKIE_SECRET` 注入）。外部 HTTPS（Cognito / JWKS）は squid 経由（AWS SDK は proxy ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`）
+- [x] 同: admin-api Lambda（`NodejsFunction` esbuild/ESM、VPC = tidb-proxy の SSM import、SG egress 13306/3128）+ Cookie 暗号鍵の Secrets Manager シークレット（自動生成。値は deploy 時に取り出して `COOKIE_SECRET` 注入）。外部 HTTPS（Cognito / JWKS）は squid 経由（AWS SDK は proxy ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`）
 - [x] 同: API Gateway HTTP API + `HttpLambdaIntegration`（`{proxy+}` ANY）
 - [x] 同: S3 ×2（SPA / images + CORS。images は prd RETAIN、dev はローカル PUT 用に `http://localhost:*` も許可）、CloudFront（エイリアス admin / images の 2 ドメイン + 3 behavior + Host チェック付き SPA fallback CF Function + OAC、PRICE_CLASS_200）、Route53 A エイリアス ×2。SPA 資材は `BucketDeployment`（`apps/admin-web/dist` 不在時はこの stack のデプロイだけをブロック）
 - [x] `bin/cdk.ts` 配線（`{d,p}-st-virginia-cert` / `{d,p}-st-admin`）+ cdk-nag suppressions + `test/admin.test.ts`（NodejsFunction をモックした snapshot + nag 検証）。deploy-role に `cognito-idp:*` / `cloudfront:*` / `secretsmanager:*` を追加
@@ -521,8 +521,8 @@ mysql -h "tidb.$TAILNET" -P 4000 -u root -e "SHOW CREATE TABLE blog_dev.admin_se
 cd docs && bun run doc-gen && cd ..
 bunx prettier --write "docs/source/01_開発ドキュメント/05_db/schema.json" "docs/source/01_開発ドキュメント/05_db/"*.md
 
-# admin-backend の proxy 対応依存
-cd apps/admin-backend && bun add https-proxy-agent @smithy/node-http-handler && cd ../..
+# admin-api の proxy 対応依存
+cd apps/admin-api && bun add https-proxy-agent @smithy/node-http-handler && cd ../..
 
 # iac/aws（NodejsFunction のローカルバンドル用 esbuild + テスト）
 cd iac/aws
@@ -534,7 +534,7 @@ cd ../..
 
 # 整形と全体チェック
 bunx prettier --write .github/workflows/deploy.yaml .github/workflows/reusable-deploy.yaml
-bunx vp fmt iac/aws apps/admin-backend
+bunx vp fmt iac/aws apps/admin-api
 bun run lint
 ```
 
@@ -547,7 +547,7 @@ bun run lint
 - [x] `MomentFeed` を実 API（cursor）に接続（server で 1 ページ目 → `MomentsInfiniteFeed`（client）が cursor で継ぎ足し。追加読み込み失敗時はフィードを打ち切り）。一覧画像は `thumb_url` を使用（`next.config.ts` の `images.remotePatterns` に `images.shuntaka.dev` / `images.shuntaka.tech` を追加）
 - [x] apps/web: `/moments/preview` ルート（query パラメータ img / text / fastener / color / date から `MomentCard` を 1 枚レンダリング。img は https + images ドメイン + `/images/moments/` パスのみ許可、noindex）
 - [x] `DESIGN.md` に moments の意図的例外（揺れアニメーション / 留め具の実物描写）を明記（3 セクション構成・タブ小文字表記も更新）
-- [x] 追加要望（2026-07-13）: admin に**編集**と**下書きに戻す**を実装。admin-backend に `GET /moments/:id`（編集フォームの初期値用）を追加し、admin-web は一覧の published 行に「下書きに戻す」（`PATCH status: draft`。published_at は backend が NULL に揃える）、全行に「編集」導線、`/moments/:id/edit` の編集ページ（`MomentForm` を編集モード拡張。画像差し替えは任意で、未選択なら既存 imageKey を維持。clip へ変更時は fastenerColor: null を明示送信）
+- [x] 追加要望（2026-07-13）: admin に**編集**と**下書きに戻す**を実装。admin-api に `GET /moments/:id`（編集フォームの初期値用）を追加し、admin-web は一覧の published 行に「下書きに戻す」（`PATCH status: draft`。published_at は backend が NULL に揃える）、全行に「編集」導線、`/moments/:id/edit` の編集ページ（`MomentForm` を編集モード拡張。画像差し替えは任意で、未選択なら既存 imageKey を維持。clip へ変更時は fastenerColor: null を明示送信）
 - [ ] tagpr リリース
 
 フェーズ 4 の動作確認（2026-07-13）: ローカルで blog-api を dev DB に向けて起動し、`GET /users/shuntaka/moments` が published のみ返すこと（draft は除外）、レスポンス形式（camelCase、orig/thumb URL、RFC3339）、不正 cursor / limit=0 が 400 になることを確認。`cargo clippy -D warnings` / `cargo test` / root `bun run lint`（10 タスク）/ `next build` すべてグリーン。
@@ -585,16 +585,17 @@ bun run lint
 
 - `8329527` フェーズ 0: moments / admin_sessions の DDL 追加と `blog_dev` 適用、tbls ドキュメント生成
 - `43ebdd1` フェーズ 0 の実行コマンド全量を記録
-- `f8e6338` フェーズ 1: apps/admin-backend（Hono + Kysely）実装とローカル疎通
+- `f8e6338` フェーズ 1: apps/admin-api（Hono + Kysely）実装とローカル疎通
 
 ### 未コミット（作業ツリーに存在）
 
 - **フェーズ 2 一式**: apps/admin-web（Vite + React 19 + TanStack Router + FSD + shadcn base-nova）。実装の流儀は `~/repos/github.com/shuntaka9576/test-pj/apps/frontend` を踏襲。lint / type / steiger グリーン
-- **フェーズ 3 一式**: iac/aws（VirginiaCertificateStack / AdminStack / cross-region-ssm / deploy-role 追記 / nag suppressions / test/admin.test.ts）、CI ワークフローの admin ステップ、admin-backend の proxy 対応（https-proxy-agent + @smithy/node-http-handler）
-- **認証のユーザー解決の設計変更**（下記）に伴う admin-backend 修正、`08_admin_sessions.sql` の `user_id` 列追加（blog_dev へは適用済み）、tbls 再生成分
+- **フェーズ 3 一式**: iac/aws（VirginiaCertificateStack / AdminStack / cross-region-ssm / deploy-role 追記 / nag suppressions / test/admin.test.ts）、CI ワークフローの admin ステップ、admin-api の proxy 対応（https-proxy-agent + @smithy/node-http-handler）
+- **認証のユーザー解決の設計変更**（下記）に伴う admin-api 修正、`08_admin_sessions.sql` の `user_id` 列追加（blog_dev へは適用済み）、tbls 再生成分
 
 ### 実装中に確定した設計変更（本文へ反映済み）
 
+- ワークスペース名を `apps/admin-backend` → **`apps/admin-api`** に統一（2026-07-13。Lambda 物理名 `{d,p}-st-admin-api` と揃えるため。本ドキュメント内の旧表記も一括置換済み）
 - 一覧 cursor は `created_at + moment_id` → **`moment_id`（ULID）単独**へ変更
 - `ADMIN_USER_ID` の固定 env は**廃止**。ログイン時に access token の `username` → `users.name` で `user_id` を解決し `admin_sessions.user_id` に保存、API はセッションの `user_id` でスコープ
 - Cookie 暗号鍵は Secrets Manager 自動生成のまま、**deploy 時に値を取り出して `COOKIE_SECRET` 注入**（VPC 内 Lambda から実行時に Secrets Manager へ届かないため）
@@ -642,6 +643,6 @@ sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sq
 3. ~~初回のみの再デプロイ（デプロイ手順の 4.）~~ → **実施済み**（配信中の SPA JS に実 Pool ID / Client ID の焼き込みを確認）
 4. ~~`admin-create-user`~~ → **実施済み**（UserStatus CONFIRMED。username は `users.name` と同じ `shuntaka`）
 5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（下書き 1 件）は不要になったら管理画面から削除
-6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-backend の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
+6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-api の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
 7. ~~`blog_prd` へ DDL 適用 → prd デプロイ~~ → **完了**（2026-07-13。admin.shuntaka.dev で確認済み。初回は Cognito 焼き込みのため 2 回 dispatch した）
 8. ~~フェーズ 4（公開側 moments タブ）~~ → **実装済み**（2026-07-13、ブランチ `feat/moments-public`。チェックリストはフェーズ 4 の節を参照）。残りはコミット → PR → main マージ（= dev への blog-api / web デプロイ）→ tagpr リリースで本番反映

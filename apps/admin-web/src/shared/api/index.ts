@@ -1,14 +1,14 @@
-import type { AppType } from '@shuntaka-dev/admin-backend';
+import type { AppType } from '@shuntaka-dev/admin-api';
 import { hc } from 'hono/client';
 
 /**
  * 型付き Hono RPC クライアント。
  *
- * `AppType` は admin-backend ワークスペースから type-only import しているため、
+ * `AppType` は admin-api ワークスペースから type-only import しているため、
  * すべてのルートとレスポンスがエンドツーエンドで型付けされる。
- * admin-backend は `basePath('/api')` を持つため baseUrl はオリジンルートで、
+ * admin-api は `basePath('/api')` を持つため baseUrl はオリジンルートで、
  * 呼び出しは `client.api.moments.$get()` の形になる。開発時は Vite が `/api` を
- * admin-backend へプロキシする (vite.config.ts)。
+ * admin-api へプロキシする (vite.config.ts)。
  */
 export const client = hc<AppType>('/', {
   init: {

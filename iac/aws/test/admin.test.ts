@@ -35,7 +35,7 @@ vi.mock('aws-cdk-lib/aws-lambda-nodejs', async (importOriginal) => {
           vpcSubnets: props.vpcSubnets,
           securityGroups: props.securityGroups,
           environment: props.environment,
-          runtime: lambdaModule.Runtime.NODEJS_22_X,
+          runtime: lambdaModule.Runtime.NODEJS_24_X,
           handler: 'index.handler',
           code: lambdaModule.Code.fromInline('exports.handler = () => {}'),
         });

@@ -141,7 +141,7 @@ export const LoadingSkeleton: Story = {
   },
 };
 
-// 末尾に到達すると ochaIcon で静かに終わる
+// 末尾に到達すると追加読み込みが止まる (締めはフッターの ochaIcon が担う)
 export const EndOfFeed: Story = {
   args: {
     moments: Array.from({ length: 3 }, (_, i) => mockMoment(i)),
