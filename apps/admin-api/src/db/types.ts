@@ -13,6 +13,9 @@ export interface MomentsTable {
   fastener: Fastener;
   fastener_color: FastenerColor | null;
   status: MomentStatus;
+  // TZ なしの撮影ローカル日時。書き込みは "YYYY-MM-DDTHH:mm:ss" 文字列を無変換で渡す
+  // (mysql2 は timezone: 'Z' のため、読み取り Date の UTC フィールド = 壁時計になる)
+  captured_at: ColumnType<Date, string, string>;
   published_at: Date | null;
   created_at: ColumnType<Date, never, never>;
   updated_at: ColumnType<Date, never, never>;

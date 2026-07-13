@@ -10,6 +10,9 @@ export const momentStatusSchema = z.enum(['published', 'draft']);
 // cspell:disable-next-line
 export const IMAGE_KEY_PATTERN = /^images\/moments\/[0-9A-HJKMNP-TV-Z]{26}\.webp$/;
 
+// TZ なしの撮影ローカル日時。EXIF の壁時計をそのまま受けて DATETIME に無変換で入れる
+export const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/;
+
 export const createMomentBodySchema = z
   .object({
     text: z.string().min(1).max(MOMENT_TEXT_MAX),
@@ -17,7 +20,8 @@ export const createMomentBodySchema = z
     fastener: fastenerSchema.default('clip'),
     fastenerColor: fastenerColorSchema.optional(),
     status: momentStatusSchema.default('published'),
-    publishedAt: z.iso.datetime({ offset: true }).optional(),
+    // 撮影時刻。クライアントが EXIF から補完する (EXIF なしはファイル更新日時 → 現在時刻)
+    capturedAt: z.string().regex(CAPTURED_AT_PATTERN),
   })
   .refine((v) => v.fastenerColor === undefined || v.fastener === 'tape', {
     message: 'fastenerColor is only valid when fastener is tape',
@@ -32,7 +36,8 @@ export const updateMomentBodySchema = z.object({
   fastener: fastenerSchema.optional(),
   fastenerColor: fastenerColorSchema.nullable().optional(),
   status: momentStatusSchema.optional(),
-  publishedAt: z.iso.datetime({ offset: true }).optional(),
+  // 写真を差し替えたときにクライアントが EXIF から再補完して送る
+  capturedAt: z.string().regex(CAPTURED_AT_PATTERN).optional(),
 });
 
 export const listMomentsQuerySchema = z.object({
@@ -50,6 +55,8 @@ export const momentSchema = z
     fastener: fastenerSchema,
     fastenerColor: fastenerColorSchema.nullable(),
     status: momentStatusSchema,
+    capturedAt: z.string(),
+    // 初回公開時刻の記録。未公開の draft は null (draft に戻しても保持される)
     publishedAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

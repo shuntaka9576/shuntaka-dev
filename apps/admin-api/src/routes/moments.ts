@@ -25,6 +25,8 @@ const toMomentDto = (row: Selectable<MomentsTable>) => ({
   fastener: row.fastener,
   fastenerColor: row.fastener_color,
   status: row.status,
+  // timezone: 'Z' で読むため UTC フィールドがそのまま壁時計。Z を付けず TZ なしで返す
+  capturedAt: row.captured_at.toISOString().slice(0, 19),
   publishedAt: row.published_at?.toISOString() ?? null,
   createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString(),
@@ -139,13 +141,6 @@ export const momentRoutes = createRouter()
   .openapi(createMomentRoute, async (c) => {
     const body = c.req.valid('json');
     const momentId = ulid();
-    // published は publishedAt 未指定なら現在時刻、draft は常に NULL
-    const publishedAt =
-      body.status === 'published'
-        ? body.publishedAt !== undefined
-          ? new Date(body.publishedAt)
-          : new Date()
-        : null;
     await getDb()
       .insertInto('moments')
       .values({
@@ -156,7 +151,8 @@ export const momentRoutes = createRouter()
         fastener: body.fastener,
         fastener_color: body.fastenerColor ?? null,
         status: body.status,
-        published_at: publishedAt,
+        captured_at: body.capturedAt,
+        published_at: body.status === 'published' ? new Date() : null,
       })
       .execute();
     const row = await findMoment(momentId, c.get('userId'));
@@ -179,12 +175,10 @@ export const momentRoutes = createRouter()
     }
 
     const status = body.status ?? current.status;
-    // 公開操作: publishedAt 指定を優先し、published へ遷移して NULL のままなら現在時刻。
-    // draft へ戻したら published_at は NULL に揃える
-    let publishedAt = current.published_at;
-    if (body.publishedAt !== undefined) publishedAt = new Date(body.publishedAt);
-    if (status === 'published' && publishedAt === null) publishedAt = new Date();
-    if (status === 'draft') publishedAt = null;
+    // 初回公開時刻の記録。published へ遷移した時点で打刻し、draft に戻しても保持する
+    // (articles と同じ挙動。消すと再公開のたびに公開時刻がわからなくなる)
+    const publishedAt =
+      status === 'published' && current.published_at === null ? new Date() : current.published_at;
 
     await getDb()
       .updateTable('moments')
@@ -194,6 +188,8 @@ export const momentRoutes = createRouter()
         fastener,
         fastener_color: fastenerColor,
         status,
+        // 撮影時刻は写真差し替え時のみクライアントが送る。公開/下書きの切替では変わらない
+        ...(body.capturedAt !== undefined ? { captured_at: body.capturedAt } : {}),
         published_at: publishedAt,
       })
       .where('moment_id', '=', id)

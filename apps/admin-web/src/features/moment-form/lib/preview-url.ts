@@ -6,8 +6,8 @@ export const buildPreviewUrl = (input: {
   text: string;
   fastener: string;
   fastenerColor: string | null;
-  /** YYYY-MM-DD。null なら今日の日付 */
-  date: string | null;
+  /** 撮影時刻 (TZ なしのローカル日時 YYYY-MM-DDTHH:mm:ss) */
+  capturedAt: string;
 }): string => {
   const base = import.meta.env.VITE_PREVIEW_BASE_URL ?? '';
   const imagesBase = import.meta.env.VITE_IMAGES_BASE_URL ?? '';
@@ -16,6 +16,6 @@ export const buildPreviewUrl = (input: {
   params.set('text', input.text);
   params.set('fastener', input.fastener);
   if (input.fastenerColor !== null) params.set('color', input.fastenerColor);
-  params.set('date', input.date ?? new Date().toISOString().slice(0, 10));
+  params.set('date', input.capturedAt);
   return `${base}/moments/preview?${params.toString()}`;
 };

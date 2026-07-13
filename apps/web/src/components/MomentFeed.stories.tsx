@@ -32,9 +32,10 @@ const FASTENER_COLORS = ['pink', 'yellow', undefined, 'blue', 'green'] as const;
 
 // 新しい順に 1.5 日ずつ遡る決定的なモックデータ。留め具は投稿ごとに選ばれる想定で混在させる
 function mockMoment(index: number): MomentSummary {
-  const publishedAt = new Date(
-    Date.UTC(2026, 6, 12, 21, 30) - index * 36 * 60 * 60 * 1000,
-  ).toISOString();
+  // capturedAt は TZ なしのローカル日時のため Z を落とす
+  const capturedAt = new Date(Date.UTC(2026, 6, 12, 21, 30) - index * 36 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19);
   const imageUrl = `https://images.unsplash.com/${IMAGES[index % IMAGES.length]}?w=720&h=720&fit=crop&q=70`;
   return {
     momentId: `mock-moment-${index}`,
@@ -42,7 +43,7 @@ function mockMoment(index: number): MomentSummary {
     imageUrl,
     // モックでは orig / thumb とも同じ URL を使う
     thumbUrl: imageUrl,
-    publishedAt,
+    capturedAt,
     fastener: FASTENERS[index % FASTENERS.length],
     fastenerColor: FASTENER_COLORS[index % FASTENER_COLORS.length],
   };

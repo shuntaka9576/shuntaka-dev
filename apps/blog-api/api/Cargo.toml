@@ -11,6 +11,7 @@ markdown.workspace = true
 infrastructure.workspace = true
 axum.workspace = true
 base64.workspace = true
+chrono.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 serde.workspace = true
