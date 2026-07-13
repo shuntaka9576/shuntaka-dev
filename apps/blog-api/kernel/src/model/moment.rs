@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 
 /// 公開フィード用の moment（180 字 + 写真必須の一文投稿）1 件分。
 /// fastener / fastener_color は DB の ENUM 値をそのまま保持する
@@ -14,5 +14,7 @@ pub struct MomentSummary {
     pub fastener: String,
     /// tape のみ有効。'pink' | 'blue' | 'yellow' | 'green'
     pub fastener_color: Option<String>,
-    pub published_at: DateTime<Utc>,
+    /// 撮影時刻。クライアントが EXIF から補完して登録する。
+    /// EXIF 同様 TZ を持たない撮影地の壁時計として扱う (DATETIME をそのまま持つ)
+    pub captured_at: NaiveDateTime,
 }

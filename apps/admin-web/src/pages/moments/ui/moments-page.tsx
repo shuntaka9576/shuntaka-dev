@@ -157,11 +157,8 @@ function MomentRow({
             {fastenerLabels[moment.fastener]}
             {moment.fastenerColor !== null && ` (${fastenerColorLabels[moment.fastenerColor]})`}
           </span>
-          <span>
-            {moment.status === 'published'
-              ? formatDateTime(moment.publishedAt)
-              : formatDateTime(moment.createdAt)}
-          </span>
+          <span>撮影 {formatDateTime(moment.capturedAt)}</span>
+          {moment.publishedAt !== null && <span>公開 {formatDateTime(moment.publishedAt)}</span>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col gap-2">

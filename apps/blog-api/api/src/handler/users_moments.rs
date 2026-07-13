@@ -3,6 +3,8 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderName, HeaderValue, header},
 };
+use chrono::{DateTime, NaiveDateTime};
+use kernel::model::moment::MomentSummary;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -20,8 +22,8 @@ const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct UsersMomentsQuery {
-    /// Cursor for pagination: the momentId (ULID) of the last item of the previous page.
-    /// Omit to fetch from the newest.
+    /// Cursor for pagination: the `nextCursor` value of the previous page
+    /// (`<capturedAt unix micros>_<momentId>`). Omit to fetch from the newest.
     pub cursor: Option<String>,
     /// Number of moments per page (1-50, default 20).
     pub limit: Option<u64>,
@@ -43,7 +45,9 @@ pub struct MomentSummaryResponse {
     pub fastener: String,
     /// tape のみ有効。'pink' | 'blue' | 'yellow' | 'green'
     pub fastener_color: Option<String>,
-    pub published_at: String,
+    /// 撮影時刻 (TZ なしのローカル日時 YYYY-MM-DDTHH:mm:ss)。
+    /// EXIF 同様に撮影地の壁時計として TZ 変換せず表示する
+    pub captured_at: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -65,6 +69,30 @@ fn is_valid_moment_id(s: &str) -> bool {
         && s.bytes().all(|b| {
             matches!(b, b'0'..=b'9' | b'A'..=b'H' | b'J' | b'K' | b'M' | b'N' | b'P'..=b'T' | b'V'..=b'Z')
         })
+}
+
+/// カーソル文字列 `<captured_at micros>_<moment_id>` を分解する。
+/// adapter 側でこのタプルとの比較だけでページングできるようにする。
+/// captured_at は TZ なしの壁時計のため、micros は epoch からの経過ではなく
+/// 「壁時計を UTC とみなした値」として往復させる
+fn parse_cursor(raw: &str) -> Option<(NaiveDateTime, &str)> {
+    let (micros_raw, moment_id) = raw.split_once('_')?;
+    if !is_valid_moment_id(moment_id) {
+        return None;
+    }
+    let micros: i64 = micros_raw.parse().ok()?;
+    let captured_at = DateTime::from_timestamp_micros(micros)?.naive_utc();
+    Some((captured_at, moment_id))
+}
+
+/// 次ページ用カーソルを組み立てる（parse_cursor と対）。
+/// captured_at は DATETIME(6) のためマイクロ秒精度で正確に往復できる
+fn encode_cursor(moment: &MomentSummary) -> String {
+    format!(
+        "{}_{}",
+        moment.captured_at.and_utc().timestamp_micros(),
+        moment.moment_id
+    )
 }
 
 fn parse_limit(raw: Option<u64>) -> Result<u64, AppError> {
@@ -117,8 +145,10 @@ pub async fn get_users_moments(
     let limit = parse_limit(query.limit)?;
     let cursor = match query.cursor.as_deref() {
         None => None,
-        Some(c) if is_valid_moment_id(c) => Some(c),
-        Some(_) => return Err(AppError::bad_request("Invalid cursor")),
+        Some(c) => match parse_cursor(c) {
+            Some(parsed) => Some(parsed),
+            None => return Err(AppError::bad_request("Invalid cursor")),
+        },
     };
 
     // limit+1 件取得して次ページの有無を判定する
@@ -133,7 +163,7 @@ pub async fn get_users_moments(
         moments.truncate(limit as usize);
     }
     let next_cursor = if has_more {
-        moments.last().map(|m| m.moment_id.clone())
+        moments.last().map(encode_cursor)
     } else {
         None
     };
@@ -151,7 +181,7 @@ pub async fn get_users_moments(
                     thumb_url,
                     fastener: m.fastener,
                     fastener_color: m.fastener_color,
-                    published_at: m.published_at.to_rfc3339(),
+                    captured_at: m.captured_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
                 }
             })
             .collect(),
@@ -194,6 +224,34 @@ mod tests {
         for c in ['I', 'L', 'O', 'U'] {
             assert!(!is_valid_moment_id(&format!("{}{c}", &VALID_ID[..25])));
         }
+    }
+
+    #[test]
+    fn parse_cursor_roundtrips_with_encode_cursor() {
+        let moment = MomentSummary {
+            moment_id: VALID_ID.to_string(),
+            text: "t".to_string(),
+            image_key: "images/moments/a.webp".to_string(),
+            fastener: "clip".to_string(),
+            fastener_color: None,
+            captured_at: DateTime::from_timestamp_micros(1_752_300_000_123_456)
+                .unwrap()
+                .naive_utc(),
+        };
+        let cursor = encode_cursor(&moment);
+        let (captured_at, moment_id) = parse_cursor(&cursor).unwrap();
+        assert_eq!(captured_at, moment.captured_at);
+        assert_eq!(moment_id, moment.moment_id);
+    }
+
+    #[test]
+    fn parse_cursor_rejects_malformed() {
+        // 区切りなし / micros が数値でない / moment_id が ULID 形式でない
+        assert!(parse_cursor(VALID_ID).is_none());
+        assert!(parse_cursor(&format!("abc_{VALID_ID}")).is_none());
+        assert!(parse_cursor(&format!("123_{}", &VALID_ID[..25])).is_none());
+        assert!(parse_cursor("123_").is_none());
+        assert!(parse_cursor("").is_none());
     }
 
     #[test]

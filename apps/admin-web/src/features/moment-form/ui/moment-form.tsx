@@ -15,12 +15,12 @@ import {
   momentStatusLabels,
 } from '@/entities/moment';
 import { client } from '@/shared/api';
-import { cn } from '@/shared/lib/utils';
+import { cn, formatDateTime } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Textarea } from '@/shared/ui/textarea';
 
+import { type CapturedAt, capturedAtSourceLabels, readCapturedAt } from '../lib/captured-at';
 import { compressImage } from '../lib/compress-image';
 import { buildPreviewUrl } from '../lib/preview-url';
 import { uploadImages } from '../lib/upload-image';
@@ -35,17 +35,6 @@ const swatchClasses: Record<FastenerColor, string> = {
   yellow: 'bg-yellow-300',
   green: 'bg-green-300',
 };
-
-/** publishedAt (ISO) を <input type="date"> 用のローカル日付 YYYY-MM-DD に変換 */
-const toDateInputValue = (iso: string | null): string => {
-  if (iso === null) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-
-/** 選択日のローカル 0 時を publishedAt として送る */
-const toPublishedAtIso = (date: string): string => new Date(`${date}T00:00:00`).toISOString();
 
 interface MomentFormProps {
   /** 指定すると編集モード。省略時は新規投稿 */
@@ -64,14 +53,22 @@ export function MomentForm({ moment }: MomentFormProps) {
     moment?.fastenerColor ?? null,
   );
   const [status, setStatus] = useState<MomentStatus>(moment?.status ?? 'published');
-  // 写真の下に表示される日付。編集では現在の publishedAt、新規は未選択 (= 投稿時の日時)
-  const initialPublishedDate = toDateInputValue(moment?.publishedAt ?? null);
-  const [publishedDate, setPublishedDate] = useState(initialPublishedDate);
+  // 選択中ファイルの撮影時刻 (EXIF から補完)。表示用。null は未選択 or 読み取り中
+  const [captured, setCaptured] = useState<CapturedAt | null>(null);
+  // 送信の進行段階。画像アップロードとレコード保存のどちらを待っているかを表示し、
+  // 全区間でボタンを無効化する (mutation 中だけの無効化だとアップロード中に再送信できてしまう)
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'uploading' | 'saving'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
   // 同じファイルの圧縮 + アップロードは一度だけ行う (プレビュー → 投稿で再利用)
   const uploadedRef = useRef<{ file: File; imageKey: string } | null>(null);
+  // 撮影時刻の EXIF 解析も同様にファイルごとに一度だけ (表示 → 投稿で同じ値を使う)
+  const capturedRef = useRef<{ file: File; value: CapturedAt } | null>(null);
+  // 連続でファイルを選び直したとき、古い解析結果で表示を上書きしないための目印
+  const latestFileRef = useRef<File | null>(null);
+  // ボタン無効化は再レンダリング後にしか効かないため、同一ティック内の連打はここで弾く
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -80,11 +77,18 @@ export function MomentForm({ moment }: MomentFormProps) {
   }, [objectUrl]);
 
   const selectFile = (next: File | null) => {
+    latestFileRef.current = next;
     setFile(next);
     setObjectUrl((prev) => {
       if (prev !== null) URL.revokeObjectURL(prev);
       return next !== null ? URL.createObjectURL(next) : null;
     });
+    setCaptured(null);
+    if (next !== null) {
+      void ensureCapturedAt(next).then((value) => {
+        if (latestFileRef.current === next) setCaptured(value);
+      });
+    }
   };
 
   const selectFastener = (next: Fastener) => {
@@ -102,10 +106,26 @@ export function MomentForm({ moment }: MomentFormProps) {
     return imageKey;
   };
 
+  const ensureCapturedAt = async (target: File): Promise<CapturedAt> => {
+    if (capturedRef.current !== null && capturedRef.current.file === target) {
+      return capturedRef.current.value;
+    }
+    const value = await readCapturedAt(target);
+    capturedRef.current = { file: target, value };
+    return value;
+  };
+
   // 編集では画像の差し替えは任意。新しいファイル未選択なら既存の imageKey を使う
   const resolveImageKey = async (): Promise<string | null> => {
     if (file !== null) return ensureUploaded(file);
     if (isEdit) return moment.imageKey;
+    return null;
+  };
+
+  // 撮影時刻も同様に、新しいファイルがあれば EXIF から補完、未選択なら既存値を使う
+  const resolveCapturedAt = async (): Promise<string | null> => {
+    if (file !== null) return (await ensureCapturedAt(file)).naive;
+    if (isEdit) return moment.capturedAt;
     return null;
   };
 
@@ -136,18 +156,23 @@ export function MomentForm({ moment }: MomentFormProps) {
     },
   });
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = submitPhase !== 'idle';
 
   const form = useForm({
     defaultValues: { text: moment?.text ?? '' },
     onSubmit: async ({ value }) => {
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       setSubmitError(null);
+      setSubmitPhase('uploading');
       try {
         const imageKey = await resolveImageKey();
-        if (imageKey === null) {
+        const capturedAt = await resolveCapturedAt();
+        if (imageKey === null || capturedAt === null) {
           setSubmitError('写真を選択してください');
           return;
         }
+        setSubmitPhase('saving');
         const text = value.text.trim();
         if (isEdit) {
           await updateMutation.mutateAsync({
@@ -159,10 +184,8 @@ export function MomentForm({ moment }: MomentFormProps) {
               // clip へ変更した場合などに残った色をサーバー側でも確実に消す
               fastenerColor: fastener === 'tape' ? fastenerColor : null,
               status,
-              // 日付を変更したときだけ送る (未変更なら既存の時刻を保持)
-              ...(publishedDate !== '' && publishedDate !== initialPublishedDate
-                ? { publishedAt: toPublishedAtIso(publishedDate) }
-                : {}),
+              // 写真を差し替えたときだけ撮影時刻を更新する
+              ...(file !== null ? { capturedAt } : {}),
             },
           });
         } else {
@@ -172,12 +195,14 @@ export function MomentForm({ moment }: MomentFormProps) {
             fastener,
             ...(fastenerColor !== null ? { fastenerColor } : {}),
             status,
-            // 未選択ならサーバー側で現在時刻になる
-            ...(publishedDate !== '' ? { publishedAt: toPublishedAtIso(publishedDate) } : {}),
+            capturedAt,
           });
         }
       } catch (err) {
         setSubmitError(err instanceof Error ? err.message : '送信に失敗しました');
+      } finally {
+        submittingRef.current = false;
+        setSubmitPhase('idle');
       }
     },
   });
@@ -187,7 +212,8 @@ export function MomentForm({ moment }: MomentFormProps) {
     setIsPreviewing(true);
     try {
       const imageKey = await resolveImageKey();
-      if (imageKey === null) {
+      const capturedAt = await resolveCapturedAt();
+      if (imageKey === null || capturedAt === null) {
         setSubmitError('写真を選択してください');
         return;
       }
@@ -196,7 +222,7 @@ export function MomentForm({ moment }: MomentFormProps) {
         text: form.state.values.text,
         fastener,
         fastenerColor,
-        date: publishedDate !== '' ? publishedDate : null,
+        capturedAt,
       });
       window.open(url, '_blank', 'noopener');
     } catch (err) {
@@ -208,6 +234,14 @@ export function MomentForm({ moment }: MomentFormProps) {
 
   // 新しいファイル選択中はそのプレビュー、編集で未選択なら現在の画像
   const previewSrc = objectUrl ?? moment?.imageUrl ?? null;
+
+  // 送信ボタンの表示。進行中はどの処理を待っているかを示す
+  const submitLabel = (() => {
+    if (submitPhase === 'uploading') return '画像アップロード中…';
+    if (submitPhase === 'saving') return isEdit ? '更新を保存中…' : '投稿を保存中…';
+    if (isEdit) return '更新する';
+    return status === 'draft' ? '下書き保存' : '投稿する';
+  })();
 
   return (
     <form
@@ -241,17 +275,18 @@ export function MomentForm({ moment }: MomentFormProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="moment-published-date">日付 (写真の下に表示)</Label>
-        <Input
-          id="moment-published-date"
-          type="date"
-          className="w-fit"
-          value={publishedDate}
-          onChange={(e) => setPublishedDate(e.target.value)}
-          data-testid="moment-form-published-date"
-        />
+        <Label>撮影日時 (写真の下に表示)</Label>
+        <p className="text-sm" data-testid="moment-form-captured-at">
+          {file !== null
+            ? captured !== null
+              ? `${formatDateTime(captured.naive)} (${capturedAtSourceLabels[captured.source]})`
+              : '読み取り中…'
+            : isEdit
+              ? formatDateTime(moment.capturedAt)
+              : '写真を選択すると自動で設定されます'}
+        </p>
         <p className="text-xs text-muted-foreground">
-          {isEdit ? '変更するとその日付で表示されます' : '未選択なら投稿した日付になります'}
+          写真の EXIF から補完します。EXIF がなければファイルの更新日時になります
         </p>
       </div>
 
@@ -369,22 +404,14 @@ export function MomentForm({ moment }: MomentFormProps) {
           disabled={isPreviewing || isSubmitting}
           data-testid="moment-form-preview"
         >
-          {isPreviewing ? 'アップロード中…' : 'プレビュー'}
+          {isPreviewing ? '画像アップロード中…' : 'プレビュー'}
         </Button>
         <Button
           type="submit"
           disabled={isSubmitting || isPreviewing}
           data-testid="moment-form-submit"
         >
-          {isEdit
-            ? isSubmitting
-              ? '更新中…'
-              : '更新する'
-            : isSubmitting
-              ? '投稿中…'
-              : status === 'draft'
-                ? '下書き保存'
-                : '投稿する'}
+          {submitLabel}
         </Button>
       </div>
     </form>

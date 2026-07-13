@@ -10,6 +10,7 @@ kernel.workspace = true
 markdown.workspace = true
 infrastructure.workspace = true
 axum.workspace = true
+chrono.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 serde.workspace = true
