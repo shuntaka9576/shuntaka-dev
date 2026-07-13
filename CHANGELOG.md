@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.0713.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.1...2026.0713.2) - 2026-07-13
+
+- chore(deps): update dependency tsx to ^4.23.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/621
+- fix(deps): update dependency @tanstack/react-form to ^1.33.2 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/623
+- fix: ツイート埋め込み記事の目次欠落を修正、見出しなし記事は本文を中央揃えに by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/624
+
 ## [2026.0713.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.0...2026.0713.1) - 2026-07-13
 
 - feat: moments の日付指定と曜日表示、公開側の日付順ソートに対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/619
