@@ -8,7 +8,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-comrak = { version = "0.53.0", default-features = false, features = ["syntect"] }
+comrak = { version = "0.54.0", default-features = false, features = ["syntect"] }
 regex = "1.13.0"
 scraper = "0.27.0"
 url = "2.5.8"
