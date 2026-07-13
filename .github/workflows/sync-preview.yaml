@@ -1,0 +1,32 @@
+name: Sync preview branch
+
+# main の内容を preview ブランチへミラーする。
+# Vercel は shuntaka.tech (Preview 環境) をブランチ preview に割り当てているため、
+# main push → preview 更新 → shuntaka.tech へ自動デプロイになる。
+# 本番 (shuntaka.dev) は tagpr のタグリリース (deploy-vercel --prod) でのみ更新する。
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # preview ブランチの ref 更新に必要
+    steps:
+      - name: Update preview ref to main HEAD
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # ref 更新は API で行う (checkout 不要 + persist-credentials を避ける)。
+          # API 経由でも push イベントが発火し Vercel の GitHub App が反応する
+          if ! gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/preview" \
+            -f "sha=${GITHUB_SHA}" -F force=true; then
+            # preview ブランチ未作成の初回のみ作成する
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/heads/preview" -f "sha=${GITHUB_SHA}"
+          fi

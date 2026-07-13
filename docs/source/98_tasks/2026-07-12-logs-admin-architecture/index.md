@@ -476,6 +476,15 @@ gh run watch "$(gh run list --workflow Deploy --branch "$BRANCH" --limit 1 --jso
 
 実績: 2026-07-13 に `chore/adjustment-document` から `stageName=dev` / `stack=admin` で実行し 54 秒で完走（他スタックはスキップされることを確認）。
 
+##### web（Vercel）のデプロイ経路
+
+公開 web は AWS ではなく Vercel 配信のため、Deploy workflow の対象外。
+
+- **dev（shuntaka.tech）**: Vercel がドメインを **git ブランチ `preview`** に割り当てているため、main への push で `sync-preview.yaml` が `preview` ブランチを main の HEAD に追従させ（API で ref 更新。初回はブランチ自動作成）、Vercel が自動デプロイする
+- **prd（shuntaka.dev）**: tagpr のタグリリース（`tagpr.yaml` の deploy-vercel ジョブ、`vercel deploy --prod`）でのみ更新。`vercel.json` で main の git デプロイは無効化してあり、main push が本番に直行しない
+- 注意: shuntaka.tech は dev 確認用のためアクセス制限を有効にしている（閲覧は所有者のみ）
+- 注意: `preview` ブランチはマシン管理のミラーのため**ブランチ保護は付けない**（force 更新が前提。全ブランチ対象の ruleset を作る場合は `preview` を除外する）
+
 ###### GitHub 側の登録手順
 
 deploy workflow は `environment: <stageName>` で GitHub Environments（dev / prd）の secrets / variables を参照する。既存デプロイ（main スタック等）で Environments と以下は登録済みのため、**admin 用に新規で必要なのは Environment variable `SITE_FQDN` のみ**。
@@ -605,6 +614,7 @@ bun run lint
 ### ローカル開発のハマりどころ（既知）
 
 - `turbo dev` は起動時のパッケージグラフで固定されるため、ワークスペース追加後は dev セッションの再起動が必要
+- ワークスペース構成が異なるブランチ間（例: ディレクトリ改名の前後）を行き来したら `bun install` で node_modules のリンクを張り直す。張り直さないと lint / type-check が依存を解決できず error 型扱いのエラーが大量に出る
 - root `.env.local` は Vercel CLI に上書きされ wt.toml のポート定義が消えることがある（TODO 管理中の未解決課題）
 - amazon-cognito-identity-js は `global` 参照するため index.html に `window.global = window` のシムを入れてある
 - 画像アップロードの S3 PUT は presign URL 発行までは確認済み。dev スタック適用でバケットは作成済みのため、残る検証は通し確認（次のアクション 5.）で行う
