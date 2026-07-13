@@ -2,7 +2,7 @@
 
 - 起票日: 2026-07-13
 - 関連: [PR #625](https://github.com/shuntaka9576/shuntaka-dev/pull/625) / [content_html 事前生成](../2026-07-02-articles-content-html-pregeneration/index.md) / [blog-api の VPC + Fargate Proxy 構成](../2026-06-29-blog-api-tidb-proxy/index.md)
-- ステータス: 実装済み（dev デプロイ・検証中）
+- ステータス: 実装済み（dev で E2E 検証完了、本番リリース待ち）
 
 ## 起票理由
 
@@ -89,4 +89,13 @@ aws logs tail /aws/lambda/d-st-blog-api --since 10m --format short | grep -E "Re
 
 ### 2026-07-14
 
-- 失敗ジョブをリラン
+- デプロイ失敗が継続。原因は Mac mini の Rancher Desktop VM のメモリ不足（`cargo chef cook --release` 中に rustc が OOM Kill）。VM メモリ増強で解決し、dev デプロイ成功
+- dev E2E 検証で 2 つの dev 環境固有の問題を発見・解消
+  - `blog_dev.users.github_installation_id` が prod の値のままで、dev App（shuntaka-blog-api-dev）の installation id と不一致 → 非同期処理がユーザー解決の 404 で終了していた。dev App の installation id（GitHub の Settings → Applications の Configure リンク先 URL 末尾、または webhook payload の `installation.id` で確認できる）に UPDATE して解消
+  - **main への push（renovate マージ等）のたびに `deploy.yaml` の push トリガーが dev を main のコードで上書きする**。ブランチ検証中に旧コードへ巻き戻り、インライン処理に見える現象が発生して切り分けに時間を要した。ブランチの dev 検証をするときはこの上書きに注意
+- 再デプロイ後、E2E 完走を確認: 受付 0.24 秒で `accepted` → 自己 Event invoke → `/events` で署名再検証 → `Webhook processing complete: processed=1, succeeded=1, failed=0`
+
+## 残課題・注意点
+
+- `infrastructure/src/github/client.rs` の reqwest が `Client::new()` でタイムアウト未設定。squid トンネル経由の接続が刺さると処理がハングし得るため、`Client::builder().timeout(30s)` を別 PR で入れる
+- LWA passthrough では、アプリがエラーレスポンス（4xx/5xx）を返しても invocation 自体は成功扱いになるため、**Lambda の Event 自動リトライはクラッシュ/タイムアウト時しか発火しない**。アプリレベルの失敗（GitHub 502 等）は再配信または次回 push でのフルスキャンでカバーされる前提
