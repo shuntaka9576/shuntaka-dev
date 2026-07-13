@@ -433,7 +433,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://images.shuntaka.tech/          
 ##### prd デプロイ
 
 ```bash
-# DDL を blog_prd へ適用（Tailscale ログイン済みシェル）
+# DDL を blog_prd へ適用（Tailscale ログイン済みシェル）→ 2026-07-13 適用済み
 TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 for f in tools/dsql-cli/dsl-tidb/schema/07_moments.sql tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sql; do
   sed 's|${SCHEMA}|blog_prd|g' "$f" | mysql -h "tidb.$TAILNET" -P 4000 -u root --default-character-set=utf8mb4
@@ -445,9 +445,36 @@ done
 # 管理ユーザー作成・通し確認も同様 (admin.shuntaka.dev)
 ```
 
+GitHub Actions（手動実行）でやる場合。admin ステップ入りの workflow 定義が main に必要なので、**本 PR のマージ後**に実行する。
+
+```bash
+# main から prd へ admin スタックをデプロイ
+gh workflow run Deploy --ref main -f stageName=prd -f stack=admin
+
+# 完走まで監視
+sleep 5
+gh run watch "$(gh run list --workflow Deploy --branch main --limit 1 --json databaseId -q '.[0].databaseId')"
+```
+
+prd も初回は Cognito 出力が SSM に無い状態で SPA が焼かれるため、完走後にもう一度同じ dispatch を実行して実 ID を焼き込む（dev の手順 4. と同じ理屈）。その後 `/prd/shuntaka/admin/user-pool-id` を使って管理ユーザーを作成し、admin.shuntaka.dev で通し確認する。
+
 ##### CI から実行する場合
 
 GitHub Actions の `Deploy` workflow を `workflow_dispatch` で `stack=admin` を選んで実行する（main push の `all` にも admin は含まれる）。初回だけ上記 4. の再デプロイが必要なのは同じ。
+
+`workflow_dispatch` は `--ref` で指定したブランチ上の workflow 定義とコードで動くため、**main へのマージ不要**で作業ブランチからそのまま dev へデプロイできる。VITE\_\* は CI が組み立てる（Cognito 2 つは SSM、URL 2 つは Environment variable `SITE_FQDN`）ので手元でのビルドも不要。
+
+```bash
+# push 済みの現在のブランチから dev へ admin スタックをデプロイ
+BRANCH=$(git branch --show-current)
+gh workflow run Deploy --ref "$BRANCH" -f stageName=dev -f stack=admin
+
+# 完走まで監視
+sleep 5
+gh run watch "$(gh run list --workflow Deploy --branch "$BRANCH" --limit 1 --json databaseId -q '.[0].databaseId')"
+```
+
+実績: 2026-07-13 に `chore/adjustment-document` から `stageName=dev` / `stack=admin` で実行し 54 秒で完走（他スタックはスキップされることを確認）。
 
 ###### GitHub 側の登録手順
 
@@ -613,4 +640,4 @@ sed 's|${SCHEMA}|blog_dev|g' tools/dsql-cli/dsl-tidb/schema/08_admin_sessions.sq
 4. ~~`admin-create-user`~~ → **実施済み**（UserStatus CONFIRMED。username は `users.name` と同じ `shuntaka`）
 5. ~~通し確認~~ → **完了**（2026-07-13）。SRP ログイン → 画像付き下書き投稿 → `blog_dev.moments` 反映 → `images.shuntaka.tech` の thumb 配信 200 / images ホスト 403 まで確認。テスト投稿（下書き 1 件）は不要になったら管理画面から削除
 6. ログイン障害の修正 2 ファイル（admin-web の hc headers / admin-backend の catch ログ）のコミット。管理ユーザーのパスワードはトラブルシュート中にターミナルへ表示されたため `admin-set-user-password --permanent` で更新を推奨
-7. `blog_prd` へ DDL 適用 → prd デプロイ → フェーズ 4（公開側 moments タブ）
+7. ~~`blog_prd` へ DDL 適用~~（2026-07-13 適用済み。moments / admin_sessions の 7 テーブル構成を確認）→ 本 PR マージ後に prd デプロイ（「prd デプロイ」の GitHub Actions 手順。初回は 2 回 dispatch）→ フェーズ 4（公開側 moments タブ）
