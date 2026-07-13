@@ -1,0 +1,54 @@
+name: Deploy preview web
+
+# main の内容を shuntaka.tech (Vercel Preview 環境) へ反映する。
+# tagpr の deploy-vercel (production) と同じ CLI デプロイの preview 版で、
+# デプロイ URL に shuntaka.tech を直接エイリアスする。
+# 本番 (shuntaka.dev) は tagpr のタグリリース (deploy-vercel --prod) でのみ更新する。
+on:
+  push:
+    branches:
+      - main
+  # 手動での再デプロイ用
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # actions/checkout でリポジトリを取得するため
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Vercel pull
+        run: bunx vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Vercel build
+        run: bunx vercel build --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Vercel deploy
+        id: deploy
+        run: |
+          url=$(bunx vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Alias shuntaka.tech to the deployment
+        run: bunx vercel alias set "$DEPLOY_URL" shuntaka.tech --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
