@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.0713.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0712.0...2026.0713.0) - 2026-07-13
+
+- feat: 公開側 moments タブ（フェーズ 4）と admin の編集・下書きに戻す by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/614
+- fix(deps): update rust crate comrak to 0.54.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/616
+- fix(deps): update dependency hono to ^4.12.30 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/615
+
 ## [2026.0712.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0711.1...2026.0712.0) - 2026-07-12
 
 - feat: エラー/404 ページを ErrorFallback に統一し、PR バンドルサイズレポートを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/608
