@@ -8,9 +8,10 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`moments` (
   `fastener`       ENUM('clip','tape') NOT NULL DEFAULT 'clip',
   `fastener_color` ENUM('pink','blue','yellow','green') NULL,
   `status`         ENUM('published','draft') NOT NULL DEFAULT 'published',
-  `published_at`   DATETIME(6)  NULL,                   -- draft は NULL。公開時に設定
+  `captured_at`    DATETIME(6)  NOT NULL,               -- 撮影時刻。クライアントが EXIF から補完して送る。表示・ソートに使う
+  `published_at`   DATETIME(6)  NULL,                   -- 初回公開時刻の記録。未公開の draft は NULL。draft に戻しても保持
   `created_at`     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at`     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`moment_id`),
-  KEY `idx_moments_feed` (`user_id`, `status`, `published_at`, `moment_id`)
+  KEY `idx_moments_feed` (`user_id`, `status`, `captured_at`, `moment_id`)
 );

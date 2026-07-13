@@ -13,6 +13,7 @@ export interface MomentsTable {
   fastener: Fastener;
   fastener_color: FastenerColor | null;
   status: MomentStatus;
+  captured_at: Date;
   published_at: Date | null;
   created_at: ColumnType<Date, never, never>;
   updated_at: ColumnType<Date, never, never>;

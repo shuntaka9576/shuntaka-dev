@@ -1,3 +1,5 @@
+env_files = ["./.env.local"]
+
 [config]
 default_to_workspace = false
 
@@ -13,7 +15,6 @@ AWS_REGION = "ap-northeast-1"
 DATABASE_URL = { script = [
   "if [ -n \"${DATABASE_URL:-}\" ]; then echo \"$DATABASE_URL\"; else TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix); echo \"mysql://root@tidb.${TAILNET}:4000/${TIDB_DATABASE:-blog_dev}\"; fi",
 ] }
-
 [tasks.run]
 command = "cargo"
 args = ["watch", "-x", "run"]

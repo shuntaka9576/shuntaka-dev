@@ -10,12 +10,15 @@ interface MomentCardProps {
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  // 例: 2026/07/13(月)。サーバーの TZ に依存しないよう JST に固定する
-  return date.toLocaleDateString('ja-JP', {
+  // 例: 2026/07/13(月) 14:30。サーバーの TZ に依存しないよう JST に固定する
+  return date.toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Tokyo',
   });
 }
@@ -92,7 +95,7 @@ export const MomentCard = memo(function MomentCard({ moment, tilt = 'left' }: Mo
             loading="lazy"
           />
           <figcaption className="py-1.5 text-center text-xs text-[var(--color-text-muted)]">
-            {formatDate(moment.publishedAt)}
+            {formatDate(moment.capturedAt)}
           </figcaption>
         </figure>
       </div>

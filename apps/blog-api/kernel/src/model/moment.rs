@@ -14,5 +14,6 @@ pub struct MomentSummary {
     pub fastener: String,
     /// tape のみ有効。'pink' | 'blue' | 'yellow' | 'green'
     pub fastener_color: Option<String>,
-    pub published_at: DateTime<Utc>,
+    /// 撮影時刻。クライアントが EXIF から補完して登録する
+    pub captured_at: DateTime<Utc>,
 }

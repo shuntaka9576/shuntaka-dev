@@ -57,7 +57,7 @@ export default async function MomentPreviewPage({ searchParams }: PreviewPagePro
     fastener === 'tape' ? FASTENER_COLORS.find((c) => c === rawColor) : undefined;
 
   const rawDate = first(params.date);
-  const publishedAt =
+  const capturedAt =
     rawDate !== undefined && !Number.isNaN(Date.parse(rawDate))
       ? rawDate
       : new Date().toISOString();
@@ -67,7 +67,7 @@ export default async function MomentPreviewPage({ searchParams }: PreviewPagePro
     text: text.slice(0, 180),
     imageUrl,
     thumbUrl: imageUrl,
-    publishedAt,
+    capturedAt,
     fastener,
     fastenerColor,
   };
