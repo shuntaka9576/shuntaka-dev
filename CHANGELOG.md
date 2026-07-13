@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0713.4](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.3...2026.0713.4) - 2026-07-13
+
+- feat: GitHub webhook の実処理を自己 Event invoke で非同期化し 10 秒配信タイムアウトを回避 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/625
+
 ## [2026.0713.3](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.2...2026.0713.3) - 2026-07-13
 
 - feat: moments の日付指定を廃止し EXIF 由来の撮影時刻 captured_at に移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/626
