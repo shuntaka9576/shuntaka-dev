@@ -81,6 +81,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   const articleUrl = `${SITE_URL}/${userName}/articles/${slug}`;
+  const contentHtml = article.contentHtml ?? '';
+  // 目次対象の見出し（h1-h3）が無い記事はサイドバーを出さず本文を中央に寄せる
+  const hasToc = /<h[1-3][\s>]/.test(contentHtml);
 
   return (
     <>
@@ -103,7 +106,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             </div>
           </div>
         </div>
-        <div className="article-body">
+        <div className={hasToc ? 'article-body' : 'article-body article-body-centered'}>
           <article className="article-content">
             {article.thumbnail && (
               <Image
@@ -117,12 +120,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               />
             )}
             <div className="article-content-wrapper">
-              <ArticleContent html={article.contentHtml ?? ''} />
+              <ArticleContent html={contentHtml} />
             </div>
           </article>
-          <aside className="right-sidebar">
-            <TableOfContents />
-          </aside>
+          {hasToc && (
+            <aside className="right-sidebar">
+              <TableOfContents />
+            </aside>
+          )}
         </div>
       </BaseLayout>
     </>

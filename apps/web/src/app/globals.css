@@ -576,6 +576,11 @@ a:hover {
   justify-content: space-between;
 }
 
+/* 見出しが無く目次サイドバーを出さない記事は本文を中央に寄せる */
+.article-body-centered {
+  justify-content: center;
+}
+
 .article-content {
   position: relative;
   width: calc(100% - var(--layout-sidebar-w) - var(--space-4));

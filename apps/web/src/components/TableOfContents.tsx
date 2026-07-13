@@ -8,7 +8,8 @@ export function TableOfContents() {
 
   useEffect(() => {
     const initTocbot = async () => {
-      const content = document.querySelector('.prose');
+      // 本文はツイート埋め込みで複数の .prose に分割されるため、全体を包むラッパーを見る
+      const content = document.querySelector('.article-content-wrapper');
       if (!content) return;
 
       const headings = content.querySelectorAll('h1, h2, h3');
@@ -27,7 +28,7 @@ export function TableOfContents() {
 
       tocbot.init({
         tocSelector: '.toc',
-        contentSelector: '.prose',
+        contentSelector: '.article-content-wrapper',
         headingSelector: 'h1, h2, h3',
         scrollSmooth: false,
         headingsOffset: 100,
