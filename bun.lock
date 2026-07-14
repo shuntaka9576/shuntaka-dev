@@ -38,7 +38,7 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
-        "@hono/node-server": "^2.0.8",
+        "@hono/node-server": "^2.0.9",
         "@scalar/hono-api-reference": "^0.11.9",
         "esbuild": "^0.28.1",
       },
@@ -540,7 +540,7 @@
 
     "@fontsource-variable/geist": ["@fontsource-variable/geist@5.2.9", "", {}, "sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ=="],
 
-    "@hono/node-server": ["@hono/node-server@2.0.8", "", { "peerDependencies": { "hono": "^4" } }, "sha512-GuCWzLxwg218fy1JaHculFsdcuY12hxit83V+algozTPnwhNjLrRL/Alg9OYjLZLoUZ1rw/S4CdTMsnkSKCmFA=="],
+    "@hono/node-server": ["@hono/node-server@2.0.9", "", { "peerDependencies": { "hono": "^4" } }, "sha512-cNMw3ziCdDcx0+ldta60zvUL5XO0OLt521n2hjPp0PB0ugczDCEczXsf33qQbkKIXWGFQ03f0LC85u6YK8pCLA=="],
 
     "@hono/zod-openapi": ["@hono/zod-openapi@1.5.0", "", { "dependencies": { "@asteasolutions/zod-to-openapi": "^8.5.0", "@hono/zod-validator": "^0.8.0", "openapi3-ts": "^4.5.0" }, "peerDependencies": { "hono": ">=4.10.0", "zod": "^4.0.0" } }, "sha512-/clSBZWBht7G4SItlTo+4ElbdIUw+987kZYttaUUJWksJoqK905z1pBNTwoJm/P1ibA2ka8nNbqb39eOlreH2g=="],
 
