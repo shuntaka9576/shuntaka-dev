@@ -1,0 +1,15 @@
+#pagefind-search {
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+#pagefind-search pagefind-modal-trigger {
+  display: block;
+  width: 100%;
+  --pf-primary: #2980b9;
+  --pf-border-focus: #2980b9;
+}
+
+#pagefind-search pagefind-modal-trigger[hidden] {
+  display: none;
+}

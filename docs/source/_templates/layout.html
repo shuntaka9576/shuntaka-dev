@@ -1,0 +1,6 @@
+{% extends "!layout.html" %} {% block extrahead %} {{ super() }}
+<link rel="stylesheet" href="{{ pathto('pagefind/pagefind-component-ui.css', 1) }}" />
+{% endblock %} {% block document %} {% if meta and ("no-search" in meta or "nosearch" in meta) %}
+<div style="display: contents" data-pagefind-ignore="all">{{ super() }}</div>
+{% else %} <span hidden data-pagefind-meta="title">{{ title|striptags }}</span> {{ super() }} {%
+endif %} {% endblock %}

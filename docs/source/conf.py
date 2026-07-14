@@ -13,11 +13,17 @@ exclude_patterns = []
 language = "ja"
 
 html_static_path = ["_static"]
+templates_path = ["_templates"]
 html_theme = "sphinx_rtd_theme"
 html_theme_options = {
     "collapse_navigation": True,
     "navigation_depth": 3,
 }
+html_css_files = ["pagefind.css"]
+
+# Pagefind のビルド前や sphinx-autobuild 中は従来検索へフォールバックする。
+# フォールバック側も日本語 splitter を使うことを明示する。
+html_search_language = "ja"
 
 # https://github.com/mgaitan/sphinxcontrib-mermaid?tab=readme-ov-file#markdown-support
 myst_fence_as_directive = ["mermaid"]
