@@ -26,7 +26,7 @@
         "@aws-sdk/client-s3": "^3.1086.0",
         "@aws-sdk/client-secrets-manager": "^3.1086.0",
         "@aws-sdk/s3-request-presigner": "^3.1086.0",
-        "@hono/zod-openapi": "^1.4.0",
+        "@hono/zod-openapi": "^1.5.0",
         "@smithy/node-http-handler": "^4.9.5",
         "hono": "^4.12.30",
         "https-proxy-agent": "^9.1.0",
@@ -542,7 +542,7 @@
 
     "@hono/node-server": ["@hono/node-server@2.0.8", "", { "peerDependencies": { "hono": "^4" } }, "sha512-GuCWzLxwg218fy1JaHculFsdcuY12hxit83V+algozTPnwhNjLrRL/Alg9OYjLZLoUZ1rw/S4CdTMsnkSKCmFA=="],
 
-    "@hono/zod-openapi": ["@hono/zod-openapi@1.4.0", "", { "dependencies": { "@asteasolutions/zod-to-openapi": "^8.5.0", "@hono/zod-validator": "^0.8.0", "openapi3-ts": "^4.5.0" }, "peerDependencies": { "hono": ">=4.10.0", "zod": "^4.0.0" } }, "sha512-AFchqR1N/NxfI4hUOSGI2/g8zLROxA1OE7Oh5JJFlTaGxhrdRyH+93gd0tIBpb0z8s9r8hUoNnaOBfHbdb4NMw=="],
+    "@hono/zod-openapi": ["@hono/zod-openapi@1.5.0", "", { "dependencies": { "@asteasolutions/zod-to-openapi": "^8.5.0", "@hono/zod-validator": "^0.8.0", "openapi3-ts": "^4.5.0" }, "peerDependencies": { "hono": ">=4.10.0", "zod": "^4.0.0" } }, "sha512-/clSBZWBht7G4SItlTo+4ElbdIUw+987kZYttaUUJWksJoqK905z1pBNTwoJm/P1ibA2ka8nNbqb39eOlreH2g=="],
 
     "@hono/zod-validator": ["@hono/zod-validator@0.8.0", "", { "peerDependencies": { "hono": ">=4.10.0", "zod": "^3.25.0 || ^4.0.0" } }, "sha512-5uS4S1/LKtZQYvD4BtpPUFkOv8d1wNxHHrChm26buMiEYc1FrHWvDUaKVBwkiVtvSExHSpLGDvcnpI2Copyj9w=="],
 
