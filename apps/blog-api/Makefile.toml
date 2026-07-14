@@ -1,10 +1,8 @@
-env_files = ["./.env.local"]
-
 [config]
 default_to_workspace = false
 
 [env]
-PORT = { script = ["echo ${API_PORT:-8080}"] }
+PORT = { script = ["echo ${API_PORT:-43003}"] }
 AWS_REGION = "ap-northeast-1"
 
 [env.development]

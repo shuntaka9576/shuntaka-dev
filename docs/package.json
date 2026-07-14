@@ -6,7 +6,7 @@
   "keywords": [],
   "scripts": {
     "build-docs": "uv run sphinx-build source build",
-    "dev": "uv run sphinx-autobuild source build --port ${DOCS_PORT:-8000}",
+    "dev": "uv run sphinx-autobuild source build --port ${DOCS_PORT:-43004}",
     "doc-gen": "TBLS_DSN=\"mysql://root@tidb.$(tailscale status --json | jq -r '.MagicDNSSuffix'):4000/blog_dev\" tbls doc -c .tbls.yaml --rm-dist",
     "clean": "rm -rf build .turbo"
   },

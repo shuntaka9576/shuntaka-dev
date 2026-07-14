@@ -1,6 +1,5 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
-import { isDevAuthBypass } from '../env.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -26,10 +25,6 @@ export const isAllowedRequest = (input: {
 };
 
 export const csrfGuard = createMiddleware(async (c, next) => {
-  if (isDevAuthBypass()) {
-    await next();
-    return;
-  }
   const ok = isAllowedRequest({
     method: c.req.method,
     origin: c.req.header('origin'),

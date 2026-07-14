@@ -175,7 +175,7 @@ moments（180 字 + 写真必須の一文投稿）は写真が主役の情緒的
 - **責務分離.** 値の唯一の真実は `globals.css`（トークン定義）。視覚的に値を確認したいときは Storybook の `Design System/Tokens` を開く。この `DESIGN.md` は voice / 原則 / 禁止事項を担い、具体値は **トークン名で参照する**（hex / px / ms / rem を直接書かない）。マスコット `ochaIcon` の 3 色だけは「再着色しない」設計上の例外として hex のまま残す。
 - **トークン実装.** すべてのデザイントークン（color、spacing、radius、line-height、type scale、motion、shadow）は `src/app/globals.css` にある。Light の値は `:root` に、Dark の上書きは `[data-theme='dark']` と `prefers-color-scheme: dark` ブロックに置く。
 - **視覚カタログ.** `apps/web/.storybook/` に Storybook（Storybook 10 + `@storybook/nextjs-vite`）を置く。Story は本番コンポーネントとトークンのスウォッチをカバーする。
-  - ローカル起動: `bun run storybook`（`http://localhost:6006`）
+  - ローカル起動: `bun run storybook`（main 既定 `http://localhost:43005`。worktree では `STORYBOOK_PORT`）
   - 静的ビルド: `bun run build-storybook` → `apps/web/storybook-static/`
   - デプロイ: `main` への push で `.github/workflows/docs.yaml` がトリガーされ、Sphinx docs と同じ artifact に同梱されて GitHub Pages に公開される（`STORYBOOK_BASE_PATH=/shuntaka-dev/storybook/`）。
 - **コンポーネント.** `src/components/*.tsx` が UI の正本。新しい視覚要素を作るときは生 HTML を書くより、既存コンポーネントを拡張するか新しい Story を追加することを優先する。

@@ -2,7 +2,8 @@ import { serve } from '@hono/node-server';
 import { Scalar } from '@scalar/hono-api-reference';
 import { Hono } from 'hono';
 
-// ローカル設定は `cp .env.example .env.local` で用意する (turbo がパッケージ dir で実行する)
+// dev の env は bare clone 直下の .envrc (direnv) から継承される。
+// worktree ごとのポート等は .env.local が上書きするので任意で読む
 try {
   process.loadEnvFile('.env.local');
 } catch {

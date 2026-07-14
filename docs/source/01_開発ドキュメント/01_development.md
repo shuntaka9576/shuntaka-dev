@@ -505,10 +505,55 @@ brew install gitleaks
 ```
 shuntaka-dev/          # bare clone
 ├── .bare/             # git bare repository
-├── .envrc             # 共通環境変数（秘匿情報等）
+├── .envrc             # 全 app 共通の環境変数（秘匿情報含む、gitignore 対象）
 ├── main/              # メインworktree（mainブランチ）
 ├── feature-foo/       # 作業worktree（wt switchで自動作成）
 └── fix-bar/           # 作業worktree
+```
+
+bare clone 直下の `.envrc` に全 app（blog-api / iac / web / admin-api / admin-web）で使う env を集約し、worktree 側の `.envrc` は `source_up` で継承する。app ごとの用途はコメントで明記する。ポート依存の値だけ worktree の `.env.local`（wt.toml が生成）で上書きされる。
+
+bare clone 直下で以下を実行して初期化する。プレースホルダは実値に差し替える（Cognito は `aws ssm get-parameters --names /dev/shuntaka/admin/user-pool-id /dev/shuntaka/admin/user-pool-client-id`、images バケットは `aws cloudformation describe-stack-resources --stack-name d-st-admin --query 'StackResources[?LogicalResourceId==\`ImagesBucket\`].PhysicalResourceId' --output text` で取得）。
+
+```bash
+cat > .envrc <<'EOF'
+# blog-api (Lambda) + iac/aws (CDK)
+export GH_APP_ID=123456
+export GH_APP_SECRET_PEM_KEY_NAME=/dev/shuntaka/github-app/private-key
+export GH_WEBHOOK_SECRET_KEY_NAME=/dev/shuntaka/github-webhook/secret
+export CLOUDINARY_CLOUD_NAME=your-cloud-name
+export CLOUDINARY_API_KEY=123456789012345
+export CLOUDINARY_API_SECRET_KEY_NAME=/dev/shuntaka/cloudinary/api-secret
+export IMAGES_BASE_URL=https://images.shuntaka.tech
+
+# blog-api + admin-api の TiDB 接続文字列。Tailnet 経由で自作クラスタ上の blog_dev を組み立てる
+if [ -z "${DATABASE_URL:-}" ]; then
+  TAILNET=$(tailscale status --json 2>/dev/null | jq -r '.MagicDNSSuffix // empty' 2>/dev/null)
+  if [ -n "$TAILNET" ]; then
+    export DATABASE_URL="mysql://root@tidb.${TAILNET}:4000/blog_dev"
+  fi
+fi
+
+# apps/web (main worktree のフォールバック。worktree では .env.local が上書き)
+export NEXT_PUBLIC_SITE_URL=http://localhost:43000
+export NEXT_PUBLIC_API_URL=http://localhost:43003
+
+# apps/admin-api (Hono/Lambda: 管理API)
+export COGNITO_USER_POOL_ID=ap-northeast-1_XXXXXXXXX
+export COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+export COOKIE_SECRET=local-dev-cookie-secret-at-least-32-chars
+export DEV_INSECURE_COOKIES=1
+export IMAGES_BUCKET_NAME=d-st-admin-imagesbucket-xxxxxxxxxx
+export ORIGIN_ALLOWLIST=http://localhost:43002
+
+# apps/admin-web (Vite SPA: 管理画面)
+export VITE_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
+export VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID
+export VITE_IMAGES_BASE_URL=$IMAGES_BASE_URL
+export VITE_PREVIEW_BASE_URL=https://shuntaka.tech
+EOF
+
+direnv allow .
 ```
 
 bare clone環境では`core.hooksPath`が不正なパスを指している場合がある。lefthookがworktreeで動作しない場合は以下を実行する（リポジトリに対して一度だけ）。
@@ -517,36 +562,51 @@ bare clone環境では`core.hooksPath`が不正なパスを指している場合
 git config --local --unset core.hooksPath
 ```
 
-mainワークツリーの環境変数は、mainはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`と`.envrc`を作成する。
+mainワークツリーはWorktrunkのpre-startフックの対象外のため、初回のみ手動で`.env.local`を作成する。`.envrc`はcommit済みなのでそのまま使える。
 
 ```bash
 cat > .env.local <<'EOF'
-WEB_PORT=3000
-API_PORT=8080
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:8080
-PORT=8080
-DOCS_PORT=8000
+WEB_PORT=43000
+API_PORT=43003
+NEXT_PUBLIC_SITE_URL=http://localhost:43000
+NEXT_PUBLIC_API_URL=http://localhost:43003
+PORT=43003
+DOCS_PORT=43004
+ADMIN_API_PORT=43001
+ADMIN_WEB_PORT=43002
+ORIGIN_ALLOWLIST=http://localhost:43002
+STORYBOOK_PORT=43005
 EOF
 
-cat > .envrc <<'EOF'
-source_up
-dotenv .env.local
-EOF
 direnv allow .
 ```
 
-ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。
+ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。main の既定は 4300x 帯に揃えて衝突を避けている。
 
-| 変数                   | 内容                      | main（既定）            |
-| ---------------------- | ------------------------- | ----------------------- |
-| `WEB_PORT`             | Next.js devサーバーポート | 3000                    |
-| `API_PORT` / `PORT`    | Rust APIポート            | 8080                    |
-| `DOCS_PORT`            | Sphinxドキュメントポート  | 8000                    |
-| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL         | `http://localhost:3000` |
-| `NEXT_PUBLIC_API_URL`  | API URL                   | `http://localhost:8080` |
+| 変数                   | 内容                        | main（既定）             |
+| ---------------------- | --------------------------- | ------------------------ |
+| `WEB_PORT`             | Next.js devサーバーポート   | 43000                    |
+| `ADMIN_API_PORT`       | admin-api devサーバーポート | 43001                    |
+| `ADMIN_WEB_PORT`       | admin-web Vite devポート    | 43002                    |
+| `API_PORT` / `PORT`    | Rust APIポート              | 43003                    |
+| `DOCS_PORT`            | Sphinxドキュメントポート    | 43004                    |
+| `STORYBOOK_PORT`       | Storybook devポート         | 43005                    |
+| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL           | `http://localhost:43000` |
+| `NEXT_PUBLIC_API_URL`  | API URL                     | `http://localhost:43003` |
+| `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin  | `http://localhost:43002` |
 
-新規worktreeではブランチ名から10000-19999の範囲でポートが決定的に生成される。同じブランチ名なら常に同じポートになる。
+新規worktreeではブランチ名から10000-19999の範囲でポートがサービスごとに決定的に生成される。同じブランチ名なら常に同じポートになる（連番ではない）。現worktreeに割り当てられたポートを確認するには`.env.local`を参照する。
+
+```bash
+grep _PORT .env.local
+# WEB_PORT=12345
+# API_PORT=18291
+# PORT=18291
+# DOCS_PORT=11284
+# ADMIN_API_PORT=10932
+# ADMIN_WEB_PORT=15607
+# STORYBOOK_PORT=19012
+```
 
 ブランチ作業は、`wt switch --create`で新しいworktreeを作成する。pre-startフックにより`.env.local`（ポート設定）、`.envrc`、依存関係のインストールが自動で行われる。
 
