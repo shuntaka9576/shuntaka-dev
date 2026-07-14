@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ ! -f .env.local ]; then
-  echo ".env.local not found. Run 'wt switch --create <branch>' or create it manually." >&2
-  exit 1
+if [ -f .env.local ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source .env.local
+  set +a
 fi
 
-set -a
-# shellcheck source=/dev/null
-source .env.local
-set +a
+# fallback: main worktree の既定値 (docs/source/01_開発ドキュメント/01_development.md 参照)
+: "${WEB_PORT:=43000}"
+: "${ADMIN_API_PORT:=43001}"
+: "${ADMIN_WEB_PORT:=43002}"
+: "${API_PORT:=43003}"
+: "${DOCS_PORT:=43004}"
+: "${STORYBOOK_PORT:=43005}"
 
 printf "%-11s http://localhost:%s\n" web       "${WEB_PORT}"
 printf "%-11s http://localhost:%s\n" api       "${API_PORT}"
