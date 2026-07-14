@@ -12,8 +12,8 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # sitemap/feed がビルド時に記事一覧を取得するため、空データを返すスタブを立てる
-    # (API_BASE_URL のデフォルト http://localhost:8080 がそのままスタブを向く)
+    # sitemap/feed がビルド時に記事一覧を取得するため、空データを返すスタブを立てる。
+    # NEXT_PUBLIC_API_URL を明示して build がこのスタブを向くようにする
     - name: Start API stub
       shell: bash
       run: |
@@ -26,6 +26,7 @@ runs:
       working-directory: apps/web
       env:
         TURBOPACK_STATS: '1'
+        NEXT_PUBLIC_API_URL: http://localhost:8080
       run: bun run build
 
     - name: Build base branch
@@ -33,6 +34,7 @@ runs:
       working-directory: base
       env:
         TURBOPACK_STATS: '1'
+        NEXT_PUBLIC_API_URL: http://localhost:8080
       run: |
         bun install --frozen-lockfile
         cd apps/web
