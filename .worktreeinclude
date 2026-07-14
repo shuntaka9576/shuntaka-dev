@@ -1,0 +1,12 @@
+# wt step copy-ignored の対象を限定。ここに列挙したもの「かつ」 gitignore 済みだけ複製される。
+# node_modules は bun install (pre-start install) が担うため意図的に除外し、
+# copy と install の並列実行での EEXIST を防ぐ。
+
+# Rust cargo target (workspace root)。cold rebuild が数分 → reflink で数秒
+target/
+
+# turbo キャッシュ
+.turbo/
+
+# Next.js の build cache
+apps/web/.next/
