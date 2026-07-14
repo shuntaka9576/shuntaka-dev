@@ -101,7 +101,7 @@ export interface MomentsQueryOptions {
   signal?: AbortSignal;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:43003';
 
 /**
  * tags 配列を API 仕様に合わせてクエリ文字列部分に変換する。

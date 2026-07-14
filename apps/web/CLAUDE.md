@@ -5,7 +5,7 @@ shuntaka.dev の本番フロントエンド。Next.js 16 + React 19 + Tailwind C
 ## デザイン仕様 / カタログ
 
 - **ブランドルール / Hard rules**: `./DESIGN.md`（voice、color、layout、iconography 全部）
-- **視覚カタログ (Storybook)**: `bun run storybook` (http://localhost:6006)。本番マージで GitHub Pages へ自動デプロイ
+- **視覚カタログ (Storybook)**: `bun run storybook` (main 既定 http://localhost:43005。worktree では `STORYBOOK_PORT`)。本番マージで GitHub Pages へ自動デプロイ
 - **Token 実装**: `src/app/globals.css`（`:root` / `[data-theme='dark']`）
 
 ## 主要ディレクトリ

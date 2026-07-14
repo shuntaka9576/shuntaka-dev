@@ -89,7 +89,6 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 | env                                               | 用途                                                                                                                                                                              |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                                    | TiDB 接続文字列（本番: `mysql://root@tidb-proxy.internal:13306/blog_{stage}`）                                                                                                    |
-| `DEV_AUTH_BYPASS_USER`                            | `DEV_AUTH_BYPASS=1` 時に成り代わる `users.name`（既定 shuntaka。ローカル専用）                                                                                                    |
 | `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID`      | access token 検証（issuer / client_id）と refresh / RevokeToken                                                                                                                   |
 | `COOKIE_SECRET`                                   | Cookie 暗号鍵。本番は CDK が deploy 時に Secrets Manager から取り出して注入（VPC 内 Lambda から Secrets Manager へ届かないため）。`COOKIE_SECRET_ID` 経由の実行時取得も実装は残置 |
 | `HTTPS_PROXY` / `NO_PROXY` / `NODE_USE_ENV_PROXY` | 本番 Lambda の外部 HTTPS（Cognito API / JWKS）を squid 経由にする。AWS SDK は明示ハンドラ、fetch は `NODE_USE_ENV_PROXY=1`（Node 22.15+）で proxy 対応                            |
@@ -97,10 +96,9 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 | `IMAGES_BASE_URL`                                 | 配信 URL の組み立て（例: `https://images.shuntaka.tech`）                                                                                                                         |
 | `ORIGIN_ALLOWLIST`                                | CSRF チェックの Origin 許可リスト（カンマ区切り）                                                                                                                                 |
 | `DEV_INSECURE_COOKIES`                            | `1` で Cookie 名を `session`・`Secure` なしに切替（ローカル http 用）                                                                                                             |
-| `DEV_AUTH_BYPASS`                                 | `1` で認証・CSRF を素通し（Cognito 未構築のローカル疎通用。本番では設定しない）                                                                                                   |
 | `ADMIN_API_PORT`                                  | dev サーバーのポート（`.config/wt.toml` が worktree ごとに hash_port で採番。既定 43001）                                                                                         |
 
-ひな形は `apps/admin-api/.env.example`（`cp .env.example .env.local` で dev.ts が起動時に読む）。
+値の実体は bare clone 直下の `.envrc`（direnv 経由で継承）。ポート系だけ worktree の `.env.local`（`wt.toml` が生成）で上書き。
 
 ### 環境変数（admin-web）
 
@@ -111,7 +109,7 @@ Hono は `basePath('/api')` で組む（CloudFront 側で prefix strip をしな
 | `VITE_PREVIEW_BASE_URL`                                | apps/web の `/moments/preview` を開くベース URL（例: `https://shuntaka.tech`） |
 | `ADMIN_WEB_PORT`                                       | Vite dev サーバーのポート（wt.toml が採番。既定 43002。shell env から参照）    |
 
-ひな形は `apps/admin-web/.env.example`（Vite が `.env.local` を自動で読む。`ADMIN_WEB_PORT` のみ shell env）。
+値の実体は bare clone 直下の `.envrc`。`ADMIN_WEB_PORT` だけ worktree の `.env.local` から shell env に載る。
 
 ## DB スキーマ（`dsl-tidb/schema/` に追加）
 

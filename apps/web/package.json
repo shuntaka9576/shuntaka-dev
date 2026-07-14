@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p ${WEB_PORT:-3000}",
+    "dev": "next dev -p ${WEB_PORT:-43000}",
     "build": "next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
     "test": "bun test src/",
-    "storybook": "storybook dev -p 6006",
+    "storybook": "storybook dev -p ${STORYBOOK_PORT:-43005} --no-open",
     "build-storybook": "storybook build",
     "clean": "rm -rf .next .turbo storybook-static"
   },
