@@ -14,6 +14,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "turbo dev storybook",
+    "port": "bash scripts/port.sh",
     "spell-check": "cspell lint . --cache --gitignore",
     "build": "turbo build",
     "type-check": "bun --filter '*' type-check",

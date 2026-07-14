@@ -595,17 +595,16 @@ direnv allow .
 | `NEXT_PUBLIC_API_URL`  | API URL                     | `http://localhost:43003` |
 | `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin  | `http://localhost:43002` |
 
-新規worktreeではブランチ名から10000-19999の範囲でポートがサービスごとに決定的に生成される。同じブランチ名なら常に同じポートになる（連番ではない）。現worktreeに割り当てられたポートを確認するには`.env.local`を参照する。
+新規worktreeではブランチ名から10000-19999の範囲でポートがサービスごとに決定的に生成される。同じブランチ名なら常に同じポートになる（連番ではない）。現worktreeに割り当てられたポートは `bun run port` で確認できる。
 
 ```bash
-grep _PORT .env.local
-# WEB_PORT=12345
-# API_PORT=18291
-# PORT=18291
-# DOCS_PORT=11284
-# ADMIN_API_PORT=10932
-# ADMIN_WEB_PORT=15607
-# STORYBOOK_PORT=19012
+bun run port
+# web         http://localhost:17265
+# api         http://localhost:14261
+# docs        http://localhost:18224
+# admin-api   http://localhost:13664
+# admin-web   http://localhost:11286
+# storybook   http://localhost:12372
 ```
 
 ブランチ作業は、`wt switch --create`で新しいworktreeを作成する。pre-startフックにより`.env.local`（ポート設定）、`.envrc`、依存関係のインストールが自動で行われる。
