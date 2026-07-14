@@ -7,6 +7,3 @@ target/
 
 # turbo キャッシュ
 .turbo/
-
-# Next.js の build cache
-apps/web/.next/
