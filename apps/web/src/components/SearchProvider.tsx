@@ -31,11 +31,15 @@ interface SearchContextValue {
   results: SearchArticleResult[] | null;
   loading: boolean;
   error: string | null;
+  /** 全画面モーダルの表示状態 */
+  modalOpen: boolean;
   setQuery: (next: string) => void;
   /** debounce をキャンセルして即時に submittedQuery を確定する（Enter キー用） */
   submitNow: () => void;
   clearQuery: () => void;
   retry: () => void;
+  openModal: () => void;
+  closeModal: () => void;
 }
 
 const SearchContext = createContext<SearchContextValue | null>(null);
@@ -66,6 +70,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   const [results, setResults] = useState<SearchArticleResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,6 +178,8 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   }, [pushSearchUrl]);
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
+  const openModal = useCallback(() => setModalOpen(true), []);
+  const closeModal = useCallback(() => setModalOpen(false), []);
 
   const value = useMemo<SearchContextValue>(
     () => ({
@@ -182,12 +189,28 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       results,
       loading,
       error,
+      modalOpen,
       setQuery,
       submitNow,
       clearQuery,
       retry,
+      openModal,
+      closeModal,
     }),
-    [query, submittedQuery, results, loading, error, setQuery, submitNow, clearQuery, retry],
+    [
+      query,
+      submittedQuery,
+      results,
+      loading,
+      error,
+      modalOpen,
+      setQuery,
+      submitNow,
+      clearQuery,
+      retry,
+      openModal,
+      closeModal,
+    ],
   );
 
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;

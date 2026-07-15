@@ -25,8 +25,8 @@ export interface SearchInputProps {
 function SearchIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -71,8 +71,8 @@ export function SearchInput({
   onClear,
   onSubmit,
   loading,
-  placeholder = '気になることを日本語で…',
-  ariaLabel,
+  placeholder = '',
+  ariaLabel = '記事を検索',
   autoFocus,
 }: SearchInputProps) {
   const inputId = useId();
@@ -98,7 +98,7 @@ export function SearchInput({
       role="search"
       className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 focus-within:border-[var(--color-text)]"
     >
-      <span className="text-[var(--color-text-muted)]" aria-hidden="true">
+      <span aria-hidden="true" className="shrink-0 text-[var(--color-text-muted)]">
         <SearchIcon />
       </span>
       <input
@@ -108,21 +108,23 @@ export function SearchInput({
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        aria-label={ariaLabel ?? placeholder}
+        aria-label={ariaLabel}
         aria-busy={loading || undefined}
-        // biome-ignore lint/a11y/noAutofocus: フローティングパネル open 時のみ true（明示 opt-in）
+        // biome-ignore lint/a11y/noAutofocus: モーダル open 時のみ true（明示 opt-in）
         autoFocus={autoFocus}
         autoComplete="off"
         spellCheck={false}
         enterKeyHint="search"
-        className="w-full min-w-0 flex-1 border-0 bg-transparent text-[length:var(--fs-body)] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+        // font-size 16px 以上にしないと iOS Safari が focus 時にページを自動 zoom する。
+        // 本体の 15px (--fs-body) より 1px 大きい --fs-body-lg (16px) を使う
+        className="w-full min-w-0 flex-1 border-0 bg-transparent text-[length:var(--fs-body-lg)] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
       />
       {value && (
         <button
           type="button"
           onClick={onClear}
           aria-label="検索をクリア"
-          className="text-[var(--color-text-muted)]"
+          className="shrink-0 text-[var(--color-text-muted)]"
         >
           <ClearIcon />
         </button>

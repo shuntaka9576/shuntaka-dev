@@ -1,6 +1,7 @@
 'use client';
 
 import { ArticleCard } from '@/components/ArticleCard';
+import { ArticleCardSkeletonList } from '@/components/ArticleCardSkeleton';
 import { useSearch } from '@/components/SearchProvider';
 import { useTagFilter } from '@/components/TagFilterProvider';
 
@@ -145,11 +146,7 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
     }
 
     if (results === null && searchLoading) {
-      return (
-        <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
-          読み込み中…
-        </p>
-      );
+      return <ArticleCardSkeletonList count={5} />;
     }
 
     const articles = results ?? [];
@@ -219,9 +216,7 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
   }
 
   if (fetchedArticles === null && tagLoading) {
-    return (
-      <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">読み込み中…</p>
-    );
+    return <ArticleCardSkeletonList count={5} />;
   }
 
   const articles = fetchedArticles ?? [];

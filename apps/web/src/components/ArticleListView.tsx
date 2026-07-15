@@ -1,11 +1,13 @@
+import { ActiveFilterBar } from '@/components/ActiveFilterBar';
 import { ArticleCard } from '@/components/ArticleCard';
 import { BaseLayout } from '@/components/BaseLayout';
 import { FilteredArticleList } from '@/components/FilteredArticleList';
-import { FloatingSearchTagFilter } from '@/components/FloatingSearchTagFilter';
 import { PageReady } from '@/components/PageReady';
 import { Pagination } from '@/components/Pagination';
+import { SearchModal } from '@/components/SearchModal';
 import { SearchProvider } from '@/components/SearchProvider';
-import { TagFilterControls } from '@/components/TagFilterControls';
+import { SearchTriggerButton } from '@/components/SearchTriggerButton';
+import { TagFilterModal } from '@/components/TagFilterModal';
 import { TagFilterProvider } from '@/components/TagFilterProvider';
 import { getArticles, getTagFacets } from '@/lib/api';
 import { ARTICLES_PER_PAGE, USER_NAME } from '@/lib/constants';
@@ -22,8 +24,6 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
   let error: string | null = null;
 
   try {
-    // 現在ページの記事と全体のファセットを並列取得する
-    // perPage=all の全件フェッチはやめ、1ページ分のみ取得する
     const [pageResult, facetsResult] = await Promise.all([
       getArticles(USER_NAME, { page, perPage: ARTICLES_PER_PAGE }),
       getTagFacets(USER_NAME),
@@ -62,11 +62,14 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
       baseHref={baseHref}
     >
       <SearchProvider userName={USER_NAME}>
-        <BaseLayout showTypeHeader currentTab="posts" narrow>
-          {/* pb はフローティング Ask & Tag ピル（下端24px+高さ約44px）とページネーションの重なりを避けるための余白。
-              BaseLayout の footer 予約 58px と合算して確保する */}
-          <main className="w-full pb-8">
-            <TagFilterControls />
+        <BaseLayout
+          showTypeHeader
+          currentTab="posts"
+          narrow
+          headerActions={<SearchTriggerButton />}
+        >
+          <main className="w-full">
+            <ActiveFilterBar />
             <FilteredArticleList userName={USER_NAME}>
               {articles.length === 0 ? (
                 <p>No articles found.</p>
@@ -86,7 +89,14 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
             </FilteredArticleList>
             <PageReady />
           </main>
-          <FloatingSearchTagFilter userName={USER_NAME} />
+          <SearchModal
+            userName={USER_NAME}
+            defaultArticles={articles}
+            page={page}
+            totalPages={totalPages}
+            baseHref={baseHref}
+          />
+          <TagFilterModal />
         </BaseLayout>
       </SearchProvider>
     </TagFilterProvider>
