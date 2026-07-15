@@ -36,7 +36,7 @@
 ## 実装フェーズ (チェックボックス管理)
 
 - [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
-- [ ] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper)
+- [x] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper) — 2026-07-15 完了
 - [ ] Phase 3: `articles.embedding` 列 + HNSW インデックス追加 (DDL)
 - [ ] Phase 4: `tools/tidb-embedder` 新規作成 (既存レコード埋め戻し、`embedding IS NULL` 対象)
 - [ ] Phase 5: `blog-api` の検索エンドポイント実装
@@ -174,7 +174,7 @@ PLaMo Embedding 1B (`pfnet/plamo-embedding-1b`, Apache 2.0) は `AutoModel` か�
 - 依存: `torch` (CPU), `transformers`, `sentencepiece`, `fastapi`, `uvicorn`
 - エンドポイント: `POST /embed` — body `{"text": "...", "mode": "query" | "document"}` → `{"vector": [float; N]}`
 - モデルは Pod 起動時に 1 回だけ load して常駐 (メモリに乗せる)
-- 次元数 (N) は model config で `hidden_size` を確認。plamo-embedding-1b は **2048 次元** と想定 (Phase 3 の DDL 前に model config の実物で必ず再確認する)
+- 次元数 (N) は `/embed` の query / document 両モードで **2048 次元** と実測済み
 - 記事本文 (~数千文字) 1 本の encode は CPU で 100 - 500 ms 程度を想定
 
 ### 2-2. ディレクトリ構成 (実装済み)
@@ -282,21 +282,21 @@ curl -s -X POST http://localhost:8080/embed \
 
 ### Phase 2 完了条件
 
-- [ ] `plamo-embedding` Pod が Ready
-- [ ] `/embed` (query / document 両方) が 2048 (実測値) 次元の float 配列を返す
-- [ ] `dim` を Phase 3 の DDL に反映する値として記録した
+- [x] `plamo-embedding` Pod が Ready
+- [x] `/embed` (query / document 両方) が 2048 (実測値) 次元の float 配列を返す
+- [x] `dim = 2048` を Phase 3 の DDL に反映する値として記録した
 
 ---
 
 ## Phase 3: `articles.embedding` 列 + HNSW インデックス
 
-### 3-1. DDL ファイル追加
+### 3-1. DDL ファイル追加 (実装済み)
 
 `tools/dsql-cli/dsl-tidb/schema/04_articles.sql` の末尾に、他のマイグレーションと同じ形式で追記する (専用ファイルを切らないのは既存の `content_html` 追加も同ファイル末尾に置いているため)。
 
 ```sql
 -- 2026-07-15 Vector 検索: articles.embedding + HNSW on TiFlash
--- N は PLaMo Embedding 1B の実測次元 (Phase 2-8 で確認した値)。以下は 2048 を仮定
+-- N は PLaMo Embedding 1B の実測次元 (Phase 2-8 で確認した値 = 2048)
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
 
@@ -312,14 +312,7 @@ CREATE VECTOR INDEX `idx_articles_embedding`
 
 ### 3-2. 適用 (ユーザー実行)
 
-```bash
-cd tools/dsql-cli/dsl-tidb
-./load.sh --database blog_dev --host tidb.${TAILNET}
-# schema/*.sql が冪等 (IF NOT EXISTS / ALTER TABLE ADD COLUMN は既適用なら失敗するので、
-# 初回のみ通ればよい)
-```
-
-冪等でない ALTER 系は再実行するとエラーになる。手動で追加分だけ流したい場合:
+`load.sh` は差分マイグレーションではなく、`schema/*.sql` を先頭から実行する初期構築用スクリプトである。既存の `blog_dev` では、適用済みのカラムやインデックスを再追加しようとしてエラーになるため、今回は新しい3文だけを実行する。
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
@@ -328,6 +321,13 @@ ALTER TABLE articles SET TIFLASH REPLICA 1;
 CREATE VECTOR INDEX idx_articles_embedding
   ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
 SQL
+```
+
+新規環境をゼロから構築する場合は `04_articles.sql` の一部として適用されるため、通常どおり `load.sh` を使用する。
+
+```bash
+cd tools/dsql-cli/dsl-tidb
+./load.sh --database blog_dev --host tidb.${TAILNET}
 ```
 
 ### 3-3. 動作確認 (ユーザー実行)

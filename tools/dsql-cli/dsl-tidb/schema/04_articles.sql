@@ -47,3 +47,14 @@ ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_status_type_pub
 --   upsert が updated_at を更新してしまうため使わない）。
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `content_html` LONGTEXT NULL AFTER `content`;
+
+-- 2026-07-15 Vector 検索: PLaMo Embedding 1B (実測 2048 次元) + HNSW on TiFlash
+ALTER TABLE `${SCHEMA}`.`articles`
+  ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
+
+-- Vector index は TiFlash replica を必要とするため、index 作成前に replica を設定する。
+ALTER TABLE `${SCHEMA}`.`articles` SET TIFLASH REPLICA 1;
+
+CREATE VECTOR INDEX `idx_articles_embedding`
+  ON `${SCHEMA}`.`articles` ((VEC_COSINE_DISTANCE(`embedding`)))
+  USING HNSW;
