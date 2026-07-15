@@ -40,8 +40,8 @@
 - [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
 - [x] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper) — 2026-07-15 完了
 - [x] Phase 3: `articles.embedding` による1記事1vectorの検証 — 2026-07-15 完了、Phase 4でchunk方式へ移行
-- [ ] Phase 4: PLaMO tokenizerによるchunk backfill + HNSWインデックス作成
-- [ ] Phase 5: `blog-api` の検索エンドポイント実装
+- [x] Phase 4: PLaMO tokenizerによるchunk backfill + HNSWインデックス作成 — 2026-07-15 完了
+- [ ] Phase 5: `blog-api` 検索エンドポイント + `apps/web` 検索 UI 実装
 - [ ] Phase 6: 本番 (blog_prd) 適用 (TiFlash replica + DDL + backfill)
 - [ ] Phase 7: GitHub webhook 経路への embedding 生成組み込み (継続更新)
 
@@ -65,7 +65,7 @@ export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 | Phase 2: PLaMo Embedding Service       | 30 - 60 分 (初回 pull 込み) |
 | Phase 3: DDL 適用                      | 5 分                        |
 | Phase 4: tidb-embedder 実装 + 埋め戻し | 60 分 + データ量依存        |
-| Phase 5: 検索エンドポイント            | 60 - 120 分                 |
+| Phase 5: 検索エンドポイント + Web UI   | 120 - 240 分                |
 | Phase 6: 本番適用                      | 30 分                       |
 | Phase 7: webhook 組み込み (継続更新)   | 30 分                       |
 
@@ -713,26 +713,27 @@ SQL
 - [x] TiFlashが `4/4 Running` のままchunk HNSW buildを完了し、未index行が0件
 - [x] `Rust Axum API` など旧方式で弱かったqueryの順位が改善する
 - [x] TiFlash固定の `EXPLAIN` に `annIndex:COSINE` が現れる
-- [ ] 検証後に旧 `articles.embedding`、HNSW、TiFlash replicaを削除する
+- [x] 検証後に旧 `articles.embedding`、HNSW、TiFlash replicaを削除する
 
 ---
 
-## Phase 5: `blog-api` 検索エンドポイント
+## Phase 5: `blog-api` 検索エンドポイント + `apps/web` 検索 UI
 
-### 5-1. 設計
+### 5-1. 全体設計
 
-- ルート: `GET /users/{user_id}/articles/search?q=<query>&limit=20`
-- 認証: 既存の users_articles と同じ policy (未認証で公開記事のみ or 認証済みで自分の記事)
-- ハンドラフロー:
+- **API**: `GET /users/{user_id}/articles/search?q=<query>&tags=<a,b>&mode=and|or&limit=20`
+- **認証**: 既存の users_articles と同じ policy (未認証で公開記事のみ or 認証済みで自分の記事)
+- **ハンドラフロー**:
   1. `q` を PLaMo Embedding Service で vectorize (mode=query)
   2. `article_embedding_chunks` から近傍chunkを `limit * 10` 件取得する
-  3. `article_id` ごとに最小distanceのchunkを残し、記事の公開条件を適用する
-  4. 既存の `ArticleSummary` DTO で返す (title / slug / published_at / dist を含める)
+  3. `article_id` ごとに最小distanceのchunkを残し、記事の公開条件+タグ絞り込み条件を適用する
+  4. 既存の `ArticleSummary` DTO に `dist` (cosine distance) を追加して返す
+- **UI コンセプト**: 既存 `FloatingTagFilter` を **「Ask & Tag」統合フローティング** に拡張。意味検索 (Ask) とタグ絞り込み (Tag) を 1 つのピル + 1 つのパネルにまとめ、パネル内で類似度メーター付きプレビューを見せる
 
-### 5-2. 実装ポイント
+### 5-2. API 実装ポイント
 
 - **`infrastructure/src/repository/embedding/`** を新規作成し、`PLAMO_EMBED_ENDPOINT` を環境変数から読んで `reqwest` で `POST /embed` を叩く小さな client を置く (query / document 両方に対応。Phase 7 でも同じものを流用する)
-- **`kernel/src/repository/articles.rs`** に `search_by_vector(user_id, vector, limit)` メソッドを追加
+- **`kernel/src/repository/articles.rs`** に `search_by_vector(user_id, vector, tags, mode, limit)` メソッドを追加
 - **`adapter/src/repository/articles.rs`** で SQL 実装:
   ```sql
   WITH nearest_chunks AS (
@@ -740,7 +741,7 @@ SQL
            VEC_COSINE_DISTANCE(embedding, ?) AS dist
       FROM article_embedding_chunks
      ORDER BY VEC_COSINE_DISTANCE(embedding, ?)
-     LIMIT ? -- API limit * 10
+     LIMIT ? -- API limit * 10 (tags 併用時は絞り込みで欠けるので * 30 まで拡張してよい)
   ),
   best_chunk_per_article AS (
     SELECT *, ROW_NUMBER() OVER (PARTITION BY article_id ORDER BY dist) AS rn
@@ -751,15 +752,88 @@ SQL
     FROM best_chunk_per_article AS c
     JOIN articles AS a ON a.article_id = c.article_id
    WHERE c.rn = 1 AND a.user_id = ? AND a.status = 'published'
+     AND (
+       ? = 0  -- tags 未指定なら常に TRUE
+       OR a.article_id IN (
+         SELECT article_id FROM articles_tags
+          WHERE tag_path IN (?)
+          GROUP BY article_id
+         HAVING COUNT(DISTINCT tag_path) = ?  -- AND: 選択タグ数と一致 / OR: 1 以上
+       )
+     )
    ORDER BY c.dist
    LIMIT ?
   ```
   - inner queryのTopNがHNSWへpushdownされるか、実データで `EXPLAIN` を確認する
   - 同じ記事の複数chunkが候補に入るため、window関数で記事単位にdeduplicateする
+  - タグ絞り込みは HNSW 後の post-filter。restrictive なタグ組み合わせで結果が空になる場合は inner LIMIT を上げる (`limit * 30` あたりまで)
 - **`api/src/route/users_articles.rs`** に `/search` サブルート追加
-- **`api/src/handler/users_articles.rs`** で 5-2 の embedding client を呼ぶ
+- **`api/src/handler/users_articles.rs`** で embedding client を呼び、`tags` / `mode` クエリを受けて repository に渡す
+- レスポンス DTO: `ArticleSummary` に `dist: Option<f32>` を追加 (検索エンドポイントのみ Some)
 
-### 5-3. 動作確認 (ユーザー実行)
+### 5-3. UI 実装ポイント (`apps/web`)
+
+**新規コンポーネント** (すべて `src/components/` 配下。Story 必須):
+
+| ファイル                          | 役割                                                                  |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `FloatingSearchTagFilter.tsx`     | 既存 `FloatingTagFilter` を差し替える親コンポーネント (Ask/Tag タブ)  |
+| `SearchInput.tsx`                 | 検索入力欄 (debounce 300ms、× でクリア)                               |
+| `SimilarityMeter.tsx`             | 類似度バー (`1 - dist/2` を 0-100% で可視化、`--color-accent` 単色)   |
+
+**拡張**:
+
+- `TagFilterProvider` に `query` / `searchResults` / `activeTab: 'ask' | 'tag'` state を追加
+- `lib/api.ts` に `searchArticles(userName, { q, tags, mode, limit, signal })` を追加
+- `ActiveTagBar` に検索クエリチップを追加表示 (× で解除)
+- `ArticleCard` に `dist?: number` prop を追加 (指定時は右端に `SimilarityMeter` を表示)
+- `FilteredArticleList` は `query || tags.length > 0` を絞り込み条件に拡張
+
+**ピル形状** (下端中央、既存 `FloatingTagFilter` と同じ位置):
+
+```
+┌──────────────────────────┐
+│  🔍  |  🏷  3           │   セグメント風の 1 ピル
+└──────────────────────────┘
+   ask    tag  (選択数)
+```
+
+- 左半分 (ask) / 右半分 (tag)。押した側のタブが panel で active に
+- `filtering || query` のときは全体を `--color-text`、それ以外は `--color-text-muted`
+
+**パネル (ask タブ)**:
+
+```
+┌──────────────────────────────────────┐
+│ [ 気になることを日本語で… ]      × │  ← SearchInput
+├──────────────────────────────────────┤
+│  # tech/rust  ×    AND               │  ← 選択中タグチップ (存在時のみ)
+├──────────────────────────────────────┤
+│  TiDBのFTS Kuromoji調査       92%▮▮▮│  ← 上位 3 件のプレビュー
+│  Vector検索 実装ノート         87%▮▮ │     クリックで記事へ直遷移
+│  PLaMo Embedding 触ってみる    83%▮▮ │
+│                                       │
+│  ─────── 全 12 件を一覧で見る → ─── │  ← main list を検索結果に差し替え
+└──────────────────────────────────────┘
+```
+
+**パネル (tag タブ)**: 既存 `TagFilterTree` そのまま (差分なし)
+
+**URL 同期**: `?q=xxx&tags=tech/rust&mode=and` (既存 `pushFilterUrl` を拡張)
+
+**併用時の挙動**:
+
+- `q` と `tags` は AND で併用。ActiveTagBar は「search: "xxx" × / #tech/rust × / AND / 12件 / クリア」の順で表示
+- 一覧本体は `FilteredArticleList` が `searchResults` を優先表示。各 `ArticleCard` は `dist` を持つので類似度メーターを右端に付ける
+- 検索結果 0 件時は「AND を OR に切り替える」ではなく「検索クエリを外す」ボタンを見せる (ミスヒット時に一撃で戻れる)
+
+**モック実装 (backend 未実装時の並行開発)**:
+
+- `lib/mockSearch.ts` に固定のダミー記事配列 + `q` からハッシュで擬似 `dist` を返す関数を置く
+- `searchArticles` は環境変数 `NEXT_PUBLIC_MOCK_SEARCH=1` のとき mock を返す
+- Storybook では `SimilarityMeter` / `SearchInput` / `FloatingSearchTagFilter` を mock データで表示
+
+### 5-4. 動作確認 (ユーザー実行)
 
 ```bash
 # blog-api ローカル起動 (別ターミナル)
@@ -768,11 +842,21 @@ PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET} \
   DATABASE_URL="mysql://root@tidb.${TAILNET}:4000/blog_dev" \
   cargo run --bin api
 
-# 検索リクエスト
+# API 単体
 curl -s "http://localhost:3000/users/<user_id>/articles/search?q=TiDB%20Vector" | jq '.'
+curl -s "http://localhost:3000/users/<user_id>/articles/search?q=TiDB&tags=tech/rust&mode=and" | jq '.'
+
+# UI (Storybook で先に mock 確認)
+cd apps/web
+bun run storybook
+# → Components/FloatingSearchTagFilter / SearchInput / SimilarityMeter
+
+# UI (実 API 接続)
+bun run dev
+# http://localhost:3000/<user_name> で floating pill をクリック
 ```
 
-### 5-4. `EXPLAIN` 確認
+### 5-5. `EXPLAIN` 確認
 
 ```sql
 EXPLAIN
@@ -784,13 +868,20 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '[...]') AS dist
 
 - `TableFullScan` の `operator info` に `annIndex:COSINE` があること (HNSW index利用時もexecutor名は `TableFullScan`)
 - 効かない場合: chunkテーブルのTiFlash replica同期 (Phase 4) とHNSW build完了を確認
+- tags 併用時も inner query (HNSW pushdown) が先に評価され、外側の JOIN + tag subquery が post-filter になっていることを確認
 
 ### Phase 5 完了条件
 
-- [ ] 検索エンドポイントが 200 を返す
+- [ ] 検索エンドポイントが 200 を返す (q のみ / q + tags AND / q + tags OR の 3 パターン)
 - [ ] 上位 20 件が意味的に妥当
 - [ ] `EXPLAIN` で HNSW / TiFlash 経路が使われている
 - [ ] 未認証で他人の下書きが返らないこと (既存 policy を破っていない)
+- [ ] UI: floating pill から Ask / Tag タブが切り替わる
+- [ ] UI: 検索クエリ入力で上位 3 件がパネル内に類似度メーター付きで即プレビューされる
+- [ ] UI: 「全 N 件を一覧で見る」で main list が検索結果に差し替わる
+- [ ] UI: タグ選択と検索クエリの AND 併用が動作する (ActiveTagBar に両方チップが出る)
+- [ ] UI: URL に `q` / `tags` / `mode` が同期する (直リンク・戻る/進むで復元)
+- [ ] UI: Storybook に `SimilarityMeter` / `SearchInput` / `FloatingSearchTagFilter` の Story がある
 
 ---
 
