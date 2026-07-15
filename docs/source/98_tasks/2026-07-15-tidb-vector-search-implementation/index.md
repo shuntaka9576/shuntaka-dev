@@ -37,7 +37,7 @@
 
 - [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
 - [x] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper) — 2026-07-15 完了
-- [ ] Phase 3: `articles.embedding` 列 + HNSW インデックス追加 (DDL)
+- [x] Phase 3: `articles.embedding` 列 + HNSW インデックス追加 (DDL) — 2026-07-15 完了
 - [ ] Phase 4: `tools/tidb-embedder` 新規作成 (既存レコード埋め戻し、`embedding IS NULL` 対象)
 - [ ] Phase 5: `blog-api` の検索エンドポイント実装
 - [ ] Phase 6: 本番 (blog_prd) 適用 (TiFlash replica + DDL + backfill)
@@ -351,9 +351,9 @@ mysql -h tidb.${TAILNET} -P 4000 -u root -e "SHOW CREATE TABLE blog_dev.articles
 
 ### Phase 3 完了条件
 
-- [ ] `articles.embedding` 列が存在 (`DESC blog_dev.articles`)
-- [ ] `TIFLASH_REPLICA.AVAILABLE = 1, PROGRESS = 1`
-- [ ] `SHOW CREATE TABLE` に `VECTOR INDEX idx_articles_embedding` がある
+- [x] `articles.embedding` 列が `vector(2048)` で存在
+- [x] `TIFLASH_REPLICA.AVAILABLE = 1, PROGRESS = 1`
+- [x] `SHOW CREATE TABLE` に `VECTOR INDEX idx_articles_embedding` がある
 
 ---
 
