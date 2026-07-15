@@ -46,9 +46,6 @@ type telemetry struct {
 	tracer   trace.Tracer
 	shutdown func(context.Context) error
 
-	// proxy.upstream.name 属性に使う論理名 (例: "tidb")
-	upstreamName string
-
 	activeConns        atomic.Int64
 	acceptCount        metric.Int64Counter
 	upstreamConnectDur metric.Float64Histogram
@@ -60,8 +57,10 @@ type telemetry struct {
 }
 
 // setupTelemetry は OTel SDK を初期化する。endpoint 未設定なら noop。
-func setupTelemetry(ctx context.Context, upstreamName string) (*telemetry, error) {
-	tel := &telemetry{upstreamName: upstreamName}
+// proxy.upstream.name 属性は複数 upstream (tidb / plamo) を区別するため
+// telemetry には保持せず、forwardConn の引数から span/metric ごとに付与する。
+func setupTelemetry(ctx context.Context) (*telemetry, error) {
+	tel := &telemetry{}
 
 	endpoint := strings.TrimSpace(os.Getenv(envOtelEndpoint))
 	if endpoint == "" {

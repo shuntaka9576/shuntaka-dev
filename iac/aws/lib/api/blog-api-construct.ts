@@ -100,6 +100,11 @@ export class BlogAPIConstruct extends Construct {
     lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(3128), 'https via tidb-proxy');
     lambdaSg.addEgressRule(
       proxySecurityGroup,
+      ec2.Port.tcp(18080),
+      'plamo embedding via tidb-proxy',
+    );
+    lambdaSg.addEgressRule(
+      proxySecurityGroup,
       ec2.Port.tcp(4318),
       'otlp http to adot collector sidecar',
     );
@@ -113,6 +118,11 @@ export class BlogAPIConstruct extends Construct {
       lambdaSg,
       ec2.Port.tcp(3128),
       `https from lambda-sg-${props.stageName}`,
+    );
+    proxySecurityGroup.addIngressRule(
+      lambdaSg,
+      ec2.Port.tcp(18080),
+      `plamo embedding from lambda-sg-${props.stageName}`,
     );
     proxySecurityGroup.addIngressRule(
       lambdaSg,
@@ -188,6 +198,9 @@ export class BlogAPIConstruct extends Construct {
         HTTP_PROXY: proxyHttpUrl,
         // OTLP 送信は squid を経由させず collector sidecar へ直接届ける
         NO_PROXY: `169.254.169.254,localhost,127.0.0.1,${proxyDnsName}`,
+        // PLaMo Embedding Service へは tidb-proxy の tsnet forwarder (18080) 経由。
+        // host が proxyDnsName なので上の NO_PROXY に載り、squid (3128) を経由せず直行する。
+        PLAMO_EMBED_ENDPOINT: `http://${proxyDnsName}:18080`,
         // tidb-proxy task 上の ADOT Collector sidecar (OTLP/HTTP)。
         // 未設定ならアプリ側で telemetry は無効化される。
         OTEL_EXPORTER_OTLP_ENDPOINT: `http://${proxyDnsName}:4318`,

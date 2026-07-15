@@ -1062,6 +1062,7 @@ aws ecs execute-command --cluster tidb-proxy --task "$TASK" \
 
 #### 落とし穴
 
+- **HTTP_PROXY に吸われない条件**: Lambda の `HTTP_PROXY`/`HTTPS_PROXY` は squid (`tidb-proxy.internal:3128`) を指すが、PLaMo は同じ `tidb-proxy.internal` の別ポートなので既存 `NO_PROXY` で除外され squid を経由しない。embedding クライアント (`infrastructure/src/embedding/client.rs:50`) は `Client::builder()` (reqwest デフォルト = env proxy 有効かつ `NO_PROXY` 尊重、`.proxy()`/`.no_proxy()` 未指定) で作るため、`PLAMO_EMBED_ENDPOINT` のホストを `tidb-proxy.internal` にしておけば追加設定は不要。別ホスト名にするなら `NO_PROXY` へ追加する (squid は CONNECT 443 のみ許可で、除外し損ねると平文 POST が `deny all` される)
 - **Host ヘッダ**が `tidb-proxy.internal:18080` になる。uvicorn / FastAPI はデフォルトで Host を検証しないので問題ないが、将来 `TrustedHostMiddleware` を入れたら許可が要る
 - **Pod 分散**: forwarder は接続ごとに `plamo-embedding.<tailnet>:80` へ dial するので operator LB / Service が分散する。本番検索は 1 リクエストにつき embedding 1 回 (query のみ) で backfill ほどシビアでない
 - **タイムアウト**: forwarder の 5s dial timeout は tsnet 接続確立まで。PLaMo 推論 (100–500ms) はストリーム転送側で forwarder は追加 timeout を持たない。実効タイムアウトは Lambda 側 reqwest で握る

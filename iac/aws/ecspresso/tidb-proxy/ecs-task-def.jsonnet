@@ -22,6 +22,11 @@ local ssmParams = import 'ssm-params.jsonnet';
         { name: 'TAILNET_SUFFIX', value: ssmParams.ssm.tailscale.tailnetSuffix },
         { name: 'TIDB_HOSTNAME', value: 'tidb' },
         { name: 'TIDB_PORT', value: '4000' },
+        // PLaMo Embedding Service (Vector 検索) 用の L4 中継。PLAMO_HOSTNAME を
+        // 設定すると forwarder が 18080 -> plamo-embedding.<suffix>:80 を張る。
+        { name: 'PLAMO_HOSTNAME', value: 'plamo-embedding' },
+        { name: 'PLAMO_PORT', value: '80' },
+        { name: 'PLAMO_LISTEN_ADDR', value: '0.0.0.0:18080' },
         // 同一 task 内 (awsvpc は network namespace 共有) の otel-collector へ送る
         { name: 'OTEL_EXPORTER_OTLP_ENDPOINT', value: 'http://localhost:4317' },
         { name: 'OTEL_SERVICE_NAME', value: 'tidb-proxy' },
@@ -35,11 +40,12 @@ local ssmParams = import 'ssm-params.jsonnet';
       portMappings: [
         { containerPort: 13306, protocol: 'tcp' },
         { containerPort: 3128, protocol: 'tcp' },
+        { containerPort: 18080, protocol: 'tcp' },
       ],
       healthCheck: {
         command: [
           'CMD-SHELL',
-          'nc -z localhost 13306 && nc -z localhost 3128',
+          'nc -z localhost 13306 && nc -z localhost 3128 && nc -z localhost 18080',
         ],
         interval: 30,
         timeout: 5,

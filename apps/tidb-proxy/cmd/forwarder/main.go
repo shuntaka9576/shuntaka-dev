@@ -2,8 +2,10 @@
 //
 //  1. 環境変数 TS_AUTHKEY (reusable / non-ephemeral / tag:proxy で発行済み)
 //     を使って tsnet.Server で Tailnet に join
-//  2. 0.0.0.0:<LISTEN_PORT> -> <TIDB_HOSTNAME>.<TAILNET_SUFFIX>:<TIDB_PORT>
-//     を TCP forward (Lambda から見える VPC 内エンドポイントとして TiDB を公開)
+//  2. 各 forward ルールを TCP forward する。TiDB (必須) は
+//     0.0.0.0:13306 -> tidb.<suffix>:4000、PLaMo (PLAMO_HOSTNAME 設定時) は
+//     0.0.0.0:18080 -> plamo-embedding.<suffix>:80 を公開し、Lambda から
+//     Tailnet 上のサービスへ VPC 内エンドポイント経由で到達させる
 //
 // alpine ベース image で動かす前提で CGO_ENABLED=0 で static build する。
 //
@@ -45,23 +47,36 @@ const (
 	envTidbHostname      = "TIDB_HOSTNAME"
 	envTidbPort          = "TIDB_PORT"
 	envTsnetStateDir     = "TSNET_STATE_DIR"
+	envPlamoHostname     = "PLAMO_HOSTNAME"
+	envPlamoPort         = "PLAMO_PORT"
+	envPlamoListenAddr   = "PLAMO_LISTEN_ADDR"
 
 	defaultTsnetHostname     = "tidb-proxy"
 	defaultForwardListenAddr = "0.0.0.0:13306"
 	defaultTidbHostname      = "tidb"
 	defaultTidbPort          = "4000"
 	defaultTsnetStateDir     = "/var/lib/tsnet-state"
+	defaultPlamoListenAddr   = "0.0.0.0:18080"
+	defaultPlamoPort         = "80"
 )
 
-type forwarderConfig struct {
-	AuthKey       string
-	Hostname      string
-	ListenAddr    string
-	ForwardTarget string
-	// ForwardTarget のホスト論理名 (例: "tidb")。span/metric の
-	// proxy.upstream.name 属性に使う。
+// forwardRule は 1 本の TCP forward (listen -> tsnet 上の upstream) を表す。
+type forwardRule struct {
+	ListenAddr string
+	// Target は "host.<suffix>:port" 形式の tsnet 上の upstream。
+	Target string
+	// UpstreamName は Target のホスト論理名 (例: "tidb" / "plamo-embedding")。
+	// span/metric の proxy.upstream.name 属性に使う。
 	UpstreamName string
-	StateDir     string
+}
+
+type forwarderConfig struct {
+	AuthKey  string
+	Hostname string
+	StateDir string
+	// Forwards は起動する forward ルール群。TiDB は必須、PLaMo は
+	// PLAMO_HOSTNAME 設定時のみ追加する。
+	Forwards []forwardRule
 }
 
 func main() {
@@ -72,8 +87,7 @@ func main() {
 		fatal("loadConfig", "error", err)
 	}
 	slog.Info("config loaded",
-		"hostname", cfg.Hostname, "listen", cfg.ListenAddr,
-		"target", cfg.ForwardTarget, "state_dir", cfg.StateDir)
+		"hostname", cfg.Hostname, "forwards", len(cfg.Forwards), "state_dir", cfg.StateDir)
 
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		fatal("mkdir state dir", "dir", cfg.StateDir, "error", err)
@@ -90,7 +104,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	tel, err := setupTelemetry(ctx, cfg.UpstreamName)
+	tel, err := setupTelemetry(ctx)
 	if err != nil {
 		fatal("setupTelemetry", "error", err)
 	}
@@ -100,28 +114,38 @@ func main() {
 	}
 	slog.Info("tsnet up", "hostname", cfg.Hostname)
 
-	listener, err := net.Listen("tcp", cfg.ListenAddr)
-	if err != nil {
-		fatal("listen", "addr", cfg.ListenAddr, "error", err)
-	}
-	defer listener.Close()
-	slog.Info("forwarder listening", "listen", listener.Addr().String(), "target", cfg.ForwardTarget)
-
 	// ts.Dial は tsnet 内部 dialer 経由で netmap に居る peer の MagicDNS 名を解決する。
-	// ACL で tag:proxy -> tag:k8s (TiDB Operator Proxy) が許可されていれば
-	// `tidb.<TAILNET_SUFFIX>` が解決可能になる。未許可だと netmap に peer が無く
-	// OS resolver にフォールバックして NXDOMAIN になるので、ACL 設定漏れに注意。
-	go runForwarder(ts, listener, cfg.ForwardTarget, tel)
+	// ACL で tag:proxy -> tag:k8s (Operator Proxy) が許可されていれば
+	// `tidb.<suffix>` / `plamo-embedding.<suffix>` が解決可能になる。未許可だと
+	// netmap に peer が無く OS resolver にフォールバックして NXDOMAIN になるので、
+	// ACL 設定漏れに注意。
+	var listeners []net.Listener
+	defer func() {
+		for _, l := range listeners {
+			_ = l.Close()
+		}
+	}()
+	for _, rule := range cfg.Forwards {
+		listener, err := net.Listen("tcp", rule.ListenAddr)
+		if err != nil {
+			fatal("listen", "addr", rule.ListenAddr, "error", err)
+		}
+		listeners = append(listeners, listener)
+		slog.Info("forwarder listening",
+			"listen", listener.Addr().String(),
+			"target", rule.Target, "upstream", rule.UpstreamName)
+		go runForwarder(ts, listener, rule.Target, tel, rule.UpstreamName)
 
-	// Pre-warm DERP / DNS by dialing once.
-	prewarmCtx, prewarmCancel := context.WithTimeout(ctx, 10*time.Second)
-	if conn, err := ts.Dial(prewarmCtx, "tcp", cfg.ForwardTarget); err == nil {
-		_ = conn.Close()
-		slog.Info("pre-warm dial ok")
-	} else {
-		slog.Warn("pre-warm dial failed", "error", err)
+		// Pre-warm DERP / DNS by dialing each upstream once.
+		prewarmCtx, prewarmCancel := context.WithTimeout(ctx, 10*time.Second)
+		if conn, err := ts.Dial(prewarmCtx, "tcp", rule.Target); err == nil {
+			_ = conn.Close()
+			slog.Info("pre-warm dial ok", "target", rule.Target)
+		} else {
+			slog.Warn("pre-warm dial failed", "target", rule.Target, "error", err)
+		}
+		prewarmCancel()
 	}
-	prewarmCancel()
 
 	<-ctx.Done()
 	slog.Info("shutdown signal received, exiting")
@@ -171,18 +195,33 @@ func loadConfig() (*forwarderConfig, error) {
 	}
 
 	hostname := getenv(envTsnetHostname, defaultTsnetHostname)
-	listenAddr := getenv(envForwardListenAddr, defaultForwardListenAddr)
-	tidbHost := getenv(envTidbHostname, defaultTidbHostname)
-	tidbPort := getenv(envTidbPort, defaultTidbPort)
 	stateDir := getenv(envTsnetStateDir, defaultTsnetStateDir)
 
+	// TiDB forward は常に張る (blog-api の MySQL 経路)。
+	tidbHost := getenv(envTidbHostname, defaultTidbHostname)
+	forwards := []forwardRule{
+		{
+			ListenAddr:   getenv(envForwardListenAddr, defaultForwardListenAddr),
+			Target:       fmt.Sprintf("%s.%s:%s", tidbHost, suffix, getenv(envTidbPort, defaultTidbPort)),
+			UpstreamName: tidbHost,
+		},
+	}
+
+	// PLaMo Embedding Service forward は PLAMO_HOSTNAME が設定された時だけ張る
+	// (Vector 検索の本番経路)。未設定の環境では TiDB のみで後方互換。
+	if plamoHost := os.Getenv(envPlamoHostname); plamoHost != "" {
+		forwards = append(forwards, forwardRule{
+			ListenAddr:   getenv(envPlamoListenAddr, defaultPlamoListenAddr),
+			Target:       fmt.Sprintf("%s.%s:%s", plamoHost, suffix, getenv(envPlamoPort, defaultPlamoPort)),
+			UpstreamName: plamoHost,
+		})
+	}
+
 	return &forwarderConfig{
-		AuthKey:       authKey,
-		Hostname:      hostname,
-		ListenAddr:    listenAddr,
-		ForwardTarget: fmt.Sprintf("%s.%s:%s", tidbHost, suffix, tidbPort),
-		UpstreamName:  tidbHost,
-		StateDir:      stateDir,
+		AuthKey:  authKey,
+		Hostname: hostname,
+		StateDir: stateDir,
+		Forwards: forwards,
 	}, nil
 }
 
@@ -193,7 +232,7 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *telemetry) {
+func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *telemetry, upstreamName string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -203,11 +242,11 @@ func runForwarder(ts *tsnet.Server, listener net.Listener, target string, tel *t
 			slog.Error("forwarder accept", "error", err)
 			return
 		}
-		go forwardConn(ts, conn, target, tel)
+		go forwardConn(ts, conn, target, tel, upstreamName)
 	}
 }
 
-func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry) {
+func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry, upstreamName string) {
 	defer src.Close()
 
 	// ECS ヘルスチェック (nc -z) は同一 task 内の loopback から来る。
@@ -220,7 +259,7 @@ func forwardConn(ts *tsnet.Server, src net.Conn, target string, tel *telemetry) 
 
 	connStart := time.Now()
 	ctx := context.Background()
-	upstreamAttr := attribute.String("proxy.upstream.name", tel.upstreamName)
+	upstreamAttr := attribute.String("proxy.upstream.name", upstreamName)
 
 	tel.acceptCount.Add(ctx, 1)
 	tel.activeConns.Add(1)
