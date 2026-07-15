@@ -1,0 +1,4 @@
+site: build
+output_subdir: pagefind
+root_selector: .document
+force_language: ja

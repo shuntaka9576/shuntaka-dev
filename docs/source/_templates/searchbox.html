@@ -1,0 +1,39 @@
+{%- if 'singlehtml' not in builder %}
+<div id="pagefind-search" role="search">
+  <form id="rtd-search-form" class="wy-form" action="{{ pathto('search') }}" method="get">
+    <input
+      type="text"
+      name="q"
+      placeholder="{{ _('Search docs') }}"
+      aria-label="{{ _('Search docs') }}"
+    />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+
+  <div id="pagefind-components"></div>
+
+  <script type="module">
+    const fallback = document.querySelector('#pagefind-search #rtd-search-form');
+    const components = document.querySelector('#pagefind-search #pagefind-components');
+
+    try {
+      await import("./{{ pathto('pagefind/pagefind-component-ui.js', 1) }}");
+      window.PagefindComponents.configureInstance('default', {
+        baseUrl: '/',
+        bundlePath: '/pagefind/',
+      });
+      components.innerHTML = `
+        <pagefind-modal-trigger hidden placeholder="ドキュメントを検索"></pagefind-modal-trigger>
+        <pagefind-modal></pagefind-modal>
+      `;
+      await customElements.whenDefined('pagefind-modal-trigger');
+      const trigger = components.querySelector('pagefind-modal-trigger');
+      fallback.hidden = true;
+      trigger.hidden = false;
+    } catch {
+      // sphinx-autobuild 中など Pagefind の成果物がない場合は Sphinx 検索を使う。
+    }
+  </script>
+</div>
+{%- endif %}

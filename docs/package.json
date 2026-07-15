@@ -5,10 +5,15 @@
   "description": "shuntaka.dev Documentation",
   "keywords": [],
   "scripts": {
-    "build-docs": "uv run sphinx-build source build",
-    "dev": "uv run sphinx-autobuild source build --port ${DOCS_PORT:-43004}",
+    "build-docs": "bun run build-sphinx && bun run build-search && bun run check-search",
+    "build-sphinx": "uv run sphinx-build source build",
+    "build-search": "pagefind",
+    "check-search": "bun scripts/check-search.ts",
+    "dev": "rm -rf build/pagefind && uv run sphinx-autobuild source build --port ${DOCS_PORT:-43004}",
     "doc-gen": "TBLS_DSN=\"mysql://root@tidb.$(tailscale status --json | jq -r '.MagicDNSSuffix'):4000/blog_dev\" tbls doc -c .tbls.yaml --rm-dist",
     "clean": "rm -rf build .turbo"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "pagefind": "^1.5.2"
+  }
 }

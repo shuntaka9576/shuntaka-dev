@@ -52,7 +52,14 @@
     },
     "docs#build-docs": {
       "dependsOn": [],
-      "inputs": ["docs/source/**", "docs/.tbls.yaml", "docs/pyproject.toml"],
+      "inputs": [
+        "docs/source/**",
+        "docs/.tbls.yaml",
+        "docs/package.json",
+        "docs/pagefind.yml",
+        "docs/pyproject.toml",
+        "docs/scripts/**"
+      ],
       "outputs": ["docs/build/**"],
       "cache": true
     },
