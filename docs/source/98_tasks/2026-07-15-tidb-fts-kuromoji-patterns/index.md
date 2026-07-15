@@ -8,10 +8,9 @@
 
 `articles.content` に対する日本語全文検索が欲しい。初版 (#652 / #655) では TiDB v8.5 の FULLTEXT INDEX + TiFlash + kuromoji で組む Pattern A を採用と結論付けたが、公式ドキュメントで裏取りをしたところ **TiDB Self-Managed では FULLTEXT INDEX が動作しない** ことが判明した。本 doc は Self-Managed で実現可能な選択肢を再選定した訂正版として、Vector + TiFlash 案の採用理由と、なぜ他の選択肢ではなくこれなのかを整理する。
 
-学習教材としての角度も兼ねて、以下 2 点を副軸に据える。
+学習教材としての角度も兼ねて、以下を副軸に据える。
 
-- なぜ TiDB の Vector 検索は TiFlash が必要か (実装論: HNSW と列指向 SIMD の相性)
-- なぜ FULLTEXT は本質的には TiFlash を必要としないか (概念論: PostgreSQL / MySQL / Tantivy が証明済み)
+- TiDB (分散 KV) はなぜ Vector も FULLTEXT も TiFlash に載せたのか (想定): 単一ノード DB (pg-vector, PG GIN 等) との対比から、想定される理由を整理
 
 ## 前提: TiDB の FTS / Vector サポート状況 (2026-07 現在)
 
@@ -30,15 +29,16 @@ Self-Managed で唯一 TiDB 内完結できる案として、Vector + TiFlash �
 
 ![採用構成: TiDB Vector + TiFlash + blog-api](adopted-vector-tiflash-architecture.png)
 
-- articles テーブルに `embedding VECTOR(1024)` 列と HNSW インデックスを追加
-- 埋め込み生成は都度スクリプト (`tools/tidb-embedder`) で、書き込み側と検索側で同じマルチリンガル埋め込みモデルを使う
-- 埋め込みモデルは Cloudflare Workers AI `@cf/baai/bge-m3` (無料枠内、日本語対応) を第一候補、レイテンシや依存を減らしたければ Rust プロセス内で `fastembed-rs` を使う
+- articles テーブルに `embedding VECTOR(N)` 列と HNSW インデックスを追加 (N は採用モデルの次元)
+- 埋め込みモデルは [`pfnet/plamo-embedding-1b`](https://huggingface.co/pfnet/plamo-embedding-1b) を採用 (Apache 2.0、日本語特化、CPU でも動く)
+- 埋め込みモデルは k8s Pod として cluster 内に配置し、書き込み側 (`tools/tidb-embedder`) と検索側 (`apps/blog-api`) の双方が同じ endpoint に問い合わせる
+- 外部 API (Cloudflare Workers AI 等) に依存しない構成にすることで、既存 cluster 運用モデル (Tailnet + k8s + self-hosted) と揃える
 - blog-api の検索エンドポイントは `VEC_COSINE_DISTANCE` で類似度検索
 
-DDL の骨格
+DDL の骨格 (VECTOR の次元は plamo-embedding-1b のモデル config を確認して合わせる)
 
 ```sql
-ALTER TABLE articles ADD COLUMN embedding VECTOR(1024);
+ALTER TABLE articles ADD COLUMN embedding VECTOR(2048);  -- 実装時にモデル次元と合わせる
 ALTER TABLE articles SET TIFLASH REPLICA 1;
 CREATE VECTOR INDEX idx_emb
   ON articles((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
@@ -49,40 +49,40 @@ SELECT id, title
  LIMIT 20;
 ```
 
-## なぜ TiDB の Vector 検索は TiFlash が必要なのか (実装論)
+## TiDB (分散 KV) はなぜ Vector も FULLTEXT も TiFlash に載せたのか (想定)
 
-![HNSW と列指向 TiFlash の相性](hnsw-tiflash-fit.png)
+前置きしておくと、本節は **推測を含む**。PingCAP は「TiDB の Vector 検索は TiFlash 必須」「TiDB Cloud の FULLTEXT は TiFlash 必須」という事実は公表しているが、「なぜ TiKV ではなく TiFlash を選んだのか」を明示した公式資料は本 doc 執筆時点で見つけられていない。以下は他 DB の実装から示唆される、TiDB がその選択をしたと想定される理由の整理。
 
-TiDB の Vector 検索は HNSW (Hierarchical Navigable Small World) というグラフ構造のインデックスを使う。HNSW は複数階層のグラフを重ねて、上位層は疎、最下層はすべてのベクトルを密に接続、というピラミッド状の探索構造を持つ。ANN (近似最近傍) 探索は上位層で greedy に降下して最下層で候補を絞り込む。
+![pg-vector も PG GIN も単一ノードで動く ── TiDB が TiFlash を選んだのは分散 KV の制約ゆえ (想定)](single-node-vs-distributed-kv.png)
 
-一方 TiFlash は列指向のストレージエンジンで、ベクトル列を連続メモリ上に配列として並べる。この配置は SIMD 命令 (Single Instruction, Multiple Data) による距離計算の並列化と極めて相性が良い。1 回の命令で複数ベクトルの距離を同時に計算できるため、HNSW の候補ノードに対する距離計算が高速に走る。
+### 事実 (裏取り済み)
 
-行指向の TiKV では
+- TiDB Self-Managed の **Vector 検索は TiFlash 必須** ([公式 doc](https://docs.pingcap.com/tidb/stable/vector-search-index/))
+- TiDB Cloud の **FULLTEXT は TiFlash 必須** ([公式 doc](https://docs.pingcap.com/tidbcloud/vector-search-full-text-search-sql/): DDL 構文に `ADD_COLUMNAR_REPLICA_ON_DEMAND`、実行プランは TiFlash MPP 上の `textSearch` オペレータ)
+- 単一ノード DB は Vector も FULLTEXT も行指向のまま実装できている
+  - Vector: [pgvector](https://github.com/pgvector/pgvector) は PostgreSQL 拡張として IVFFlat / HNSW を行指向のまま実装
+  - FULLTEXT: PostgreSQL GIN / MySQL InnoDB FULLTEXT / SQLite FTS5 / Lucene / Tantivy が inverted index を行指向のまま実装
 
-- ベクトルが行の中に埋め込まれるため、SIMD 前提の連続メモリ配置が作れない
-- HNSW のようなグラフ構造を管理するための index 型が KV API に無い
-- Raft consensus 経路を汚さずに派生インデックスを非同期で維持する仕組みが無い
+つまり **HNSW 自体、inverted index 自体は列指向 (TiFlash) を要求しない** ことが、単一ノード DB の実装から示唆される。pg-vector が PostgreSQL 内で普通に動いているのがその直接的な反例。したがって TiDB が TiFlash を選んだのは技術的必然というより設計判断であろう、というのが本節の想定。
 
-TiFlash は Raft Learner として非同期にレプリカを受け取り、自前のストレージエンジン (DeltaTree) を持ち、その上に HNSW を含む新しい index 型をプラグイン追加できる。したがって「HNSW と列指向 SIMD と非同期レプリカ」が 3 点セットで噛み合うのが TiFlash 側で、TiKV 側にはこの噛み合わせが無い。これが TiDB の Vector 検索が TiFlash 必須である実装上の理由。
+### 想定される理由 (推測)
 
-## なぜ FULLTEXT は本質的には TiFlash を必要としないのか (概念論)
+TiDB が Vector も FULLTEXT も TiFlash に載せている想定される理由は、以下 3 点に集約される (推測)。
 
-![FULLTEXT 実装ルート 4 種](fulltext-implementation-routes.png)
+1. **OLTP 経路 (TiKV + Raft consensus) を汚したくない**
+   複雑な index の更新 (Vector index の graph 更新も、FULLTEXT の posting list 更新も 1 文書で数十〜数百キー相当) を分散トランザクションに載せると、OLTP パフォーマンスが劣化する。TiFlash は Raft Learner で非同期に受け取るため、書き込みが確定してから TiFlash 側で index を作れば OLTP には影響しない。
+2. **TiFlash のインフラを再利用できる**
+   Raft Learner レプリカ + 独自ストレージエンジン (DeltaTree) + MPP クエリエンジンが既に揃っている場所に新しい index 型 (Vector, FULLTEXT) を追加する方が、TiKV に差し込むより実装コストが低い。
+3. **分散環境でのランキング統計集約**
+   BM25 の IDF や近傍探索の相対距離は、複数ノードの統計・データを集約しないと正確に計算できない。TiFlash の MPP エンジンは分析クエリ向けに設計されていて、この種の集約が得意 (TiKV の KV API では round-trip が爆発する)。
 
-Full-text search の本体は inverted index (転置索引) + BM25 スコアリング。データ構造としては「キー (トークン) がソート順に並ぶ / 前方一致・範囲スキャンできる / 1 キーに対して大きな posting list を効率的に読める」の 3 点さえ満たせば、行指向でも列指向でも、B-tree でも LSM でも成立する。実際、実装ルートは 4 種類ある。
+これらは公式に確認された理由ではなく、他 DB の実装事情と TiDB のアーキテクチャから逆算した仮説であることを再度強調しておく。単一ノードなら pg-vector / PG GIN のように行指向で普通にできることを、分散 KV で強一貫性を保ちつつやろうとすると割に合わない、というのが根っこにある構造だと想定している。
 
-- Route 1: **in-process (Tantivy in Rust app)** — blog-api に Tantivy を組み込み、TiDB は関与しない。単一プロセス、低レイテンシ
-- Route 2: **外部サービス (Meilisearch / OpenSearch / Elasticsearch)** — TiDB からデータを同期し、専用エンジンで検索。分散環境で FTS を成立させる正攻法
-- Route 3: **単一ノード DB 内蔵 (PostgreSQL GIN / MySQL FULLTEXT / SQLite FTS5)** — 行指向のまま FTS を実装。単一ノードなら列指向も TiFlash も不要
-- Route 4: **TiDB Cloud (TiFlash に載せる)** — 分散 KV の一貫性経路の外側で inverted index を維持できる場所として TiFlash を選択
-
-TiDB Cloud が Route 4 を採ったのは、分散 KV の OLTP 経路 (TiKV + Raft consensus) を汚さずに転置索引を維持するための実装判断であって、FTS という技術が TiFlash を要求しているわけではない。単一ノードなら Route 3、分散環境で正確なランキングが欲しければ Route 2、単一プロセスに閉じたければ Route 1、というふうに用途によって選べる。
-
-### 補足: なぜ分散 KV で FTS を維持するのが割に合わないか
+### 補足: 分散 KV に転置索引 / ベクトル索引を一貫維持するのが辛い理由
 
 ![分散 KV で FTS を維持する 4 つの困難](distributed-fts-hard-spots.png)
 
-分散 KV で inverted index を一貫性を保ちつつ維持するのが辛いのは、Fan-out (posting list がリージョンに散る) / グローバル統計 (BM25 の IDF は全ノード統計の集約が必要) / 書き込みコスト (1 文書で数十〜数百 key を分散 TX 更新) / 大きな値 (posting list の圧縮・分割) の 4 点が同時にのしかかるため。だから Elasticsearch / OpenSearch は「eventually consistent + local defer」で一貫性を意図的に緩め、TiDB Cloud は「TiFlash という非トランザクショナルな AP レプリカに寄せる」ことで OLTP 経路を汚さないようにしている。どちらも「一貫性の緩い場所に FTS を追い出す」という同じ構造の設計判断。
+上の想定理由と表裏の関係で、分散 KV で複雑な index を一貫性を保ちつつ維持するのが辛いのは、Fan-out (posting list や HNSW graph が region に散る) / グローバル統計 (BM25 の IDF や相対距離は全ノード統計の集約が必要) / 書き込みコスト (1 文書で数十〜数百 key を分散 TX 更新) / 大きな値 (posting list や graph node は 1 キーあたり大きい) の 4 点が同時にのしかかるため。Elasticsearch / OpenSearch は「eventually consistent + local defer」で一貫性を意図的に緩めることでこの制約を回避し、TiDB は「TiFlash という非トランザクショナルな AP レプリカに寄せる」ことで OLTP 経路を汚さずに済ませている。どちらも「一貫性の緩い場所に複雑な index を追い出す」という同じ構造の設計判断。
 
 ## 選択肢の全体像
 
@@ -111,9 +111,10 @@ Self-Managed TiDB v8.5.7 で日本語検索を実現する現実的な選択肢�
 以下 4 フェーズを別途 `YYYY-MM-DD-tidb-vector-search-implementation/` として起票して進める。本 doc は設計判断の記録に留める。
 
 - Phase 1: `cluster/manifests/tidb-cluster/tidb-cluster.yaml` に `spec.tiflash` を追加して `kubectl apply`
-- Phase 2: `tools/dsql-cli/dsl-tidb/schema/` に `embedding VECTOR(1024)` 列 + HNSW インデックスの DDL を追加、`load.sh` で適用
-- Phase 3: `tools/tidb-embedder/` を新規作成 (埋め込みモデルは Cloudflare Workers AI `@cf/baai/bge-m3` を第一候補、Tailnet 経由で dev DB 接続)
-- Phase 4: `apps/blog-api` の検索エンドポイントを `VEC_COSINE_DISTANCE` で実装 (検索クエリも同じモデルで vectorize)
+- Phase 2: `cluster/manifests/plamo-embedding/` に PLaMo Embedding 1B の Deployment + Service を追加 (Hugging Face から `pfnet/plamo-embedding-1b` を pull、`/embed` HTTP endpoint を公開)
+- Phase 3: モデル config から実際の embedding dimension を確認し、`tools/dsql-cli/dsl-tidb/schema/` に `embedding VECTOR(N)` 列 + HNSW インデックスの DDL を追加、`load.sh` で適用
+- Phase 4: `tools/tidb-embedder/` を新規作成 (PLaMo Embedding service に HTTP で問い合わせ、Tailnet 経由で dev DB に UPDATE)
+- Phase 5: `apps/blog-api` の検索エンドポイントを `VEC_COSINE_DISTANCE` で実装 (検索クエリも PLaMo Embedding service で vectorize)
 
 ## 誤前提の訂正記録
 
@@ -126,6 +127,9 @@ Self-Managed TiDB v8.5.7 で日本語検索を実現する現実的な選択肢�
   - `pattern-a-architecture.png` (Pattern A が Self-Managed で動く前提の構成図)
   - `fts-inverted-index-vs-column-store.png` (TiDB Self-Managed で列指向 FTS が動く前提の整理)
   - `tiflash-outside-oltp-plane.png` (Self-Managed で FULLTEXT + TiFlash 前提の深掘り)
+- 訂正版で追加した以下の画像は、根拠付けが不十分だったため削除・差し替えた
+  - `hnsw-tiflash-fit.png` (「HNSW と列指向 SIMD の相性」を必然のように描いていたが、pg-vector が反例。削除)
+  - `fulltext-implementation-routes.png` (FULLTEXT のみの実装ルート比較。Vector も同じ話に収斂するため、統合図 `single-node-vs-distributed-kv.png` に差し替え)
 - `distributed-fts-hard-spots.png` は一般論として正しいので保持
 
 ## 作業ログ
@@ -135,5 +139,6 @@ Self-Managed TiDB v8.5.7 で日本語検索を実現する現実的な選択肢�
 - 初版で TiDB v8.5 の FULLTEXT + kuromoji Pattern A を採用と結論付け、深掘り節まで追加した
 - 公式ドキュメントで裏取りしたところ Self-Managed では FULLTEXT INDEX が動作しないことが判明
 - Vector + TiFlash を採用パターンとして再選定し、他 4 選択肢との比較で判断根拠を整理
-- 学習教材として「Vector は TiFlash 必須 (実装論)」「FULLTEXT は TiFlash 不要 (概念論)」の対比を追加
+- 埋め込みモデルを Cloudflare Workers AI から k8s Pod 上の PLaMo Embedding 1B (pfnet/plamo-embedding-1b, Apache 2.0) に変更
+- 学習章の framing を「Vector は TiFlash 必須 (実装論) / FULLTEXT は TiFlash 不要 (概念論)」の 2 章から、pg-vector が反例になる指摘を受けて「TiDB (分散 KV) はなぜ Vector も FULLTEXT も TiFlash に載せたのか (想定)」の 1 章に統合。単一ノード DB (pg-vector, PG GIN) の反例を対比として並置
 - 実装は別タスクとして起票する
