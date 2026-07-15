@@ -644,6 +644,12 @@ SELECT TIDB_DATABASE, TIDB_TABLE, INDEX_NAME,
 
 `ROWS_STABLE_NOT_INDEXED = 0`、`ROWS_DELTA_NOT_INDEXED = 0`、`ERROR_MESSAGE` が空ならbuild完了。
 
+2026-07-15の実行結果:
+
+- 133記事から1,101 chunksを生成 (`missing_articles = 0`)
+- token数は最小20、最大1024、1024超過は0件
+- HNSWは `ROWS_STABLE_INDEXED = 1101`、Stable/Deltaの未index行はともに0、errorなし
+
 ### 4-7. サンプル検索と旧vector削除 (ユーザー実行)
 
 ```bash
@@ -661,6 +667,10 @@ SELECT c.article_id, LEFT(a.title, 55) AS title, c.heading,
  LIMIT 20;"
 ```
 
+2026-07-15に `Rust Axum API` で確認したところ、旧1記事1vector方式では対象記事のdistanceが `0.4674` で上位に入らなかったのに対し、chunk方式では「Rust(axum) on Lambda × Aurora DSQL × Next.js on Vercelで個人ブログをリーアーキした話」が1位 (`0.35846897784588017`) になった。
+
+このqueryはタイトルとの一致が強いため、同じ記事の複数chunkが上位20件に現れる。chunk近傍検索としては想定どおりであり、Phase 5の検索APIでは候補を多めに取得した後、`article_id` ごとにdistance最小のchunkへ集約する。
+
 HNSW利用可否はjoinや記事単位の集約を外し、TiFlashを固定した最小queryで確認する。
 
 ```bash
@@ -676,6 +686,17 @@ SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
 
 `TableFullScan` の `operator info` に `index:idx_article_embedding_chunks_embedding` と `annIndex:COSINE` があれば利用可能。件数が小さい間、hintなしではoptimizerがTiKV全走査を選ぶことがある。
 
+2026-07-15の実行計画では、TiFlash MPPへTopN (`count:20`) がpushdownされ、chunk用HNSW indexを使う `annIndex:COSINE` を確認できた。vector部分は2048次元のため省略表記。
+
+```text
+TableReader_24                               MppVersion: 2, data:ExchangeSender_23
+└─ExchangeSender_23            mpp[tiflash] ExchangeType: PassThrough
+  └─TopN_22                    mpp[tiflash] offset:0, count:20
+    └─TableFullScan_21         mpp[tiflash] table:c,
+      index:idx_article_embedding_chunks_embedding(embedding)
+      keep order:false, annIndex:COSINE(embedding..[...], limit:20)
+```
+
 chunk検索の精度を確認できた後、比較・rollback用に残していた旧vectorを削除する。
 
 ```sql
@@ -687,10 +708,10 @@ ALTER TABLE articles DROP COLUMN embedding;
 
 ### Phase 4 完了条件
 
-- [ ] 全133記事に1件以上のchunkがあり、1024 tokens超過が0件
-- [ ] TiFlashが `4/4 Running` のままchunk HNSW buildを完了し、未index行が0件
-- [ ] `Rust Axum API` など旧方式で弱かったqueryの順位が改善する
-- [ ] TiFlash固定の `EXPLAIN` に `annIndex:COSINE` が現れる
+- [x] 全133記事に1件以上のchunkがあり、1024 tokens超過が0件
+- [x] TiFlashが `4/4 Running` のままchunk HNSW buildを完了し、未index行が0件
+- [x] `Rust Axum API` など旧方式で弱かったqueryの順位が改善する
+- [x] TiFlash固定の `EXPLAIN` に `annIndex:COSINE` が現れる
 - [ ] 検証後に旧 `articles.embedding`、HNSW、TiFlash replicaを削除する
 
 ---
