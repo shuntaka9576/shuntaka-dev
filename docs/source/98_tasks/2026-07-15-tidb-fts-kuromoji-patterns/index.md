@@ -21,27 +21,27 @@
 
 「TiFlash = 列指向 = FTS に有利」という因果関係ではない。全文検索の速さの本体は inverted index (転置索引) というデータ構造で、格納が行指向でも列指向でも成立する。実際 PostgreSQL / MySQL InnoDB は行指向のまま FTS を実装しているし、ClickHouse は列指向でも FTS 本体は skip index (bloom / ngram) 相当を使う。
 
-TiDB v8.5 が FULLTEXT を TiFlash 側に載せたのは、性能理論からの選択というより、TiKV は OLTP 特化の LSM ストアで新しい二次索引を差し込みにくく、TiFlash は既に Raft Learner でレプリケーション済みで新しい index 型のプラグイン先として自然だった、という実装都合が主。列指向の恩恵 (FTS ヒット後の projection で content BLOB を跨がない、集計と併用しやすい) は副次的なオマケの位置付け。
+物理層 (B-tree / LSM のどちら) も本質ではない。inverted index に必要なのは「キー (トークン) がソート順に並ぶ / キーの前方一致・範囲スキャンができる / 1 キーに対して大きな posting list を効率的に読める」の 3 点で、B-tree でも LSM でも成立する。Lucene 自身が LSM 的 (immutable segment + merge)、SQLite FTS5 は B-tree 上に自前でセグメント構造を載せている。RocksDB ベースの TiKV も LSM でソート済み KV レンジスキャンができるので、原理的には転置索引を載せられる。
 
-したがって「TiFlash を追加する」は「FTS のために列指向ストレージが要る」ではなく、「TiDB のアーキテクチャ上、FULLTEXT INDEX を置く場所が TiFlash しか無い」と理解しておくのが正しい。
+### コラム: 分散 KV に転置索引を一貫維持するのが割に合わない 4 つの理由
 
-### コラム: なぜ TiKV には載せられず TiFlash なのか
+![分散 KV で FTS を維持する 4 つの困難](distributed-fts-hard-spots.png)
 
-![なぜ FTS は TiKV ではなく TiFlash に載っているか](why-tiflash-not-tikv.png)
+TiDB / DSQL のような分散 KV で FTS が辛いのは、B-tree か LSM かの話ではなく、以下の 4 点が同時にのしかかるから。
 
-TiKV は RocksDB (LSM) ベースの KV ストアで、TiDB の二次索引は「別のキー空間に張られた通常のレコード」として表現される。B-tree 索引はこのモデルに素直に乗り、Raft のトランザクション経路とも整合させやすい。
+- Fan-out: posting list が広いキーレンジに散り、1 クエリで多数の region / node に fan-out する
+- グローバル統計: BM25 / TF-IDF は全ノードの用語 df・文書数を集約しないと正確なランキングにならない。ローカルスコアだけでは順位が歪む
+- 書き込みコスト: 1 文書 insert で数十〜数百の posting key を更新する必要があり、分散トランザクションだと 2PC の同期コストが跳ねる。Lucene は immutable local segment に書いて defer merge で逃げられるが、KV レイヤは逃げ場が無い
+- 大きな値: 長い posting list をどう分割・圧縮するかを自前で組む必要があり、行指向 KV だと肥大化しやすい
 
-一方 inverted index は、更新はセグメントマージ、読み取りは posting list の交差、スコアリングは BM25 / TF-IDF、と索引エンジン固有の意味論を伴う。TiKV に載せるにはこの意味論を分散 KV 上で組み直す必要があり、これは「差し込みにくい」というより新ストレージを一本書くのに近い作業になる。
+要するに「B-tree じゃないから無理」ではなく、分散 KV の上でグローバル統計を要する転置索引を一貫性を保ちつつ維持するのが割に合わないので、みんな検索は別コンポーネントに切り出している、という話。単一ノードの PostgreSQL / SQLite / MySQL は全部ローカルで済むので、行指向のままでも FTS が持てる。
 
-補足として、inverted index の物理格納そのものは B-tree で十分表現できる (下図の PostgreSQL GIN の例)。「TiKV に載せられない」の本質は物理層の話ではなく、この意味論層 (トークナイザ / 交差 / スコアリング / セグメントマージ) を TiKV が持たないことにある。SQL 層で組むと KV round-trip で通信量が爆発するため、索引エンジンはストレージと同居させる必要がある。
+現状の逃げ道は 2 種類。
 
-![Inverted Index も物理層は B-tree に乗る](inverted-index-on-btree.png)
+- TiDB → v8.x 以降、TiFlash 側でベクトル検索や FTS を実装する方向 (列指向・非トランザクショナルな AP レプリカに寄せて OLTP 経路を汚さない)
+- DSQL → 素直に OpenSearch / Elasticsearch を横に置いて CDC で同期
 
-PostgreSQL / InnoDB が行指向のまま FTS を持てるのは、単一ノードで、かつ拡張可能な索引フレームワーク (PG なら `amgettuple` 等の Access Method API、GIN はその一実装) を最初から持っているから。分散 KV にはその層が無い。
-
-一方 TiFlash は既に Raft Learner としてレプリカを受け取り、自前のストレージエンジン (DeltaTree) を持ち、非同期に構造を作り替えることが許されている。つまり「レプリカに派生索引エンジンを同居させる」ためのフレームが最初から揃っている。inverted index はそこに新しい index 型として追加すればいい。
-
-強いて難点を挙げるなら、FTS を使うには TiFlash レプリカを持つ必要がある、つまり分析用途が無くても TiFlash を立てる運用コスト (メモリ / ストレージ / CPU) がかかる、という点になる。今回のように blog 検索が主目的なら、この代償を承知の上で TiFlash を導入することになる。
+今回のように blog 検索が主目的なら、TiFlash レプリカを立てる運用コスト (メモリ / ストレージ / CPU) を承知の上で TiDB 内に閉じる、という選択になる。
 
 ## パターン一覧
 
