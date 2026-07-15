@@ -794,3 +794,25 @@ wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` �
 ```bash
 bun run test
 ```
+
+### tidb-embedder
+
+PLaMo Embedding Service の document embedding を使い、`articles.embedding` が NULL の記事を埋め戻す。API 応答が2048次元の有限値配列であることを検証し、`embedding` カラムだけを更新するため `updated_at` は変更しない。
+
+先に PLaMo Embedding Service へ port-forward する。
+
+```bash
+kubectl -n plamo-embedding port-forward svc/plamo-embedding 8080:80
+```
+
+別ターミナルで dry-run を実行し、対象件数と全記事の次元数を確認する。
+
+```bash
+cd tools/tidb-embedder
+bun run backfill -- \
+  --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev \
+  --embed-endpoint http://localhost:8080 \
+  --dry-run
+```
+
+問題がなければ `--dry-run` を外して実行する。既存の embedding も再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、推論のタイムアウトを変える場合は `--timeout <ms>` を付ける。記事単位で処理を継続し、1件でも失敗した場合は非0で終了する。

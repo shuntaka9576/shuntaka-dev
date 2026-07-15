@@ -359,7 +359,7 @@ mysql -h tidb.${TAILNET} -P 4000 -u root -e "SHOW CREATE TABLE blog_dev.articles
 
 ## Phase 4: `tools/tidb-embedder` (既存レコード埋め戻し)
 
-### 4-1. ディレクトリ構成
+### 4-1. ディレクトリ構成 (実装済み)
 
 `tools/content-html-backfill` を参考に、TypeScript + mysql2 で埋め戻す小さな CLI を作る。
 
@@ -389,13 +389,16 @@ tools/tidb-embedder/
 }
 ```
 
-### 4-3. `src/index.ts` の骨格
+### 4-3. `src/index.ts` の実装
 
 `content-html-backfill/src/index.ts` (WHERE 条件で NULL 対象を絞り込み、slug 単発指定と dry-run に対応するパターン) を踏襲する。差分は以下だけ:
 
 - markdown 変換ロジックの代わりに `fetch(embeddingEndpoint, { body: { text, mode: 'document' } })` を叩く
 - `UPDATE ... SET embedding = ?` の bind 値は `[0.1, 0.2, ...]` 形式の文字列 (mysql2 が VECTOR にキャストする)
 - `updated_at` を保持したいので、`content_html` と同じく `ON UPDATE` が無いことを利用して `SET embedding = ?` だけ更新する
+- API 応答の `dim`、vector 長、全要素が有限値であることを検証し、2048 次元以外は更新しない
+- `--all` を付けない更新には `AND embedding IS NULL` を付け、同時実行で埋められた値を上書きしない
+- 記事は逐次処理し、1件が失敗しても残りを続行したうえで、失敗があれば終了コードを非0にする
 
 主要処理:
 
@@ -421,6 +424,7 @@ CLI オプション:
 --all                     embedding IS NOT NULL も再生成
 --slug <slug>             特定 slug のみ
 --dry-run                 UPDATE せず件数と次元だけ表示
+--timeout <ms>            1記事あたりの embedding API timeout (default: 120000)
 ```
 
 ### 4-4. 実行 (ユーザー実行)
@@ -441,7 +445,7 @@ bun run backfill \
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
-SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL) AS filled,
+SELECT SUM(embedding IS NOT NULL) AS filled,
        COUNT(*) AS total FROM articles;"
 ```
 
@@ -452,13 +456,23 @@ SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL) AS filled,
 QVEC=$(curl -s -X POST http://localhost:8080/embed \
   -H 'Content-Type: application/json' \
   -d '{"text":"TiDB の Vector 検索","mode":"query"}' \
-  | jq -r '.vector | tostring')
+  | jq -c '.vector')
 
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
 SELECT article_id, LEFT(title, 40) AS title,
        VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
   FROM articles
- WHERE embedding IS NOT NULL
+ ORDER BY dist ASC
+ LIMIT 5;"
+```
+
+HNSW index が使われると、`TableFullScan` の `operator info` に `annIndex:COSINE` が表示される。
+
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
+EXPLAIN
+SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
+  FROM articles
  ORDER BY dist ASC
  LIMIT 5;"
 ```
@@ -467,7 +481,7 @@ SELECT article_id, LEFT(title, 40) AS title,
 
 - [ ] 全記事の `embedding` が埋まっている
 - [ ] サンプル検索で意味の近い記事が上位に来る (目視)
-- [ ] `EXPLAIN` に `IndexRangeScan` (vector) / TiFlash MPP が現れる
+- [ ] `EXPLAIN` の `operator info` に `annIndex:COSINE` が現れる
 
 ---
 
