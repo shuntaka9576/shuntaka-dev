@@ -387,12 +387,21 @@ kubectl -n tidb-cluster patch tidbcluster basic --type merge \
   -p '{"spec":{"tiflash":{"replicas":0}}}'
 kubectl -n tidb-cluster wait --for=delete pod/basic-tiflash-0 --timeout=5m
 
-# 現在の分析用replica PVCだけを削除する。Retainのままだと実データが残るためDeleteへ変更する
+# 現在の分析用replica PVCと、Retainされるnode上の実データを削除する
 PV=$(kubectl -n tidb-cluster get pvc data0-basic-tiflash-0 \
   -o jsonpath='{.spec.volumeName}')
-kubectl patch pv "${PV}" --type merge \
-  -p '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'
+PV_NODE=$(kubectl get pv "${PV}" \
+  -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}')
+PV_PATH=$(kubectl get pv "${PV}" -o jsonpath='{.spec.hostPath.path}')
 kubectl -n tidb-cluster delete pvc data0-basic-tiflash-0
+kubectl -n tidb-cluster wait \
+  --for=delete pvc/data0-basic-tiflash-0 --timeout=5m
+
+# pvReclaimPolicy=Retainのため、対象pathを表示・確認してから削除する
+echo "${PV_NODE}:${PV_PATH}"
+# /opt/local-path-provisioner/*_tidb-cluster_data0-basic-tiflash-0 であること
+ssh "${PV_NODE}" sudo rm -rf --one-file-system -- "${PV_PATH}"
+kubectl delete pv "${PV}" --wait=false
 kubectl wait --for=delete "pv/${PV}" --timeout=5m
 
 # source manifestと同じ1 replicaへ戻す
@@ -400,6 +409,52 @@ kubectl -n tidb-cluster patch tidbcluster basic --type merge \
   -p '{"spec":{"tiflash":{"replicas":1}}}'
 kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
 # 新しいbasic-tiflash-0が4/4 Runningになること
+```
+
+#### PVCを先に削除して`Terminating`になった場合
+
+Podを停止する前にPVCの削除を開始すると、`kubernetes.io/pvc-protection` finalizerにより、PodがPVCを使用している間は削除が完了しない。2026-07-15の作業では以下の中途状態になった。
+
+- `data0-basic-tiflash-0`: `Terminating`
+- `basic-tiflash-0`: 古いPVCを使用したまま `3/4 CrashLoopBackOff`
+- TiDB: `REPLICA_COUNT = 1`のまま (`SET TIFLASH REPLICA 0`のDDL履歴なし)
+- PV: `pvc-01d5b048-5bd0-4348-9bcb-b4f8bfd73d35`, reclaim policyは`Retain`
+
+この場合はfinalizerを強制削除せず、次の順序で復旧を続ける。
+
+```bash
+# 削除中PVCのPV、node、hostPathをPVCが消える前に記録する
+PV=$(kubectl -n tidb-cluster get pvc data0-basic-tiflash-0 \
+  -o jsonpath='{.spec.volumeName}')
+PV_NODE=$(kubectl get pv "${PV}" \
+  -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}')
+PV_PATH=$(kubectl get pv "${PV}" -o jsonpath='{.spec.hostPath.path}')
+
+# DB上のTiFlash replicaを外す
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e \
+  "ALTER TABLE articles SET TIFLASH REPLICA 0;"
+
+# TiFlash Podを停止するとPVC protectionが解除され、PVC/PVの削除が進む
+kubectl -n tidb-cluster patch tidbcluster basic --type merge \
+  -p '{"spec":{"tiflash":{"replicas":0}}}'
+kubectl -n tidb-cluster wait --for=delete pod/basic-tiflash-0 --timeout=5m
+kubectl -n tidb-cluster wait \
+  --for=delete pvc/data0-basic-tiflash-0 --timeout=5m
+
+# pvReclaimPolicy=Retainのため、旧データとReleased PVを明示削除する
+if kubectl get pv "${PV}" >/dev/null 2>&1; then
+  echo "${PV_NODE}:${PV_PATH}"
+  # /opt/local-path-provisioner/*_tidb-cluster_data0-basic-tiflash-0 であること
+  ssh "${PV_NODE}" sudo rm -rf --one-file-system -- "${PV_PATH}"
+  kubectl delete pv "${PV}" --wait=false
+  kubectl wait --for=delete "pv/${PV}" --timeout=5m
+fi
+
+# 空のPVCでTiFlashを再作成する
+kubectl -n tidb-cluster patch tidbcluster basic --type merge \
+  -p '{"spec":{"tiflash":{"replicas":1}}}'
+kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
+# 新しいPVC名になり、basic-tiflash-0が4/4 Runningを維持すること
 ```
 
 HNSW indexはPhase 4でbackfill、TiFlash replica再同期、compactionが完了した後に作成する。`04_articles.sql` にもindex作成を含めない。
