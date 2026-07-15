@@ -196,6 +196,7 @@ cluster/manifests/plamo-embedding/
 - **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。arm64 wheel が公式提供されている
 - **Deployment strategy: Recreate**: 1 replica で model メモリが 2-3GB 効くため、RollingUpdate だと同一 node で 2 Pod = メモリ倍増になる。Recreate で旧 Pod を落としてから新 Pod を起こす
 - **依存バージョン (Dockerfile)**: `torch==2.5.1`, `transformers==4.46.0`, `sentencepiece==0.2.0`, `fastapi==0.115.4`, `uvicorn==0.32.0`, `pydantic==2.9.2` を pin
+- **`--provenance=false --sbom=false` (build-and-push.sh)**: buildx はデフォルトで OCI index に attestation manifest を追加するが、k3s/MiniPC の古めの containerd がそれで `no match for platform in manifest` と誤判定して pull に失敗する (`ImagePullBackOff`)。attestation を切ることで single-platform manifest だけになり pull が通る
 
 ### 2-4. ghcr ログイン (初回のみ、ユーザー実行)
 

@@ -18,8 +18,14 @@ IMAGE="${IMAGE:-ghcr.io/shuntaka9576/plamo-embedding}"
 TAG="${TAG:-latest}"
 
 echo "==> Building ${IMAGE}:${TAG} (linux/arm64)"
+# --provenance=false / --sbom=false: buildx はデフォルトで OCI index に attestation
+# manifest を追加するが、k3s/MiniPC の古めの containerd がそれで "no match for
+# platform" と誤判定して pull に失敗する。attestation を切ると single-platform
+# の manifest だけになり pull が通る。
 docker buildx build \
   --platform linux/arm64 \
+  --provenance=false \
+  --sbom=false \
   -t "${IMAGE}:${TAG}" \
   --push \
   .
