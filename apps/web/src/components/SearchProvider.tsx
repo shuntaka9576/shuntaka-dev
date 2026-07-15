@@ -33,6 +33,10 @@ interface SearchContextValue {
   error: string | null;
   /** 全画面モーダルの表示状態 */
   modalOpen: boolean;
+  /** 検索結果の現在ページ番号（1-based） */
+  searchPage: number;
+  /** 検索結果の総ページ数 */
+  searchTotalPages: number;
   setQuery: (next: string) => void;
   /** debounce をキャンセルして即時に submittedQuery を確定する（Enter キー用） */
   submitNow: () => void;
@@ -40,6 +44,7 @@ interface SearchContextValue {
   retry: () => void;
   openModal: () => void;
   closeModal: () => void;
+  setSearchPage: (page: number) => void;
 }
 
 const SearchContext = createContext<SearchContextValue | null>(null);
@@ -72,6 +77,8 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [searchPage, setSearchPageState] = useState(1);
+  const [searchTotalPages, setSearchTotalPages] = useState(1);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -89,13 +96,14 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
     return () => window.removeEventListener('popstate', applyFromLocation);
   }, []);
 
-  // submittedQuery / 選択タグ / mode / retry が変わったら fetch する
+  // submittedQuery / 選択タグ / mode / searchPage / retry が変わったら fetch する
   useEffect(() => {
     if (!submittedQuery) {
       // 未検索状態にリセット
       setResults(null);
       setError(null);
       setLoading(false);
+      setSearchTotalPages(1);
       abortRef.current?.abort();
       abortRef.current = null;
       return;
@@ -109,14 +117,19 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
     setLoading(true);
     setError(null);
 
+    const offset = (searchPage - 1) * DEFAULT_LIMIT;
+
     searchArticles(userName, submittedQuery, {
       tags: selected,
       mode,
       limit: DEFAULT_LIMIT,
+      offset,
       signal: controller.signal,
     })
       .then((res) => {
         setResults(res.articles);
+        const pages = res.totalCount === 0 ? 1 : Math.ceil(res.totalCount / DEFAULT_LIMIT);
+        setSearchTotalPages(pages);
         setLoading(false);
       })
       .catch((err) => {
@@ -127,7 +140,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submittedQuery, selected, mode, retryCount, userName]);
+  }, [submittedQuery, selected, mode, searchPage, retryCount, userName]);
 
   /** URL の q パラメータを更新（tags/mode/page は維持）。同値なら何もしない */
   const pushSearchUrl = useCallback((nextQuery: string, replace = false) => {
@@ -148,6 +161,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       debounceRef.current = setTimeout(() => {
         pushSearchUrl(next);
         setSubmittedQuery(next.trim());
+        setSearchPageState(1);
       }, DEBOUNCE_MS);
     },
     [pushSearchUrl],
@@ -163,6 +177,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       const trimmed = current.trim();
       pushSearchUrl(trimmed);
       setSubmittedQuery(trimmed);
+      setSearchPageState(1);
       return current;
     });
   }, [pushSearchUrl]);
@@ -180,6 +195,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
+  const setSearchPage = useCallback((p: number) => setSearchPageState(p), []);
 
   const value = useMemo<SearchContextValue>(
     () => ({
@@ -190,12 +206,15 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       loading,
       error,
       modalOpen,
+      searchPage,
+      searchTotalPages,
       setQuery,
       submitNow,
       clearQuery,
       retry,
       openModal,
       closeModal,
+      setSearchPage,
     }),
     [
       query,
@@ -204,12 +223,15 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       loading,
       error,
       modalOpen,
+      searchPage,
+      searchTotalPages,
       setQuery,
       submitNow,
       clearQuery,
       retry,
       openModal,
       closeModal,
+      setSearchPage,
     ],
   );
 

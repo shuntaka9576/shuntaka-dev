@@ -76,6 +76,10 @@ export interface SearchArticlesResult {
   query: string;
   /** サーバに渡された上限件数 */
   limit: number;
+  /** サーバに渡されたオフセット */
+  offset: number;
+  /** 候補プール内の合致記事総数（ページネーション用） */
+  totalCount: number;
 }
 
 export interface SearchArticlesOptions {
@@ -85,6 +89,8 @@ export interface SearchArticlesOptions {
   mode?: 'and' | 'or';
   /** 上限件数。省略時は API のデフォルト（20）に従う */
   limit?: number;
+  /** オフセット（ページネーション用）。省略時は 0 */
+  offset?: number;
   signal?: AbortSignal;
 }
 
@@ -207,6 +213,7 @@ export async function searchArticles(
 ): Promise<SearchArticlesResult> {
   const queryParts: string[] = [`q=${encodeURIComponent(q)}`];
   if (opts.limit !== undefined) queryParts.push(`limit=${opts.limit}`);
+  if (opts.offset !== undefined && opts.offset > 0) queryParts.push(`offset=${opts.offset}`);
   if (opts.tags && opts.tags.length > 0) {
     queryParts.push(...buildTagsQuery(opts.tags, opts.mode));
   }

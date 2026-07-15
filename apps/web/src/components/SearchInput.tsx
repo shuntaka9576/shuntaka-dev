@@ -96,7 +96,7 @@ export function SearchInput({
   return (
     <div
       role="search"
-      className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 focus-within:border-[var(--color-text)]"
+      className="flex items-center gap-2 rounded-[var(--radius-sm)] border-2 border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 focus-within:border-[var(--color-text)]"
     >
       <span aria-hidden="true" className="shrink-0 text-[var(--color-text-muted)]">
         <SearchIcon />
@@ -117,7 +117,7 @@ export function SearchInput({
         enterKeyHint="search"
         // font-size 16px 以上にしないと iOS Safari が focus 時にページを自動 zoom する。
         // 本体の 15px (--fs-body) より 1px 大きい --fs-body-lg (16px) を使う
-        className="w-full min-w-0 flex-1 border-0 bg-transparent text-[length:var(--fs-body-lg)] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+        className="w-full min-w-0 flex-1 border-0 bg-transparent text-[length:var(--fs-body-lg)] text-[var(--color-text)] outline-none focus-visible:outline-none placeholder:text-[var(--color-text-muted)]"
       />
       {value && (
         <button

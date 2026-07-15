@@ -12,6 +12,11 @@ pub struct ArticleSearchResult {
     pub distance: f64,
 }
 
+pub struct ArticleSearchResultPage {
+    pub results: Vec<ArticleSearchResult>,
+    pub total_count: u64,
+}
+
 pub struct TagFacet {
     pub path: String,
     pub count: u64,
@@ -44,7 +49,8 @@ pub trait UsersArticlesRepository: Send + Sync {
         tag_filter: Option<&TagFilter>,
         candidate_limit: u64,
         limit: u64,
-    ) -> Result<Vec<ArticleSearchResult>, anyhow::Error>;
+        offset: u64,
+    ) -> Result<ArticleSearchResultPage, anyhow::Error>;
 
     async fn find_tag_facets(
         &self,

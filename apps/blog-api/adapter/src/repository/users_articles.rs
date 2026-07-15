@@ -8,7 +8,8 @@ use kernel::model::article::{
     TagFilterMode, Thumbnail, Title, UserId,
 };
 use kernel::repository::users_articles::{
-    ArticleSearchResult, ArticleSummaryPage, TagFacet, TagFacetsResult, UsersArticlesRepository,
+    ArticleSearchResult, ArticleSearchResultPage, ArticleSummaryPage, TagFacet, TagFacetsResult,
+    UsersArticlesRepository,
 };
 use sqlx::{FromRow, MySqlPool};
 use uuid::Uuid;
@@ -74,6 +75,7 @@ struct ArticleSearchRow {
     created_at: Option<DateTime<Utc>>,
     updated_at: Option<DateTime<Utc>>,
     distance: f64,
+    total_count: i64,
 }
 
 impl TryFrom<ArticleSearchRow> for ArticleSearchResult {
@@ -316,11 +318,12 @@ ranked_articles AS (
      WHERE a.status = 'published' AND u.name = ?{filter_conditions}
 )
 SELECT article_id, title, slug, user_id, thumbnail, description, status,
-       published_at, created_at, updated_at, distance
+       published_at, created_at, updated_at, distance,
+       COUNT(*) OVER() AS total_count
   FROM ranked_articles
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
- LIMIT ?"#
+ LIMIT ? OFFSET ?"#
     )
 }
 
@@ -603,7 +606,8 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         tag_filter: Option<&TagFilter>,
         candidate_limit: u64,
         limit: u64,
-    ) -> Result<Vec<ArticleSearchResult>, anyhow::Error> {
+        offset: u64,
+    ) -> Result<ArticleSearchResultPage, anyhow::Error> {
         let pool = self.db.pool();
         let vector_json = serde_json::to_string(vector)?;
         let candidate_limit = candidate_limit.max(limit);
@@ -616,14 +620,20 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 match filter.mode {
                     TagFilterMode::And => {
                         if resolved.iter().any(Option::is_none) {
-                            return Ok(vec![]);
+                            return Ok(ArticleSearchResultPage {
+                                results: vec![],
+                                total_count: 0,
+                            });
                         }
                         Some(resolved.into_iter().flatten().collect())
                     }
                     TagFilterMode::Or => {
                         let ids: Vec<String> = resolved.into_iter().flatten().collect();
                         if ids.is_empty() {
-                            return Ok(vec![]);
+                            return Ok(ArticleSearchResultPage {
+                                results: vec![],
+                                total_count: 0,
+                            });
                         }
                         Some(ids)
                     }
@@ -653,7 +663,7 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
                 query = query.bind(id.as_str());
             }
         }
-        query = query.bind(limit);
+        query = query.bind(limit).bind(offset);
 
         let rows: Vec<ArticleSearchRow> = observe_query(
             "article_vector_search",
@@ -662,6 +672,8 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             |rows| Some(rows.len() as i64),
         )
         .await?;
+
+        let total_count = rows.first().map(|r| r.total_count as u64).unwrap_or(0);
 
         let mut results: Vec<ArticleSearchResult> = rows
             .into_iter()
@@ -682,7 +694,10 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
             }
         }
 
-        Ok(results)
+        Ok(ArticleSearchResultPage {
+            results,
+            total_count,
+        })
     }
 
     async fn find_tag_facets(

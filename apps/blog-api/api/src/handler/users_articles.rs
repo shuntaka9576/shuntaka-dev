@@ -16,6 +16,7 @@ const DEFAULT_PER_PAGE: u32 = 10;
 const MAX_PER_PAGE: u32 = 500;
 const DEFAULT_SEARCH_LIMIT: u32 = 20;
 const MAX_SEARCH_LIMIT: u32 = 100;
+const MAX_SEARCH_OFFSET: u32 = 200;
 const MAX_SEARCH_QUERY_CHARS: usize = 500;
 const SEARCH_CANDIDATE_MULTIPLIER: u32 = 10;
 const TAGGED_SEARCH_CANDIDATE_MULTIPLIER: u32 = 30;
@@ -59,8 +60,10 @@ pub struct UsersArticlesSearchQuery {
     pub tags: Option<String>,
     /// Tag filter mode: "and" (default) or "or".
     pub mode: Option<String>,
-    /// Maximum number of unique articles to return (default 20, max 100).
+    /// Maximum number of unique articles to return per page (default 20, max 100).
     pub limit: Option<u32>,
+    /// Number of results to skip for pagination (default 0, max 200).
+    pub offset: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,6 +144,8 @@ pub struct UsersArticlesSearchResponse {
     pub articles: Vec<ArticleSearchResultResponse>,
     pub query: String,
     pub limit: u32,
+    pub offset: u32,
+    pub total_count: u64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -219,13 +224,22 @@ fn parse_search_limit(raw: Option<u32>) -> Result<u32, AppError> {
     Ok(limit)
 }
 
-fn search_candidate_limit(limit: u32, has_tag_filter: bool) -> u32 {
+fn parse_search_offset(raw: Option<u32>) -> Result<u32, AppError> {
+    let offset = raw.unwrap_or(0);
+    if offset > MAX_SEARCH_OFFSET {
+        return Err(AppError::bad_request("offset exceeds maximum"));
+    }
+    Ok(offset)
+}
+
+fn search_candidate_limit(limit: u32, offset: u32, has_tag_filter: bool) -> u32 {
+    let effective = limit.saturating_add(offset);
     let multiplier = if has_tag_filter {
         TAGGED_SEARCH_CANDIDATE_MULTIPLIER
     } else {
         SEARCH_CANDIDATE_MULTIPLIER
     };
-    limit.saturating_mul(multiplier).min(MAX_SEARCH_CANDIDATES)
+    effective.saturating_mul(multiplier).min(MAX_SEARCH_CANDIDATES)
 }
 
 // ─────────────────────────────────────────
@@ -338,8 +352,9 @@ pub async fn get_users_articles_search(
 > {
     let search_query = parse_search_query(&query.q)?;
     let limit = parse_search_limit(query.limit)?;
+    let offset = parse_search_offset(query.offset)?;
     let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
-    let candidate_limit = search_candidate_limit(limit, tag_filter.is_some());
+    let candidate_limit = search_candidate_limit(limit, offset, tag_filter.is_some());
 
     let embedding_client = registry.embedding_client().ok_or_else(|| {
         AppError::service_unavailable("PLaMO embedding service is not configured")
@@ -349,7 +364,7 @@ pub async fn get_users_articles_search(
         .await
         .map_err(|error| AppError::bad_gateway("Failed to generate query embedding", error))?;
 
-    let results = registry
+    let search_result = registry
         .users_articles_repository()
         .search_published_by_user_name(
             &name,
@@ -357,6 +372,7 @@ pub async fn get_users_articles_search(
             tag_filter.as_ref(),
             u64::from(candidate_limit),
             u64::from(limit),
+            u64::from(offset),
         )
         .await
         .map_err(|error| AppError::internal("Failed to search articles", error))?;
@@ -366,7 +382,8 @@ pub async fn get_users_articles_search(
         config.cloudinary_cloud_name.clone(),
         config.cloudinary_api_secret.clone(),
     );
-    let articles = results
+    let articles = search_result
+        .results
         .into_iter()
         .map(|result| {
             let article = result.article;
@@ -394,6 +411,8 @@ pub async fn get_users_articles_search(
             articles,
             query: search_query.to_string(),
             limit,
+            offset,
+            total_count: search_result.total_count,
         }),
     ))
 }
@@ -602,9 +621,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_search_offset_defaults_and_validates() {
+        assert_eq!(parse_search_offset(None).unwrap(), 0);
+        assert_eq!(parse_search_offset(Some(0)).unwrap(), 0);
+        assert_eq!(
+            parse_search_offset(Some(MAX_SEARCH_OFFSET)).unwrap(),
+            MAX_SEARCH_OFFSET
+        );
+        assert!(parse_search_offset(Some(MAX_SEARCH_OFFSET + 1)).is_err());
+    }
+
+    #[test]
     fn search_candidates_expand_when_tags_are_present() {
-        assert_eq!(search_candidate_limit(20, false), 200);
-        assert_eq!(search_candidate_limit(20, true), 600);
-        assert_eq!(search_candidate_limit(MAX_SEARCH_LIMIT, true), 3000);
+        assert_eq!(search_candidate_limit(20, 0, false), 200);
+        assert_eq!(search_candidate_limit(20, 0, true), 600);
+        assert_eq!(search_candidate_limit(MAX_SEARCH_LIMIT, 0, true), 3000);
+    }
+
+    #[test]
+    fn search_candidates_expand_with_offset() {
+        assert_eq!(search_candidate_limit(20, 20, false), 400);
+        assert_eq!(search_candidate_limit(20, 20, true), 1200);
     }
 }

@@ -3,7 +3,6 @@
 import { Fragment } from 'react';
 import { ArticleCard } from '@/components/ArticleCard';
 import { ArticleCardSkeletonList } from '@/components/ArticleCardSkeleton';
-import { Pagination } from '@/components/Pagination';
 import { useSearch } from '@/components/SearchProvider';
 import { SearchInput } from '@/components/SearchInput';
 import { useTagFilter } from '@/components/TagFilterProvider';
@@ -14,12 +13,6 @@ interface SearchModalProps {
   userName: string;
   /** SSR で渡された現在ページの記事一覧。未検索・未絞り込みのときに表示する */
   defaultArticles: ArticleSummary[];
-  /** default 一覧の現在ページ番号 */
-  page: number;
-  /** default 一覧の総ページ数 */
-  totalPages: number;
-  /** Pagination の baseHref */
-  baseHref: string;
 }
 
 /** Lucide "tag" 相当 */
@@ -62,21 +55,83 @@ function CloseIcon() {
   );
 }
 
+type PageItem = number | 'ellipsis';
+
+function buildPageItems(currentPage: number, totalPages: number): PageItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const items: PageItem[] = [];
+  const window = 2;
+  const start = Math.max(2, currentPage - window);
+  const end = Math.min(totalPages - 1, currentPage + window);
+  items.push(1);
+  if (start > 2) items.push('ellipsis');
+  for (let p = start; p <= end; p += 1) items.push(p);
+  if (end < totalPages - 1) items.push('ellipsis');
+  items.push(totalPages);
+  return items;
+}
+
+function ModalPagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  const items = buildPageItems(currentPage, totalPages);
+  return (
+    <nav className="mt-6 flex items-center justify-center text-sm sm:mt-8" aria-label="pagination">
+      <ul className="flex items-center gap-1 sm:gap-2">
+        {items.map((item, idx) =>
+          item === 'ellipsis' ? (
+            <li
+              key={`ellipsis-${idx}`}
+              className="px-1 text-[var(--color-text-muted)] sm:px-2"
+              aria-hidden="true"
+            >
+              …
+            </li>
+          ) : item === currentPage ? (
+            <li key={item}>
+              <span
+                aria-current="page"
+                className="inline-flex min-h-10 min-w-10 items-center justify-center border-b-2 border-[var(--color-text)] px-2 font-medium text-[var(--color-text)] sm:px-3"
+              >
+                {item}
+              </span>
+            </li>
+          ) : (
+            <li key={item}>
+              <button
+                type="button"
+                onClick={() => onPageChange(item)}
+                aria-label={`page ${item}`}
+                className="inline-flex min-h-10 min-w-10 items-center justify-center px-2 text-[var(--color-link)] hover:text-[var(--color-link-hover)] sm:px-3"
+              >
+                {item}
+              </button>
+            </li>
+          ),
+        )}
+      </ul>
+    </nav>
+  );
+}
+
 /**
  * 検索専用の全画面モーダル。ページ chrome を覆い、SearchInput + 記事一覧に集中する。
  * タグ絞り込みは別モーダル (`TagFilterModal`) で扱う。両者は provider を共有するので
  * ここに表示される「記事一覧」は、検索・タグ絞り込みの合成結果を反映する。
  *
  * 記事は既存の `ArticleCard` (thumbnail 付き) をそのまま使い、ページ本体と同じ見た目を保つ。
- * 未検索・未絞り込みのときだけ既存の `Pagination` を出す (検索・タグ結果はページングなし)。
+ * 検索・タグ絞り込みの結果にも onClick ベースのページネーションを表示する。
  */
-export function SearchModal({
-  userName,
-  defaultArticles,
-  page,
-  totalPages,
-  baseHref,
-}: SearchModalProps) {
+export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
   const {
     modalOpen,
     query,
@@ -85,10 +140,13 @@ export function SearchModal({
     results,
     loading: searchLoading,
     error: searchError,
+    searchPage,
+    searchTotalPages,
     setQuery,
     submitNow,
     clearQuery,
     closeModal,
+    setSearchPage,
   } = useSearch();
 
   const {
@@ -97,10 +155,13 @@ export function SearchModal({
     filtering,
     fetchedArticles,
     loading: tagLoading,
+    filterPage,
+    filteredTotalPages,
     isTagMatched,
     toggleTag,
     changeMode,
     clear: clearTags,
+    setFilterPage,
     openTagModal,
   } = useTagFilter();
 
@@ -108,14 +169,12 @@ export function SearchModal({
 
   if (!modalOpen) return null;
 
-  // 表示する記事一覧 (優先順: 検索 → タグ絞り込み → デフォルト)
   const articleList: (ArticleSummary | SearchArticleResult)[] = searching
     ? (results ?? [])
     : filtering
       ? (fetchedArticles ?? [])
       : defaultArticles;
   const listLoading = (searching && searchLoading) || (filtering && tagLoading);
-  const showPagination = !searching && !filtering && totalPages > 1;
 
   const priorityArticleIds = new Set(
     articleList
@@ -241,8 +300,19 @@ export function SearchModal({
                   }
                 />
               ))}
-              {showPagination && (
-                <Pagination currentPage={page} totalPages={totalPages} baseHref={baseHref} />
+              {searching && searchTotalPages > 1 && (
+                <ModalPagination
+                  currentPage={searchPage}
+                  totalPages={searchTotalPages}
+                  onPageChange={setSearchPage}
+                />
+              )}
+              {!searching && filtering && filteredTotalPages > 1 && (
+                <ModalPagination
+                  currentPage={filterPage}
+                  totalPages={filteredTotalPages}
+                  onPageChange={setFilterPage}
+                />
               )}
             </>
           )}

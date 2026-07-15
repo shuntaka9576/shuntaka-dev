@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { memo } from 'react';
 import type { ArticleSummary } from '@/lib/api';
+import { AngleMeter } from './AngleMeter';
 import { ProgressLink } from './ProgressLink';
 import { SimilarityMeter } from './SimilarityMeter';
 
@@ -45,25 +46,29 @@ export const ArticleCard = memo(function ArticleCard({
         <div className="mb-2 flex justify-between">
           <div className="min-w-0">
             <div className="pt-2 pr-2 pb-4 text-base font-normal">{article.title}</div>
-            {tags && tags.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-light">
-                <span>{formatDate(article.publishedAt)}</span>
-                {hasDistance && <SimilarityMeter distance={distance} />}
-                {tags.map((tag) => (
-                  <span
-                    key={tag.path}
-                    className={
-                      tag.matched ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'
-                    }
-                  >
-                    #{tag.path}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-light">
-                <span>{formatDate(article.publishedAt)}</span>
-                {hasDistance && <SimilarityMeter distance={distance} />}
+            <div className="flex items-center gap-x-2 text-xs font-light">
+              <span className="shrink-0">{formatDate(article.publishedAt)}</span>
+              {hasDistance && (
+                <>
+                  <SimilarityMeter distance={distance} />
+                  <AngleMeter distance={distance} />
+                </>
+              )}
+            </div>
+            {tags && tags.length > 0 && (
+              <div className="overflow-x-auto">
+                <div className="flex items-center gap-x-2 text-xs font-light">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.path}
+                      className={`shrink-0 ${
+                        tag.matched ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'
+                      }`}
+                    >
+                      #{tag.path}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>

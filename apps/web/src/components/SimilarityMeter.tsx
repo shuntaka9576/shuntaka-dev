@@ -27,7 +27,7 @@ export function SimilarityMeter({ distance, className = '' }: SimilarityMeterPro
         aria-hidden="true"
       >
         <span
-          className="absolute inset-y-0 left-0 rounded-[var(--radius-full)] bg-[var(--color-accent)]"
+          className="absolute inset-y-0 left-0 rounded-[var(--radius-full)] bg-[var(--color-text)]"
           style={{ width: `${percent}%` }}
         />
       </span>

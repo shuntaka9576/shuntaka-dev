@@ -89,13 +89,7 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
             </FilteredArticleList>
             <PageReady />
           </main>
-          <SearchModal
-            userName={USER_NAME}
-            defaultArticles={articles}
-            page={page}
-            totalPages={totalPages}
-            baseHref={baseHref}
-          />
+          <SearchModal userName={USER_NAME} defaultArticles={articles} />
           <TagFilterModal />
         </BaseLayout>
       </SearchProvider>

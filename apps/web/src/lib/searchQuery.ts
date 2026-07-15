@@ -66,3 +66,17 @@ export function distanceToSimilarity(distance: number): number {
   const clamped = Math.max(0, Math.min(2, distance));
   return 1 - clamped / 2;
 }
+
+/**
+ * cosine distance (0..2) を、クエリと記事ベクトルの「なす角」(度, 0..180) に変換する。
+ * cosine similarity = 1 - distance なので θ = Math.acos(1 - distance)。
+ * distance=0 → 0°(同じ向き=激似)、=1 → 90°(直交=無関係)、=2 → 180°(正反対)。
+ * 非数は最遠の 180° に倒す。
+ */
+export function distanceToAngle(distance: number): number {
+  if (!Number.isFinite(distance)) return 180;
+  const clamped = Math.max(0, Math.min(2, distance));
+  const cos = 1 - clamped; // cosine similarity, 1..-1
+  const rad = Math.acos(Math.max(-1, Math.min(1, cos)));
+  return (rad * 180) / Math.PI;
+}

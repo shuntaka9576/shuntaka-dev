@@ -1,7 +1,12 @@
 // cspell:ignore Cmisc
 
 import { describe, expect, test } from 'bun:test';
-import { buildLocationSearch, distanceToSimilarity, parseSearchParam } from './searchQuery';
+import {
+  buildLocationSearch,
+  distanceToAngle,
+  distanceToSimilarity,
+  parseSearchParam,
+} from './searchQuery';
 
 describe('parseSearchParam', () => {
   test('null は空文字になる', () => {
@@ -96,5 +101,31 @@ describe('distanceToSimilarity', () => {
 
   test('NaN は 0', () => {
     expect(distanceToSimilarity(Number.NaN)).toBe(0);
+  });
+});
+
+describe('distanceToAngle', () => {
+  test('distance=0 は 0° (同じ向き)', () => {
+    expect(distanceToAngle(0)).toBeCloseTo(0);
+  });
+
+  test('distance=1 は 90° (直交)', () => {
+    expect(distanceToAngle(1)).toBeCloseTo(90);
+  });
+
+  test('distance=2 は 180° (正反対)', () => {
+    expect(distanceToAngle(2)).toBeCloseTo(180);
+  });
+
+  test('負の値は 0° にクランプ', () => {
+    expect(distanceToAngle(-0.1)).toBeCloseTo(0);
+  });
+
+  test('2 を超える値は 180° にクランプ', () => {
+    expect(distanceToAngle(3)).toBeCloseTo(180);
+  });
+
+  test('NaN は 180° (最遠)', () => {
+    expect(distanceToAngle(Number.NaN)).toBe(180);
   });
 });

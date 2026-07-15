@@ -112,8 +112,11 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
     loading: searchLoading,
     error: searchError,
     submittedQuery,
+    searchPage,
+    searchTotalPages,
     clearQuery,
     retry: retrySearch,
+    setSearchPage,
   } = useSearch();
 
   // === 検索モード（最優先） ===
@@ -190,6 +193,11 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
               distance={article.distance}
             />
           ))}
+          <FilterPagination
+            currentPage={searchPage}
+            totalPages={searchTotalPages}
+            onPageChange={setSearchPage}
+          />
         </div>
       </div>
     );

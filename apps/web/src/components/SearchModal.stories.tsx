@@ -56,9 +56,6 @@ const meta = {
   args: {
     userName: 'storybook',
     defaultArticles: sampleArticles,
-    page: 1,
-    totalPages: 3,
-    baseHref: '/',
   },
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof SearchModal>;
