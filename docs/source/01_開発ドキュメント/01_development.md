@@ -812,7 +812,8 @@ cd tools/tidb-embedder
 bun run backfill -- \
   --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev \
   --embed-endpoint http://localhost:8080 \
+  --concurrency 2 \
   --dry-run
 ```
 
-問題がなければ `--dry-run` を外して実行する。既存の embedding も再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、推論のタイムアウトを変える場合は `--timeout <ms>` を付ける。記事単位で処理を継続し、1件でも失敗した場合は非0で終了する。
+問題がなければ `--dry-run` を外して実行する。既存の embedding も再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、推論のタイムアウトを変える場合は `--timeout <ms>` を付ける。`--concurrency` の既定値は1で、CPUの過負荷を避けるためまず2で比較し、4以上には増やさない。記事単位で処理を継続し、1件でも失敗した場合は非0で終了する。

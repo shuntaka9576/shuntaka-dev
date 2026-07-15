@@ -116,6 +116,7 @@ async function main(): Promise<void> {
     .option('--all', 'embedding が埋まっている記事も再生成する', false)
     .option('--slug <slug>', '指定 slug の記事だけ処理する')
     .option('--dry-run', 'UPDATE せず、対象記事と生成した embedding の次元数を表示する', false)
+    .option('--concurrency <n>', 'embedding API への同時リクエスト数', '1')
     .option('--timeout <ms>', '記事1件あたりの embedding API timeout (ms)', '120000')
     .parse();
 
@@ -125,8 +126,10 @@ async function main(): Promise<void> {
     all: boolean;
     slug?: string;
     dryRun: boolean;
+    concurrency: string;
     timeout: string;
   }>();
+  const concurrency = positiveInteger(opts.concurrency, '--concurrency');
   const timeoutMs = positiveInteger(opts.timeout, '--timeout');
   const embedEndpoint = embeddingEndpoint(opts.embedEndpoint);
   const conn = await mysql.createConnection(opts.endpoint);
@@ -157,34 +160,44 @@ async function main(): Promise<void> {
     let failed = 0;
     let updated = 0;
 
-    for (const [index, row] of rows.entries()) {
-      try {
-        const { vector, dim } = await embedDocument(embedEndpoint, row.content, timeoutMs);
-        const progress = `[${index + 1}/${rows.length}] ${row.slug}: dim ${dim}`;
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      while (nextIndex < rows.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const row = rows[index];
 
-        if (opts.dryRun) {
-          console.log(`  [dry-run] ${progress}`);
-        } else {
-          const updateSql = opts.all
-            ? 'UPDATE articles SET embedding = ? WHERE article_id = ?'
-            : 'UPDATE articles SET embedding = ? WHERE article_id = ? AND embedding IS NULL';
-          const [result] = await conn.execute<mysql.ResultSetHeader>(updateSql, [
-            JSON.stringify(vector),
-            row.article_id,
-          ]);
-          updated += result.affectedRows;
-          console.log(
-            `  ${progress}${result.affectedRows === 0 ? ' (更新済みのためスキップ)' : ''}`,
+        try {
+          const { vector, dim } = await embedDocument(embedEndpoint, row.content, timeoutMs);
+          const progress = `[${index + 1}/${rows.length}] ${row.slug}: dim ${dim}`;
+
+          if (opts.dryRun) {
+            console.log(`  [dry-run] ${progress}`);
+          } else {
+            const updateSql = opts.all
+              ? 'UPDATE articles SET embedding = ? WHERE article_id = ?'
+              : 'UPDATE articles SET embedding = ? WHERE article_id = ? AND embedding IS NULL';
+            const [result] = await conn.execute<mysql.ResultSetHeader>(updateSql, [
+              JSON.stringify(vector),
+              row.article_id,
+            ]);
+            updated += result.affectedRows;
+            console.log(
+              `  ${progress}${result.affectedRows === 0 ? ' (更新済みのためスキップ)' : ''}`,
+            );
+          }
+          succeeded += 1;
+        } catch (error) {
+          failed += 1;
+          console.error(
+            `  [${index + 1}/${rows.length}] ${row.slug}: 失敗 (${error instanceof Error ? error.message : String(error)})`,
           );
         }
-        succeeded += 1;
-      } catch (error) {
-        failed += 1;
-        console.error(
-          `  [${index + 1}/${rows.length}] ${row.slug}: 失敗 (${error instanceof Error ? error.message : String(error)})`,
-        );
       }
-    }
+    };
+
+    const workerCount = Math.min(concurrency, rows.length);
+    await Promise.all(Array.from({ length: workerCount }, worker));
 
     console.log(
       `完了: 成功 ${succeeded} 件 / 失敗 ${failed} 件${opts.dryRun ? '' : ` / 更新 ${updated} 件`}`,

@@ -424,6 +424,7 @@ CLI オプション:
 --all                     embedding IS NOT NULL も再生成
 --slug <slug>             特定 slug のみ
 --dry-run                 UPDATE せず件数と次元だけ表示
+--concurrency <n>         embedding API への同時リクエスト数 (default: 1、まず 2 まで)
 --timeout <ms>            1記事あたりの embedding API timeout (default: 120000)
 ```
 
@@ -437,9 +438,12 @@ bun install
 bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_dev" \
   --embed-endpoint "http://localhost:8080" \
+  --concurrency 2 \
   --dry-run
 # 対象件数と次元が想定通りなら --dry-run を外して本実行
 ```
+
+PLaMo は CPU 推論内でも複数スレッドを使うため、同時リクエスト数を増やしすぎると CPU oversubscription で逆に遅くなる。まず `--concurrency 2` で逐次実行との差を測り、4以上には上げない。
 
 ### 4-5. 動作確認 (ユーザー実行)
 
