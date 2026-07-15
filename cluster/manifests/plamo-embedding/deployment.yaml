@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: plamo-embedding
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plamo-embedding
+  namespace: plamo-embedding
+spec:
+  replicas: 1
+  # モデルが 2.3GB あり RollingUpdate だと同一 node 上で 2 Pod = メモリ倍増になる。
+  # 1 replica なので Recreate に固定して、旧 Pod を止めてから新 Pod を起動する。
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: plamo-embedding
+  template:
+    metadata:
+      labels:
+        app: plamo-embedding
+    spec:
+      containers:
+        - name: server
+          image: ghcr.io/shuntaka9576/plamo-embedding:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            # image に model を焼き込んでいるので初回 load は数秒で済むはず。
+            # 万一遅延した場合を見込んで 30s 待ってから polling を始める。
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: '500m'
+              memory: '4Gi'
+            limits:
+              memory: '6Gi'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plamo-embedding
+  namespace: plamo-embedding
+spec:
+  type: ClusterIP
+  selector:
+    app: plamo-embedding
+  ports:
+    - port: 80
+      targetPort: 8080

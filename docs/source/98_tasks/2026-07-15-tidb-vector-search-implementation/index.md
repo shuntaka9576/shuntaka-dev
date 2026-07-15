@@ -177,156 +177,68 @@ PLaMo Embedding 1B (`pfnet/plamo-embedding-1b`, Apache 2.0) は `AutoModel` か�
 - 次元数 (N) は model config で `hidden_size` を確認。plamo-embedding-1b は **2048 次元** と想定 (Phase 3 の DDL 前に model config の実物で必ず再確認する)
 - 記事本文 (~数千文字) 1 本の encode は CPU で 100 - 500 ms 程度を想定
 
-### 2-2. ディレクトリ構成
+### 2-2. ディレクトリ構成 (実装済み)
 
 ```
 cluster/manifests/plamo-embedding/
-├── deployment.yaml    # Deployment + Service (ClusterIP)
-├── Dockerfile         # (別途 ghcr 等に push する想定なら参考として残す)
-└── server.py          # FastAPI + transformers wrapper
+├── server.py          # FastAPI + transformers wrapper
+├── Dockerfile         # linux/arm64, model を build 時に焼き込み
+├── deployment.yaml    # Namespace + Deployment (Recreate) + Service (ClusterIP)
+└── build-and-push.sh  # ローカル build & ghcr push
 ```
 
-### 2-3. `server.py`
+実体は [`cluster/manifests/plamo-embedding/`](../../../../cluster/manifests/plamo-embedding/) を参照。
 
-```python
-import os
-from fastapi import FastAPI
-from pydantic import BaseModel
-from transformers import AutoModel, AutoTokenizer
-import torch
+### 2-3. 設計メモ
 
-MODEL_ID = os.environ.get("MODEL_ID", "pfnet/plamo-embedding-1b")
-DEVICE = "cpu"
+- **model 事前焼き込み**: Dockerfile の build 時に HuggingFace から model を pull し image に含める。image サイズは ~5GB になるが、Pod 起動時のダウンロード時間 / ネットワーク依存を消せる (registry pull は node ごとに 1 回で済む)
+- **`snapshot_download` を使う理由**: 素直に `AutoModel.from_pretrained()` で pre-warm すると model を RAM に全展開して verify するため、Docker Desktop 既定メモリ (2-4GB) を超えて OOM (`Killed`, `cannot allocate memory`) になる。`huggingface_hub.snapshot_download` はファイル DL のみで RAM を使わないので build が通る。runtime の `AutoModel.from_pretrained()` は HF cache から読むので network 不要のまま
+- **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。arm64 wheel が公式提供されている
+- **Deployment strategy: Recreate**: 1 replica で model メモリが 2-3GB 効くため、RollingUpdate だと同一 node で 2 Pod = メモリ倍増になる。Recreate で旧 Pod を落としてから新 Pod を起こす
+- **依存バージョン (Dockerfile)**: `torch==2.5.1`, `transformers==4.46.0`, `sentencepiece==0.2.0`, `fastapi==0.115.4`, `uvicorn==0.32.0`, `pydantic==2.9.2` を pin
 
-app = FastAPI()
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True).to(DEVICE).eval()
+### 2-4. ghcr ログイン (初回のみ、ユーザー実行)
 
-class EmbedRequest(BaseModel):
-    text: str
-    mode: str  # "query" or "document"
+ghcr.io は Docker のパスワード認証を受け付けない (MFA の有無に関わらず PAT 必須)。既存の `gh` CLI 認証に `write:packages` / `read:packages` を後付けして、`gh auth token` の出力で docker login するのが最短。
 
-class EmbedResponse(BaseModel):
-    vector: list[float]
-    dim: int
+```bash
+# 現状の scope 確認 (write:packages が無ければ次のコマンドで追加)
+gh auth status
 
-@app.post("/embed", response_model=EmbedResponse)
-def embed(req: EmbedRequest) -> EmbedResponse:
-    with torch.inference_mode():
-        if req.mode == "query":
-            vec = model.encode_query(req.text, tokenizer)
-        else:
-            vec = model.encode_document(req.text, tokenizer)
-    vec_list = vec.squeeze(0).cpu().tolist()
-    return EmbedResponse(vector=vec_list, dim=len(vec_list))
+# scope を後付け (ブラウザで one-time code の入力を求められる)
+gh auth refresh --scopes write:packages,read:packages
 
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+# gh のトークンで ghcr にログイン
+gh auth token | docker login ghcr.io -u shuntaka9576 --password-stdin
+# → "Login Succeeded" が出れば OK
 ```
 
-### 2-4. `Dockerfile`
+**トラブルシュート**: `docker login ghcr.io` で対話的に password を入力すると `denied: denied` になる。これは GitHub の web パスワードを渡しているため。必ず PAT (もしくは `gh auth token` の出力) を stdin から渡すこと。
 
-```dockerfile
-FROM python:3.12-slim
+### 2-5. Image ビルド + push (ユーザー実行)
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      git ca-certificates && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-RUN pip install --no-cache-dir \
-      torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir \
-      transformers==4.46.0 sentencepiece fastapi uvicorn pydantic
-
-COPY server.py /app/server.py
-
-# ビルド時にモデルを事前 pull しておくと、初回起動を短縮できる
-ARG MODEL_ID=pfnet/plamo-embedding-1b
-ENV MODEL_ID=${MODEL_ID}
-RUN python -c "from transformers import AutoModel, AutoTokenizer; \
-  AutoTokenizer.from_pretrained('${MODEL_ID}', trust_remote_code=True); \
-  AutoModel.from_pretrained('${MODEL_ID}', trust_remote_code=True)"
-
-EXPOSE 8080
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-### 2-5. `deployment.yaml`
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: plamo-embedding
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: plamo-embedding
-  namespace: plamo-embedding
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: plamo-embedding
-  template:
-    metadata:
-      labels:
-        app: plamo-embedding
-    spec:
-      containers:
-        - name: server
-          image: ghcr.io/shuntaka9576/plamo-embedding:latest  # 別途 build & push
-          ports:
-            - containerPort: 8080
-          readinessProbe:
-            httpGet: { path: /healthz, port: 8080 }
-            initialDelaySeconds: 60
-            periodSeconds: 10
-          resources:
-            requests:
-              cpu: '500m'
-              memory: '6Gi'
-            limits:
-              memory: '8Gi'
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: plamo-embedding
-  namespace: plamo-embedding
-spec:
-  type: ClusterIP
-  selector:
-    app: plamo-embedding
-  ports:
-    - port: 80
-      targetPort: 8080
-```
-
-クラスタ内から `http://plamo-embedding.plamo-embedding.svc.cluster.local/embed` で叩ける。
-
-### 2-6. Image ビルド + push
-
-ghcr など到達可能なレジストリに push する。arm64 対応が必要。
+Apple Silicon Mac (native arm64) から実行するのが速い。
 
 ```bash
 cd cluster/manifests/plamo-embedding
-docker buildx build --platform linux/arm64 \
-  -t ghcr.io/shuntaka9576/plamo-embedding:latest --push .
+./build-and-push.sh
+# → ghcr.io/shuntaka9576/plamo-embedding:latest を build & push
+# タグを分けたい場合: TAG=2026-07-15 ./build-and-push.sh
 ```
 
-### 2-7. 反映 (ユーザー実行)
+初回 build は torch install + model download で 10-20 分程度。
+
+**なぜ workflow_dispatch action ではないか**: PLaMo image は「Python deps か server.py を変えるまで更新しない」性質で、更新頻度が低い。`deploy-tidb-proxy.yaml` のような頻繁な更新は想定しないため、まずローカルスクリプトで済ませる。更新頻度が上がってきたら (~ 月次) workflow 化を検討する。
+
+### 2-6. 反映 (ユーザー実行)
 
 ```bash
 kubectl apply -f cluster/manifests/plamo-embedding/deployment.yaml
 kubectl -n plamo-embedding get pods -w
+# STATUS が Running / READY 1/1 になるまで待つ (registry pull 込みで数分)
 ```
 
-初回起動時にモデル load が走るため readinessProbe が通るまで 1 - 3 分。
-
-### 2-8. 動作確認 (ユーザー実行)
+### 2-7. 動作確認 (ユーザー実行)
 
 Tailnet 経由で ClusterIP に到達するには port-forward が手っ取り早い。
 
@@ -338,10 +250,18 @@ curl -s -X POST http://localhost:8080/embed \
 # → 2048 が返れば OK。異なる値なら Phase 3 の VECTOR(N) を実測値に合わせる
 ```
 
+`document` モードも一応叩いておく:
+
+```bash
+curl -s -X POST http://localhost:8080/embed \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"これは記事本文の例です","mode":"document"}' | jq '{dim, head: .vector[0:3]}'
+```
+
 ### Phase 2 完了条件
 
 - [ ] `plamo-embedding` Pod が Ready
-- [ ] `/embed` が 2048 (実測値) 次元の float 配列を返す
+- [ ] `/embed` (query / document 両方) が 2048 (実測値) 次元の float 配列を返す
 - [ ] `dim` を Phase 3 の DDL に反映する値として記録した
 
 ---
@@ -354,7 +274,7 @@ curl -s -X POST http://localhost:8080/embed \
 
 ```sql
 -- 2026-07-15 Vector 検索: articles.embedding + HNSW on TiFlash
--- N は PLaMo Embedding 1B の実測次元 (Phase 2-8 で確認した値)。以下は 2048 を仮定
+-- N は PLaMo Embedding 1B の実測次元 (Phase 2-7 で確認した値)。以下は 2048 を仮定
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
 
