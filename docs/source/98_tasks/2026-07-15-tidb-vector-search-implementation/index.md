@@ -699,11 +699,12 @@ TableReader_24                               MppVersion: 2, data:ExchangeSender_
 
 chunk検索の精度を確認できた後、比較・rollback用に残していた旧vectorを削除する。
 
-```sql
-USE blog_dev;
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
 ALTER TABLE articles DROP INDEX idx_articles_embedding;
 ALTER TABLE articles SET TIFLASH REPLICA 0;
 ALTER TABLE articles DROP COLUMN embedding;
+SQL
 ```
 
 ### Phase 4 完了条件
