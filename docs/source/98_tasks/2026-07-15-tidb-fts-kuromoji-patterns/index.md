@@ -41,6 +41,18 @@ TiDB / DSQL のような分散 KV で FTS が辛いのは、B-tree か LSM か�
 - TiDB → v8.x 以降、TiFlash 側でベクトル検索や FTS を実装する方向 (列指向・非トランザクショナルな AP レプリカに寄せて OLTP 経路を汚さない)
 - DSQL → 素直に OpenSearch / Elasticsearch を横に置いて CDC で同期
 
+### 深掘り: TiFlash は分散だが OLTP 一貫性の外にある
+
+![TiFlash は分散だが OLTP 一貫性の外にある](tiflash-outside-oltp-plane.png)
+
+「TiFlash に載せると FTS が成立する」の直感的な誤解として「TiFlash は非分散だから楽」と受け取れるが、これは正確ではない。TiFlash も複数ノードで動かせて、データは TiKV と同じ region 単位でシャーディングされる。
+
+本質は分散トポロジーではなく **consensus プロトコルへの参加有無**。TiKV は Voter として Raft consensus に参加し、書き込みが Quorum で確定してから ACK するため、書き込みごとに強一貫性を守る必要がある。TiFlash は Raft Learner で log を受け取るだけ、consensus には参加せず、非同期に apply する。書き込みタイムラインで見ると、Client が ACK を受け取った時点で TiFlash はまだ古い状態で、apply 完了まで数 ms〜数秒のギャップがある (この間の FTS クエリは stale なデータを返す)。
+
+この遅延を許容することが、そのまま「FTS の意味論層 (グローバル統計 / セグメントマージ) を現実的な同期コストで維持できる」に繋がる。Elasticsearch や OpenSearch が採用している near-realtime + eventually consistent と同じ設計思想を、TiDB クラスタ内に取り込んだのが TiFlash である。
+
+したがって「TiFlash に FTS が成立するのは分散していないから」ではなく「**OLTP 一貫性の外に出たから**」が正しい理解になる。この cluster で `TIFLASH REPLICA 1` を選ぶと副次的に全 region の TiFlash 複製が 1 ノードに集約されて実質単一ノード状態になり、分散 FTS の困難がさらに軽減されるが、これは SPOF (TiFlash 障害で FTS 縮退) との引き換えになる。
+
 今回のように blog 検索が主目的なら、TiFlash レプリカを立てる運用コスト (メモリ / ストレージ / CPU) を承知の上で TiDB 内に閉じる、という選択になる。
 
 ## パターン一覧
