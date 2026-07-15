@@ -815,10 +815,10 @@ cd tools/tidb-embedder
 bun run backfill -- \
   --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev \
   --embed-endpoint http://plamo-embedding.$TAILNET \
-  --concurrency 4 \
+  --concurrency 2 \
   --dry-run
 ```
 
-問題がなければ `--dry-run` を外して実行する。既存の embedding も再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、推論のタイムアウトを変える場合は `--timeout <ms>` を付ける。`--concurrency` の既定値は1。2 Pod構成では4を上限の目安とし、それ以上はCPU oversubscriptionを避ける。記事単位で処理を継続し、1件でも失敗した場合は非0で終了する。
+問題がなければ `--dry-run` を外して実行する。既存の embedding も再生成する場合は `--all`、特定記事だけなら `--slug <slug>`、推論のタイムアウトを変える場合は `--timeout <ms>` を付ける。1リクエストで約14/16 logical CPUを使用する実測結果から、2 Pod構成では `--concurrency 2` を上限とする。記事単位で処理を継続し、1件でも失敗した場合は非0で終了する。
 
 HNSW indexは全記事のbackfill後に `ALTER TABLE articles COMPACT` を実行してから作成する。全NULLの既存TiFlash DMFileへ先にindexを作ると、TiFlash v8.5.7がindex build中にクラッシュする事象を確認済み。

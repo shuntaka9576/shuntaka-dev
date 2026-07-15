@@ -1,3 +1,5 @@
+<!-- cspell:ignore fastapi huggingface pretrained pydantic QVEC sentencepiece uvicorn -->
+
 # TiDB Vector 検索実装 (PLaMo Embedding 1B + TiFlash)
 
 - 起票日: 2026-07-15
@@ -57,15 +59,15 @@ export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 
 ## 想定所要時間 (dev 環境)
 
-| フェーズ                                    | 目安時間                    |
-| ------------------------------------------- | --------------------------- |
-| Phase 1: TiFlash 追加                       | 10 - 20 分                  |
-| Phase 2: PLaMo Embedding Service            | 30 - 60 分 (初回 pull 込み) |
-| Phase 3: DDL 適用                           | 5 分                        |
-| Phase 4: tidb-embedder 実装 + 埋め戻し      | 60 分 + データ量依存        |
-| Phase 5: 検索エンドポイント                 | 60 - 120 分                 |
-| Phase 6: 本番適用                           | 30 分                       |
-| Phase 7: webhook 組み込み (継続更新)        | 30 分                       |
+| フェーズ                               | 目安時間                    |
+| -------------------------------------- | --------------------------- |
+| Phase 1: TiFlash 追加                  | 10 - 20 分                  |
+| Phase 2: PLaMo Embedding Service       | 30 - 60 分 (初回 pull 込み) |
+| Phase 3: DDL 適用                      | 5 分                        |
+| Phase 4: tidb-embedder 実装 + 埋め戻し | 60 分 + データ量依存        |
+| Phase 5: 検索エンドポイント            | 60 - 120 分                 |
+| Phase 6: 本番適用                      | 30 分                       |
+| Phase 7: webhook 組み込み (継続更新)   | 30 分                       |
 
 ---
 
@@ -94,30 +96,30 @@ kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.ar
 追加内容 (末尾に追記):
 
 ```yaml
-  tiflash:
-    baseImage: pingcap/tiflash
-    replicas: 1
-    requests:
-      cpu: '500m'
-      memory: '4Gi'
-    limits:
-      memory: '8Gi'
-    storageClaims:
-      - resources:
-          requests:
-            storage: 50Gi
-        storageClassName: local-path
-    config:
-      config: |
-        [logger]
-          level = "info"
-        [profiles.default]
-          max_memory_usage = 0
-      proxy: |
-        log-level = "info"
-    topologySpreadConstraints:
-      - topologyKey: kubernetes.io/hostname
-        maxSkew: 1
+tiflash:
+  baseImage: pingcap/tiflash
+  replicas: 1
+  requests:
+    cpu: '500m'
+    memory: '4Gi'
+  limits:
+    memory: '8Gi'
+  storageClaims:
+    - resources:
+        requests:
+          storage: 50Gi
+      storageClassName: local-path
+  config:
+    config: |
+      [logger]
+        level = "info"
+      [profiles.default]
+        max_memory_usage = 0
+    proxy: |
+      log-level = "info"
+  topologySpreadConstraints:
+    - topologyKey: kubernetes.io/hostname
+      maxSkew: 1
 ```
 
 TiFlash 特有の注意点:
@@ -355,17 +357,52 @@ FramedChecksumReadBuffer<XXH3>::doSeek
 DMFileVectorIndexWriter::buildIndexForFile
 ```
 
-現在のindexをdropするとTiFlashがindex buildを再試行しなくなる。以下はユーザーが実行する。
+TiDB側のindex定義はdrop済みだが、TiFlashはPVC上に残った古いlocal-index taskをschema同期より先に再開し、同じクラッシュを繰り返した。`SHOW CREATE TABLE` にindexがないことを確認してから、一度TiFlash replicaを0にしてlocal replicaを切り離す。以下はユーザーが実行する。
 
 ```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root -e \
+  "SHOW CREATE TABLE blog_dev.articles\G"
+# idx_articles_embedding がないこと
+
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e \
-  "ALTER TABLE articles DROP INDEX idx_articles_embedding;"
+  "ALTER TABLE articles SET TIFLASH REPLICA 0;"
+
+mysql -h tidb.${TAILNET} -P 4000 -u root -e "
+SELECT * FROM INFORMATION_SCHEMA.TIFLASH_REPLICA
+ WHERE TABLE_SCHEMA = 'blog_dev' AND TABLE_NAME = 'articles';"
+# 0 rowsになること
+
+# CrashLoopのbackoffを待たず、replica=0の最新schemaで起動し直す
+kubectl -n tidb-cluster delete pod basic-tiflash-0
 
 kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
 # basic-tiflash-0 が 4/4 Running に戻ること
 ```
 
-HNSW indexはPhase 4でbackfillとTiFlash compactionが完了した後に作成する。`04_articles.sql` にもindex作成を含めない。
+[TiDB公式のTiFlash replica作成手順](https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/)でも `SET TIFLASH REPLICA 0` はreplicaの削除を意味する。これだけで復旧しない場合は、壊れた分析用replicaのPVCを再作成する。元データはTiKVにあるため、backfill後にreplicaを1へ戻すと再同期される。
+
+```bash
+# TiFlashだけを停止する (TiDB / TiKVには影響しない)
+kubectl -n tidb-cluster patch tidbcluster basic --type merge \
+  -p '{"spec":{"tiflash":{"replicas":0}}}'
+kubectl -n tidb-cluster wait --for=delete pod/basic-tiflash-0 --timeout=5m
+
+# 現在の分析用replica PVCだけを削除する。Retainのままだと実データが残るためDeleteへ変更する
+PV=$(kubectl -n tidb-cluster get pvc data0-basic-tiflash-0 \
+  -o jsonpath='{.spec.volumeName}')
+kubectl patch pv "${PV}" --type merge \
+  -p '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'
+kubectl -n tidb-cluster delete pvc data0-basic-tiflash-0
+kubectl wait --for=delete "pv/${PV}" --timeout=5m
+
+# source manifestと同じ1 replicaへ戻す
+kubectl -n tidb-cluster patch tidbcluster basic --type merge \
+  -p '{"spec":{"tiflash":{"replicas":1}}}'
+kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
+# 新しいbasic-tiflash-0が4/4 Runningになること
+```
+
+HNSW indexはPhase 4でbackfill、TiFlash replica再同期、compactionが完了した後に作成する。`04_articles.sql` にもindex作成を含めない。
 
 ---
 
@@ -417,7 +454,7 @@ tools/tidb-embedder/
 ```typescript
 const res = await fetch(`${opts.embedEndpoint}/embed`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', Connection: 'close' },
   body: JSON.stringify({ text: row.content, mode: 'document' }),
 });
 const { vector } = (await res.json()) as { vector: number[] };
@@ -436,7 +473,7 @@ CLI オプション:
 --all                     embedding IS NOT NULL も再生成
 --slug <slug>             特定 slug のみ
 --dry-run                 UPDATE せず件数と次元だけ表示
---concurrency <n>         embedding API への同時リクエスト数 (default: 1、まず 2 まで)
+--concurrency <n>         embedding API への同時リクエスト数 (default: 1、2 Pod時は2)
 --timeout <ms>            1記事あたりの embedding API timeout (default: 120000)
 ```
 
@@ -450,12 +487,12 @@ bun install
 bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_dev" \
   --embed-endpoint "http://plamo-embedding.${TAILNET}" \
-  --concurrency 4 \
+  --concurrency 2 \
   --dry-run
 # 対象件数と次元が想定通りなら --dry-run を外して本実行
 ```
 
-PLaMo は CPU 推論内でも複数スレッドを使う。2 Podに対して `--concurrency 4` (1 Podあたり最大2リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなる可能性があるため増やさない。
+PLaMo は1リクエストでも約14/16 logical CPUを使用した。2 Podに対して `--concurrency 2` (1 Podあたり1リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなるため増やさない。CLIはリクエストごとにHTTP connectionを閉じ、Kubernetes Serviceがconnection単位でnode2/node3へ振り分けられるようにする。
 
 ### 4-5. 動作確認 (ユーザー実行)
 
@@ -465,9 +502,18 @@ SELECT SUM(embedding IS NOT NULL) AS filled,
        COUNT(*) AS total FROM articles;"
 ```
 
-`filled = total` を確認した後、全NULLの旧DMFileを残さないようTiFlashをcompactしてからHNSW indexを作成する。
+`filled = total` を確認した後、復旧時に0へ変更したTiFlash replicaを1へ戻して再同期を待つ。全NULLの旧DMFileを残さないようTiFlashをcompactしてからHNSW indexを作成する。
 
 ```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e \
+  "ALTER TABLE articles SET TIFLASH REPLICA 1;"
+
+mysql -h tidb.${TAILNET} -P 4000 -u root -e "
+SELECT TABLE_SCHEMA, TABLE_NAME, REPLICA_COUNT, AVAILABLE, PROGRESS
+  FROM INFORMATION_SCHEMA.TIFLASH_REPLICA
+ WHERE TABLE_SCHEMA = 'blog_dev' AND TABLE_NAME = 'articles';"
+# AVAILABLE = 1, PROGRESS = 1 まで待つ
+
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
 ALTER TABLE articles COMPACT;
 CREATE VECTOR INDEX idx_articles_embedding
@@ -574,7 +620,7 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '[...]') AS dist
  ORDER BY dist ASC LIMIT 20;
 ```
 
-- `TableFullScan` → TiFlash MPP + `Sort` になっていないか (HNSW インデックスが効くと `IndexRangeScan_*` が出るはず)
+- `TableFullScan` の `operator info` に `annIndex:COSINE` があること (HNSW index利用時もexecutor名は `TableFullScan`)
 - 効かない場合: TiFlash replica の同期 (Phase 3) と HNSW build 完了を確認
 
 ### Phase 5 完了条件
@@ -627,7 +673,7 @@ cd tools/tidb-embedder
 bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_prd" \
   --embed-endpoint "http://plamo-embedding.${TAILNET}" \
-  --concurrency 4 \
+  --concurrency 2 \
   --dry-run
 # 件数確認後に --dry-run を外して本実行
 ```
@@ -706,4 +752,5 @@ Phase 4 のローカルバックフィルは「その時点で `embedding IS NUL
 - Phase 4 dry-run中のクラスタ負荷を確認。node3のPLaMoが約14.1/16 CPUを使用する一方、node1/node2は各約0.2 CPU、available memoryは各ノード約21〜24GiBあり、node2/node3の2 Pod分散を採用
 - `kubectl port-forward svc/plamo-embedding` は1 Podへ直接転送されるため、Tailnet LoadBalancer Service (`plamo-embedding.<tailnet>`) 経由へ変更
 - TiFlashが `3/4 CrashLoopBackOff` になっていることを検出。全133記事のembeddingがNULLの状態でHNSWを先行作成した結果、`DMFileVectorIndexWriter` → `FramedChecksumReadBuffer::doSeek` でframe size 0の除算が発生 (exit 136)
-- HNSW作成をPhase 4のbackfill + `ALTER TABLE articles COMPACT` 後へ移動。現indexをdropしてTiFlashを復旧する手順を3-4へ記録
+- TiDB側でindexをdropした後も、TiFlashはPVC上の古いlocal-index taskを起動直後に再開してCrashLoopを継続。replicaを0へ切り替え、必要時は分析用PVCを再作成する復旧手順を3-4へ記録
+- HNSW作成をPhase 4のbackfill + TiFlash replica再同期 + `ALTER TABLE articles COMPACT` 後へ移動

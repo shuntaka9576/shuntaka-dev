@@ -73,7 +73,9 @@ async function embedDocument(
   try {
     response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Kubernetes Service の backend 選択は TCP connection 単位。
+      // backfill 中は connection を再利用せず、複数 PLaMo Pod へ分散させる。
+      headers: { 'Content-Type': 'application/json', Connection: 'close' },
       body: JSON.stringify({ text, mode: 'document' }),
       signal: AbortSignal.timeout(timeoutMs),
     });
