@@ -58,6 +58,7 @@
 | `http://tidb-dashboard.<tailnet>.ts.net:2379/dashboard` | TiDB Dashboard (PD 組み込み)                           |
 | `http://node-grafana.<tailnet>.ts.net:3000`             | Grafana (kube-prom-stack、ホスト + TiDB 監視)          |
 | `http://hubble.<tailnet>.ts.net`                        | Hubble UI (Cilium サービスマップ)                      |
+| `http://plamo-embedding.<tailnet>.ts.net`               | PLaMo Embedding Service (node2 / node3へ負荷分散)      |
 | `https://node1:6443`                                    | k8s API (Subnet Router 経由、Mac の /etc/hosts で解決) |
 | `ssh node1`                                             | ノード SSH (管理 VLAN / Subnet Router 経由)            |
 

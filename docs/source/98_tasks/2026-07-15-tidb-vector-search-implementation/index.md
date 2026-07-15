@@ -37,8 +37,8 @@
 
 - [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
 - [x] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper) — 2026-07-15 完了
-- [x] Phase 3: `articles.embedding` 列 + HNSW インデックス追加 (DDL) — 2026-07-15 完了
-- [ ] Phase 4: `tools/tidb-embedder` 新規作成 (既存レコード埋め戻し、`embedding IS NULL` 対象)
+- [x] Phase 3: `articles.embedding` 列 + TiFlash replica追加 (DDL) — 2026-07-15 完了
+- [ ] Phase 4: `tools/tidb-embedder` で埋め戻し後に HNSW インデックス作成
 - [ ] Phase 5: `blog-api` の検索エンドポイント実装
 - [ ] Phase 6: 本番 (blog_prd) 適用 (TiFlash replica + DDL + backfill)
 - [ ] Phase 7: GitHub webhook 経路への embedding 生成組み込み (継続更新)
@@ -77,14 +77,14 @@ TiFlash は各 k8s ノードのローカルディスクに DeltaTree ストレ�
 
 - ノードに空きストレージがあること (`local-path` provisioner の PV が確保できる領域)
 - 記事データは 2.5MB 程度と小さいので 20Gi あれば十分だが、将来の拡張を見越して **50Gi** で確保する
-- MiniPC は Intel NUC 系 (**amd64**) なので `pingcap/tiflash:v8.5.7` の amd64 manifest が pull される
+- MiniPC は Ryzen 7 7730U (**amd64**) なので `pingcap/tiflash:v8.5.7` の amd64 manifest が pull される
 
 ```bash
 kubectl -n tidb-cluster get tc basic -o jsonpath='{.spec.version}'
 # → v8.5.7 が出ればよい
 
 kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture
-# → amd64 が並ぶこと (MiniPC = Intel NUC 系)
+# → amd64 が並ぶこと (MiniPC = Ryzen 7 7730U)
 ```
 
 ### 1-2. TidbCluster manifest 編集
@@ -182,8 +182,8 @@ PLaMo Embedding 1B (`pfnet/plamo-embedding-1b`, Apache 2.0) は `AutoModel` か�
 ```
 cluster/manifests/plamo-embedding/
 ├── server.py          # FastAPI + transformers wrapper
-├── Dockerfile         # linux/arm64, model を build 時に焼き込み
-├── deployment.yaml    # Namespace + Deployment (Recreate) + Service (ClusterIP)
+├── Dockerfile         # linux/amd64, model を build 時に焼き込み
+├── deployment.yaml    # Namespace + Deployment (2 replicas) + Service (ClusterIP)
 └── build-and-push.sh  # ローカル build & ghcr push
 ```
 
@@ -193,8 +193,10 @@ cluster/manifests/plamo-embedding/
 
 - **model 事前焼き込み**: Dockerfile の build 時に HuggingFace から model を pull し image に含める。image サイズは ~5GB になるが、Pod 起動時のダウンロード時間 / ネットワーク依存を消せる (registry pull は node ごとに 1 回で済む)
 - **`snapshot_download` を使う理由**: 素直に `AutoModel.from_pretrained()` で pre-warm すると model を RAM に全展開して verify するため、Docker Desktop 既定メモリ (2-4GB) を超えて OOM (`Killed`, `cannot allocate memory`) になる。`huggingface_hub.snapshot_download` はファイル DL のみで RAM を使わないので build が通る。runtime の `AutoModel.from_pretrained()` は HF cache から読むので network 不要のまま
-- **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。amd64 wheel が公式提供されている (target が node の Intel NUC = amd64)
-- **Deployment strategy: Recreate**: 1 replica で model メモリが 2-3GB 効くため、RollingUpdate だと同一 node で 2 Pod = メモリ倍増になる。Recreate で旧 Pod を落としてから新 Pod を起こす
+- **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。amd64 wheel が公式提供されている (target が Ryzen MiniPC = amd64)
+- **2 replicas**: node1 は TiFlash 用に空け、node2 / node3 へ PLaMo を1 Podずつ配置する。`podAntiAffinity` で同居を禁止する
+- **Deployment strategy: RollingUpdate**: `maxSurge: 0`, `maxUnavailable: 1` とし、更新中に追加 Pod を作らずモデル分のメモリ増加を防ぐ
+- **Tailnet 公開**: `cluster/manifests/tailscale/plamo-embedding-public.yaml` で `plamo-embedding.<tailnet>` をServiceへ接続する。`port-forward svc/...` は1 Podへ直接転送されるため、複数Podへの分散には使わない
 - **依存バージョン (Dockerfile)**: `torch==2.5.1`, `transformers==4.46.0`, `sentencepiece==0.2.0`, `fastapi==0.115.4`, `uvicorn==0.32.0`, `pydantic==2.9.2` を pin
 - **`--provenance=false --sbom=false` (build-and-push.sh)**: buildx はデフォルトで OCI index に attestation manifest を追加するが、k3s/MiniPC の古めの containerd がそれで `no match for platform in manifest` と誤判定して pull に失敗する (`ImagePullBackOff`)。attestation を切ることで single-platform manifest だけになり pull が通る
 
@@ -256,17 +258,17 @@ gh api /user/packages/container/plamo-embedding | jq '.visibility'
 
 ```bash
 kubectl apply -f cluster/manifests/plamo-embedding/deployment.yaml
+kubectl apply -f cluster/manifests/tailscale/plamo-embedding-public.yaml
 kubectl -n plamo-embedding get pods -w
-# STATUS が Running / READY 1/1 になるまで待つ (registry pull 込みで数分)
+# node2 / node3 の2 Podが Running / READY 1/1 になるまで待つ
 ```
 
 ### 2-8. 動作確認 (ユーザー実行)
 
-Tailnet 経由で ClusterIP に到達するには port-forward が手っ取り早い。
+Tailnet公開Serviceへ接続する。
 
 ```bash
-kubectl -n plamo-embedding port-forward svc/plamo-embedding 8080:80 &
-curl -s -X POST http://localhost:8080/embed \
+curl -s -X POST http://plamo-embedding.${TAILNET}/embed \
   -H 'Content-Type: application/json' \
   -d '{"text":"日本語の検索テスト","mode":"query"}' | jq '.dim'
 # → 2048 が返れば OK。異なる値なら Phase 3 の VECTOR(N) を実測値に合わせる
@@ -275,7 +277,7 @@ curl -s -X POST http://localhost:8080/embed \
 `document` モードも一応叩いておく:
 
 ```bash
-curl -s -X POST http://localhost:8080/embed \
+curl -s -X POST http://plamo-embedding.${TAILNET}/embed \
   -H 'Content-Type: application/json' \
   -d '{"text":"これは記事本文の例です","mode":"document"}' | jq '{dim, head: .vector[0:3]}'
 ```
@@ -288,14 +290,14 @@ curl -s -X POST http://localhost:8080/embed \
 
 ---
 
-## Phase 3: `articles.embedding` 列 + HNSW インデックス
+## Phase 3: `articles.embedding` 列 + TiFlash replica
 
 ### 3-1. DDL ファイル追加 (実装済み)
 
 `tools/dsql-cli/dsl-tidb/schema/04_articles.sql` の末尾に、他のマイグレーションと同じ形式で追記する (専用ファイルを切らないのは既存の `content_html` 追加も同ファイル末尾に置いているため)。
 
 ```sql
--- 2026-07-15 Vector 検索: articles.embedding + HNSW on TiFlash
+-- 2026-07-15 Vector 検索: articles.embedding + TiFlash replica
 -- N は PLaMo Embedding 1B の実測次元 (Phase 2-8 で確認した値 = 2048)
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
@@ -303,23 +305,17 @@ ALTER TABLE `${SCHEMA}`.`articles`
 -- TiFlash replica を張る (Phase 1 で TiFlash store が起動済みであること)
 ALTER TABLE `${SCHEMA}`.`articles` SET TIFLASH REPLICA 1;
 
--- HNSW インデックスは TiFlash replica の同期完了後に作成される。
--- CREATE VECTOR INDEX 自体はすぐ返り、バックグラウンドで build される。
-CREATE VECTOR INDEX `idx_articles_embedding`
-  ON `${SCHEMA}`.`articles` ((VEC_COSINE_DISTANCE(`embedding`)))
-  USING HNSW;
+-- HNSW index は embedding の backfill と TiFlash COMPACT の完了後に作成する。
 ```
 
 ### 3-2. 適用 (ユーザー実行)
 
-`load.sh` は差分マイグレーションではなく、`schema/*.sql` を先頭から実行する初期構築用スクリプトである。既存の `blog_dev` では、適用済みのカラムやインデックスを再追加しようとしてエラーになるため、今回は新しい3文だけを実行する。
+`load.sh` は差分マイグレーションではなく、`schema/*.sql` を先頭から実行する初期構築用スクリプトである。既存の `blog_dev` では、適用済みのカラムやインデックスを再追加しようとしてエラーになるため、今回は新しい2文だけを実行する。
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
 ALTER TABLE articles ADD COLUMN embedding VECTOR(2048) NULL AFTER content_html;
 ALTER TABLE articles SET TIFLASH REPLICA 1;
-CREATE VECTOR INDEX idx_articles_embedding
-  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
 SQL
 ```
 
@@ -342,22 +338,38 @@ SELECT TABLE_SCHEMA, TABLE_NAME, REPLICA_COUNT, AVAILABLE, PROGRESS
 # AVAILABLE = 1, PROGRESS = 1 になれば同期完了 (数分〜十数分)
 ```
 
-HNSW インデックスの状態確認。
-
-```bash
-mysql -h tidb.${TAILNET} -P 4000 -u root -e "SHOW CREATE TABLE blog_dev.articles;"
-# 出力に VECTOR INDEX idx_articles_embedding が含まれること
-```
-
 ### Phase 3 完了条件
 
 - [x] `articles.embedding` 列が `vector(2048)` で存在
 - [x] `TIFLASH_REPLICA.AVAILABLE = 1, PROGRESS = 1`
-- [x] `SHOW CREATE TABLE` に `VECTOR INDEX idx_articles_embedding` がある
+
+### 3-4. HNSW先行作成によるTiFlashクラッシュと復旧 (2026-07-15)
+
+初回は全133記事の `embedding` が NULL の状態で HNSW index を作成した。その後、TiFlash v8.5.7 が `DMFileVectorIndexWriter` で既存DMFileのindexを構築する際、checksum frame size 0を除算して `Floating point exception` (exit 136) でCrashLoopした。
+
+```text
+EnsureStableLocalIndex - Begin building index
+Received signal Floating point exception(8).
+Integer divide by zero.
+FramedChecksumReadBuffer<XXH3>::doSeek
+DMFileVectorIndexWriter::buildIndexForFile
+```
+
+現在のindexをdropするとTiFlashがindex buildを再試行しなくなる。以下はユーザーが実行する。
+
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e \
+  "ALTER TABLE articles DROP INDEX idx_articles_embedding;"
+
+kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
+# basic-tiflash-0 が 4/4 Running に戻ること
+```
+
+HNSW indexはPhase 4でbackfillとTiFlash compactionが完了した後に作成する。`04_articles.sql` にもindex作成を含めない。
 
 ---
 
-## Phase 4: `tools/tidb-embedder` (既存レコード埋め戻し)
+## Phase 4: `tools/tidb-embedder` (既存レコード埋め戻し + HNSW作成)
 
 ### 4-1. ディレクトリ構成 (実装済み)
 
@@ -398,7 +410,7 @@ tools/tidb-embedder/
 - `updated_at` を保持したいので、`content_html` と同じく `ON UPDATE` が無いことを利用して `SET embedding = ?` だけ更新する
 - API 応答の `dim`、vector 長、全要素が有限値であることを検証し、2048 次元以外は更新しない
 - `--all` を付けない更新には `AND embedding IS NULL` を付け、同時実行で埋められた値を上書きしない
-- 記事は逐次処理し、1件が失敗しても残りを続行したうえで、失敗があれば終了コードを非0にする
+- `--concurrency` で指定したworker数で処理し、1件が失敗しても残りを続行したうえで、失敗があれば終了コードを非0にする
 
 主要処理:
 
@@ -420,7 +432,7 @@ CLI オプション:
 
 ```
 --endpoint <url>          TiDB (例: mysql://root@tidb.<TAILNET>:4000/blog_dev)
---embed-endpoint <url>    PLaMo (例: http://localhost:8080)
+--embed-endpoint <url>    PLaMo (例: http://plamo-embedding.<TAILNET>)
 --all                     embedding IS NOT NULL も再生成
 --slug <slug>             特定 slug のみ
 --dry-run                 UPDATE せず件数と次元だけ表示
@@ -430,20 +442,20 @@ CLI オプション:
 
 ### 4-4. 実行 (ユーザー実行)
 
-Phase 2 の port-forward を張ったまま実行。
+Tailnet公開Service経由でnode2/node3の2 Podへ分散する。`kubectl port-forward svc/...` は1 Podへ直接転送されるため使用しない。
 
 ```bash
 cd tools/tidb-embedder
 bun install
 bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_dev" \
-  --embed-endpoint "http://localhost:8080" \
-  --concurrency 2 \
+  --embed-endpoint "http://plamo-embedding.${TAILNET}" \
+  --concurrency 4 \
   --dry-run
 # 対象件数と次元が想定通りなら --dry-run を外して本実行
 ```
 
-PLaMo は CPU 推論内でも複数スレッドを使うため、同時リクエスト数を増やしすぎると CPU oversubscription で逆に遅くなる。まず `--concurrency 2` で逐次実行との差を測り、4以上には上げない。
+PLaMo は CPU 推論内でも複数スレッドを使う。2 Podに対して `--concurrency 4` (1 Podあたり最大2リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなる可能性があるため増やさない。
 
 ### 4-5. 動作確認 (ユーザー実行)
 
@@ -453,11 +465,32 @@ SELECT SUM(embedding IS NOT NULL) AS filled,
        COUNT(*) AS total FROM articles;"
 ```
 
+`filled = total` を確認した後、全NULLの旧DMFileを残さないようTiFlashをcompactしてからHNSW indexを作成する。
+
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
+ALTER TABLE articles COMPACT;
+CREATE VECTOR INDEX idx_articles_embedding
+  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
+SQL
+```
+
+index buildの進捗を確認する。`ROWS_STABLE_NOT_INDEXED = 0` で完了。
+
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root -e "
+SELECT TIDB_DATABASE, TIDB_TABLE, INDEX_NAME,
+       ROWS_STABLE_INDEXED, ROWS_STABLE_NOT_INDEXED,
+       ROWS_DELTA_INDEXED, ROWS_DELTA_NOT_INDEXED, ERROR_MESSAGE
+  FROM INFORMATION_SCHEMA.TIFLASH_INDEXES
+ WHERE TIDB_DATABASE = 'blog_dev' AND TIDB_TABLE = 'articles';"
+```
+
 サンプル検索:
 
 ```bash
 # クエリ側 embedding を取得
-QVEC=$(curl -s -X POST http://localhost:8080/embed \
+QVEC=$(curl -s -X POST http://plamo-embedding.${TAILNET}/embed \
   -H 'Content-Type: application/json' \
   -d '{"text":"TiDB の Vector 検索","mode":"query"}' \
   | jq -c '.vector')
@@ -484,6 +517,7 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
 ### Phase 4 完了条件
 
 - [ ] 全記事の `embedding` が埋まっている
+- [ ] TiFlashが `4/4 Running` のままHNSW buildを完了し、`ROWS_STABLE_NOT_INDEXED = 0`
 - [ ] サンプル検索で意味の近い記事が上位に来る (目視)
 - [ ] `EXPLAIN` の `operator info` に `annIndex:COSINE` が現れる
 
@@ -522,7 +556,7 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
 ```bash
 # blog-api ローカル起動 (別ターミナル)
 cd apps/blog-api
-PLAMO_EMBED_ENDPOINT=http://localhost:8080 \
+PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET} \
   DATABASE_URL="mysql://root@tidb.${TAILNET}:4000/blog_dev" \
   cargo run --bin api
 
@@ -581,8 +615,6 @@ cd tools/dsql-cli/dsl-tidb
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_prd <<'SQL'
 ALTER TABLE articles ADD COLUMN embedding VECTOR(2048) NULL AFTER content_html;
-CREATE VECTOR INDEX idx_articles_embedding
-  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
 SQL
 ```
 
@@ -591,13 +623,23 @@ SQL
 ユーザーが手元から実行 (Tailnet 経由で prd DB と PLaMo Pod の両方に到達可能)。
 
 ```bash
-kubectl -n plamo-embedding port-forward svc/plamo-embedding 8080:80 &
 cd tools/tidb-embedder
 bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_prd" \
-  --embed-endpoint "http://localhost:8080" \
+  --embed-endpoint "http://plamo-embedding.${TAILNET}" \
+  --concurrency 4 \
   --dry-run
 # 件数確認後に --dry-run を外して本実行
+```
+
+全記事のbackfill完了後にcompactとHNSW index作成を行う。
+
+```bash
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_prd <<'SQL'
+ALTER TABLE articles COMPACT;
+CREATE VECTOR INDEX idx_articles_embedding
+  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
+SQL
 ```
 
 ### 6-5. 本番 blog-api への検索 API 公開 (到達性の課題)
@@ -616,6 +658,7 @@ bun run backfill \
 
 - [ ] `blog_prd.articles.embedding` が全記事埋まっている
 - [ ] `TIFLASH_REPLICA.AVAILABLE = 1` for `blog_prd.articles`
+- [ ] `idx_articles_embedding` の `ROWS_STABLE_NOT_INDEXED = 0`
 - [ ] 本番検索 API 公開の別タスクを起票した (6-5 の到達性設計)
 
 ---
@@ -642,7 +685,7 @@ Phase 4 のローカルバックフィルは「その時点で `embedding IS NUL
 
 ### 7-4. 動作確認
 
-- ローカルで `PLAMO_EMBED_ENDPOINT=http://localhost:8080` を渡して webhook を再送
+- ローカルで `PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET}` を渡して webhook を再送
 - 対象記事の `content` を変更したコミットで `embedding` も更新されること
 - endpoint 未設定でも記事更新自体は成功すること
 
@@ -660,3 +703,7 @@ Phase 4 のローカルバックフィルは「その時点で `embedding IS NUL
 
 - タスク doc 起票、Phase 1 の manifest 編集まで実施
 - Phase 1 実施完了。`kubectl apply` 後、`basic-tiflash-0` が Up (store id 7097)、`pd-ctl store` で engine=tiflash 1 store 確認
+- Phase 4 dry-run中のクラスタ負荷を確認。node3のPLaMoが約14.1/16 CPUを使用する一方、node1/node2は各約0.2 CPU、available memoryは各ノード約21〜24GiBあり、node2/node3の2 Pod分散を採用
+- `kubectl port-forward svc/plamo-embedding` は1 Podへ直接転送されるため、Tailnet LoadBalancer Service (`plamo-embedding.<tailnet>`) 経由へ変更
+- TiFlashが `3/4 CrashLoopBackOff` になっていることを検出。全133記事のembeddingがNULLの状態でHNSWを先行作成した結果、`DMFileVectorIndexWriter` → `FramedChecksumReadBuffer::doSeek` でframe size 0の除算が発生 (exit 136)
+- HNSW作成をPhase 4のbackfill + `ALTER TABLE articles COMPACT` 後へ移動。現indexをdropしてTiFlashを復旧する手順を3-4へ記録

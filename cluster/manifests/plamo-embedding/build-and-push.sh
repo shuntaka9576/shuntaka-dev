@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PLaMo Embedding image を linux/amd64 でビルドして ghcr に push する。
-# MiniPC cluster の node は Intel NUC 系 (amd64) のため amd64 target。
+# MiniPC cluster の node は Ryzen 7 7730U (amd64) のため amd64 target。
 # Apple Silicon Mac から実行する場合は buildx が QEMU emulation を挟むので
 # 初回 build は arm64 native よりも遅い (torch install が特に重い)。
 #

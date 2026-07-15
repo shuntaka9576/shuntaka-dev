@@ -9,11 +9,14 @@ metadata:
   name: plamo-embedding
   namespace: plamo-embedding
 spec:
-  replicas: 1
-  # モデルが 2.3GB あり RollingUpdate だと同一 node 上で 2 Pod = メモリ倍増になる。
-  # 1 replica なので Recreate に固定して、旧 Pod を止めてから新 Pod を起動する。
+  # node1 は TiFlash の vector index build 用に空け、node2 / node3 へ 1 Pod ずつ配置する。
+  replicas: 2
+  # maxSurge=0 で更新中にも追加 Pod を作らず、モデル分のメモリ増加を防ぐ。
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: plamo-embedding
@@ -22,6 +25,22 @@ spec:
       labels:
         app: plamo-embedding
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - node2
+                      - node3
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: plamo-embedding
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: server
           image: ghcr.io/shuntaka9576/plamo-embedding:latest
@@ -32,16 +51,20 @@ spec:
             httpGet:
               path: /healthz
               port: 8080
-            # image に model を焼き込んでいるので初回 load は数秒で済むはず。
-            # 万一遅延した場合を見込んで 30s 待ってから polling を始める。
-            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            # node ごとの初回 image pull と model load を最大 10 分待つ。
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 60
           livenessProbe:
             httpGet:
               path: /healthz
               port: 8080
-            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

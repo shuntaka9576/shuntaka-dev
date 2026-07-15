@@ -55,6 +55,6 @@ ALTER TABLE `${SCHEMA}`.`articles`
 -- Vector index は TiFlash replica を必要とするため、index 作成前に replica を設定する。
 ALTER TABLE `${SCHEMA}`.`articles` SET TIFLASH REPLICA 1;
 
-CREATE VECTOR INDEX `idx_articles_embedding`
-  ON `${SCHEMA}`.`articles` ((VEC_COSINE_DISTANCE(`embedding`)))
-  USING HNSW;
+-- HNSW index は embedding の backfill と TiFlash COMPACT の完了後に作成する。
+-- 全行 NULL の既存 DMFile に先に index を作ると TiFlash v8.5.7 が index build 中に
+-- Floating point exception でクラッシュするため、初期構築 DDL には含めない。

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# CPU 版 PyTorch を linux/amd64 向けにインストール (MiniPC cluster は Intel NUC 系)。
+# CPU 版 PyTorch を linux/amd64 向けにインストール (MiniPC cluster は Ryzen 7 7730U)。
 # amd64 wheel は https://download.pytorch.org/whl/cpu に登録済み。
 FROM python:3.12-slim
 
