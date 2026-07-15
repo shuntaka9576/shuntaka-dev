@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# PLaMo Embedding image を linux/arm64 でビルドして ghcr に push する。
+# PLaMo Embedding image を linux/amd64 でビルドして ghcr に push する。
+# MiniPC cluster の node は Intel NUC 系 (amd64) のため amd64 target。
+# Apple Silicon Mac から実行する場合は buildx が QEMU emulation を挟むので
+# 初回 build は arm64 native よりも遅い (torch install が特に重い)。
 #
 # 前提:
-#   - `docker login ghcr.io` 済み (write:packages スコープ付きの PAT が必要)
-#   - Apple Silicon Mac から実行 (native arm64 なのでビルド速い。x86_64 からは
-#     buildx の QEMU emulation でも動くが、torch install が遅い)
+#   - ghcr にログイン済み (Phase 2-4 参照)
+#   - Rancher Desktop / Docker Desktop で QEMU emulation が有効
+#     (未設定なら: `docker run --privileged --rm tonistiigi/binfmt --install all`)
 #
 # Usage:
 #   ./build-and-push.sh                 # ghcr.io/shuntaka9576/plamo-embedding:latest を push
@@ -17,13 +20,13 @@ cd "${SCRIPT_DIR}"
 IMAGE="${IMAGE:-ghcr.io/shuntaka9576/plamo-embedding}"
 TAG="${TAG:-latest}"
 
-echo "==> Building ${IMAGE}:${TAG} (linux/arm64)"
+echo "==> Building ${IMAGE}:${TAG} (linux/amd64)"
 # --provenance=false / --sbom=false: buildx はデフォルトで OCI index に attestation
-# manifest を追加するが、k3s/MiniPC の古めの containerd がそれで "no match for
-# platform" と誤判定して pull に失敗する。attestation を切ると single-platform
-# の manifest だけになり pull が通る。
+# manifest を追加するが、cluster 側 containerd がそれで "no match for platform"
+# と誤判定して pull に失敗する。attestation を切ると single-platform manifest
+# だけになり pull が通る。
 docker buildx build \
-  --platform linux/arm64 \
+  --platform linux/amd64 \
   --provenance=false \
   --sbom=false \
   -t "${IMAGE}:${TAG}" \

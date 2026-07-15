@@ -77,14 +77,14 @@ TiFlash は各 k8s ノードのローカルディスクに DeltaTree ストレ�
 
 - ノードに空きストレージがあること (`local-path` provisioner の PV が確保できる領域)
 - 記事データは 2.5MB 程度と小さいので 20Gi あれば十分だが、将来の拡張を見越して **50Gi** で確保する
-- TiFlash は arm64 対応済み (v8.5.7 の `pingcap/tiflash:v8.5.7` を使う)
+- MiniPC は Intel NUC 系 (**amd64**) なので `pingcap/tiflash:v8.5.7` の amd64 manifest が pull される
 
 ```bash
 kubectl -n tidb-cluster get tc basic -o jsonpath='{.spec.version}'
 # → v8.5.7 が出ればよい
 
 kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture
-# → arm64 が並ぶこと (MiniPC クラスタ)
+# → amd64 が並ぶこと (MiniPC = Intel NUC 系)
 ```
 
 ### 1-2. TidbCluster manifest 編集
@@ -193,7 +193,7 @@ cluster/manifests/plamo-embedding/
 
 - **model 事前焼き込み**: Dockerfile の build 時に HuggingFace から model を pull し image に含める。image サイズは ~5GB になるが、Pod 起動時のダウンロード時間 / ネットワーク依存を消せる (registry pull は node ごとに 1 回で済む)
 - **`snapshot_download` を使う理由**: 素直に `AutoModel.from_pretrained()` で pre-warm すると model を RAM に全展開して verify するため、Docker Desktop 既定メモリ (2-4GB) を超えて OOM (`Killed`, `cannot allocate memory`) になる。`huggingface_hub.snapshot_download` はファイル DL のみで RAM を使わないので build が通る。runtime の `AutoModel.from_pretrained()` は HF cache から読むので network 不要のまま
-- **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。arm64 wheel が公式提供されている
+- **CPU 版 torch**: `--index-url https://download.pytorch.org/whl/cpu` で fetch。amd64 wheel が公式提供されている (target が node の Intel NUC = amd64)
 - **Deployment strategy: Recreate**: 1 replica で model メモリが 2-3GB 効くため、RollingUpdate だと同一 node で 2 Pod = メモリ倍増になる。Recreate で旧 Pod を落としてから新 Pod を起こす
 - **依存バージョン (Dockerfile)**: `torch==2.5.1`, `transformers==4.46.0`, `sentencepiece==0.2.0`, `fastapi==0.115.4`, `uvicorn==0.32.0`, `pydantic==2.9.2` を pin
 - **`--provenance=false --sbom=false` (build-and-push.sh)**: buildx はデフォルトで OCI index に attestation manifest を追加するが、k3s/MiniPC の古めの containerd がそれで `no match for platform in manifest` と誤判定して pull に失敗する (`ImagePullBackOff`)。attestation を切ることで single-platform manifest だけになり pull が通る
