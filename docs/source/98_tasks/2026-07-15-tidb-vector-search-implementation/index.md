@@ -230,7 +230,28 @@ cd cluster/manifests/plamo-embedding
 
 **なぜ workflow_dispatch action ではないか**: PLaMo image は「Python deps か server.py を変えるまで更新しない」性質で、更新頻度が低い。`deploy-tidb-proxy.yaml` のような頻繁な更新は想定しないため、まずローカルスクリプトで済ませる。更新頻度が上がってきたら (~ 月次) workflow 化を検討する。
 
-### 2-6. 反映 (ユーザー実行)
+### 2-6. Package を public 化 (初回のみ、ユーザー実行)
+
+ghcr は **push した package が必ず private で作成される** (リポジトリが public でも独立)。private のままだと kubelet が pull できず `ErrImagePull` になる。無料運用のため public に切り替える。
+
+**個人アカウントの package visibility は REST API から変更できない** (org packages 用の PATCH はあるが user packages 側は 404)。Web UI からのみ操作可能。
+
+```bash
+open "https://github.com/users/shuntaka9576/packages/container/plamo-embedding/settings"
+```
+
+ページ末尾 **Danger Zone** → **"Change package visibility"** → **Public** → package name (`plamo-embedding`) を入力して確定。
+
+確認 (API では visibility 取得は可能):
+
+```bash
+gh api /user/packages/container/plamo-embedding | jq '.visibility'
+# → "public"
+```
+
+一度 public 化すれば同名 package への以降の push でも visibility は維持される。**将来別 image (例: `tidb-embedder`) を追加する場合はそれぞれ改めて public 化が必要**。
+
+### 2-7. 反映 (ユーザー実行)
 
 ```bash
 kubectl apply -f cluster/manifests/plamo-embedding/deployment.yaml
@@ -238,7 +259,7 @@ kubectl -n plamo-embedding get pods -w
 # STATUS が Running / READY 1/1 になるまで待つ (registry pull 込みで数分)
 ```
 
-### 2-7. 動作確認 (ユーザー実行)
+### 2-8. 動作確認 (ユーザー実行)
 
 Tailnet 経由で ClusterIP に到達するには port-forward が手っ取り早い。
 
@@ -274,7 +295,7 @@ curl -s -X POST http://localhost:8080/embed \
 
 ```sql
 -- 2026-07-15 Vector 検索: articles.embedding + HNSW on TiFlash
--- N は PLaMo Embedding 1B の実測次元 (Phase 2-7 で確認した値)。以下は 2048 を仮定
+-- N は PLaMo Embedding 1B の実測次元 (Phase 2-8 で確認した値)。以下は 2048 を仮定
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
 
