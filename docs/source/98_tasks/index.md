@@ -7,7 +7,7 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
-| 2026-07-15 | [TiDB FULLTEXT + kuromoji で日本語全文検索を実現する構成パターン整理](2026-07-15-tidb-fts-kuromoji-patterns/index.md)                                             |
+| 2026-07-15 | [TiDB Self-Managed で日本語全文検索を実現する方法 (Vector + TiFlash 採用)](2026-07-15-tidb-fts-kuromoji-patterns/index.md)                                        |
 | 2026-07-15 | [Sphinx 日本語検索を Pagefind へ置き換える](2026-07-15-sphinx-pagefind-search/index.md)                                                                           |
 | 2026-07-14 | [moments の日付を EXIF 撮影時刻 (captured_at) に移行](2026-07-14-moments-exif-captured-at/index.md)                                                               |
 | 2026-07-13 | [GitHub webhook の非同期化（自己 Event invoke で 10 秒配信タイムアウトを回避）](2026-07-13-webhook-async-self-invoke/index.md)                                    |
