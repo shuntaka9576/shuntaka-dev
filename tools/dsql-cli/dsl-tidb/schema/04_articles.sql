@@ -47,14 +47,3 @@ ALTER TABLE `${SCHEMA}`.`articles` DROP INDEX `idx_articles_user_status_type_pub
 --   upsert が updated_at を更新してしまうため使わない）。
 ALTER TABLE `${SCHEMA}`.`articles`
   ADD COLUMN `content_html` LONGTEXT NULL AFTER `content`;
-
--- 2026-07-15 Vector 検索: PLaMo Embedding 1B (実測 2048 次元) + HNSW on TiFlash
-ALTER TABLE `${SCHEMA}`.`articles`
-  ADD COLUMN `embedding` VECTOR(2048) NULL AFTER `content_html`;
-
--- Vector index は TiFlash replica を必要とするため、index 作成前に replica を設定する。
-ALTER TABLE `${SCHEMA}`.`articles` SET TIFLASH REPLICA 1;
-
--- HNSW index は embedding の backfill と TiFlash COMPACT の完了後に作成する。
--- 全行 NULL の既存 DMFile に先に index を作ると TiFlash v8.5.7 が index build 中に
--- Floating point exception でクラッシュするため、初期構築 DDL には含めない。

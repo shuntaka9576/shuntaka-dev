@@ -17,30 +17,30 @@
                                           │       │
                                           ▼       │ q="..."
                              PLaMo Embedding Service ◀─┘
-                              (k8s Pod, /embed HTTP)
+                         (k8s Pod, /chunks + /embed HTTP)
                                           ▲
-                                          │ document embedding
+                                          │ PLaMO tokenizerでchunk化 + document embedding
         tidb-embedder (ローカル backfill) ─┤
-        (embedding IS NULL の行だけ)      │
+        (source hashが変わった記事だけ)   │
                                           ▼
                                 TiDB (blog_dev / blog_prd)
-                                articles.embedding VECTOR(2048)
+                                article_embedding_chunks.embedding VECTOR(2048)
                                 + HNSW index on TiFlash replica
 
   ─ ─ ─ (最終フェーズ) ─ ─ ─
-   GitHub webhook → blog-api が content 変更時に PLaMo → embedding を UPDATE
+   GitHub webhook → blog-api が記事変更時にchunkを再生成・記事単位で差し替え
 ```
 
-- 書き込み経路 (初期): ローカルから `tools/tidb-embedder` を叩いて `embedding IS NULL` の行だけ埋める
-- 読み取り経路: blog-api の検索エンドポイントがクエリを PLaMo で vectorize → `VEC_COSINE_DISTANCE` で ORDER BY
-- 継続更新 (webhook 経路): 全体が動き始めてから最後に組み込む。それまでは content 更新時にも embedding は更新されない (再度ローカルスクリプトで埋める運用)
+- 書き込み経路 (初期): ローカルから `tools/tidb-embedder` を実行し、記事を最大1024 tokens、128 tokens overlapでchunk化して専用テーブルへ保存する
+- 読み取り経路: blog-api がクエリをPLaMOでvectorizeし、近いchunkを検索して記事単位に集約する
+- 継続更新 (webhook 経路): 全体が動き始めてから最後に組み込む。それまでは記事更新後に再度ローカルスクリプトを実行する
 
 ## 実装フェーズ (チェックボックス管理)
 
 - [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
 - [x] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper) — 2026-07-15 完了
-- [x] Phase 3: `articles.embedding` 列 + TiFlash replica追加 (DDL) — 2026-07-15 完了
-- [ ] Phase 4: `tools/tidb-embedder` で埋め戻し後に HNSW インデックス作成
+- [x] Phase 3: `articles.embedding` による1記事1vectorの検証 — 2026-07-15 完了、Phase 4でchunk方式へ移行
+- [ ] Phase 4: PLaMO tokenizerによるchunk backfill + HNSWインデックス作成
 - [ ] Phase 5: `blog-api` の検索エンドポイント実装
 - [ ] Phase 6: 本番 (blog_prd) 適用 (TiFlash replica + DDL + backfill)
 - [ ] Phase 7: GitHub webhook 経路への embedding 生成組み込み (継続更新)
@@ -292,9 +292,11 @@ curl -s -X POST http://plamo-embedding.${TAILNET}/embed \
 
 ---
 
-## Phase 3: `articles.embedding` 列 + TiFlash replica
+## Phase 3: `articles.embedding` 列 + TiFlash replica (旧方式・実施記録)
 
-### 3-1. DDL ファイル追加 (実装済み)
+このフェーズでは1記事の本文全体を1vectorにしたが、長文でタイトルや検索対象の話題が薄まり、PLaMOの最大context長4096 tokensを超える部分はtruncationされる。2026-07-15の精度確認を受け、Phase 4から `article_embedding_chunks` へ移行する。以下はTiFlash障害を含む実施記録として残し、新規環境のschemaには `articles.embedding` を追加しない。
+
+### 3-1. 当初適用したDDL (履歴)
 
 `tools/dsql-cli/dsl-tidb/schema/04_articles.sql` の末尾に、他のマイグレーションと同じ形式で追記する (専用ファイルを切らないのは既存の `content_html` 追加も同ファイル末尾に置いているため)。
 
@@ -321,7 +323,7 @@ ALTER TABLE articles SET TIFLASH REPLICA 1;
 SQL
 ```
 
-新規環境をゼロから構築する場合は `04_articles.sql` の一部として適用されるため、通常どおり `load.sh` を使用する。
+このDDLは旧方式であり、現在の `04_articles.sql` からは削除済み。新規環境では実行しない。
 
 ```bash
 cd tools/dsql-cli/dsl-tidb
@@ -457,82 +459,112 @@ kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash -w
 # 新しいPVC名になり、basic-tiflash-0が4/4 Runningを維持すること
 ```
 
-HNSW indexはPhase 4でbackfill、TiFlash replica再同期、compactionが完了した後に作成する。`04_articles.sql` にもindex作成を含めない。
+旧 `articles.embedding` のHNSW indexは、Phase 4のchunk方式を検証してから削除する。それまでは比較・rollback用として残す。
 
 ---
 
-## Phase 4: `tools/tidb-embedder` (既存レコード埋め戻し + HNSW作成)
+## Phase 4: PLaMO tokenizerによるchunk backfill + HNSW作成
 
-### 4-1. ディレクトリ構成 (実装済み)
+### 4-1. chunk設計 (実装済み)
 
-`tools/content-html-backfill` を参考に、TypeScript + mysql2 で埋め戻す小さな CLI を作る。
+[PLaMO-Embedding-1B公式model card](https://huggingface.co/pfnet/plamo-embedding-1b)では最大context長は4096 tokensだが、学習時のcontext長とbenchmark計測は1024 tokens。これに合わせ、文字数近似ではなくPLaMO Pod内の同じtokenizerで分割する。
 
-```
-tools/tidb-embedder/
-├── package.json
-├── tsconfig.json
-└── src/
-    └── index.ts
-```
+- MarkdownのATX見出し (`#`〜`######`) をsection境界にし、見出し階層を保持する
+- code fence内の `#` は見出しとして扱わない
+- 1 chunkはmetadataを含め最大1024 tokens、長いsectionは128 tokens overlapでwindow分割する
+- 各embedding入力は `タイトル + 見出し階層 + 概要 + 本文chunk` とする
+- metadataは最大256 tokensに制限し、本文用budgetを確保する
+- `source_hash` はchunking version、token設定、title、description、contentからSHA-256で作る
 
-### 4-2. `package.json`
+PLaMO Serviceへ `POST /chunks` を追加した。ここでtokenizeだけ行い、返された `embedding_text` を既存の `POST /embed` (`mode=document`) へ渡す。
 
-```json
-{
-  "name": "tidb-embedder",
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "backfill": "tsx src/index.ts",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "commander": "^15.0.0",
-    "mysql2": "^3.23.0"
-  }
-}
+```text
+cluster/manifests/plamo-embedding/
+├── chunking.py
+├── chunking_test.py
+├── server.py
+└── Dockerfile
 ```
 
-### 4-3. `src/index.ts` の実装
+### 4-2. PLaMO Service更新 (ユーザー実行)
 
-`content-html-backfill/src/index.ts` (WHERE 条件で NULL 対象を絞り込み、slug 単発指定と dry-run に対応するパターン) を踏襲する。差分は以下だけ:
+```bash
+cd cluster/manifests/plamo-embedding
+./build-and-push.sh
 
-- markdown 変換ロジックの代わりに `fetch(embeddingEndpoint, { body: { text, mode: 'document' } })` を叩く
-- `UPDATE ... SET embedding = ?` の bind 値は `[0.1, 0.2, ...]` 形式の文字列 (mysql2 が VECTOR にキャストする)
-- `updated_at` を保持したいので、`content_html` と同じく `ON UPDATE` が無いことを利用して `SET embedding = ?` だけ更新する
-- API 応答の `dim`、vector 長、全要素が有限値であることを検証し、2048 次元以外は更新しない
-- `--all` を付けない更新には `AND embedding IS NULL` を付け、同時実行で埋められた値を上書きしない
-- `--concurrency` で指定したworker数で処理し、1件が失敗しても残りを続行したうえで、失敗があれば終了コードを非0にする
-
-主要処理:
-
-```typescript
-const res = await fetch(`${opts.embedEndpoint}/embed`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Connection: 'close' },
-  body: JSON.stringify({ text: row.content, mode: 'document' }),
-});
-const { vector } = (await res.json()) as { vector: number[] };
-const literal = `[${vector.join(',')}]`;
-await conn.execute('UPDATE articles SET embedding = ? WHERE article_id = ?', [
-  literal,
-  row.article_id,
-]);
+kubectl -n plamo-embedding rollout restart deployment/plamo-embedding
+kubectl -n plamo-embedding rollout status deployment/plamo-embedding --timeout=15m
 ```
 
-CLI オプション:
+`/chunks` がversion、token数、embedding用textを返すことを確認する。
 
-```
---endpoint <url>          TiDB (例: mysql://root@tidb.<TAILNET>:4000/blog_dev)
---embed-endpoint <url>    PLaMo (例: http://plamo-embedding.<TAILNET>)
---all                     embedding IS NOT NULL も再生成
---slug <slug>             特定 slug のみ
---dry-run                 UPDATE せず件数と次元だけ表示
---concurrency <n>         embedding API への同時リクエスト数 (default: 1、2 Pod時は2)
---timeout <ms>            1記事あたりの embedding API timeout (default: 120000)
+```bash
+curl -s -X POST http://plamo-embedding.${TAILNET}/chunks \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title":"TiDB Vector検索",
+    "description":"動作確認用の記事",
+    "content":"# 概要\nPLaMOで記事を分割します。",
+    "max_tokens":1024,
+    "overlap_tokens":128
+  }' | jq '{version, max_tokens, overlap_tokens, chunks}'
 ```
 
-### 4-4. 実行 (ユーザー実行)
+### 4-3. chunkテーブル作成 (ユーザー実行)
+
+`09_article_embedding_chunks.sql` を追加した。既存の `blog_dev` には過去の非冪等な `ALTER TABLE` が適用済みなので `load.sh` は再実行せず、今回のファイルだけを流す。
+
+```bash
+cd tools/dsql-cli/dsl-tidb
+SCHEMA=blog_dev
+sed "s|\${SCHEMA}|${SCHEMA}|g" schema/09_article_embedding_chunks.sql \
+  | mysql -h tidb.${TAILNET} -P 4000 -u root
+```
+
+```sql
+CREATE TABLE article_embedding_chunks (
+  chunk_id CHAR(36) NOT NULL DEFAULT (UUID()),
+  article_id CHAR(36) NOT NULL,
+  chunk_index INT UNSIGNED NOT NULL,
+  heading VARCHAR(1000) NULL,
+  content LONGTEXT NOT NULL,
+  token_count INT UNSIGNED NOT NULL,
+  chunking_version VARCHAR(64) NOT NULL,
+  source_hash CHAR(64) NOT NULL,
+  embedding VECTOR(2048) NOT NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (chunk_id),
+  UNIQUE KEY uq_article_embedding_chunks_article_index (article_id, chunk_index)
+);
+ALTER TABLE article_embedding_chunks SET TIFLASH REPLICA 1;
+```
+
+HNSW indexはbackfillとTiFlash compactionの後に作る。`embedding` は最初から `NOT NULL` でinsertするため、旧方式の「全NULLのDMFileへindexを先行作成」した状態にはならない。
+
+### 4-4. `tools/tidb-embedder` (実装済み)
+
+CLIは全記事を読み、保存済み `source_hash` と現在の記事内容から計算したhashが違う記事だけを対象にする。
+
+- `--dry-run` は `/chunks` まで実行し、chunk数とtoken数を表示する。embedding生成とDB更新は行わない
+- 本実行は全chunkの2048次元vector生成が成功してから、記事単位のtransactionで旧chunkを削除・新chunkをinsertする
+- 途中のAPI失敗では既存chunkを保持し、終了コードを非0にする
+- `--all` でhash一致記事も再生成できる
+- 全件実行時は削除済み記事の孤立chunkも検出し、本実行で削除する
+- リクエストごとにHTTP connectionを閉じ、2 Podへconnection単位で分散する
+
+```text
+--endpoint <url>          TiDB接続先
+--embed-endpoint <url>    PLaMO Service
+--all                     source hash一致記事も再生成
+--slug <slug>             特定slugだけ処理
+--dry-run                 chunk数/token数だけ確認
+--concurrency <n>         同時embedding request数 (default: 1、2 Pod時は2)
+--timeout <ms>            PLaMO API 1 requestのtimeout (default: 120000)
+--max-tokens <n>          1 chunkの最大token数 (default: 1024)
+--overlap-tokens <n>      window間の重複token数 (default: 128)
+```
+
+### 4-5. backfill (ユーザー実行)
 
 Tailnet公開Service経由でnode2/node3の2 Podへ分散する。`kubectl port-forward svc/...` は1 Podへ直接転送されるため使用しない。
 
@@ -543,46 +575,62 @@ bun run backfill \
   --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_dev" \
   --embed-endpoint "http://plamo-embedding.${TAILNET}" \
   --concurrency 2 \
+  --max-tokens 1024 \
+  --overlap-tokens 128 \
   --dry-run
-# 対象件数と次元が想定通りなら --dry-run を外して本実行
+
+# chunk数と最大token数を確認後、--dry-runを外す
+bun run backfill \
+  --endpoint "mysql://root@tidb.${TAILNET}:4000/blog_dev" \
+  --embed-endpoint "http://plamo-embedding.${TAILNET}" \
+  --concurrency 2 \
+  --max-tokens 1024 \
+  --overlap-tokens 128
 ```
 
-PLaMo は1リクエストでも約14/16 logical CPUを使用した。2 Podに対して `--concurrency 2` (1 Podあたり1リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなるため増やさない。CLIはリクエストごとにHTTP connectionを閉じ、Kubernetes Serviceがconnection単位でnode2/node3へ振り分けられるようにする。
+PLaMOは1リクエストでも約14/16 logical CPUを使用した。2 Podに対して `--concurrency 2` (1 Podあたり1リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなるため増やさない。
 
-#### 2 Pod backfill時のCPU使用率 (2026-07-15)
+#### 2 Pod backfill時のCPU使用率 (2026-07-15、旧1記事1vector時)
 
-![PLaMoをnode2/node3の2 Podでbackfillした際のノード別CPU使用率](plamo-2pod-backfill-cpu.png)
+![PLaMOをnode2/node3の2 Podでbackfillした際のノード別CPU使用率](plamo-2pod-backfill-cpu.png)
 
-17:23頃まではnode3の単一Podが約90%のCPUを継続使用していた。2 Pod化した17:41頃以降はnode2/node3の両方に負荷が分散し、TiFlashを配置するnode1は約2〜3%を維持した。記事ごとの本文長とKubernetes Serviceのconnection単位の振り分けにより、node2/node3の負荷は均等な直線ではなく交互に変動する。
+17:23頃まではnode3の単一Podが約90%のCPUを継続使用していた。2 Pod化した17:41頃以降はnode2/node3の両方に負荷が分散し、TiFlashを配置するnode1は約2〜3%を維持した。chunk方式はrequest数が増えるが、同じく2 Pod、同時実行2を上限にする。
 
-### 4-5. 動作確認 (ユーザー実行)
+### 4-6. backfillとHNSWの確認 (ユーザー実行)
+
+全記事にchunkがあり、token上限違反が0件であることを確認する。
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
-SELECT SUM(embedding IS NOT NULL) AS filled,
-       COUNT(*) AS total FROM articles;"
+SELECT COUNT(*) AS chunks,
+       COUNT(DISTINCT article_id) AS chunked_articles,
+       MIN(token_count) AS min_tokens,
+       MAX(token_count) AS max_tokens,
+       SUM(token_count > 1024) AS over_limit
+  FROM article_embedding_chunks;
+
+SELECT COUNT(*) AS missing_articles
+  FROM articles AS a
+  LEFT JOIN article_embedding_chunks AS c ON c.article_id = a.article_id
+ WHERE c.chunk_id IS NULL;"
 ```
 
-`filled = total` を確認した後、復旧時に0へ変更したTiFlash replicaを1へ戻して再同期を待つ。全NULLの旧DMFileを残さないようTiFlashをcompactしてからHNSW indexを作成する。
+`chunked_articles = 133`、`missing_articles = 0`、`over_limit = 0`を確認する。TiFlash replica同期後にcompactし、HNSW indexを作る。
 
 ```bash
-mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e \
-  "ALTER TABLE articles SET TIFLASH REPLICA 1;"
-
 mysql -h tidb.${TAILNET} -P 4000 -u root -e "
 SELECT TABLE_SCHEMA, TABLE_NAME, REPLICA_COUNT, AVAILABLE, PROGRESS
   FROM INFORMATION_SCHEMA.TIFLASH_REPLICA
- WHERE TABLE_SCHEMA = 'blog_dev' AND TABLE_NAME = 'articles';"
-# AVAILABLE = 1, PROGRESS = 1 まで待つ
+ WHERE TABLE_SCHEMA = 'blog_dev'
+   AND TABLE_NAME = 'article_embedding_chunks';"
+# AVAILABLE = 1, PROGRESS = 1まで待つ
 
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev <<'SQL'
-ALTER TABLE articles COMPACT;
-CREATE VECTOR INDEX idx_articles_embedding
-  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
+ALTER TABLE article_embedding_chunks COMPACT;
+CREATE VECTOR INDEX idx_article_embedding_chunks_embedding
+  ON article_embedding_chunks ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
 SQL
 ```
-
-index buildの進捗を確認する。`ROWS_STABLE_NOT_INDEXED = 0` で完了。
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root -e "
@@ -590,43 +638,60 @@ SELECT TIDB_DATABASE, TIDB_TABLE, INDEX_NAME,
        ROWS_STABLE_INDEXED, ROWS_STABLE_NOT_INDEXED,
        ROWS_DELTA_INDEXED, ROWS_DELTA_NOT_INDEXED, ERROR_MESSAGE
   FROM INFORMATION_SCHEMA.TIFLASH_INDEXES
- WHERE TIDB_DATABASE = 'blog_dev' AND TIDB_TABLE = 'articles';"
+ WHERE TIDB_DATABASE = 'blog_dev'
+   AND TIDB_TABLE = 'article_embedding_chunks';"
 ```
 
-サンプル検索:
+`ROWS_STABLE_NOT_INDEXED = 0`、`ROWS_DELTA_NOT_INDEXED = 0`、`ERROR_MESSAGE` が空ならbuild完了。
+
+### 4-7. サンプル検索と旧vector削除 (ユーザー実行)
 
 ```bash
-# クエリ側 embedding を取得
 QVEC=$(curl -s -X POST http://plamo-embedding.${TAILNET}/embed \
   -H 'Content-Type: application/json' \
-  -d '{"text":"TiDB の Vector 検索","mode":"query"}' \
+  -d '{"text":"Rust Axum API","mode":"query"}' \
   | jq -c '.vector')
 
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
-SELECT article_id, LEFT(title, 40) AS title,
-       VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
-  FROM articles
- ORDER BY dist ASC
- LIMIT 5;"
+SELECT c.article_id, LEFT(a.title, 55) AS title, c.heading,
+       VEC_COSINE_DISTANCE(c.embedding, '${QVEC}') AS dist
+  FROM article_embedding_chunks AS c
+  JOIN articles AS a ON a.article_id = c.article_id
+ ORDER BY VEC_COSINE_DISTANCE(c.embedding, '${QVEC}')
+ LIMIT 20;"
 ```
 
-HNSW index が使われると、`TableFullScan` の `operator info` に `annIndex:COSINE` が表示される。
+HNSW利用可否はjoinや記事単位の集約を外し、TiFlashを固定した最小queryで確認する。
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
 EXPLAIN
-SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
-  FROM articles
- ORDER BY dist ASC
- LIMIT 5;"
+SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
+       c.article_id,
+       VEC_COSINE_DISTANCE(c.embedding, '${QVEC}') AS dist
+  FROM article_embedding_chunks AS c
+ ORDER BY VEC_COSINE_DISTANCE(c.embedding, '${QVEC}')
+ LIMIT 20;"
+```
+
+`TableFullScan` の `operator info` に `index:idx_article_embedding_chunks_embedding` と `annIndex:COSINE` があれば利用可能。件数が小さい間、hintなしではoptimizerがTiKV全走査を選ぶことがある。
+
+chunk検索の精度を確認できた後、比較・rollback用に残していた旧vectorを削除する。
+
+```sql
+USE blog_dev;
+ALTER TABLE articles DROP INDEX idx_articles_embedding;
+ALTER TABLE articles SET TIFLASH REPLICA 0;
+ALTER TABLE articles DROP COLUMN embedding;
 ```
 
 ### Phase 4 完了条件
 
-- [ ] 全記事の `embedding` が埋まっている
-- [ ] TiFlashが `4/4 Running` のままHNSW buildを完了し、`ROWS_STABLE_NOT_INDEXED = 0`
-- [ ] サンプル検索で意味の近い記事が上位に来る (目視)
-- [ ] `EXPLAIN` の `operator info` に `annIndex:COSINE` が現れる
+- [ ] 全133記事に1件以上のchunkがあり、1024 tokens超過が0件
+- [ ] TiFlashが `4/4 Running` のままchunk HNSW buildを完了し、未index行が0件
+- [ ] `Rust Axum API` など旧方式で弱かったqueryの順位が改善する
+- [ ] TiFlash固定の `EXPLAIN` に `annIndex:COSINE` が現れる
+- [ ] 検証後に旧 `articles.embedding`、HNSW、TiFlash replicaを削除する
 
 ---
 
@@ -638,8 +703,9 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
 - 認証: 既存の users_articles と同じ policy (未認証で公開記事のみ or 認証済みで自分の記事)
 - ハンドラフロー:
   1. `q` を PLaMo Embedding Service で vectorize (mode=query)
-  2. `VEC_COSINE_DISTANCE(embedding, ?)` で ORDER BY, LIMIT 20
-  3. 既存の `ArticleSummary` DTO で返す (title / slug / published_at / dist を含める)
+  2. `article_embedding_chunks` から近傍chunkを `limit * 10` 件取得する
+  3. `article_id` ごとに最小distanceのchunkを残し、記事の公開条件を適用する
+  4. 既存の `ArticleSummary` DTO で返す (title / slug / published_at / dist を含める)
 
 ### 5-2. 実装ポイント
 
@@ -647,14 +713,27 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '${QVEC}') AS dist
 - **`kernel/src/repository/articles.rs`** に `search_by_vector(user_id, vector, limit)` メソッドを追加
 - **`adapter/src/repository/articles.rs`** で SQL 実装:
   ```sql
-  SELECT article_id, title, slug, description, thumbnail, type, published_at,
-         VEC_COSINE_DISTANCE(embedding, ?) AS dist
-    FROM articles
-   WHERE user_id = ? AND status = 'published' AND embedding IS NOT NULL
-   ORDER BY dist ASC
+  WITH nearest_chunks AS (
+    SELECT article_id, heading, content,
+           VEC_COSINE_DISTANCE(embedding, ?) AS dist
+      FROM article_embedding_chunks
+     ORDER BY VEC_COSINE_DISTANCE(embedding, ?)
+     LIMIT ? -- API limit * 10
+  ),
+  best_chunk_per_article AS (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY article_id ORDER BY dist) AS rn
+      FROM nearest_chunks
+  )
+  SELECT a.article_id, a.title, a.slug, a.description, a.thumbnail,
+         a.type, a.published_at, c.dist
+    FROM best_chunk_per_article AS c
+    JOIN articles AS a ON a.article_id = c.article_id
+   WHERE c.rn = 1 AND a.user_id = ? AND a.status = 'published'
+   ORDER BY c.dist
    LIMIT ?
   ```
-  - TiFlash MPP に落ちるよう `SET SESSION tidb_isolation_read_engines = 'tiflash,tikv'` の設定が必要かは `EXPLAIN` で確認
+  - inner queryのTopNがHNSWへpushdownされるか、実データで `EXPLAIN` を確認する
+  - 同じ記事の複数chunkが候補に入るため、window関数で記事単位にdeduplicateする
 - **`api/src/route/users_articles.rs`** に `/search` サブルート追加
 - **`api/src/handler/users_articles.rs`** で 5-2 の embedding client を呼ぶ
 
@@ -676,13 +755,13 @@ curl -s "http://localhost:3000/users/<user_id>/articles/search?q=TiDB%20Vector" 
 ```sql
 EXPLAIN
 SELECT article_id, VEC_COSINE_DISTANCE(embedding, '[...]') AS dist
-  FROM articles
- WHERE user_id = 'xxx' AND status = 'published'
- ORDER BY dist ASC LIMIT 20;
+  FROM article_embedding_chunks
+ ORDER BY VEC_COSINE_DISTANCE(embedding, '[...]') ASC
+ LIMIT 200;
 ```
 
 - `TableFullScan` の `operator info` に `annIndex:COSINE` があること (HNSW index利用時もexecutor名は `TableFullScan`)
-- 効かない場合: TiFlash replica の同期 (Phase 3) と HNSW build 完了を確認
+- 効かない場合: chunkテーブルのTiFlash replica同期 (Phase 4) とHNSW build完了を確認
 
 ### Phase 5 完了条件
 
@@ -699,30 +778,24 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '[...]') AS dist
 
 `docs/source/98_tasks/2026-07-05-tidb-prd-dump/index.md` の手順で `blog_prd` を論理ダンプ。
 
-### 6-2. TiFlash replica (本番)
+### 6-2. TiFlash store確認 (本番)
 
-Phase 1 で cluster レベルの TiFlash 追加は完了しているため、本番でも同じ store を共有できる。追加作業は `blog_prd.articles` へ replica を張るだけ。
+Phase 1でclusterレベルのTiFlash追加は完了しているため、本番でも同じstoreを共有できる。`article_embedding_chunks` のreplica設定は6-3のDDLに含まれる。
 
-```sql
-USE blog_prd;
-ALTER TABLE articles SET TIFLASH REPLICA 1;
+```bash
+kubectl -n tidb-cluster get pods -l app.kubernetes.io/component=tiflash
+# basic-tiflash-0 が4/4 Runningであること
 ```
-
-`TIFLASH_REPLICA.AVAILABLE = 1` を待つ。
 
 ### 6-3. DDL 適用 (本番)
 
+既存 `blog_prd` でも `load.sh` は再実行せず、追加ファイルだけ適用する。
+
 ```bash
 cd tools/dsql-cli/dsl-tidb
-./load.sh --database blog_prd --host tidb.${TAILNET}
-```
-
-または追加分だけ手動で:
-
-```bash
-mysql -h tidb.${TAILNET} -P 4000 -u root blog_prd <<'SQL'
-ALTER TABLE articles ADD COLUMN embedding VECTOR(2048) NULL AFTER content_html;
-SQL
+SCHEMA=blog_prd
+sed "s|\${SCHEMA}|${SCHEMA}|g" schema/09_article_embedding_chunks.sql \
+  | mysql -h tidb.${TAILNET} -P 4000 -u root
 ```
 
 ### 6-4. 埋め戻し (本番)
@@ -743,9 +816,9 @@ bun run backfill \
 
 ```bash
 mysql -h tidb.${TAILNET} -P 4000 -u root blog_prd <<'SQL'
-ALTER TABLE articles COMPACT;
-CREATE VECTOR INDEX idx_articles_embedding
-  ON articles ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
+ALTER TABLE article_embedding_chunks COMPACT;
+CREATE VECTOR INDEX idx_article_embedding_chunks_embedding
+  ON article_embedding_chunks ((VEC_COSINE_DISTANCE(embedding))) USING HNSW;
 SQL
 ```
 
@@ -763,44 +836,45 @@ SQL
 
 ### Phase 6 完了条件
 
-- [ ] `blog_prd.articles.embedding` が全記事埋まっている
-- [ ] `TIFLASH_REPLICA.AVAILABLE = 1` for `blog_prd.articles`
-- [ ] `idx_articles_embedding` の `ROWS_STABLE_NOT_INDEXED = 0`
+- [ ] `blog_prd.article_embedding_chunks` に全記事のchunkがある
+- [ ] `TIFLASH_REPLICA.AVAILABLE = 1` for `blog_prd.article_embedding_chunks`
+- [ ] `idx_article_embedding_chunks_embedding` の未index行が0件
 - [ ] 本番検索 API 公開の別タスクを起票した (6-5 の到達性設計)
 
 ---
 
 ## Phase 7: GitHub webhook 経路への embedding 生成組み込み (継続更新)
 
-Phase 4 のローカルバックフィルは「その時点で `embedding IS NULL` の行を埋める」だけ。以降の記事追加・更新は再度手で `tidb-embedder` を回す運用になる。それを webhook 契機で自動化するのが本フェーズ。
+Phase 4のローカルbackfillは、実行時点でsource hashが変わった記事のchunkを記事単位で差し替える。以降の記事追加・更新をwebhook契機で自動化するのが本フェーズ。
 
 ### 7-1. 変更方針
 
-`apps/blog-api/api/src/handler/webhooks.rs` は `content_html` を「content が変わったとき」に生成している。同じロジックで `embedding` も生成する。
+`apps/blog-api/api/src/handler/webhooks.rs` は `content_html` を「contentが変わったとき」に生成している。同じ条件を起点にchunkも再生成する。
 
-- content 変更検知は既存の `needs_html` 判定を流用 (`markdown_content` が更新される条件と同じ)
-- 埋め込みは Phase 5-2 で作った embedding client (`reqwest`) を再利用
+- title、description、contentのいずれかの変更でchunkを再生成する
+- Phase 5-2で作ったPLaMO clientを使い、`/chunks` と `/embed` を呼ぶ
+- 全vector生成成功後、`article_embedding_chunks` をtransactionで記事単位に差し替える
 - 本番の到達性 (Phase 6-5) が解決していない間は、環境変数 `PLAMO_EMBED_ENDPOINT` が未設定なら生成をスキップする実装にしておく (dev のみ有効化)
 
-### 7-2. `adapter/src/repository/articles.rs` の SQL 修正
+### 7-2. `adapter/src/repository/articles.rs` のSQL追加
 
-`upsert_from_webhook` の UPDATE 文に `embedding = COALESCE(?, embedding)` を追加。バインドを 1 つ増やす (VECTOR は `[..]` 形式の文字列で bind)。
+記事upsertとは別transactionで、対象 `article_id` の既存chunkを削除し、新chunkをinsertするrepository methodを追加する。PLaMO呼び出し失敗時はこのtransactionを開始せず、既存chunkを残す。
 
 ### 7-3. `handler/webhooks.rs` の修正
 
-`content_html` 生成の直後に、同じ `needs_html` 判定を使って embedding を生成する分岐を追加。PLaMo endpoint 未設定または呼び出し失敗はログに出して None を渡す (embedding 未反映で記事だけ更新される安全側フォールバック)。
+`content_html` 生成の直後にchunk生成を追加する。PLaMO endpoint未設定または呼び出し失敗はログに出し、記事更新を成功させつつ既存chunkを保持する。
 
 ### 7-4. 動作確認
 
 - ローカルで `PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET}` を渡して webhook を再送
-- 対象記事の `content` を変更したコミットで `embedding` も更新されること
+- 対象記事のtitle、description、contentを変更したコミットでsource hashとchunkが更新されること
 - endpoint 未設定でも記事更新自体は成功すること
 
 ### Phase 7 完了条件
 
-- [ ] webhook で content が変わった記事は embedding も更新される (dev)
+- [ ] webhookで記事が変わった場合、chunkが記事単位で差し替わる (dev)
 - [ ] PLaMo endpoint 未設定 / 呼び出し失敗でも記事更新自体は成功する
-- [ ] `updated_at` は他フィールドの更新条件でのみ変わる (embedding だけの UPDATE は起こさない — content_html と同じ扱い)
+- [ ] PLaMO失敗時に既存chunkが削除されない
 
 ---
 
@@ -815,3 +889,6 @@ Phase 4 のローカルバックフィルは「その時点で `embedding IS NUL
 - TiFlashが `3/4 CrashLoopBackOff` になっていることを検出。全133記事のembeddingがNULLの状態でHNSWを先行作成した結果、`DMFileVectorIndexWriter` → `FramedChecksumReadBuffer::doSeek` でframe size 0の除算が発生 (exit 136)
 - TiDB側でindexをdropした後も、TiFlashはPVC上の古いlocal-index taskを起動直後に再開してCrashLoopを継続。replicaを0へ切り替え、必要時は分析用PVCを再作成する復旧手順を3-4へ記録
 - HNSW作成をPhase 4のbackfill + TiFlash replica再同期 + `ALTER TABLE articles COMPACT` 後へ移動
+- 1記事1vectorの精度確認では `Rust Axum API` に対し本文全体がdistance 0.4674、タイトルのみが0.3815となり、長文による話題の希釈を確認
+- PLaMOの学習時context長1024 tokensに合わせ、同じtokenizerでMarkdownを見出し単位 + 128 tokens overlapに分割する方式へ変更
+- `article_embedding_chunks` とsource hashによる差分backfillを実装。全vector生成後に記事単位transactionで差し替える

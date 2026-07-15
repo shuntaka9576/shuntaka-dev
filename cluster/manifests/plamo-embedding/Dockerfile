@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir \
       uvicorn==0.32.0 \
       pydantic==2.9.2
 
-COPY server.py /app/server.py
+COPY server.py chunking.py /app/
 
 # ビルド時にモデルファイルを事前ダウンロードし image に焼き込む (~2.3GB)。
 # AutoModel.from_pretrained() を使うと RAM に model を全展開して verify する

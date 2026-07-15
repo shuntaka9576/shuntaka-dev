@@ -40,3 +40,6 @@ apm_modules/
 .vercel
 .env*
 !.envrc
+
+# python
+__pycache__
