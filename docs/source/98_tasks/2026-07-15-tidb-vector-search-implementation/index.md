@@ -549,6 +549,12 @@ bun run backfill \
 
 PLaMo は1リクエストでも約14/16 logical CPUを使用した。2 Podに対して `--concurrency 2` (1 Podあたり1リクエスト目安) とし、それ以上はCPU oversubscriptionで逆に遅くなるため増やさない。CLIはリクエストごとにHTTP connectionを閉じ、Kubernetes Serviceがconnection単位でnode2/node3へ振り分けられるようにする。
 
+#### 2 Pod backfill時のCPU使用率 (2026-07-15)
+
+![PLaMoをnode2/node3の2 Podでbackfillした際のノード別CPU使用率](plamo-2pod-backfill-cpu.png)
+
+17:23頃まではnode3の単一Podが約90%のCPUを継続使用していた。2 Pod化した17:41頃以降はnode2/node3の両方に負荷が分散し、TiFlashを配置するnode1は約2〜3%を維持した。記事ごとの本文長とKubernetes Serviceのconnection単位の振り分けにより、node2/node3の負荷は均等な直線ではなく交互に変動する。
+
 ### 4-5. 動作確認 (ユーザー実行)
 
 ```bash
