@@ -35,7 +35,7 @@
 
 ## 実装フェーズ (チェックボックス管理)
 
-- [ ] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認)
+- [x] Phase 1: TiFlash 追加 (manifest 編集 → apply → replica 確認) — 2026-07-15 完了
 - [ ] Phase 2: PLaMo Embedding Service (k8s Pod + HTTP wrapper)
 - [ ] Phase 3: `articles.embedding` 列 + HNSW インデックス追加 (DDL)
 - [ ] Phase 4: `tools/tidb-embedder` 新規作成 (既存レコード埋め戻し、`embedding IS NULL` 対象)
@@ -159,9 +159,9 @@ mysql -h tidb.${TAILNET} -P 4000 -u root -e \
 
 ### Phase 1 完了条件
 
-- [ ] `basic-tiflash-0` Pod が `4/4 Running`
-- [ ] `pd-ctl store` に engine=tiflash が 1 store 見える
-- [ ] `INFORMATION_SCHEMA.TIFLASH_REPLICA` が空 (テーブル未指定なので正常)
+- [x] `basic-tiflash-0` Pod が `4/4 Running`
+- [x] `pd-ctl store` に engine=tiflash が 1 store 見える (store id 7097, state Up, v8.5.7)
+- [x] `INFORMATION_SCHEMA.TIFLASH_REPLICA` が空 (テーブル未指定なので正常。TiFlash store の `region_count: 0` からも確認可能)
 
 ---
 
@@ -699,3 +699,4 @@ Phase 4 のローカルバックフィルは「その時点で `embedding IS NUL
 ### 2026-07-15
 
 - タスク doc 起票、Phase 1 の manifest 編集まで実施
+- Phase 1 実施完了。`kubectl apply` 後、`basic-tiflash-0` が Up (store id 7097)、`pd-ctl store` で engine=tiflash 1 store 確認
