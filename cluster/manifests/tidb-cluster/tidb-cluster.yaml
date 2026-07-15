@@ -80,3 +80,27 @@ spec:
     topologySpreadConstraints:
       - topologyKey: kubernetes.io/hostname
         maxSkew: 1
+  tiflash:
+    baseImage: pingcap/tiflash
+    replicas: 1
+    requests:
+      cpu: '500m'
+      memory: '4Gi'
+    limits:
+      memory: '8Gi'
+    storageClaims:
+      - resources:
+          requests:
+            storage: 50Gi
+        storageClassName: local-path
+    config:
+      config: |
+        [logger]
+          level = "info"
+        [profiles.default]
+          max_memory_usage = 0
+      proxy: |
+        log-level = "info"
+    topologySpreadConstraints:
+      - topologyKey: kubernetes.io/hostname
+        maxSkew: 1
