@@ -459,7 +459,7 @@ cilium status --wait
 <https://login.tailscale.com/admin/acls> の ACL エディタで以下を投入する。
 
 - `tag:k8s` — Tailscale Operator 本体と、Operator が立てる Proxy Pod (ts-\*) の両方が名乗るタグ
-- `tag:proxy` — AWS 側の tidb-proxy (ECS Fargate) が名乗るタグ。blog-api → TiDB (`:4000`) の経路（auth key は SSM `/shared/shuntaka/tailscale/proxy-auth-key`、90 日ローテーション。経緯は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)）
+- `tag:proxy` — AWS 側の tidb-proxy (ECS Fargate) が名乗るタグ。blog-api → TiDB (`:4000`) と PLaMo Embedding Service (`:80`) の経路（auth key は SSM `/shared/shuntaka/tailscale/proxy-auth-key`、90 日ローテーション。経緯は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)、PLaMo 経路は [TiDB Vector 検索実装](../98_tasks/2026-07-15-tidb-vector-search-implementation/index.md) Phase 6-5）
 
 ```json
 {
@@ -481,7 +481,7 @@ cilium status --wait
     {
       "action": "accept",
       "src": ["tag:proxy"],
-      "dst": ["tag:k8s:4000"]
+      "dst": ["tag:k8s:4000", "tag:k8s:80"]
     }
   ]
 }

@@ -1,4 +1,4 @@
-<!-- cspell:ignore fastapi huggingface pretrained pydantic QVEC sentencepiece uvicorn -->
+<!-- cspell:ignore fastapi huggingface pretrained pydantic QVEC sentencepiece urlencode uvicorn -->
 
 # TiDB Vector 検索実装 (PLaMo Embedding 1B + TiFlash)
 
@@ -721,20 +721,20 @@ SQL
 
 ### 5-1. 全体設計
 
-- **API**: `GET /users/{user_id}/articles/search?q=<query>&tags=<a,b>&mode=and|or&limit=20`
-- **認証**: 既存の users_articles と同じ policy (未認証で公開記事のみ or 認証済みで自分の記事)
+- **API**: `GET /users/{name}/articles/search?q=<query>&tags=<a,b>&mode=and|or&limit=20`
+- **認証**: 既存の公開記事一覧と同じく認証不要。`status = 'published'` の記事だけを返す
 - **ハンドラフロー**:
   1. `q` を PLaMo Embedding Service で vectorize (mode=query)
   2. `article_embedding_chunks` から近傍chunkを `limit * 10` 件取得する
   3. `article_id` ごとに最小distanceのchunkを残し、記事の公開条件+タグ絞り込み条件を適用する
-  4. 既存の `ArticleSummary` DTO に `dist` (cosine distance) を追加して返す
-- **UI コンセプト**: 既存 `FloatingTagFilter` を **「Ask & Tag」統合フローティング** に拡張。意味検索 (Ask) とタグ絞り込み (Tag) を 1 つのピル + 1 つのパネルにまとめ、パネル内で類似度メーター付きプレビューを見せる
+  4. 検索用DTOに `distance` (cosine distance) を付けて返す
+- **UI コンセプト**: 既存 `FloatingTagFilter` を検索・タグ統合フローティングへ拡張。意味検索とタグ絞り込みを1つのピル + 1つのpanelにまとめ、検索入力・類似度付きpreview・タグtreeを同時に見せる
 
 ### 5-2. API 実装ポイント
 
-- **`infrastructure/src/repository/embedding/`** を新規作成し、`PLAMO_EMBED_ENDPOINT` を環境変数から読んで `reqwest` で `POST /embed` を叩く小さな client を置く (query / document 両方に対応。Phase 7 でも同じものを流用する)
-- **`kernel/src/repository/articles.rs`** に `search_by_vector(user_id, vector, tags, mode, limit)` メソッドを追加
-- **`adapter/src/repository/articles.rs`** で SQL 実装:
+- **`infrastructure/src/embedding/client.rs`** を新規作成し、`PLAMO_EMBED_ENDPOINT` を環境変数から読んで `reqwest` で `POST /embed` を叩くclientを置く (query / document両方に対応。Phase 7でも同じものを流用する)
+- **`kernel/src/repository/users_articles.rs`** に `search_published_by_user_name(name, vector, tag_filter, candidate_limit, limit)` メソッドを追加
+- **`adapter/src/repository/users_articles.rs`** でSQL実装:
   ```sql
   WITH nearest_chunks AS (
     SELECT article_id, heading, content,
@@ -768,40 +768,42 @@ SQL
   - 同じ記事の複数chunkが候補に入るため、window関数で記事単位にdeduplicateする
   - タグ絞り込みは HNSW 後の post-filter。restrictive なタグ組み合わせで結果が空になる場合は inner LIMIT を上げる (`limit * 30` あたりまで)
 - **`api/src/route/users_articles.rs`** に `/search` サブルート追加
-- **`api/src/handler/users_articles.rs`** で embedding client を呼び、`tags` / `mode` クエリを受けて repository に渡す
-- レスポンス DTO: `ArticleSummary` に `dist: Option<f32>` を追加 (検索エンドポイントのみ Some)
+- **`api/src/handler/users_articles.rs`** でembedding clientを呼び、`tags` / `mode` クエリを受けてrepositoryへ渡す。`q` は空文字不可・500文字以内、`limit` は1 - 100件に制限する
+- レスポンスDTO: `ArticleSearchResultResponse` に `distance: f64` を持たせ、通常の記事一覧DTOへ検索固有フィールドを混ぜない
+- タグなしは `limit * 10`、タグありはpost-filterで候補が減るため `limit * 30` のchunkをANN候補にする (最大3000件)
+- `PLAMO_EMBED_ENDPOINT` が未設定でもAPI自体は起動し、検索endpointだけ `503 Service Unavailable` を返す。PLaMO呼び出し失敗は `502 Bad Gateway` を返す
 
 ### 5-3. UI 実装ポイント (`apps/web`)
 
 **新規コンポーネント** (すべて `src/components/` 配下。Story 必須):
 
-| ファイル                          | 役割                                                                  |
-| --------------------------------- | --------------------------------------------------------------------- |
-| `FloatingSearchTagFilter.tsx`     | 既存 `FloatingTagFilter` を差し替える親コンポーネント (Ask/Tag タブ)  |
-| `SearchInput.tsx`                 | 検索入力欄 (debounce 300ms、× でクリア)                               |
-| `SimilarityMeter.tsx`             | 類似度バー (`1 - dist/2` を 0-100% で可視化、`--color-accent` 単色)   |
+| ファイル                      | 役割                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `FloatingSearchTagFilter.tsx` | 既存 `FloatingTagFilter` を差し替える検索・タグ統合コンポーネント      |
+| `SearchInput.tsx`             | 検索入力欄 (debounce 300ms、× でクリア)                                |
+| `SimilarityMeter.tsx`         | 類似度バー (`1 - distance/2` を0 - 100%で可視化、`--color-accent`単色) |
 
 **拡張**:
 
-- `TagFilterProvider` に `query` / `searchResults` / `activeTab: 'ask' | 'tag'` state を追加
+- `SearchProvider` を `TagFilterProvider` の内側へ追加し、`query` / `submittedQuery` / `searchResults` とdebounce・request cancelを管理する
+- `TagFilterProvider` のURL更新時は検索queryを保持し、検索とタグが互いのquery parameterを消さないようにする
 - `lib/api.ts` に `searchArticles(userName, { q, tags, mode, limit, signal })` を追加
 - `ActiveTagBar` に検索クエリチップを追加表示 (× で解除)
-- `ArticleCard` に `dist?: number` prop を追加 (指定時は右端に `SimilarityMeter` を表示)
+- `ArticleCard` に `distance?: number` prop を追加 (指定時は右端に `SimilarityMeter` を表示)
 - `FilteredArticleList` は `query || tags.length > 0` を絞り込み条件に拡張
 
 **ピル形状** (下端中央、既存 `FloatingTagFilter` と同じ位置):
 
 ```
-┌──────────────────────────┐
-│  🔍  |  🏷  3           │   セグメント風の 1 ピル
-└──────────────────────────┘
-   ask    tag  (選択数)
+┌──────────────────┐
+│  search  tag  3  │   検索とタグを一体化した1ピル
+└──────────────────┘
 ```
 
-- 左半分 (ask) / 右半分 (tag)。押した側のタブが panel で active に
-- `filtering || query` のときは全体を `--color-text`、それ以外は `--color-text-muted`
+- クリックで検索 + タグの統合panel全体を開閉する
+- `filtering || query` のときはピル全体を `--color-text`、それ以外は `--color-text-muted`
 
-**パネル (ask タブ)**:
+**統合panel**:
 
 ```
 ┌──────────────────────────────────────┐
@@ -814,24 +816,22 @@ SQL
 │  PLaMo Embedding 触ってみる    83%▮▮ │
 │                                       │
 │  ─────── 全 12 件を一覧で見る → ─── │  ← main list を検索結果に差し替え
+├──────────────────────────────────────┤
+│  tech/                                │
+│    rust                         (12)  │  ← 既存 TagFilterTree
+│    aws/                         (24)  │
 └──────────────────────────────────────┘
 ```
-
-**パネル (tag タブ)**: 既存 `TagFilterTree` そのまま (差分なし)
 
 **URL 同期**: `?q=xxx&tags=tech/rust&mode=and` (既存 `pushFilterUrl` を拡張)
 
 **併用時の挙動**:
 
 - `q` と `tags` は AND で併用。ActiveTagBar は「search: "xxx" × / #tech/rust × / AND / 12件 / クリア」の順で表示
-- 一覧本体は `FilteredArticleList` が `searchResults` を優先表示。各 `ArticleCard` は `dist` を持つので類似度メーターを右端に付ける
+- 一覧本体は `FilteredArticleList` が `searchResults` を優先表示。各 `ArticleCard` は `distance` を持つので類似度メーターを右端に付ける
 - 検索結果 0 件時は「AND を OR に切り替える」ではなく「検索クエリを外す」ボタンを見せる (ミスヒット時に一撃で戻れる)
-
-**モック実装 (backend 未実装時の並行開発)**:
-
-- `lib/mockSearch.ts` に固定のダミー記事配列 + `q` からハッシュで擬似 `dist` を返す関数を置く
-- `searchArticles` は環境変数 `NEXT_PUBLIC_MOCK_SEARCH=1` のとき mock を返す
-- Storybook では `SimilarityMeter` / `SearchInput` / `FloatingSearchTagFilter` を mock データで表示
+- 検索inputは300ms debounceし、Enterでは即時確定する。新しい検索やタグ変更時は直前requestを `AbortController` でcancelする
+- Escapeはinputに値がある場合は1回目で検索を解除し、空の状態でもう一度押すとpanelを閉じる
 
 ### 5-4. 動作確認 (ユーザー実行)
 
@@ -840,11 +840,19 @@ SQL
 cd apps/blog-api
 PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET} \
   DATABASE_URL="mysql://root@tidb.${TAILNET}:4000/blog_dev" \
-  cargo run --bin api
+  PORT=43003 cargo run --bin server
 
 # API 単体
-curl -s "http://localhost:3000/users/<user_id>/articles/search?q=TiDB%20Vector" | jq '.'
-curl -s "http://localhost:3000/users/<user_id>/articles/search?q=TiDB&tags=tech/rust&mode=and" | jq '.'
+curl -sG "http://localhost:43003/users/<user_name>/articles/search" \
+  --data-urlencode 'q=Rust Axum API' --data-urlencode 'limit=5' | jq '.'
+curl -sG "http://localhost:43003/users/<user_name>/articles/search" \
+  --data-urlencode 'q=Rust Axum API' \
+  --data-urlencode 'tags=tech/rust,tech/aws/lambda' \
+  --data-urlencode 'mode=and' --data-urlencode 'limit=5' | jq '.'
+curl -sG "http://localhost:43003/users/<user_name>/articles/search" \
+  --data-urlencode 'q=Rust Axum API' \
+  --data-urlencode 'tags=tech/rust,tech/aws/lambda' \
+  --data-urlencode 'mode=or' --data-urlencode 'limit=5' | jq '.'
 
 # UI (Storybook で先に mock 確認)
 cd apps/web
@@ -853,8 +861,16 @@ bun run storybook
 
 # UI (実 API 接続)
 bun run dev
-# http://localhost:3000/<user_name> で floating pill をクリック
+# http://localhost:43000/ でfloating pillをクリック
 ```
+
+2026-07-15に `blog_dev` とPLaMOを使って確認した結果:
+
+- `q=Rust Axum API&limit=5`: 5件。先頭は「Rust(axum) on Lambda × Aurora DSQL × Next.js on Vercelで個人ブログをリーアーキした話」
+- 上記query + `tags=tech/rust,tech/aws/lambda&mode=and`: 両方のタグを持つ上記記事だけ1件
+- 上記query + 同じtags + `mode=or`: 片方以上のタグを持つ5件
+- PLaMOのquery vector生成、TiDB検索、タグ取得を含むAPI全体の応答時間は約0.8秒 (ローカルからTailnet経由)
+- `PLAMO_EMBED_ENDPOINT` 未設定時は `/health` が204のまま、検索endpointだけ503になる
 
 ### 5-5. `EXPLAIN` 確認
 
@@ -870,18 +886,26 @@ SELECT article_id, VEC_COSINE_DISTANCE(embedding, '[...]') AS dist
 - 効かない場合: chunkテーブルのTiFlash replica同期 (Phase 4) とHNSW build完了を確認
 - tags 併用時も inner query (HNSW pushdown) が先に評価され、外側の JOIN + tag subquery が post-filter になっていることを確認
 
+2026-07-15にタグAND条件を含む実装SQLで確認した。`nearest_chunks LIMIT 600` がTiFlash MPPへpushdownされ、次のoperatorが出力された。
+
+```text
+TableFullScan_177  mpp[tiflash]
+table:c, index:idx_article_embedding_chunks_embedding(embedding)
+keep order:false, annIndex:COSINE(embedding..[...], limit:600)
+```
+
 ### Phase 5 完了条件
 
-- [ ] 検索エンドポイントが 200 を返す (q のみ / q + tags AND / q + tags OR の 3 パターン)
+- [x] 検索エンドポイントが 200 を返す (q のみ / q + tags AND / q + tags OR の 3 パターン)
 - [ ] 上位 20 件が意味的に妥当
-- [ ] `EXPLAIN` で HNSW / TiFlash 経路が使われている
-- [ ] 未認証で他人の下書きが返らないこと (既存 policy を破っていない)
-- [ ] UI: floating pill から Ask / Tag タブが切り替わる
-- [ ] UI: 検索クエリ入力で上位 3 件がパネル内に類似度メーター付きで即プレビューされる
-- [ ] UI: 「全 N 件を一覧で見る」で main list が検索結果に差し替わる
-- [ ] UI: タグ選択と検索クエリの AND 併用が動作する (ActiveTagBar に両方チップが出る)
-- [ ] UI: URL に `q` / `tags` / `mode` が同期する (直リンク・戻る/進むで復元)
-- [ ] UI: Storybook に `SimilarityMeter` / `SearchInput` / `FloatingSearchTagFilter` の Story がある
+- [x] `EXPLAIN` で HNSW / TiFlash 経路が使われている
+- [x] 未認証で他人の下書きが返らないこと (`status = 'published'` を検索SQLのpost-filterで強制)
+- [x] UI: floating pillから検索 + タグの統合panelを開ける
+- [x] UI: 検索クエリ入力で上位3件がpanel内に類似度メーター付きで即previewされる
+- [x] UI: 「全 N 件を一覧で見る」でmain listが検索結果に差し替わる
+- [x] UI: タグ選択と検索クエリのAND併用が動作する (`ActiveTagBar` に両方chipが出る)
+- [x] UI: URLに `q` / `tags` / `mode` が同期する (直link・戻る/進むで復元)
+- [x] UI: Storybookに `SimilarityMeter` / `SearchInput` / `FloatingSearchTagFilter` のStoryがある
 
 ---
 
@@ -935,24 +959,121 @@ CREATE VECTOR INDEX idx_article_embedding_chunks_embedding
 SQL
 ```
 
-### 6-5. 本番 blog-api への検索 API 公開 (到達性の課題)
+### 6-5. 本番 blog-api → PLaMo Service の到達経路 (案 1: tidb-proxy に L4 中継を増設)
 
-本番 blog-api は AWS Lambda 上で動き、TiDB へは `tidb-proxy` (ECS Fargate + Tailscale tsnet) 経由で TCP 中継している。PLaMo Embedding Service (HTTP) は現状同じルートを通せない。
+本番 blog-api は AWS Lambda 上で動き、TiDB へは `tidb-proxy` (ECS Fargate + Tailscale tsnet) 経由で TCP 中継している。PLaMo Embedding Service は Tailnet 上の `plamo-embedding.<tailnet>` (HTTP) にしか存在せず、Lambda から直接は到達できない。
 
-**方針候補 (別タスク検討)**:
+#### 方式選定
 
-1. `tidb-proxy` に L4 で PLaMo Service 用の中継ポートを追加する
-2. Lambda 用の HTTP プロキシを新設する (squid 側で許可 URL を絞る)
-3. 検索エンドポイントを **Tailnet 内 (cluster 内) の別サービス** として立てる (Lambda を経由しない)
+Tailnet 到達性は `tidb-proxy` コンテナ内の **forwarder プロセスの `tsnet.Server` にしか無い**。squid は同じ VPC 上の別プロセスで Tailnet ノードではないため、`plamo-embedding.<tailnet>` の MagicDNS 名を解決も WireGuard ルーティングもできない (`squid.conf` も CONNECT 443 のみ許可で、PLaMo の平文 HTTP:80 は通らない)。したがって:
 
-いずれも本タスクの範囲外。**本番の検索 API 公開は保留** し、6-4 の埋め戻しまでで一旦切る。
+- **案 2 (squid で中継)**: squid を Tailnet ノードにできないため不可。成立するのは PLaMo を Funnel 等で公開 HTTPS にする場合のみで、private 推論サービスをインターネットに晒すことになるので却下
+- **案 3 (cluster 内に検索サービスを別建て)**: blog-api の公開判定・認可 policy を二重実装し read-path が 2 ランタイムに割れる。Lambda を Tailnet から完全に外す強い理由がある時のみ検討
+- **案 1 (forwarder に PLaMo 用ポートを増設)**: `plamo-embedding.<tailnet>` は `tidb.<tailnet>` と同じ Tailscale operator LoadBalancer で公開されており、既存 `tag:proxy → tag:k8s` ACL がそのまま効く。HTTP は TCP ストリームなので L4 転送でそのまま流せる。既存パターンの素直な拡張で追加の攻撃面もゼロ (VPC 内 ENI からのみ到達可)
+
+→ **案 1 を採用する。**
+
+#### 確認済みの事実 (2026-07-15, `tailscale status --json`)
+
+| デバイス               | HostName          | タグ        |
+| ---------------------- | ----------------- | ----------- |
+| PLaMo Service          | `plamo-embedding` | `tag:k8s`   |
+| TiDB                   | `tidb`            | `tag:k8s`   |
+| forwarder (tidb-proxy) | `tidb-proxy`      | `tag:proxy` |
+
+- Tailnet suffix: `tailea8e2.ts.net`
+- TiDB は本番で既に `tag:proxy → tidb.<tailnet>:4000` に到達できている。PLaMo も同じ `tag:k8s` なので、**残る論点は既存 ACL がポート限定か全ポートか、と PLaMo の 80 が通るかだけ**
+
+#### (1) Go forwarder をマルチターゲット化 — `apps/tidb-proxy/cmd/forwarder/main.go`
+
+現状は単一ターゲット (`TIDB_HOSTNAME`/`TIDB_PORT` → `0.0.0.0:13306` の 1 listener)。これを forward ルールのリストにし、同じ `ts *tsnet.Server` を共有したまま listener を 2 本立てる。PLaMo listener はオプション (`PLAMO_HOSTNAME` が空なら張らない = 後方互換)。
+
+```
+PLAMO_LISTEN_ADDR=0.0.0.0:18080
+PLAMO_HOSTNAME=plamo-embedding
+PLAMO_PORT=80
+```
+
+- `loadConfig()` が `[]forwardRule{ListenAddr, Target, UpstreamName}` を返すようにし、ルールごとに `net.Listen` → `go runForwarder(ts, listener, rule.Target, tel, rule.UpstreamName)`
+- pre-warm dial も各 Target に対して回す
+- **注意**: telemetry の `upstreamName` は現状 `setupTelemetry` で単一固定 (`otel.go`)。`forwardConn` が読む `tel.upstreamName` を `runForwarder` から渡す per-forward の名前 (`"tidb"` / `"plamo-embedding"`) に差し替えて、span/metric で 2 経路を区別する
+
+#### (2) ecspresso task def — `iac/aws/ecspresso/tidb-proxy/ecs-task-def.jsonnet`
+
+```jsonnet
+environment: [
+  // ... 既存 ...
+  { name: 'PLAMO_HOSTNAME', value: 'plamo-embedding' },
+  { name: 'PLAMO_PORT', value: '80' },
+  { name: 'PLAMO_LISTEN_ADDR', value: '0.0.0.0:18080' },
+],
+portMappings: [
+  { containerPort: 13306, protocol: 'tcp' },
+  { containerPort: 3128, protocol: 'tcp' },
+  { containerPort: 18080, protocol: 'tcp' },   // 追加
+],
+healthCheck: {
+  command: ['CMD-SHELL',
+    'nc -z localhost 13306 && nc -z localhost 3128 && nc -z localhost 18080'],
+  // interval / timeout / retries / startPeriod は据え置き
+},
+```
+
+#### (3) CDK: Lambda の SG と env — `iac/aws/lib/api/blog-api-construct.ts`
+
+```ts
+lambdaSg.addEgressRule(proxySecurityGroup, ec2.Port.tcp(18080), 'plamo embedding via tidb-proxy');
+proxySecurityGroup.addIngressRule(
+  lambdaSg,
+  ec2.Port.tcp(18080),
+  `plamo from lambda-sg-${props.stageName}`,
+);
+
+// environment に追加
+PLAMO_EMBED_ENDPOINT: `http://${proxyDnsName}:18080`, // = http://tidb-proxy.internal:18080
+```
+
+既存の `NO_PROXY` に `tidb-proxy.internal` が含まれるため、reqwest は `PLAMO_EMBED_ENDPOINT` を `HTTP_PROXY` (squid) に回さず **直で TCP 接続**し、forwarder → tsnet に乗る。追加設定不要。
+
+#### (4) Tailscale ACL — `tag:k8s:80` を追加
+
+ACL の正は [`02_cluster.md` の ACL 設定](../../01_開発ドキュメント/02_cluster.md)。現行は `tag:proxy → tag:k8s:4000` (TiDB のみ)。PLaMo も同じ `tag:k8s` なので dst に `tag:k8s:80` を足すだけ。<https://login.tailscale.com/admin/acls> で保存する (`tagOwners` は変更不要)。
+
+```json
+{ "action": "accept", "src": ["tag:proxy"], "dst": ["tag:k8s:4000", "tag:k8s:80"] }
+```
+
+#### (5) blog-api embedding client
+
+Phase 5-2 で作る reqwest クライアントが `PLAMO_EMBED_ENDPOINT` を読んで POST するだけなので **コード変更不要**。ローカルは `http://plamo-embedding.<tailnet>`、Lambda は `http://tidb-proxy.internal:18080` と env が違うだけ。
+
+#### (6) 検証 (デプロイ後)
+
+ECS exec 内でも `nc plamo-embedding.<tailnet> 80` は通らない (Tailnet 到達性は forwarder プロセス内の tsnet に閉じており、コンテナ OS の `nc` は MagicDNS を解決できない)。検証は **18080 listener 経由**で行う。
+
+```bash
+TASK=$(aws ecs list-tasks --cluster tidb-proxy --query 'taskArns[0]' --output text)
+aws ecs execute-command --cluster tidb-proxy --task "$TASK" \
+  --container tidb-proxy --interactive \
+  --command "wget -qO- --post-data '{\"text\":\"疎通確認\",\"mode\":\"query\"}' \
+    --header 'Content-Type: application/json' http://localhost:18080/embed | head -c 200"
+# → vector 配列が返れば ACL + forwarder 経路ともに OK
+```
+
+#### 落とし穴
+
+- **Host ヘッダ**が `tidb-proxy.internal:18080` になる。uvicorn / FastAPI はデフォルトで Host を検証しないので問題ないが、将来 `TrustedHostMiddleware` を入れたら許可が要る
+- **Pod 分散**: forwarder は接続ごとに `plamo-embedding.<tailnet>:80` へ dial するので operator LB / Service が分散する。本番検索は 1 リクエストにつき embedding 1 回 (query のみ) で backfill ほどシビアでない
+- **タイムアウト**: forwarder の 5s dial timeout は tsnet 接続確立まで。PLaMo 推論 (100–500ms) はストリーム転送側で forwarder は追加 timeout を持たない。実効タイムアウトは Lambda 側 reqwest で握る
 
 ### Phase 6 完了条件
 
 - [ ] `blog_prd.article_embedding_chunks` に全記事のchunkがある
 - [ ] `TIFLASH_REPLICA.AVAILABLE = 1` for `blog_prd.article_embedding_chunks`
 - [ ] `idx_article_embedding_chunks_embedding` の未index行が0件
-- [ ] 本番検索 API 公開の別タスクを起票した (6-5 の到達性設計)
+- [ ] forwarder に PLaMo 用 18080 listener を追加し、ECS exec の 18080 経由で `/embed` が vector を返す
+- [ ] Tailscale ACL tests に `tag:proxy → plamo-embedding:80` が含まれ、保存できている
+- [ ] Lambda の `PLAMO_EMBED_ENDPOINT` が `http://tidb-proxy.internal:18080` を指し、本番検索 API が 200 を返す
 
 ---
 

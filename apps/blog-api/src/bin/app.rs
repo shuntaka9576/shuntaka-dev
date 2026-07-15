@@ -4,7 +4,10 @@ use api::route::health::build_health_check_routers;
 use api::route::users_articles::build_users_articles_routers;
 use api::route::users_moments::build_users_moments_routers;
 use api::route::webhooks::build_webhooks_routers;
-use infrastructure::lambda::{LambdaSelfInvoker, SelfInvoker};
+use infrastructure::{
+    embedding::client::{EmbeddingClient, EmbeddingClientImpl},
+    lambda::{LambdaSelfInvoker, SelfInvoker},
+};
 use registry::{AppRegistry, WebhookConfig};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -80,7 +83,15 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         .await
         .map(|invoker| Arc::new(invoker) as Arc<dyn SelfInvoker>);
 
-    let registry = AppRegistry::new(pool, webhook_config, self_invoker).await;
+    let embedding_client = app_config
+        .embedding
+        .endpoint
+        .as_deref()
+        .map(EmbeddingClientImpl::new)
+        .transpose()?
+        .map(|client| Arc::new(client) as Arc<dyn EmbeddingClient>);
+
+    let registry = AppRegistry::new(pool, webhook_config, self_invoker, embedding_client).await;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

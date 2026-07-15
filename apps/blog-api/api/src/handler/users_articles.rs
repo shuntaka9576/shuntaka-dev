@@ -14,6 +14,12 @@ use crate::error::AppError;
 
 const DEFAULT_PER_PAGE: u32 = 10;
 const MAX_PER_PAGE: u32 = 500;
+const DEFAULT_SEARCH_LIMIT: u32 = 20;
+const MAX_SEARCH_LIMIT: u32 = 100;
+const MAX_SEARCH_QUERY_CHARS: usize = 500;
+const SEARCH_CANDIDATE_MULTIPLIER: u32 = 10;
+const TAGGED_SEARCH_CANDIDATE_MULTIPLIER: u32 = 30;
+const MAX_SEARCH_CANDIDATES: u32 = 3000;
 
 // 公開済み記事しか返さない API のため、CDN / ブラウザ双方でキャッシュを許可する
 const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
@@ -43,6 +49,18 @@ pub struct UsersArticlesTagFacetsQuery {
     pub tags: Option<String>,
     /// Tag filter mode for the pre-filter: "and" (default) or "or".
     pub mode: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct UsersArticlesSearchQuery {
+    /// Semantic search query.
+    pub q: String,
+    /// Comma-separated full-path tags for post-filtering the ANN candidates.
+    pub tags: Option<String>,
+    /// Tag filter mode: "and" (default) or "or".
+    pub mode: Option<String>,
+    /// Maximum number of unique articles to return (default 20, max 100).
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +118,33 @@ pub struct UsersArticlesResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(rename_all = "camelCase")]
+pub struct ArticleSearchResultResponse {
+    pub article_id: String,
+    pub title: String,
+    pub slug: String,
+    pub description: String,
+    pub thumbnail: Option<String>,
+    pub ogp_url: String,
+    pub tags: Vec<String>,
+    pub published_at: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    /// Cosine distance. Smaller values indicate a closer semantic match.
+    pub distance: f64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(rename_all = "camelCase")]
+pub struct UsersArticlesSearchResponse {
+    pub articles: Vec<ArticleSearchResultResponse>,
+    pub query: String,
+    pub limit: u32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TagFacetEntry {
     /// Full-path tag (e.g. "tech/aws" or "tech/aws/lambda")
     pub path: String,
@@ -150,6 +195,37 @@ fn parse_per_page(raw: Option<&str>) -> Result<u32, AppError> {
         return Err(AppError::bad_request("perPage exceeds maximum"));
     }
     Ok(parsed)
+}
+
+fn parse_search_query(raw: &str) -> Result<&str, AppError> {
+    let query = raw.trim();
+    if query.is_empty() {
+        return Err(AppError::bad_request("q must not be empty"));
+    }
+    if query.chars().count() > MAX_SEARCH_QUERY_CHARS {
+        return Err(AppError::bad_request("q exceeds maximum length"));
+    }
+    Ok(query)
+}
+
+fn parse_search_limit(raw: Option<u32>) -> Result<u32, AppError> {
+    let limit = raw.unwrap_or(DEFAULT_SEARCH_LIMIT);
+    if limit == 0 {
+        return Err(AppError::bad_request("limit must be >= 1"));
+    }
+    if limit > MAX_SEARCH_LIMIT {
+        return Err(AppError::bad_request("limit exceeds maximum"));
+    }
+    Ok(limit)
+}
+
+fn search_candidate_limit(limit: u32, has_tag_filter: bool) -> u32 {
+    let multiplier = if has_tag_filter {
+        TAGGED_SEARCH_CANDIDATE_MULTIPLIER
+    } else {
+        SEARCH_CANDIDATE_MULTIPLIER
+    };
+    limit.saturating_mul(multiplier).min(MAX_SEARCH_CANDIDATES)
 }
 
 // ─────────────────────────────────────────
@@ -231,6 +307,95 @@ pub async fn get_users_articles(
     };
 
     Ok(([CACHE_CONTROL_PUBLIC], Json(response)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/users/{name}/articles/search",
+    params(
+        ("name" = String, Path, description = "User name"),
+        UsersArticlesSearchQuery,
+    ),
+    responses(
+        (status = 200, description = "Semantic article search completed", body = UsersArticlesSearchResponse),
+        (status = 400, description = "Invalid query or limit"),
+        (status = 502, description = "Embedding service request failed"),
+        (status = 503, description = "Embedding service is not configured"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users_articles"
+)]
+pub async fn get_users_articles_search(
+    State(registry): State<AppRegistry>,
+    Path(name): Path<String>,
+    Query(query): Query<UsersArticlesSearchQuery>,
+) -> Result<
+    (
+        [(HeaderName, HeaderValue); 1],
+        Json<UsersArticlesSearchResponse>,
+    ),
+    AppError,
+> {
+    let search_query = parse_search_query(&query.q)?;
+    let limit = parse_search_limit(query.limit)?;
+    let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
+    let candidate_limit = search_candidate_limit(limit, tag_filter.is_some());
+
+    let embedding_client = registry.embedding_client().ok_or_else(|| {
+        AppError::service_unavailable("PLaMO embedding service is not configured")
+    })?;
+    let vector = embedding_client
+        .embed_query(search_query)
+        .await
+        .map_err(|error| AppError::bad_gateway("Failed to generate query embedding", error))?;
+
+    let results = registry
+        .users_articles_repository()
+        .search_published_by_user_name(
+            &name,
+            &vector,
+            tag_filter.as_ref(),
+            u64::from(candidate_limit),
+            u64::from(limit),
+        )
+        .await
+        .map_err(|error| AppError::internal("Failed to search articles", error))?;
+
+    let config = registry.webhook_config();
+    let cloudinary = CloudinaryClientImpl::new(
+        config.cloudinary_cloud_name.clone(),
+        config.cloudinary_api_secret.clone(),
+    );
+    let articles = results
+        .into_iter()
+        .map(|result| {
+            let article = result.article;
+            let title = article.title.into_inner();
+            let ogp_url = cloudinary.create_signed_ogp_url(&config.ogp_public_id, &title, "webp");
+            ArticleSearchResultResponse {
+                article_id: article.article_id.into_inner().to_string(),
+                title,
+                slug: article.slug.into_inner(),
+                description: article.description.into_inner(),
+                thumbnail: article.thumbnail.map(|value| value.into_inner()),
+                ogp_url,
+                tags: article.tags,
+                published_at: article.published_at.map(|value| value.to_rfc3339()),
+                created_at: article.created_at.map(|value| value.to_rfc3339()),
+                updated_at: article.updated_at.map(|value| value.to_rfc3339()),
+                distance: result.distance,
+            }
+        })
+        .collect();
+
+    Ok((
+        [CACHE_CONTROL_PUBLIC],
+        Json(UsersArticlesSearchResponse {
+            articles,
+            query: search_query.to_string(),
+            limit,
+        }),
+    ))
 }
 
 #[utoipa::path(
@@ -406,5 +571,40 @@ mod tests {
     #[test]
     fn parse_per_page_over_max_is_error() {
         assert!(parse_per_page(Some("501")).is_err());
+    }
+
+    #[test]
+    fn parse_search_query_trims_whitespace() {
+        assert_eq!(parse_search_query("  Rust Axum  ").unwrap(), "Rust Axum");
+    }
+
+    #[test]
+    fn parse_search_query_rejects_empty() {
+        assert!(parse_search_query("   ").is_err());
+    }
+
+    #[test]
+    fn parse_search_query_rejects_over_maximum() {
+        let query = "あ".repeat(MAX_SEARCH_QUERY_CHARS + 1);
+        assert!(parse_search_query(&query).is_err());
+    }
+
+    #[test]
+    fn parse_search_limit_defaults_and_validates_range() {
+        assert_eq!(parse_search_limit(None).unwrap(), DEFAULT_SEARCH_LIMIT);
+        assert_eq!(parse_search_limit(Some(1)).unwrap(), 1);
+        assert_eq!(
+            parse_search_limit(Some(MAX_SEARCH_LIMIT)).unwrap(),
+            MAX_SEARCH_LIMIT
+        );
+        assert!(parse_search_limit(Some(0)).is_err());
+        assert!(parse_search_limit(Some(MAX_SEARCH_LIMIT + 1)).is_err());
+    }
+
+    #[test]
+    fn search_candidates_expand_when_tags_are_present() {
+        assert_eq!(search_candidate_limit(20, false), 200);
+        assert_eq!(search_candidate_limit(20, true), 600);
+        assert_eq!(search_candidate_limit(MAX_SEARCH_LIMIT, true), 3000);
     }
 }

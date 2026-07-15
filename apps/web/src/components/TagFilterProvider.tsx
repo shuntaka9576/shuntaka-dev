@@ -201,13 +201,16 @@ export function TagFilterProvider({
 
   const pushFilterUrl = useCallback(
     (nextSelected: string[], nextMode: TagFilterMode, nextFilterPage: number, replace = false) => {
+      // 検索クエリ (?q=) は SearchProvider が管理する別軸なので、こちらの URL 更新でも保持する
+      const currentQ = new URLSearchParams(window.location.search).get('q');
       let url: string;
       if (nextSelected.length === 0) {
-        url = unfilteredHref;
+        url = currentQ ? `${unfilteredHref}?q=${encodeURIComponent(currentQ)}` : unfilteredHref;
       } else {
         const query = buildFilterQuery(nextSelected, nextMode);
         const pageParam = nextFilterPage > 1 ? `&page=${nextFilterPage}` : '';
-        url = `${baseHref}${query}${pageParam}`;
+        const qParam = currentQ ? `&q=${encodeURIComponent(currentQ)}` : '';
+        url = `${baseHref}${query}${pageParam}${qParam}`;
       }
       if (replace) {
         window.history.replaceState(null, '', url);
@@ -238,7 +241,7 @@ export function TagFilterProvider({
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
-  // FloatingTagFilter の effect 依存に入るため参照を安定させる
+  // FloatingSearchTagFilter の effect 依存に入るため参照を安定させる
   const closePanel = useCallback(() => setPanelOpen(false), []);
 
   const value: TagFilterContextValue = {

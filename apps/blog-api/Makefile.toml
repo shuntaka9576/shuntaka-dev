@@ -13,6 +13,9 @@ AWS_REGION = "ap-northeast-1"
 DATABASE_URL = { script = [
   "if [ -n \"${DATABASE_URL:-}\" ]; then echo \"$DATABASE_URL\"; else TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix); echo \"mysql://root@tidb.${TAILNET}:4000/${TIDB_DATABASE:-blog_dev}\"; fi",
 ] }
+PLAMO_EMBED_ENDPOINT = { script = [
+  "if [ -n \"${PLAMO_EMBED_ENDPOINT:-}\" ]; then echo \"$PLAMO_EMBED_ENDPOINT\"; else TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix); echo \"http://plamo-embedding.${TAILNET}\"; fi",
+] }
 [tasks.run]
 command = "cargo"
 args = ["watch", "-x", "run"]

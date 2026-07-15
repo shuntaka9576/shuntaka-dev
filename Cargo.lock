@@ -13,6 +13,7 @@ dependencies = [
  "hex",
  "kernel",
  "opentelemetry",
+ "serde_json",
  "sha2 0.11.0",
  "shared",
  "sqlx",

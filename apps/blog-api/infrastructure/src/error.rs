@@ -40,6 +40,24 @@ pub enum LambdaInvokeError {
 }
 
 #[derive(Error, Debug)]
+pub enum EmbeddingError {
+    #[error("invalid embedding endpoint: {0}")]
+    InvalidEndpoint(String),
+
+    #[error("failed to build HTTP client: {0}")]
+    HttpClient(#[source] reqwest::Error),
+
+    #[error("embedding HTTP request failed: {0}")]
+    Http(#[from] reqwest::Error),
+
+    #[error("embedding API error: {status} - {message}")]
+    Api { status: u16, message: String },
+
+    #[error("invalid embedding response: {0}")]
+    InvalidResponse(String),
+}
+
+#[derive(Error, Debug)]
 pub enum WebhookError {
     #[error("Missing X-Hub-Signature-256 header")]
     MissingSignature,
