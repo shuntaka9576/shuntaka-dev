@@ -62,12 +62,7 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
       baseHref={baseHref}
     >
       <SearchProvider userName={USER_NAME}>
-        <BaseLayout
-          showTypeHeader
-          currentTab="posts"
-          narrow
-          headerActions={<SearchTriggerButton />}
-        >
+        <BaseLayout showTypeHeader currentTab="posts" narrow>
           <main className="w-full">
             <ActiveFilterBar />
             <FilteredArticleList userName={USER_NAME}>
@@ -89,6 +84,7 @@ export async function ArticleListView({ page, baseHref }: ArticleListViewProps) 
             </FilteredArticleList>
             <PageReady />
           </main>
+          <SearchTriggerButton />
           <SearchModal userName={USER_NAME} defaultArticles={articles} />
           <TagFilterModal />
         </BaseLayout>

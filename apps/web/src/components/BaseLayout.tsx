@@ -11,8 +11,6 @@ interface BaseLayoutProps {
   currentTab?: 'posts' | 'moments' | 'about';
   /** ヘッダー・タブ行・本文を記事一覧と同じ --layout-list-max のカラムに揃える */
   narrow?: boolean;
-  /** ヘッダー右側 (ToggleSwitch の左) に置く追加アクション。SearchTrigger 等 */
-  headerActions?: React.ReactNode;
 }
 
 export function BaseLayout({
@@ -20,7 +18,6 @@ export function BaseLayout({
   showTypeHeader = false,
   currentTab,
   narrow = false,
-  headerActions,
 }: BaseLayoutProps) {
   const pathname = usePathname();
 
@@ -50,7 +47,6 @@ export function BaseLayout({
             <div className="text-2xl font-semibold">shuntaka.dev</div>
           </ProgressLink>
           <div className="flex items-center gap-3">
-            {headerActions}
             <ToggleSwitch />
           </div>
         </div>
