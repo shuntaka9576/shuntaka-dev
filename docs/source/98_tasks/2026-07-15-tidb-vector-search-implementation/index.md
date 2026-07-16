@@ -1,4 +1,4 @@
-<!-- cspell:ignore fastapi huggingface pretrained pydantic QVEC sentencepiece urlencode uvicorn -->
+<!-- cspell:ignore eprintln fastapi huggingface pretrained pydantic QVEC sentencepiece urlencode uvicorn -->
 
 # TiDB Vector 検索実装 (PLaMo Embedding 1B + TiFlash)
 
@@ -1107,9 +1107,33 @@ Phase 4のローカルbackfillは、実行時点でsource hashが変わった記
 
 ### Phase 7 完了条件
 
-- [ ] webhookで記事が変わった場合、chunkが記事単位で差し替わる (dev)
+- [x] webhookで記事が変わった場合、chunkが記事単位で差し替わる (dev。`blog_dev.article_embedding_chunks` の created_at が webhook 処理ウィンドウ内で更新されることを確認)
 - [ ] PLaMo endpoint 未設定 / 呼び出し失敗でも記事更新自体は成功する
 - [ ] PLaMO失敗時に既存chunkが削除されない
+
+### 7-5. Followup: Lambda ループ内の tracing ログが CloudWatch に出ない
+
+dev で webhook を再送して DB の chunk 差し替えは検証できたが、`process_push_event` のループ**内側**で発火する `info!("Article upserted: ...")` / `info!("Article chunks replaced: ...")` / `warn!("Failed to chunk article ...")` などが CloudWatch Logs に一切現れない。
+
+観測結果 (2026-07-16, dev, requestId `e4a4e306-ba9a-49b8-8413-1ca77108bf47`):
+
+- ループ**外側**の `info!("Processing async push event")` / `info!("Found {} markdown files")` / `info!("Webhook processing complete: processed=2, succeeded=2, failed=0")` は出る
+- ループ**内側**の info!/warn! は 0 件 (`aws logs filter-log-events` で `Article`, `upserted`, `chunks`, `slug`, `keeping`, `Skipping`, `Failed`, `error`, `panic` すべてマッチしない)
+- 同じ target (`api::handler::webhooks`) / 同じレベル (INFO) / 同じ span (`lambda.handler`) なのに、ループの前後だけ通る
+- DB (`article_embedding_chunks`) は正しく差し替わっているので、code path は実行されている
+- Athena (tidb-proxy squid_access) には OGP 用の外部 fetch が記録されており、markdown 変換まで含めてループが完走した傍証はある
+
+推測される原因候補:
+
+- `spawn_blocking` から戻った直後の future の tracing context が壊れて event が subscribable でない
+- Lambda LWA の `response_stream` モードで、レスポンス書き出しと非同期な stdout flush の間で内部ログが失われる
+- tracing_opentelemetry layer が span を close する順序で fmt::layer への forwarding を妨げている
+
+暫定対応案 (別 PR):
+
+- `regenerate_chunks` に `#[tracing::instrument(skip_all, fields(slug, chunks))]` を張り、event を span 属性化する
+- ループの各記事に per-article span を張って明示的に enter する
+- 一部の重要 info!/warn! を `eprintln!` に差し替えて fmt::layer をバイパスし、CloudWatch に必ず載る形を確認する
 
 ---
 
@@ -1127,3 +1151,13 @@ Phase 4のローカルbackfillは、実行時点でsource hashが変わった記
 - 1記事1vectorの精度確認では `Rust Axum API` に対し本文全体がdistance 0.4674、タイトルのみが0.3815となり、長文による話題の希釈を確認
 - PLaMOの学習時context長1024 tokensに合わせ、同じtokenizerでMarkdownを見出し単位 + 128 tokens overlapに分割する方式へ変更
 - `article_embedding_chunks` とsource hashによる差分backfillを実装。全vector生成後に記事単位transactionで差し替える
+
+### 2026-07-16
+
+- Phase 7 実装。`EmbeddingClient` に `chunk_document` を追加し、`compute_source_hash` を tidb-embedder と同じ JSON レイアウトで書いて後段バッチと hash が揃うようにした
+- `ArticlesRepository::replace_article_chunks` を追加。`article_embedding_chunks` の記事単位 transaction 差し替えを webhook でも使えるようにした
+- `handler/webhooks.rs` で title / description / content の変更を検出したら chunk 再生成を走らせるようにした。effective description の判定は `upsert_article` の書き込み挙動と同じ (frontmatter が None なら既存値、無ければ title) に揃えた
+- 失敗時は `warn!` を残して既存 chunk を保持し、記事 upsert 自体は成功扱い。`PLAMO_EMBED_ENDPOINT` 未設定時は skip ログのみ (dev のみ有効化)
+- 動作確認は次回、`PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET}` を渡した状態で webhook を再送して行う
+- dev デプロイ後 (2c9371b, 02:44:16Z 反映) に webhook 再送。`blog_dev.article_embedding_chunks` の `0c646f1b-...` に 3 chunks が created_at=02:45:01.427842 で差し替え済み ✅
+- ただし CloudWatch Logs で `process_push_event` **ループ内側**の info!/warn! (Article upserted、Article chunks replaced 等) が全部消失。ループ**外側**の info! と DB 書き込みは動作しているので機能面は OK。詳細は 7-5 followup に記録

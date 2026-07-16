@@ -5,7 +5,9 @@ use kernel::model::article::{
     Article, ArticleId, Content, ContentHtml, Description, Slug, Status, Thumbnail, Title, UserId,
     normalize_tags, parse_tag_path,
 };
-use kernel::repository::articles::{ArticlesRepository, UpsertArticleInput, UpsertResult};
+use kernel::repository::articles::{
+    ArticleEmbeddingChunk, ArticlesRepository, UpsertArticleInput, UpsertResult,
+};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -19,6 +21,10 @@ const TAGS_SYNC_SQL: &str =
 /// sync_tag_article_counts 全体を 1 span で計装するための代表 SQL（statement_hash 用）
 const TAG_ARTICLE_COUNTS_SYNC_SQL: &str =
     "DELETE FROM tag_article_counts; INSERT INTO tag_article_counts";
+
+/// replace_article_chunks 全体を 1 span で計装するための代表 SQL（statement_hash 用）
+const CHUNKS_REPLACE_SQL: &str =
+    "DELETE FROM article_embedding_chunks; INSERT INTO article_embedding_chunks";
 
 #[derive(FromRow)]
 struct ArticleRow {
@@ -439,5 +445,57 @@ impl ArticlesRepository for ArticlesRepositoryImpl {
                 Ok(UpsertResult::Created(ArticleId::new(article_id)))
             }
         }
+    }
+
+    async fn replace_article_chunks(
+        &self,
+        article_id: &ArticleId,
+        chunks: &[ArticleEmbeddingChunk],
+        chunking_version: &str,
+        source_hash: &str,
+    ) -> Result<(), anyhow::Error> {
+        let article_id_str = article_id.as_uuid().to_string();
+
+        observe_query(
+            "article_chunks_replace",
+            CHUNKS_REPLACE_SQL,
+            async {
+                let mut tx = self.db.pool().begin().await?;
+
+                sqlx::query("DELETE FROM article_embedding_chunks WHERE article_id = ?")
+                    .bind(&article_id_str)
+                    .execute(&mut *tx)
+                    .await?;
+
+                for chunk in chunks {
+                    // TiDB の VECTOR 列は JSON 配列文字列を受け付ける。
+                    // tidb-embedder と同じ形式で送るため serde_json で serialize する。
+                    let embedding_json = serde_json::to_string(&chunk.embedding)?;
+                    sqlx::query(
+                        r#"
+                        INSERT INTO article_embedding_chunks
+                            (article_id, chunk_index, heading, content, token_count,
+                             chunking_version, source_hash, embedding)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        "#,
+                    )
+                    .bind(&article_id_str)
+                    .bind(chunk.chunk_index)
+                    .bind(chunk.heading.as_deref())
+                    .bind(&chunk.content)
+                    .bind(chunk.token_count)
+                    .bind(chunking_version)
+                    .bind(source_hash)
+                    .bind(&embedding_json)
+                    .execute(&mut *tx)
+                    .await?;
+                }
+
+                tx.commit().await?;
+                Ok::<(), anyhow::Error>(())
+            },
+            |_| Some(chunks.len() as i64),
+        )
+        .await
     }
 }
