@@ -17,8 +17,8 @@ import { buildLocationSearch, parseSearchParam } from '@/lib/searchQuery';
 /** 検索 fetch の debounce（ms）。過剰な API 呼び出しを避けつつ体感速度は保つ */
 const DEBOUNCE_MS = 300;
 
-/** ヘッダ検索 API の既定件数。プレビュー 3 件 + 一覧差し替え用に余裕を持たせる */
-const DEFAULT_LIMIT = 20;
+/** 検索結果の1ページあたり件数。通常の記事一覧 (ARTICLES_PER_PAGE) と揃える */
+const DEFAULT_LIMIT = 10;
 
 interface SearchContextValue {
   /** input が現在保持している値。debounce 前 */

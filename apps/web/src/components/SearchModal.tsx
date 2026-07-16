@@ -1,12 +1,13 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useCallback, useEffect, useRef } from 'react';
 import { ArticleCard } from '@/components/ArticleCard';
 import { ArticleCardSkeletonList } from '@/components/ArticleCardSkeleton';
 import { useSearch } from '@/components/SearchProvider';
 import { SearchInput } from '@/components/SearchInput';
 import { useTagFilter } from '@/components/TagFilterProvider';
 import type { ArticleSummary, SearchArticleResult } from '@/lib/api';
+import { useNavigationProgress } from '@/components/NavigationProgressProvider';
 import { useFullScreenModal } from '@/lib/useFullScreenModal';
 
 interface SearchModalProps {
@@ -35,8 +36,8 @@ function TagIcon() {
   );
 }
 
-/** Lucide "x" 相当 */
-function CloseIcon() {
+/** Lucide "arrow-left" 相当 */
+function BackIcon() {
   return (
     <svg
       width="20"
@@ -49,8 +50,8 @@ function CloseIcon() {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
     </svg>
   );
 }
@@ -165,7 +166,26 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
     openTagModal,
   } = useTagFilter();
 
+  const { startProgress, doneProgress } = useNavigationProgress();
   const { containerStyle } = useFullScreenModal(modalOpen, closeModal);
+
+  const listLoading = (searching && searchLoading) || (filtering && tagLoading);
+
+  const prevLoadingRef = useRef(false);
+  useEffect(() => {
+    if (listLoading && !prevLoadingRef.current) startProgress();
+    if (!listLoading && prevLoadingRef.current) doneProgress();
+    prevLoadingRef.current = listLoading;
+  }, [listLoading, startProgress, doneProgress]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const handlePageChange = useCallback(
+    (setter: (page: number) => void) => (page: number) => {
+      setter(page);
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [],
+  );
 
   if (!modalOpen) return null;
 
@@ -174,7 +194,6 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
     : filtering
       ? (fetchedArticles ?? [])
       : defaultArticles;
-  const listLoading = (searching && searchLoading) || (filtering && tagLoading);
 
   const priorityArticleIds = new Set(
     articleList
@@ -220,10 +239,10 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
           <button
             type="button"
             onClick={closeModal}
-            aria-label="閉じる"
+            aria-label="戻る"
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-full)] text-[var(--color-text-muted)]"
           >
-            <CloseIcon />
+            <BackIcon />
           </button>
         </div>
 
@@ -269,13 +288,13 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8 sm:px-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-8 sm:px-6">
         <div className="mx-auto w-full max-w-[var(--layout-list-max)]">
           {searchError && searching && results === null ? (
             <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
               検索に失敗しました
             </p>
-          ) : listLoading && articleList.length === 0 ? (
+          ) : listLoading ? (
             <ArticleCardSkeletonList count={5} />
           ) : articleList.length === 0 ? (
             <p>
@@ -304,14 +323,14 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
                 <ModalPagination
                   currentPage={searchPage}
                   totalPages={searchTotalPages}
-                  onPageChange={setSearchPage}
+                  onPageChange={handlePageChange(setSearchPage)}
                 />
               )}
               {!searching && filtering && filteredTotalPages > 1 && (
                 <ModalPagination
                   currentPage={filterPage}
                   totalPages={filteredTotalPages}
-                  onPageChange={setFilterPage}
+                  onPageChange={handlePageChange(setFilterPage)}
                 />
               )}
             </>

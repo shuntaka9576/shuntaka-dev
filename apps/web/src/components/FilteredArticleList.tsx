@@ -174,31 +174,28 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
         .slice(0, 2)
         .map((a) => a.articleId),
     );
-    const wrapperClass = searchLoading ? 'pointer-events-none opacity-50' : '';
-
     return (
       <div>
-        {searchLoading && (
-          <p className="mb-2 text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
-            読み込み中…
-          </p>
-        )}
-        <div className={wrapperClass}>
-          {articles.map((article) => (
-            <ArticleCard
-              key={article.articleId}
-              article={article}
-              userName={userName}
-              priority={priorityArticleIds.has(article.articleId)}
-              distance={article.distance}
+        {searchLoading ? (
+          <ArticleCardSkeletonList count={5} />
+        ) : (
+          <>
+            {articles.map((article) => (
+              <ArticleCard
+                key={article.articleId}
+                article={article}
+                userName={userName}
+                priority={priorityArticleIds.has(article.articleId)}
+                distance={article.distance}
+              />
+            ))}
+            <FilterPagination
+              currentPage={searchPage}
+              totalPages={searchTotalPages}
+              onPageChange={setSearchPage}
             />
-          ))}
-          <FilterPagination
-            currentPage={searchPage}
-            totalPages={searchTotalPages}
-            onPageChange={setSearchPage}
-          />
-        </div>
+          </>
+        )}
       </div>
     );
   }
@@ -262,31 +259,28 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
       .map((a) => a.articleId),
   );
 
-  const wrapperClass = tagLoading ? 'pointer-events-none opacity-50' : '';
-
   return (
     <div>
-      {tagLoading && (
-        <p className="mb-2 text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
-          読み込み中…
-        </p>
-      )}
-      <div className={wrapperClass}>
-        {articles.map((article) => (
-          <ArticleCard
-            key={article.articleId}
-            article={article}
-            userName={userName}
-            priority={priorityArticleIds.has(article.articleId)}
-            tags={(article.tags ?? []).map((path) => ({ path, matched: isTagMatched(path) }))}
+      {tagLoading ? (
+        <ArticleCardSkeletonList count={5} />
+      ) : (
+        <>
+          {articles.map((article) => (
+            <ArticleCard
+              key={article.articleId}
+              article={article}
+              userName={userName}
+              priority={priorityArticleIds.has(article.articleId)}
+              tags={(article.tags ?? []).map((path) => ({ path, matched: isTagMatched(path) }))}
+            />
+          ))}
+          <FilterPagination
+            currentPage={filterPage}
+            totalPages={filteredTotalPages}
+            onPageChange={setFilterPage}
           />
-        ))}
-        <FilterPagination
-          currentPage={filterPage}
-          totalPages={filteredTotalPages}
-          onPageChange={setFilterPage}
-        />
-      </div>
+        </>
+      )}
     </div>
   );
 }
