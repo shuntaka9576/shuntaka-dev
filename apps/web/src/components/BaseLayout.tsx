@@ -88,7 +88,7 @@ export function BaseLayout({
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-0 mx-auto w-full">
+      <div className="absolute bottom-0 mx-auto w-full border-t border-[var(--color-border-subtle)]">
         <Footer />
       </div>
     </div>

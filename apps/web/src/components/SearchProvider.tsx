@@ -12,13 +12,14 @@ import {
 import { useTagFilter } from '@/components/TagFilterProvider';
 import type { SearchArticleResult } from '@/lib/api';
 import { searchArticles } from '@/lib/api';
+import { ARTICLES_PER_PAGE } from '@/lib/constants';
 import { buildLocationSearch, parseSearchParam } from '@/lib/searchQuery';
 
 /** 検索 fetch の debounce（ms）。過剰な API 呼び出しを避けつつ体感速度は保つ */
 const DEBOUNCE_MS = 300;
 
-/** 検索結果の1ページあたり件数。通常の記事一覧 (ARTICLES_PER_PAGE) と揃える */
-const DEFAULT_LIMIT = 10;
+/** 検索結果の1ページあたり件数。通常の記事一覧と揃える */
+const DEFAULT_LIMIT = ARTICLES_PER_PAGE;
 
 interface SearchContextValue {
   /** input が現在保持している値。debounce 前 */
@@ -172,15 +173,13 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    // 最新の入力値を確定させる（同期的に読める query state を使う）
-    setQueryState((current) => {
-      const trimmed = current.trim();
-      pushSearchUrl(trimmed);
-      setSubmittedQuery(trimmed);
-      setSearchPageState(1);
-      return current;
-    });
-  }, [pushSearchUrl]);
+    // state updater 内での副作用は render 中に実行され React が警告するため、
+    // deps の query から最新値を読む（controlled input なので Enter 時点で確定済み）
+    const trimmed = query.trim();
+    pushSearchUrl(trimmed);
+    setSubmittedQuery(trimmed);
+    setSearchPageState(1);
+  }, [query, pushSearchUrl]);
 
   const clearQuery = useCallback(() => {
     if (debounceRef.current) {
@@ -196,6 +195,30 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
   const setSearchPage = useCallback((p: number) => setSearchPageState(p), []);
+
+  // `/` と cmd+K (Windows/Linux は ctrl+K) で検索モーダルを開く。閉じるのは
+  // useFullScreenModal の Escape。`/` は入力フィールドでは通常のタイプとして扱う
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+      const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+      const isSlash = event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey;
+      if (!isCmdK && !isSlash) return;
+      if (isSlash) {
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        ) {
+          return;
+        }
+      }
+      event.preventDefault();
+      openModal();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [openModal]);
 
   const value = useMemo<SearchContextValue>(
     () => ({
