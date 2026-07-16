@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026.0716.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.4...2026.0716.0) - 2026-07-16
+
+- fix(deps): update aws-sdk-js-v3 monorepo to ^3.1086.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/630
+- chore(deps): update rust crate uuid to 1.23.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/634
+- fix(deps): update tanstack-router monorepo by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/635
+- chore(deps): update dependency vercel to v56.2.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/644
+- chore(deps): update rust crate aws-sdk-lambda to 1.134.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/643
+- fix(deps): update dependency @hono/zod-openapi to ^1.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/640
+- feat: Sphinxの日本語検索をPagefindへ置き換える by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/648
+- chore(deps): update dependency steiger to ^0.6.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/650
+- docs: TiFlash が OLTP 一貫性の外にある構造の深掘り節を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/655
+- fix(deps): update aws-sdk-js-v3 monorepo to ^3.1087.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/654
+- chore(deps): update dependency @feature-sliced/steiger-plugin to ^0.7.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/649
+- fix(deps): update dependency @hono/zod-openapi to ^1.5.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/653
+- chore(deps): update dependency @hono/node-server to ^2.0.9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/646
+- chore(deps): update actions/setup-node action to v6.5.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/656
+- fix(deps): update dependency mysql2 to ^3.23.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/657
+- fix(deps): update dependency @smithy/node-http-handler to ^4.9.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/647
+- docs: TiDB FTS 構成 doc を訂正版として全面書き直し (Vector + TiFlash 採用に変更) by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/658
+- chore(deps): update actions/setup-node action to v7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/660
+- fix(deps): update tools/dsql-cli to ^3.1088.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/659
+- chore(deps): update dependency @scalar/hono-api-reference to ^0.11.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/663
+- feat: TiDB Vector 検索（TiFlash + PLaMo Embedding）を追加する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/665
+
 ## [2026.0713.4](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.3...2026.0713.4) - 2026-07-13
 
 - feat: GitHub webhook の実処理を自己 Event invoke で非同期化し 10 秒配信タイムアウトを回避 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/625
