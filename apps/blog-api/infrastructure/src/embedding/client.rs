@@ -3,22 +3,47 @@ use std::time::Duration;
 use async_trait::async_trait;
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::EmbeddingError;
 use crate::observability::observe_external_request;
 
 const EXPECTED_DIMENSION: usize = 2048;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+/// PLaMo Service の chunking.py で公開されている version と一致させる。
+/// tidb-embedder (バッチ backfill) が同じ値で source_hash を作るため、webhook 側で
+/// 生成した chunk と後段のバッチが同じ hash になる。
+pub const CHUNKING_VERSION: &str = "plamo-markdown-1024-v1";
+pub const DEFAULT_MAX_TOKENS: u32 = 1024;
+pub const DEFAULT_OVERLAP_TOKENS: u32 = 128;
+
+#[derive(Debug, Clone)]
+pub struct DocumentChunk {
+    pub index: u32,
+    pub heading: Option<String>,
+    pub content: String,
+    pub embedding_text: String,
+    pub token_count: u32,
+}
 
 #[async_trait]
 pub trait EmbeddingClient: Send + Sync {
     async fn embed_query(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
     async fn embed_document(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
+    async fn chunk_document(
+        &self,
+        title: &str,
+        description: &str,
+        content: &str,
+        max_tokens: u32,
+        overlap_tokens: u32,
+    ) -> Result<Vec<DocumentChunk>, EmbeddingError>;
 }
 
 pub struct EmbeddingClientImpl {
     http_client: Client,
-    endpoint: Url,
+    embed_endpoint: Url,
+    chunks_endpoint: Url,
 }
 
 #[derive(Serialize)]
@@ -33,19 +58,49 @@ struct EmbedResponse {
     dim: usize,
 }
 
+#[derive(Serialize)]
+struct ChunksRequest<'a> {
+    title: &'a str,
+    description: &'a str,
+    content: &'a str,
+    max_tokens: u32,
+    overlap_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChunkItemResponse {
+    index: u32,
+    heading: Option<String>,
+    content: String,
+    embedding_text: String,
+    token_count: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChunksResponse {
+    version: String,
+    max_tokens: u32,
+    overlap_tokens: u32,
+    chunks: Vec<ChunkItemResponse>,
+}
+
 impl EmbeddingClientImpl {
     pub fn new(base_url: &str) -> Result<Self, EmbeddingError> {
-        let mut endpoint = Url::parse(base_url)
+        let mut base = Url::parse(base_url)
             .map_err(|error| EmbeddingError::InvalidEndpoint(error.to_string()))?;
-        if endpoint.scheme() != "http" && endpoint.scheme() != "https" {
+        if base.scheme() != "http" && base.scheme() != "https" {
             return Err(EmbeddingError::InvalidEndpoint(
                 "scheme must be http or https".to_string(),
             ));
         }
-        let base_path = endpoint.path().trim_end_matches('/');
-        endpoint.set_path(&format!("{base_path}/embed"));
-        endpoint.set_query(None);
-        endpoint.set_fragment(None);
+        let base_path = base.path().trim_end_matches('/').to_string();
+        base.set_query(None);
+        base.set_fragment(None);
+
+        let mut embed_endpoint = base.clone();
+        embed_endpoint.set_path(&format!("{base_path}/embed"));
+        let mut chunks_endpoint = base;
+        chunks_endpoint.set_path(&format!("{base_path}/chunks"));
 
         let http_client = Client::builder()
             .timeout(REQUEST_TIMEOUT)
@@ -53,7 +108,8 @@ impl EmbeddingClientImpl {
             .map_err(EmbeddingError::HttpClient)?;
         Ok(Self {
             http_client,
-            endpoint,
+            embed_endpoint,
+            chunks_endpoint,
         })
     }
 
@@ -83,7 +139,7 @@ impl EmbeddingClientImpl {
         observe_external_request("plamo", mode, "POST", "/embed", async {
             let response = self
                 .http_client
-                .post(self.endpoint.clone())
+                .post(self.embed_endpoint.clone())
                 .json(&EmbedRequest { text, mode })
                 .send()
                 .await?;
@@ -109,6 +165,124 @@ impl EmbeddingClient for EmbeddingClientImpl {
     async fn embed_document(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
         self.embed(text, "document").await
     }
+
+    async fn chunk_document(
+        &self,
+        title: &str,
+        description: &str,
+        content: &str,
+        max_tokens: u32,
+        overlap_tokens: u32,
+    ) -> Result<Vec<DocumentChunk>, EmbeddingError> {
+        observe_external_request("plamo", "chunk", "POST", "/chunks", async {
+            let response = self
+                .http_client
+                .post(self.chunks_endpoint.clone())
+                .json(&ChunksRequest {
+                    title,
+                    description,
+                    content,
+                    max_tokens,
+                    overlap_tokens,
+                })
+                .send()
+                .await?;
+
+            if !response.status().is_success() {
+                let status = response.status().as_u16();
+                let message: String = response.text().await?.chars().take(500).collect();
+                return Err(EmbeddingError::Api { status, message });
+            }
+
+            let body = response.json::<ChunksResponse>().await?;
+            if body.version != CHUNKING_VERSION {
+                return Err(EmbeddingError::InvalidResponse(format!(
+                    "unexpected chunking version: expected={CHUNKING_VERSION}, actual={}",
+                    body.version
+                )));
+            }
+            if body.max_tokens != max_tokens || body.overlap_tokens != overlap_tokens {
+                return Err(EmbeddingError::InvalidResponse(format!(
+                    "chunks API returned different token config: max={}, overlap={}",
+                    body.max_tokens, body.overlap_tokens
+                )));
+            }
+            if body.chunks.is_empty() {
+                return Err(EmbeddingError::InvalidResponse(
+                    "chunks API returned no chunks".to_string(),
+                ));
+            }
+            for (index, chunk) in body.chunks.iter().enumerate() {
+                if chunk.index as usize != index {
+                    return Err(EmbeddingError::InvalidResponse(format!(
+                        "chunks API index is not sequential: expected={index}, actual={}",
+                        chunk.index
+                    )));
+                }
+                if chunk.token_count == 0 {
+                    return Err(EmbeddingError::InvalidResponse(format!(
+                        "chunks[{index}] token_count must be positive"
+                    )));
+                }
+                if chunk.token_count > max_tokens {
+                    return Err(EmbeddingError::InvalidResponse(format!(
+                        "chunks[{index}] token_count={} exceeds max_tokens={}",
+                        chunk.token_count, max_tokens
+                    )));
+                }
+            }
+
+            Ok(body
+                .chunks
+                .into_iter()
+                .map(|chunk| DocumentChunk {
+                    index: chunk.index,
+                    heading: chunk.heading,
+                    content: chunk.content,
+                    embedding_text: chunk.embedding_text,
+                    token_count: chunk.token_count,
+                })
+                .collect())
+        })
+        .await
+    }
+}
+
+/// tidb-embedder と同じ JSON レイアウトで SHA-256 を計算する。TS 側は
+/// `JSON.stringify({version, maxTokens, overlapTokens, title, description, content})`
+/// を hash 元にしているため、Rust 側の struct 順序と rename もこれに揃える。
+/// これにより、webhook で書いた chunk を後段の tidb-embedder バッチが同じ hash と
+/// 見なしてスキップできる。
+pub fn compute_source_hash(
+    title: &str,
+    description: &str,
+    content: &str,
+    max_tokens: u32,
+    overlap_tokens: u32,
+) -> String {
+    #[derive(Serialize)]
+    struct HashInput<'a> {
+        version: &'static str,
+        #[serde(rename = "maxTokens")]
+        max_tokens: u32,
+        #[serde(rename = "overlapTokens")]
+        overlap_tokens: u32,
+        title: &'a str,
+        description: &'a str,
+        content: &'a str,
+    }
+
+    let payload = serde_json::to_string(&HashInput {
+        version: CHUNKING_VERSION,
+        max_tokens,
+        overlap_tokens,
+        title,
+        description,
+        content,
+    })
+    .expect("HashInput is always serializable");
+    let digest = Sha256::digest(payload.as_bytes());
+    hex::encode(digest)
 }
 
 #[cfg(test)]
@@ -116,9 +290,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn endpoint_appends_embed_path() {
+    fn endpoints_append_paths() {
         let client = EmbeddingClientImpl::new("http://localhost:8080/base/").unwrap();
-        assert_eq!(client.endpoint.as_str(), "http://localhost:8080/base/embed");
+        assert_eq!(
+            client.embed_endpoint.as_str(),
+            "http://localhost:8080/base/embed"
+        );
+        assert_eq!(
+            client.chunks_endpoint.as_str(),
+            "http://localhost:8080/base/chunks"
+        );
     }
 
     #[test]
@@ -147,5 +328,15 @@ mod tests {
                 .len(),
             EXPECTED_DIMENSION
         );
+    }
+
+    #[test]
+    fn source_hash_matches_tidb_embedder_layout() {
+        // tidb-embedder が JSON.stringify で出す文字列と同じであること。
+        // Node.js の JSON.stringify で下記の値を hash して得られる SHA-256 と一致する。
+        let hash = compute_source_hash("title", "desc", "content", 1024, 128);
+        let expected_payload = r#"{"version":"plamo-markdown-1024-v1","maxTokens":1024,"overlapTokens":128,"title":"title","description":"desc","content":"content"}"#;
+        let expected: String = hex::encode(Sha256::digest(expected_payload.as_bytes()));
+        assert_eq!(hash, expected);
     }
 }

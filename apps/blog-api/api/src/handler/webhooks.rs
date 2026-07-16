@@ -2,14 +2,19 @@ use axum::{Json, body::Bytes, extract::State, http::HeaderMap};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use futures::future::join_all;
+use infrastructure::embedding::client::{
+    CHUNKING_VERSION, DEFAULT_MAX_TOKENS, DEFAULT_OVERLAP_TOKENS, DocumentChunk, EmbeddingClient,
+    compute_source_hash,
+};
 use infrastructure::github::{GitHubAppClient, GitHubAppClientImpl, PushEvent};
 use infrastructure::webhook::verify_signature;
-use kernel::model::article::Slug;
+use kernel::model::article::{ArticleId, Slug};
 use kernel::model::frontmatter::ArticleFrontmatter;
-use kernel::repository::articles::UpsertArticleInput;
+use kernel::repository::articles::{ArticleEmbeddingChunk, UpsertArticleInput, UpsertResult};
 use markdown::convert_markdown_to_html;
 use registry::AppRegistry;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::sync::LazyLock;
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
@@ -317,6 +322,8 @@ async fn process_push_event(
     let mut succeeded = 0;
     let mut failed = 0;
     let mut errors: Vec<ArticleProcessError> = vec![];
+    // PLaMO Service へ到達できる環境でのみ Some。未設定でも記事の upsert 自体は成功させる。
+    let embedding_client = registry.embedding_client();
 
     for (file_path, fetch_result) in file_paths.iter().zip(fetch_results) {
         processed += 1;
@@ -377,6 +384,25 @@ async fn process_push_event(
                     None => true,
                 };
 
+                // ArticlesRepository の upsert が保存する description。frontmatter が
+                // None のときは既存値を維持、なければ title をデフォルトにする挙動と一致させる。
+                let effective_description = frontmatter
+                    .description
+                    .clone()
+                    .or_else(|| existing.as_ref().map(|a| a.description.as_str().to_string()))
+                    .unwrap_or_else(|| frontmatter.title.clone());
+
+                // title / description / content のいずれかが変わったら chunk を再生成する。
+                // upsert 内の判定と揃えるため、description は effective 値で比較する。
+                let needs_chunks = match &existing {
+                    Some(article) => {
+                        article.content.as_str() != content
+                            || article.title.as_str() != frontmatter.title
+                            || article.description.as_str() != effective_description
+                    }
+                    None => true,
+                };
+
                 let content_html = if needs_html {
                     // OGP リンクカードや GitHub 埋め込みで同期 HTTP フェッチが走るため
                     // blocking スレッドで実行して tokio ワーカーを塞がない
@@ -401,6 +427,8 @@ async fn process_push_event(
                 };
 
                 // Build upsert input
+                let title = frontmatter.title.clone();
+                let content_for_chunks = content.clone();
                 let input = UpsertArticleInput {
                     user_id: user_id.clone(),
                     slug: Slug::new(slug.clone()),
@@ -418,6 +446,20 @@ async fn process_push_event(
                     Ok(result) => {
                         info!("Article upserted: slug={}, result={:?}", slug, result);
                         succeeded += 1;
+
+                        if needs_chunks {
+                            let article_id = upsert_result_article_id(&result);
+                            regenerate_chunks(
+                                registry,
+                                embedding_client.as_ref(),
+                                &article_id,
+                                &slug,
+                                &title,
+                                &effective_description,
+                                &content_for_chunks,
+                            )
+                            .await;
+                        }
                     }
                     Err(e) => {
                         error!("Failed to upsert article: slug={}, error={}", slug, e);
@@ -459,4 +501,109 @@ async fn process_push_event(
         succeeded: Some(succeeded),
         failed: Some(failed),
     })
+}
+
+fn upsert_result_article_id(result: &UpsertResult) -> ArticleId {
+    match result {
+        UpsertResult::Created(id)
+        | UpsertResult::Updated(id)
+        | UpsertResult::TagsUpdated(id)
+        | UpsertResult::NoChange(id) => id.clone(),
+    }
+}
+
+/// 記事 upsert 直後に呼ぶ chunk 再生成。PLaMO 呼び出しや DB 書き込みの失敗は
+/// warn ログを残して呑み込み、既存 chunk を保持する。上位ループは記事 upsert 自体を
+/// 成功として扱う。
+async fn regenerate_chunks(
+    registry: &AppRegistry,
+    embedding_client: Option<&Arc<dyn EmbeddingClient>>,
+    article_id: &ArticleId,
+    slug: &str,
+    title: &str,
+    description: &str,
+    content: &str,
+) {
+    let Some(client) = embedding_client else {
+        info!(
+            "Skipping chunk regeneration (PLAMO_EMBED_ENDPOINT not configured): slug={}",
+            slug
+        );
+        return;
+    };
+
+    let chunks = match client
+        .chunk_document(
+            title,
+            description,
+            content,
+            DEFAULT_MAX_TOKENS,
+            DEFAULT_OVERLAP_TOKENS,
+        )
+        .await
+    {
+        Ok(chunks) => chunks,
+        Err(e) => {
+            warn!(
+                "Failed to chunk article, keeping existing chunks: slug={}, error={}",
+                slug, e
+            );
+            return;
+        }
+    };
+
+    let mut embedded: Vec<ArticleEmbeddingChunk> = Vec::with_capacity(chunks.len());
+    for chunk in chunks {
+        let DocumentChunk {
+            index,
+            heading,
+            content: chunk_content,
+            embedding_text,
+            token_count,
+        } = chunk;
+        match client.embed_document(&embedding_text).await {
+            Ok(vector) => {
+                embedded.push(ArticleEmbeddingChunk {
+                    chunk_index: index,
+                    heading,
+                    content: chunk_content,
+                    token_count,
+                    embedding: vector,
+                });
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to embed chunk, keeping existing chunks: slug={}, chunk_index={}, error={}",
+                    slug, index, e
+                );
+                return;
+            }
+        }
+    }
+
+    let source_hash = compute_source_hash(
+        title,
+        description,
+        content,
+        DEFAULT_MAX_TOKENS,
+        DEFAULT_OVERLAP_TOKENS,
+    );
+
+    if let Err(e) = registry
+        .articles_repository()
+        .replace_article_chunks(article_id, &embedded, CHUNKING_VERSION, &source_hash)
+        .await
+    {
+        warn!(
+            "Failed to persist article chunks, keeping existing chunks: slug={}, error={}",
+            slug, e
+        );
+        return;
+    }
+
+    info!(
+        "Article chunks replaced: slug={}, chunks={}",
+        slug,
+        embedded.len()
+    );
 }

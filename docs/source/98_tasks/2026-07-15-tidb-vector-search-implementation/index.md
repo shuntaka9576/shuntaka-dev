@@ -1127,3 +1127,11 @@ Phase 4のローカルbackfillは、実行時点でsource hashが変わった記
 - 1記事1vectorの精度確認では `Rust Axum API` に対し本文全体がdistance 0.4674、タイトルのみが0.3815となり、長文による話題の希釈を確認
 - PLaMOの学習時context長1024 tokensに合わせ、同じtokenizerでMarkdownを見出し単位 + 128 tokens overlapに分割する方式へ変更
 - `article_embedding_chunks` とsource hashによる差分backfillを実装。全vector生成後に記事単位transactionで差し替える
+
+### 2026-07-16
+
+- Phase 7 実装。`EmbeddingClient` に `chunk_document` を追加し、`compute_source_hash` を tidb-embedder と同じ JSON レイアウトで書いて後段バッチと hash が揃うようにした
+- `ArticlesRepository::replace_article_chunks` を追加。`article_embedding_chunks` の記事単位 transaction 差し替えを webhook でも使えるようにした
+- `handler/webhooks.rs` で title / description / content の変更を検出したら chunk 再生成を走らせるようにした。effective description の判定は `upsert_article` の書き込み挙動と同じ (frontmatter が None なら既存値、無ければ title) に揃えた
+- 失敗時は `warn!` を残して既存 chunk を保持し、記事 upsert 自体は成功扱い。`PLAMO_EMBED_ENDPOINT` 未設定時は skip ログのみ (dev のみ有効化)
+- 動作確認は次回、`PLAMO_EMBED_ENDPOINT=http://plamo-embedding.${TAILNET}` を渡した状態で webhook を再送して行う
