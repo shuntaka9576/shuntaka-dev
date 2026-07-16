@@ -288,6 +288,7 @@
     "pypi",
     "qlapi",
     "rdbms",
+    "rearchitecture",
     "relabelings",
     "reqwest",
     "rlib",

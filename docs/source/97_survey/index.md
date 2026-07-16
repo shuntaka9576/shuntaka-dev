@@ -7,6 +7,7 @@
 | 調査日     | タイトル                                                                                                                           |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                              |
+| 2026-07-16 | [blog-api で使われているクエリの playground](2026-07-16-blog-api-queryplayground/index.md)                                         |
 | 2026-07-04 | [CloudWatch OTel Metrics と Classic メトリクスの機能差分](2026-07-04-cloudwatch-otel-vs-classic-metrics/index.md)                  |
 | 2026-07-02 | [記事一覧の viewport prefetch 一斉発火による体感遅延](2026-07-02-next-viewport-prefetch-burst/index.md)                            |
 | 2026-07-01 | [5M 行スケールで `articles` 一覧クエリの OFFSET 依存プラン分岐を再現](2026-07-01-tidb-articles-offset-plan-verify-5m/index.md)     |
