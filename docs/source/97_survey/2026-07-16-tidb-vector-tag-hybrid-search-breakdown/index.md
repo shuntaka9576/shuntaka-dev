@@ -242,6 +242,23 @@ kNN 探索（問題）: クエリベクトルに最も近い k 件を探せ
 
 つまり「TiDB のベクトルインデックス」を正確に言うと、**kNN 探索を ANN 戦略で解くための HNSW 実装**。本文で「ANN」と書いている箇所は戦略の話、「HNSW」と書いている箇所はその実装固有の話（多層グラフ、entry point、貪欲探索）をしている。
 
+なお「NN → kNN → ANN」という進化の直列で説明する資料もあるが、その順で覚えると混乱する。**kNN 探索という 1 つの問題に対して解き方が 2 通り（厳密 / 近似）ある**という並列構造が正しい形。
+
+#### 補足: kNN の「k」で混乱しやすい点
+
+kNN という語は文脈で 2 つの意味を持ち、解説記事によって指すものが違う。
+
+| 文脈              | 意味                                    | k の性格                                                                         |
+| ----------------- | --------------------------------------- | -------------------------------------------------------------------------------- |
+| 検索（本 survey） | 「近い k 件を返す」問題                 | **ただの取得件数**。LIMIT と同じで、決めるのに困難はない                         |
+| 機械学習          | kNN 分類器（近傍 k 件のラベルで多数決） | **ハイパーパラメータ**。小さいとノイズに敏感、大きいと境界がぼやけ、選定が難しい |
+
+「kNN は k を決めるのが難しい」という説明を見かけたら、それは ML 分類器の文脈。検索の k に選定の難しさはない。ただし本クエリの `LIMIT 50` のように、**post-filter で落ちる分を見込んだ over-fetch 量の調整**という別種の設計判断はある（「未検証 / TODO」の LIMIT 50 妥当性がこれ）。
+
+また製品用語にも揺れがあり、Elasticsearch の「kNN search」は機能名で、approximate kNN の中身は Lucene の HNSW、exact kNN（`script_score`）の中身は brute force。**問題名（kNN）を機能名に使い、実装（HNSW）は別レイヤ**という構図なので、ベンダー文書を読むときは本節の階層に読み替えるとブレない。
+
+参考: [Elastic「近似最近傍アルゴリズム (ANN) を理解する」](https://www.elastic.co/jp/blog/understanding-ann) — ANN の入門解説。実装例として kd 木 / LSH / Annoy / リニアスキャンを紹介している（HNSW は登場しない）。kNN を「NN と ANN の間の手法」と位置づけるなど本節と枠組みが異なるので、上の対応で読み替えること。
+
 ### 厳密 kNN と ANN の違い
 
 「クエリベクトルに最も近い K 件」を求める素朴な方法は、**全行との距離を計算してソートする**（厳密 kNN）。結果は 100% 正確だが、コストは行数に線形で O(N)。2048 次元のコサイン距離は 1 回あたり数千回の乗算になるので、chunk が増えるほど素直に遅くなる。
@@ -289,6 +306,137 @@ TiDB が採用する HNSW (Hierarchical Navigable Small World) は**グラフベ
 | 全件走査 | brute force | 正確。数千〜数万件で次元が小さければ実は十分速い                               |
 
 chunk 数がまだ小さいうちは brute force でも困らないが、HNSW を最初から入れておくと記事増加に対して検索レイテンシが安定する。
+
+### 実測: dev での `EXPLAIN ANALYZE`（2026-07-16）
+
+blog_dev（chunk 1,104 件、HNSW は Stable 1,101 行 index 済み + Delta 3 行未 index）に対して実測した。ベクトルは単位ダミー `[1,0,...,0]`（全 0 だとノルムが 0 になりコサイン距離が定義できないため、先頭だけ 1 にする）。
+
+事前確認に使ったクエリ。
+
+```bash
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+mysql -h tidb.${TAILNET} -P 4000 -u root blog_dev -e "
+SELECT COUNT(*) AS chunks FROM article_embedding_chunks;
+SELECT TIDB_TABLE, INDEX_NAME, ROWS_STABLE_INDEXED,
+       ROWS_STABLE_NOT_INDEXED, ROWS_DELTA_NOT_INDEXED
+  FROM INFORMATION_SCHEMA.TIFLASH_INDEXES
+ WHERE TIDB_DATABASE = 'blog_dev';"
+```
+
+計測 1: 最小 ANN クエリ。
+
+```sql
+SET @vector = CONCAT('[1,', REPEAT('0,', 2046), '0]');
+EXPLAIN ANALYZE
+SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
+       c.article_id,
+       VEC_COSINE_DISTANCE(c.embedding, @vector) AS distance
+  FROM article_embedding_chunks AS c
+ ORDER BY VEC_COSINE_DISTANCE(c.embedding, @vector)
+ LIMIT 50;
+```
+
+計測 2: 本番相当（タグ AND）。対象クエリ（再掲）と同じ構造で、返却列をプランが読みやすいよう `article_id, title, distance` に絞っている。
+
+```sql
+SET @user_name = 'shuntaka';
+SET @vector = CONCAT('[1,', REPEAT('0,', 2046), '0]');
+SELECT @tag_id_a := tag_id FROM tags WHERE name = 'tech';
+SELECT @tag_id_b := tag_id FROM tags WHERE name = 'misc';
+EXPLAIN ANALYZE
+WITH RECURSIVE tag_descendants AS (
+    SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
+    UNION ALL
+    SELECT t.tag_id, td.root_tag_id FROM tags t
+    JOIN tag_descendants td ON t.parent_tag_id = td.tag_id
+),
+nearest_chunks AS (
+    SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
+           c.article_id,
+           VEC_COSINE_DISTANCE(c.embedding, @vector) AS distance
+      FROM article_embedding_chunks AS c
+     ORDER BY VEC_COSINE_DISTANCE(c.embedding, @vector)
+     LIMIT 50
+),
+ranked_articles AS (
+    SELECT a.article_id, a.title, nc.distance,
+           ROW_NUMBER() OVER (
+               PARTITION BY a.article_id ORDER BY nc.distance, a.article_id
+           ) AS chunk_rank
+      FROM nearest_chunks AS nc
+      JOIN articles AS a ON a.article_id = nc.article_id
+      JOIN users    AS u ON u.user_id    = a.user_id
+     WHERE a.status = 'published'
+       AND u.name   = @user_name
+       AND EXISTS (SELECT 1 FROM articles_tags at0
+                     JOIN tag_descendants td ON at0.tag_id = td.tag_id AND td.root_tag_id = @tag_id_a
+                    WHERE at0.article_id = a.article_id)
+       AND EXISTS (SELECT 1 FROM articles_tags at1
+                     JOIN tag_descendants td ON at1.tag_id = td.tag_id AND td.root_tag_id = @tag_id_b
+                    WHERE at1.article_id = a.article_id)
+)
+SELECT article_id, title, distance,
+       COUNT(*) OVER() AS total_count
+  FROM ranked_articles
+ WHERE chunk_rank = 1
+ ORDER BY distance, article_id
+ LIMIT 10 OFFSET 0;
+```
+
+| クエリ                                            | 合計時間 | TiFlash 部分 |
+| ------------------------------------------------- | -------- | ------------ |
+| 計測 1: 最小 ANN（hint + LIMIT 50 のみ）          | 14.5ms   | 8.2ms        |
+| 計測 2: 本番相当（タグ AND + post-filter + 集約） | 16.1ms   | 5.9ms        |
+
+最小クエリの TiFlash スキャンの execution info（抜粋）。
+
+```text
+TableFullScan_21  mpp[tiflash]
+  table:c, index:idx_article_embedding_chunks_embedding(embedding)
+  annIndex:COSINE(embedding..., limit:50)
+  vector_idx:{load:{from_cache:1},
+              search:{total:0ms, visited_nodes:145, discarded_nodes:0}}
+  actRows: 53
+```
+
+読み取れること。
+
+- **`visited_nodes:145`** — 1,101 ノード中 145 ノードだけ訪問して top-50 を出している。HNSW の「グラフを辿って一部だけ見る」がそのまま数字に出る（brute force なら全 1,104 行の距離計算）
+- **actRows = 53 = HNSW 50 + Delta 3** — 未 index の Delta 層 3 行は brute force で評価され、HNSW の結果に透過的にマージされる。「HNSW は直近の書き込みに追従しにくい」問題を、TiFlash は **Stable 層 = index / Delta 層 = 総当たり**の二層構造で吸収している。書いた直後のデータも検索に出る
+- **行数ファネルが Part 構造どおり** — 53（ANN 候補）→ 50（TopN）→ 42（published × user）→ 7（タグ AND の EXISTS × 2）→ 5（`chunk_rank = 1` で記事集約）。再帰 CTE は 2 タグ → 65 行に展開して 3.6ms
+- post-filter を全部載せても合計は +1.6ms 程度。現規模では ANN 部分（クエリ埋め込みを除く DB 内処理）が支配的でないことも分かる
+
+本番相当クエリの生プラン（主要 operator のみに整形。`@tag_id_a` = tech, `@tag_id_b` = misc）。
+
+```text
+id                                actRows  task          execution info / operator info
+Projection_124                    5        root          time:16.1ms  ← 最終結果 5 記事
+└─TopN_127                        5        root          LIMIT 10 のページング
+  └─Window_132                    5        root          count(1) over() = total_count
+    └─Selection_133               5        root          eq(chunk_rank, 1)  ← 記事集約
+      └─Window_135                7        root          row_number() partition by article_id
+        └─Sort_217                7        root
+          └─HashJoin_137          7        root          semi join  ← EXISTS (tag_b=misc 系列)
+            ├─IndexHashJoin_206   44       root          articles_tags × tag_descendants(misc)
+            │ └─CTEFullScan_212   65       root          CTE:tag_descendants
+            └─HashJoin_141        42       root          semi join  ← EXISTS (tag_a=tech 系列)
+              ├─IndexHashJoin_188 170      root          articles_tags × tag_descendants(tech)
+              └─HashJoin_145      42       root          inner join  ← published × user
+                ├─IndexJoin_152   92       root          articles × users
+                │ ├─Point_Get_160 1        root          users, uq_users_name
+                │ └─IndexLookUp   92       root          idx_articles_user_status_type_published_at_id
+                └─TopN_168        50       root          nearest_chunks の受け口
+                  └─TableReader   50       root          MppVersion: 2
+                    └─TopN_178    50       mpp[tiflash]  count:50 (pushdown)
+                      └─TableFullScan_177
+                                  53       mpp[tiflash]  annIndex:COSINE(..., limit:50)
+                                                         vector_idx:{from_cache:1}, time:5.9ms
+CTE_0                             65       root          Recursive CTE, time:3.6ms
+├─Batch_Point_Get_97 (Seed)       2        root          tags PRIMARY(tag_id)  ← anchor 2 タグ
+└─IndexHashJoin_110 (Recursive)   63       root          idx_tags_parent_tag_id で子孫 63 行
+```
+
+Part 2（TiFlash の `annIndex`）だけが `mpp[tiflash]`、CTE と post-filter はすべて root / `cop[tikv]` で処理されており、本 survey の Part 1〜3 の分担がプラン上でそのまま確認できる。
 
 ## Part 3: 行ストア側で post-filter、chunk → 記事に集約
 
@@ -448,7 +596,7 @@ DevelopersIO の「6 万件の記事を NumPy と Bedrock でセマンティッ�
 1. **メモリの壁**: レプリカごとに行列を持つため、件数 × 次元 × 4 byte × レプリカ数で線形に膨らむ
 2. **O(N) の壁**: brute force の計算量が件数に比例して伸び、いずれ ANN が必要になる。その時点で HNSW を自作するか、ベクトル DB へ移行するかの選択を迫られる
 
-出典: DevelopersIO「ベクトルDBレスで、6万件のDevelopersIO記事をNumPyとBedrockでセマンティック検索してみた」(suzuki.ryo, 2026-02-17)
+出典: [DevelopersIO「ベクトルDBレスで、6万件のDevelopersIO記事をNumPyとBedrockでセマンティック検索してみた」](https://dev.classmethod.jp/articles/vector-db-less-semantic-search/) (suzuki.ryo, 2026-02-17)
 
 ### なぜ HNSW はアプリに置きにくいのか — 事前構築物の維持
 
@@ -502,6 +650,6 @@ brute force の「常駐」は単なるキャッシュの問題で、データ�
 
 ## 未検証 / TODO
 
-- [ ] 実データでの `EXPLAIN ANALYZE`（TiFlash の HNSW が想定通り選ばれているかの確認）
+- [x] 実データでの `EXPLAIN ANALYZE` — 2026-07-16 実測済み（「実測: dev での EXPLAIN ANALYZE」参照）。プラン確認（`EXPLAIN` のみ）は [2026-07-15 の実装記録](../../98_tasks/2026-07-15-tidb-vector-search-implementation/index.md) にもある
 - [ ] `LIMIT 50` の妥当性（post-filter でどれくらい落ちるか実測して調整）
 - [ ] BM25 や `heading` の完全一致シグナルを混ぜたい場合の設計
