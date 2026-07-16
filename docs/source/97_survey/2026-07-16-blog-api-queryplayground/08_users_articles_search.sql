@@ -58,8 +58,8 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
 --   ranked_articles CTE の WHERE に EXISTS を積む
 -- ────────────────────────────────────
 
-SET @tag_id_a = '00000000-0000-0000-0000-000000000001';
-SET @tag_id_b = '00000000-0000-0000-0000-000000000002';
+SELECT tag_id INTO @tag_id_a FROM tags WHERE name = 'tech';
+SELECT tag_id INTO @tag_id_b FROM tags WHERE name = 'misc';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
