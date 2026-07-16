@@ -1,7 +1,9 @@
 import Image from 'next/image';
 import { memo } from 'react';
 import type { ArticleSummary } from '@/lib/api';
+import { AngleMeter } from './AngleMeter';
 import { ProgressLink } from './ProgressLink';
+import { SimilarityMeter } from './SimilarityMeter';
 
 export interface ArticleCardTag {
   /** 相対パス表記のタグ（例: "rust", "aws/lambda"） */
@@ -16,6 +18,8 @@ interface ArticleCardProps {
   priority?: boolean;
   /** タグ絞り込み中のみ渡される。未指定なら通常表示（タイトル + 日付） */
   tags?: ArticleCardTag[];
+  /** セマンティック検索中のみ渡される。cosine distance (0..2) */
+  distance?: number;
 }
 
 function formatDate(dateString: string | null): string {
@@ -33,29 +37,39 @@ export const ArticleCard = memo(function ArticleCard({
   userName,
   priority = false,
   tags,
+  distance,
 }: ArticleCardProps) {
+  const hasDistance = typeof distance === 'number' && Number.isFinite(distance);
   return (
     <ProgressLink href={`/${userName}/articles/${article.slug}`}>
       <article className="mb-4 block w-full border-b border-[var(--color-border-subtle)]">
         <div className="mb-2 flex justify-between">
-          <div>
+          <div className="min-w-0">
             <div className="pt-2 pr-2 pb-4 text-base font-normal">{article.title}</div>
-            {tags && tags.length > 0 ? (
-              <div className="flex flex-wrap items-baseline gap-x-2 text-xs font-light">
-                <span>{formatDate(article.publishedAt)}</span>
-                {tags.map((tag) => (
-                  <span
-                    key={tag.path}
-                    className={
-                      tag.matched ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'
-                    }
-                  >
-                    #{tag.path}
-                  </span>
-                ))}
+            <div className="flex items-center gap-x-2 text-xs font-light">
+              <span className="shrink-0">{formatDate(article.publishedAt)}</span>
+              {hasDistance && (
+                <>
+                  <SimilarityMeter distance={distance} />
+                  <AngleMeter distance={distance} />
+                </>
+              )}
+            </div>
+            {tags && tags.length > 0 && (
+              <div className="overflow-x-auto">
+                <div className="flex items-center gap-x-2 text-xs font-light">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.path}
+                      className={`shrink-0 ${
+                        tag.matched ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'
+                      }`}
+                    >
+                      #{tag.path}
+                    </span>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div className="text-xs font-light">{formatDate(article.publishedAt)}</div>
             )}
           </div>
           {article.thumbnail && (

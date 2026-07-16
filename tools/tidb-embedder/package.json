@@ -1,0 +1,13 @@
+{
+  "name": "tidb-embedder",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "backfill": "tsx src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "mysql2": "^3.23.0"
+  }
+}

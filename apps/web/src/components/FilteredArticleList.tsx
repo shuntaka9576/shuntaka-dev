@@ -1,6 +1,8 @@
 'use client';
 
 import { ArticleCard } from '@/components/ArticleCard';
+import { ArticleCardSkeletonList } from '@/components/ArticleCardSkeleton';
+import { useSearch } from '@/components/SearchProvider';
 import { useTagFilter } from '@/components/TagFilterProvider';
 
 interface FilteredArticleListProps {
@@ -80,32 +82,128 @@ function FilterPagination({
 }
 
 /**
- * 絞り込みなしのときはサーバーレンダリング済みの children をそのまま表示し、
- * 絞り込み中だけクライアント側でヒット記事に差し替える。
+ * 表示切替の優先順:
+ *   1. `searching` (?q= が有効) → SearchProvider の結果を表示 (距離メーター付き)
+ *   2. `filtering` (タグ選択が 1 件以上) → TagFilterProvider の結果を表示
+ *   3. どちらも無い → SSR 済みの children (通常一覧 + Pagination)
  *
- * loading 中は既存一覧の opacity を下げ、"読み込み中…" テキストを表示する。
- * エラー時はミュートテキストと再試行ボタンを表示する。
+ * ローディング / エラー / 0 件表示はそれぞれの provider の state から組み立てる。
+ * 検索結果に関しては手動 pagination しない（API が上位 20 件を返す仕様）。
  */
 export function FilteredArticleList({ userName, children }: FilteredArticleListProps) {
   const {
     filtering,
     fetchedArticles,
-    loading,
-    error,
+    loading: tagLoading,
+    error: tagError,
     mode,
     filterPage,
     filteredTotalPages,
     changeMode,
-    clear,
+    clear: clearTags,
     setFilterPage,
-    retry,
+    retry: retryTags,
     isTagMatched,
   } = useTagFilter();
 
+  const {
+    searching,
+    results,
+    loading: searchLoading,
+    error: searchError,
+    submittedQuery,
+    searchPage,
+    searchTotalPages,
+    clearQuery,
+    retry: retrySearch,
+    setSearchPage,
+  } = useSearch();
+
+  // === 検索モード（最優先） ===
+  if (searching) {
+    // エラー状態（初回フェッチ失敗 = results が null）
+    if (searchError && results === null) {
+      return (
+        <div>
+          <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
+            検索に失敗しました。
+          </p>
+          <div className="mt-2 flex gap-3 text-[length:var(--fs-caption)]">
+            <button
+              type="button"
+              onClick={retrySearch}
+              className="text-[var(--color-text-muted)] underline"
+            >
+              再試行
+            </button>
+            <button
+              type="button"
+              onClick={clearQuery}
+              className="text-[var(--color-text-muted)] underline"
+            >
+              検索を解除
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (results === null && searchLoading) {
+      return <ArticleCardSkeletonList count={5} />;
+    }
+
+    const articles = results ?? [];
+    if (!searchLoading && articles.length === 0) {
+      return (
+        <div>
+          <p>「{submittedQuery}」に一致する記事はありません。</p>
+          <button
+            type="button"
+            onClick={clearQuery}
+            className="mt-2 text-[length:var(--fs-caption)] text-[var(--color-text-muted)] underline"
+          >
+            検索を解除
+          </button>
+        </div>
+      );
+    }
+
+    const priorityArticleIds = new Set(
+      articles
+        .filter((a) => a.thumbnail)
+        .slice(0, 2)
+        .map((a) => a.articleId),
+    );
+    return (
+      <div>
+        {searchLoading ? (
+          <ArticleCardSkeletonList count={5} />
+        ) : (
+          <>
+            {articles.map((article) => (
+              <ArticleCard
+                key={article.articleId}
+                article={article}
+                userName={userName}
+                priority={priorityArticleIds.has(article.articleId)}
+                distance={article.distance}
+              />
+            ))}
+            <FilterPagination
+              currentPage={searchPage}
+              totalPages={searchTotalPages}
+              onPageChange={setSearchPage}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // === タグ絞り込みモード ===
   if (!filtering) return children;
 
-  // エラー状態（初回フェッチ失敗 = fetchedArticles が null の場合）
-  if (error && fetchedArticles === null) {
+  if (tagError && fetchedArticles === null) {
     return (
       <div>
         <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
@@ -113,7 +211,7 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
         </p>
         <button
           type="button"
-          onClick={retry}
+          onClick={retryTags}
           className="mt-2 text-[length:var(--fs-caption)] text-[var(--color-text-muted)] underline"
         >
           再試行
@@ -122,17 +220,13 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
     );
   }
 
-  // 初回フェッチ中（まだ記事がない）
-  if (fetchedArticles === null && loading) {
-    return (
-      <p className="text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">読み込み中…</p>
-    );
+  if (fetchedArticles === null && tagLoading) {
+    return <ArticleCardSkeletonList count={5} />;
   }
 
   const articles = fetchedArticles ?? [];
 
-  // フィルタ結果 0 件
-  if (!loading && articles.length === 0) {
+  if (!tagLoading && articles.length === 0) {
     return (
       <div>
         <p>一致する記事がありません。</p>
@@ -148,7 +242,7 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
           )}
           <button
             type="button"
-            onClick={clear}
+            onClick={clearTags}
             className="text-[var(--color-text-muted)] underline"
           >
             タグを外す
@@ -165,32 +259,28 @@ export function FilteredArticleList({ userName, children }: FilteredArticleListP
       .map((a) => a.articleId),
   );
 
-  // ページ変更時または次フェッチ中は一覧を薄く表示する
-  const wrapperClass = loading ? 'pointer-events-none opacity-50' : '';
-
   return (
     <div>
-      {loading && (
-        <p className="mb-2 text-[length:var(--fs-caption)] text-[var(--color-text-muted)]">
-          読み込み中…
-        </p>
-      )}
-      <div className={wrapperClass}>
-        {articles.map((article) => (
-          <ArticleCard
-            key={article.articleId}
-            article={article}
-            userName={userName}
-            priority={priorityArticleIds.has(article.articleId)}
-            tags={(article.tags ?? []).map((path) => ({ path, matched: isTagMatched(path) }))}
+      {tagLoading ? (
+        <ArticleCardSkeletonList count={5} />
+      ) : (
+        <>
+          {articles.map((article) => (
+            <ArticleCard
+              key={article.articleId}
+              article={article}
+              userName={userName}
+              priority={priorityArticleIds.has(article.articleId)}
+              tags={(article.tags ?? []).map((path) => ({ path, matched: isTagMatched(path) }))}
+            />
+          ))}
+          <FilterPagination
+            currentPage={filterPage}
+            totalPages={filteredTotalPages}
+            onPageChange={setFilterPage}
           />
-        ))}
-        <FilterPagination
-          currentPage={filterPage}
-          totalPages={filteredTotalPages}
-          onPageChange={setFilterPage}
-        />
-      </div>
+        </>
+      )}
     </div>
   );
 }

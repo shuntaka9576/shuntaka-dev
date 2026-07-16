@@ -8,7 +8,7 @@ use adapter::{
         users_moments::UsersMomentsRepositoryImpl,
     },
 };
-use infrastructure::lambda::SelfInvoker;
+use infrastructure::{embedding::client::EmbeddingClient, lambda::SelfInvoker};
 use kernel::repository::{
     articles::ArticlesRepository, health::HealthCheckRepository, users::UsersRepository,
     users_articles::UsersArticlesRepository, users_moments::UsersMomentsRepository,
@@ -39,6 +39,8 @@ pub struct AppRegistry {
     webhook_config: WebhookConfig,
     /// Lambda 実行環境でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
     self_invoker: Option<Arc<dyn SelfInvoker>>,
+    /// PLaMOへの到達経路がある環境でのみSome。未設定でも検索以外のAPIは起動する。
+    embedding_client: Option<Arc<dyn EmbeddingClient>>,
 }
 
 impl AppRegistry {
@@ -46,6 +48,7 @@ impl AppRegistry {
         pool: ConnectionPool,
         webhook_config: WebhookConfig,
         self_invoker: Option<Arc<dyn SelfInvoker>>,
+        embedding_client: Option<Arc<dyn EmbeddingClient>>,
     ) -> Self {
         let health_check_repository = Arc::new(HealthCheckRepositoryImpl::new(pool.clone()));
         let users_articles_repository = Arc::new(UsersArticlesRepositoryImpl::new(pool.clone()));
@@ -61,6 +64,7 @@ impl AppRegistry {
             users_repository,
             webhook_config,
             self_invoker,
+            embedding_client,
         }
     }
 
@@ -90,5 +94,9 @@ impl AppRegistry {
 
     pub fn self_invoker(&self) -> Option<Arc<dyn SelfInvoker>> {
         self.self_invoker.clone()
+    }
+
+    pub fn embedding_client(&self) -> Option<Arc<dyn EmbeddingClient>> {
+        self.embedding_client.clone()
     }
 }

@@ -58,6 +58,22 @@ impl AppError {
             source: None,
         }
     }
+
+    pub fn bad_gateway(msg: &str, source: impl Into<anyhow::Error>) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message: msg.to_string(),
+            source: Some(source.into()),
+        }
+    }
+
+    pub fn service_unavailable(msg: &str) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            message: msg.to_string(),
+            source: None,
+        }
+    }
 }
 
 impl IntoResponse for AppError {

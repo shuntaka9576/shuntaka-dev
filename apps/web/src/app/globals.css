@@ -46,7 +46,7 @@
   --color-warning-bg: #fff2b8;
   --color-warning-border: #fcc800;
   --color-danger-bg: #eb6e9f36;
-  --color-danger-border: #e4007f;
+  --color-danger-border: #525457;
 
   /* logs: マスキングテープの色（投稿ごとに管理画面で選ぶ想定）。半透明でテープの質感を出す */
   --moment-tape-plain: rgba(162, 177, 202, 0.35);
@@ -272,8 +272,13 @@ a:hover {
 
 /* Focus-visible ring for interactive elements */
 :is(a, button, [role='button'], input, select, textarea, summary):focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
+}
+
+/* SearchInput: 親 div の focus-within ボーダーがフォーカス表示を担うので input 自身の outline は消す */
+[role='search'] input:focus-visible {
+  outline: none;
 }
 
 /* Article prose styles */

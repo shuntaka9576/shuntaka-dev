@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: plamo-embedding
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plamo-embedding
+  namespace: plamo-embedding
+spec:
+  # node1 は TiFlash の vector index build 用に空け、node2 / node3 へ 1 Pod ずつ配置する。
+  replicas: 2
+  # maxSurge=0 で更新中にも追加 Pod を作らず、モデル分のメモリ増加を防ぐ。
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: plamo-embedding
+  template:
+    metadata:
+      labels:
+        app: plamo-embedding
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - node2
+                      - node3
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: plamo-embedding
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: server
+          image: ghcr.io/shuntaka9576/plamo-embedding:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            # node ごとの初回 image pull と model load を最大 10 分待つ。
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: '500m'
+              memory: '4Gi'
+            limits:
+              memory: '6Gi'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plamo-embedding
+  namespace: plamo-embedding
+spec:
+  type: ClusterIP
+  selector:
+    app: plamo-embedding
+  ports:
+    - port: 80
+      targetPort: 8080

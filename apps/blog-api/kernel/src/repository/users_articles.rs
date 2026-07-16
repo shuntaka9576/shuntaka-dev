@@ -7,6 +7,16 @@ pub struct ArticleSummaryPage {
     pub total_count: u64,
 }
 
+pub struct ArticleSearchResult {
+    pub article: ArticleSummary,
+    pub distance: f64,
+}
+
+pub struct ArticleSearchResultPage {
+    pub results: Vec<ArticleSearchResult>,
+    pub total_count: u64,
+}
+
 pub struct TagFacet {
     pub path: String,
     pub count: u64,
@@ -31,6 +41,16 @@ pub trait UsersArticlesRepository: Send + Sync {
         user_name: &str,
         slug: &str,
     ) -> Result<Option<Article>, anyhow::Error>;
+
+    async fn search_published_by_user_name(
+        &self,
+        user_name: &str,
+        vector: &[f32],
+        tag_filter: Option<&TagFilter>,
+        candidate_limit: u64,
+        limit: u64,
+        offset: u64,
+    ) -> Result<ArticleSearchResultPage, anyhow::Error>;
 
     async fn find_tag_facets(
         &self,

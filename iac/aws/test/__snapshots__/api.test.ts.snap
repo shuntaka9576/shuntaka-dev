@@ -390,6 +390,24 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::EC2::SecurityGroupIngress",
     },
+    "BlogAPIImportedProxySgfromTestMainStackBlogAPILambdaSgB55D8F2D180801D4CF0D4": {
+      "Properties": {
+        "Description": "plamo embedding from lambda-sg-development",
+        "FromPort": 18080,
+        "GroupId": {
+          "Ref": "SsmParameterValuetesttidbproxyproxysgidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "BlogAPILambdaSgDB7152F1",
+            "GroupId",
+          ],
+        },
+        "ToPort": 18080,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
     "BlogAPIImportedProxySgfromTestMainStackBlogAPILambdaSgB55D8F2D3128213EFAFB": {
       "Properties": {
         "Description": "https from lambda-sg-development",
@@ -451,6 +469,24 @@ exports[`MainStack > snapshot 1`] = `
         },
         "IpProtocol": "tcp",
         "ToPort": 13306,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "BlogAPILambdaSgtoTestMainStackBlogAPIImportedProxySg14796E3518080D68F916E": {
+      "Properties": {
+        "Description": "plamo embedding via tidb-proxy",
+        "DestinationSecurityGroupId": {
+          "Ref": "SsmParameterValuetesttidbproxyproxysgidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "FromPort": 18080,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "BlogAPILambdaSgDB7152F1",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 18080,
       },
       "Type": "AWS::EC2::SecurityGroupEgress",
     },
@@ -860,6 +896,7 @@ exports[`MainStack > snapshot 1`] = `
             "NO_PROXY": "169.254.169.254,localhost,127.0.0.1,tidb-proxy.internal",
             "OTEL_EXPORTER_OTLP_ENDPOINT": "http://tidb-proxy.internal:4318",
             "OTEL_SERVICE_NAME": "blog-api-development",
+            "PLAMO_EMBED_ENDPOINT": "http://tidb-proxy.internal:18080",
           },
         },
         "FunctionName": "dev-tp-blog-api",

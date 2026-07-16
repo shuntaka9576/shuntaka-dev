@@ -24,7 +24,12 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 - **Light:** ページ背景は `--color-bg`（オフホワイト）、サーフェスは `--color-surface`、ヘッダーなど持ち上げ面は `--color-surface-raised`。本文テキストは `--color-text`（暖色寄りダークグレー、純黒では **ない**）。
 - **Dark:** GitHub-Dark 系のネイビー。同じ `--color-*` トークンを `[data-theme='dark']` で上書きする。実値は `globals.css` を参照。
-- **Accent:** **マゼンタピンク (`--color-accent`)**。用途：ダークモードトグル ON のトラック、NProgress バー、focus-visible アウトライン、danger callout のボーダー。本文テキストには **絶対** 使わない、カードの fill にも **絶対** 使わない。
+- **Accent:** **マゼンタピンク (`--color-accent`)**。使用箇所は **2 つだけ** に限定する：
+  1. **ダークモードトグル** ON 時のトラック（`--color-accent-alt`）
+  2. **AngleMeter**（検索結果の「なす角」ゲージ — 針・トレイル・中心点）
+
+  上記以外でアクセント色を使わない。focus-visible アウトラインは `--color-text`、Button primary は `--color-text`、danger callout ボーダーも `--color-text` で統一する。本文テキストにもカードの fill にも **絶対** 使わない。
+
 - **Borders:** 一般用途は `--color-border`、記事リスト下線は `--color-border-subtle`（ほぼ見えない、タイポグラフィのベースライン的な存在）。
 
 ### Typography
@@ -82,7 +87,7 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 ### Hover / press / focus
 
 - **Hover.** 1 つのプロパティを 1 段階だけ変える — ボタンは `filter: brightness(95%)`、リンクカードは border-color を入れ替える程度。
-- **Focus-visible.** 全要素共通の `outline: 2px solid var(--color-accent); outline-offset: 2px;` を `globals.css` で `a`、`button`、`[role="button"]`、input、summary に当てる。アクセシビリティの基盤。
+- **Focus-visible.** 全要素共通の `outline: 2px solid var(--color-text); outline-offset: 2px;` を `globals.css` で `a`、`button`、`[role="button"]`、input、summary に当てる。アクセシビリティの基盤。アクセント色は使わない。
 - **Active.** ボタンは `filter: brightness(90%)`。
 - **Disabled.** `opacity: 0.5; pointer-events: none;` + `aria-disabled="true"`。
 

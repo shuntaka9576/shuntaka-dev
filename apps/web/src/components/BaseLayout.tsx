@@ -46,7 +46,9 @@ export function BaseLayout({
           <ProgressLink href="/">
             <div className="text-2xl font-semibold">shuntaka.dev</div>
           </ProgressLink>
-          <ToggleSwitch />
+          <div className="flex items-center gap-3">
+            <ToggleSwitch />
+          </div>
         </div>
       </div>
 

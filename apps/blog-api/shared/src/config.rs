@@ -4,6 +4,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
     pub webhook: WebhookConfig,
+    pub embedding: EmbeddingConfig,
 }
 
 impl AppConfig {
@@ -33,10 +34,17 @@ impl AppConfig {
             images_base_url: std::env::var("IMAGES_BASE_URL").unwrap_or_default(),
         };
 
+        let embedding = EmbeddingConfig {
+            endpoint: std::env::var("PLAMO_EMBED_ENDPOINT")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
+        };
+
         Ok(Self {
             database,
             server,
             webhook,
+            embedding,
         })
     }
 }
@@ -48,6 +56,11 @@ pub struct DatabaseConfig {
 
 pub struct ServerConfig {
     pub port: u16,
+}
+
+pub struct EmbeddingConfig {
+    /// PLaMO Embedding Serviceのbase URL。未設定時もAPI自体は起動し、検索だけ503を返す。
+    pub endpoint: Option<String>,
 }
 
 pub struct WebhookConfig {

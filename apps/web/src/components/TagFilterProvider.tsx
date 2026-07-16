@@ -21,10 +21,8 @@ import {
   type TagNode,
 } from '@/lib/tagFilter';
 
-export const TAG_FILTER_PANEL_ID = 'tag-filter-panel';
-
 interface TagFilterContextValue {
-  panelOpen: boolean;
+  tagModalOpen: boolean;
   selected: string[];
   mode: TagFilterMode;
   /** 選択タグが1つ以上あるか */
@@ -43,8 +41,8 @@ interface TagFilterContextValue {
   facetsError: boolean;
   /** タグパネルに表示するツリー（facets から構築） */
   tagTree: TagNode[];
-  togglePanel: () => void;
-  closePanel: () => void;
+  openTagModal: () => void;
+  closeTagModal: () => void;
   toggleTag: (path: string) => void;
   changeMode: (mode: TagFilterMode) => void;
   clear: () => void;
@@ -96,7 +94,7 @@ export function TagFilterProvider({
   baseHref,
   children,
 }: TagFilterProviderProps) {
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [tagModalOpen, setTagModalOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<TagFilterMode>('and');
   const [filterPage, setFilterPageState] = useState(1);
@@ -201,13 +199,16 @@ export function TagFilterProvider({
 
   const pushFilterUrl = useCallback(
     (nextSelected: string[], nextMode: TagFilterMode, nextFilterPage: number, replace = false) => {
+      // 検索クエリ (?q=) は SearchProvider が管理する別軸なので、こちらの URL 更新でも保持する
+      const currentQ = new URLSearchParams(window.location.search).get('q');
       let url: string;
       if (nextSelected.length === 0) {
-        url = unfilteredHref;
+        url = currentQ ? `${unfilteredHref}?q=${encodeURIComponent(currentQ)}` : unfilteredHref;
       } else {
         const query = buildFilterQuery(nextSelected, nextMode);
         const pageParam = nextFilterPage > 1 ? `&page=${nextFilterPage}` : '';
-        url = `${baseHref}${query}${pageParam}`;
+        const qParam = currentQ ? `&q=${encodeURIComponent(currentQ)}` : '';
+        url = `${baseHref}${query}${pageParam}${qParam}`;
       }
       if (replace) {
         window.history.replaceState(null, '', url);
@@ -238,11 +239,12 @@ export function TagFilterProvider({
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
-  // FloatingTagFilter の effect 依存に入るため参照を安定させる
-  const closePanel = useCallback(() => setPanelOpen(false), []);
+  // FloatingSearchTagFilter の effect 依存に入るため参照を安定させる
+  const closeTagModal = useCallback(() => setTagModalOpen(false), []);
+  const openTagModal = useCallback(() => setTagModalOpen(true), []);
 
   const value: TagFilterContextValue = {
-    panelOpen,
+    tagModalOpen,
     selected,
     mode,
     filtering,
@@ -254,8 +256,8 @@ export function TagFilterProvider({
     error,
     facetsError,
     tagTree,
-    togglePanel: () => setPanelOpen((prev) => !prev),
-    closePanel,
+    openTagModal,
+    closeTagModal,
     toggleTag: (path) => {
       const next = selected.includes(path)
         ? selected.filter((t) => t !== path)

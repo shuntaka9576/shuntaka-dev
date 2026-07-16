@@ -8,7 +8,8 @@ use kernel::model::article::{
     TagFilterMode, Thumbnail, Title, UserId,
 };
 use kernel::repository::users_articles::{
-    ArticleSummaryPage, TagFacet, TagFacetsResult, UsersArticlesRepository,
+    ArticleSearchResult, ArticleSearchResultPage, ArticleSummaryPage, TagFacet, TagFacetsResult,
+    UsersArticlesRepository,
 };
 use sqlx::{FromRow, MySqlPool};
 use uuid::Uuid;
@@ -58,6 +59,43 @@ impl TryFrom<ArticleSummaryBaseRow> for ArticleSummary {
             row.created_at,
             row.updated_at,
         ))
+    }
+}
+
+#[derive(FromRow)]
+struct ArticleSearchRow {
+    article_id: String,
+    title: String,
+    slug: String,
+    user_id: String,
+    thumbnail: Option<String>,
+    description: String,
+    status: String,
+    published_at: Option<DateTime<Utc>>,
+    created_at: Option<DateTime<Utc>>,
+    updated_at: Option<DateTime<Utc>>,
+    distance: f64,
+    total_count: i64,
+}
+
+impl TryFrom<ArticleSearchRow> for ArticleSearchResult {
+    type Error = anyhow::Error;
+
+    fn try_from(row: ArticleSearchRow) -> Result<Self, Self::Error> {
+        let distance = row.distance;
+        let article = ArticleSummary::try_from(ArticleSummaryBaseRow {
+            article_id: row.article_id,
+            title: row.title,
+            slug: row.slug,
+            user_id: row.user_id,
+            thumbnail: row.thumbnail,
+            description: row.description,
+            status: row.status,
+            published_at: row.published_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })?;
+        Ok(Self { article, distance })
     }
 }
 
@@ -246,6 +284,47 @@ fn build_list_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String,
             .to_string(),
     };
     (cte, conditions)
+}
+
+/// ANN候補取得を必ず先に行い、公開条件・ユーザー・タグを外側でpost-filterするSQLを組み立てる。
+fn build_search_sql(tag_ids: Option<&[String]>, mode: Option<&TagFilterMode>) -> String {
+    let (with_prefix, filter_conditions) = match tag_ids {
+        None => ("WITH ".to_string(), String::new()),
+        Some(ids) => {
+            let (filter_cte, conditions) =
+                build_list_filter_parts(ids, mode.expect("tag filter mode must exist"));
+            (format!("{filter_cte},\n"), format!("\n{conditions}"))
+        }
+    };
+
+    format!(
+        r#"{with_prefix}nearest_chunks AS (
+    SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
+           c.article_id,
+           VEC_COSINE_DISTANCE(c.embedding, ?) AS distance
+      FROM article_embedding_chunks AS c
+     ORDER BY VEC_COSINE_DISTANCE(c.embedding, ?)
+     LIMIT ?
+),
+ranked_articles AS (
+    SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
+           a.status, a.published_at, a.created_at, a.updated_at, nc.distance,
+           ROW_NUMBER() OVER (
+               PARTITION BY a.article_id ORDER BY nc.distance, a.article_id
+           ) AS chunk_rank
+      FROM nearest_chunks AS nc
+      JOIN articles AS a ON a.article_id = nc.article_id
+      JOIN users AS u ON u.user_id = a.user_id
+     WHERE a.status = 'published' AND u.name = ?{filter_conditions}
+)
+SELECT article_id, title, slug, user_id, thumbnail, description, status,
+       published_at, created_at, updated_at, distance,
+       COUNT(*) OVER() AS total_count
+  FROM ranked_articles
+ WHERE chunk_rank = 1
+ ORDER BY distance, article_id
+ LIMIT ? OFFSET ?"#
+    )
 }
 
 /// ファセット集計クエリ用の tag_descendants CTE 本体と WHERE 条件句を構築する。
@@ -520,6 +599,107 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         row.map(Article::try_from).transpose()
     }
 
+    async fn search_published_by_user_name(
+        &self,
+        user_name: &str,
+        vector: &[f32],
+        tag_filter: Option<&TagFilter>,
+        candidate_limit: u64,
+        limit: u64,
+        offset: u64,
+    ) -> Result<ArticleSearchResultPage, anyhow::Error> {
+        let pool = self.db.pool();
+        let vector_json = serde_json::to_string(vector)?;
+        let candidate_limit = candidate_limit.max(limit);
+
+        let resolved_ids: Option<Vec<String>> = match tag_filter {
+            None => None,
+            Some(filter) if filter.is_empty() => None,
+            Some(filter) => {
+                let resolved = resolve_tag_ids_for_paths(&pool, &filter.paths).await?;
+                match filter.mode {
+                    TagFilterMode::And => {
+                        if resolved.iter().any(Option::is_none) {
+                            return Ok(ArticleSearchResultPage {
+                                results: vec![],
+                                total_count: 0,
+                            });
+                        }
+                        Some(resolved.into_iter().flatten().collect())
+                    }
+                    TagFilterMode::Or => {
+                        let ids: Vec<String> = resolved.into_iter().flatten().collect();
+                        if ids.is_empty() {
+                            return Ok(ArticleSearchResultPage {
+                                results: vec![],
+                                total_count: 0,
+                            });
+                        }
+                        Some(ids)
+                    }
+                }
+            }
+        };
+        let filter_mode = tag_filter.map(|filter| &filter.mode);
+
+        // user/status filterをHNSWの内側に置くとTiFlash全走査になるため、まずchunkの
+        // ANN候補を取得する。外側で公開記事へ絞り、同一記事は最小distanceだけを残す。
+        let search_sql = build_search_sql(resolved_ids.as_deref(), filter_mode);
+
+        let mut query =
+            sqlx::query_as::<_, ArticleSearchRow>(sqlx::AssertSqlSafe(search_sql.as_str()));
+        if let Some(ids) = &resolved_ids {
+            for id in ids {
+                query = query.bind(id.as_str());
+            }
+        }
+        query = query
+            .bind(&vector_json)
+            .bind(&vector_json)
+            .bind(candidate_limit)
+            .bind(user_name);
+        if let (Some(ids), Some(TagFilterMode::And)) = (&resolved_ids, filter_mode) {
+            for id in ids {
+                query = query.bind(id.as_str());
+            }
+        }
+        query = query.bind(limit).bind(offset);
+
+        let rows: Vec<ArticleSearchRow> = observe_query(
+            "article_vector_search",
+            search_sql.as_str(),
+            query.fetch_all(&pool),
+            |rows| Some(rows.len() as i64),
+        )
+        .await?;
+
+        let total_count = rows.first().map(|r| r.total_count as u64).unwrap_or(0);
+
+        let mut results: Vec<ArticleSearchResult> = rows
+            .into_iter()
+            .map(ArticleSearchResult::try_from)
+            .collect::<Result<_, _>>()?;
+
+        if !results.is_empty() {
+            let article_ids: Vec<String> = results
+                .iter()
+                .map(|result| result.article.article_id.as_uuid().to_string())
+                .collect();
+            let mut tags_map = fetch_article_tags(&pool, &article_ids).await?;
+            for result in &mut results {
+                let id = result.article.article_id.as_uuid().to_string();
+                if let Some(tags) = tags_map.remove(&id) {
+                    result.article.tags = tags;
+                }
+            }
+        }
+
+        Ok(ArticleSearchResultPage {
+            results,
+            total_count,
+        })
+    }
+
     async fn find_tag_facets(
         &self,
         user_name: &str,
@@ -729,5 +909,26 @@ mod tests {
         // single EXISTS condition for OR
         assert_eq!(conds.matches("EXISTS").count(), 1);
         assert!(conds.contains("ats"), "OR uses alias 'ats'");
+    }
+
+    #[test]
+    fn build_search_sql_without_tags_keeps_filters_outside_ann() {
+        let sql = build_search_sql(None, None);
+        assert!(sql.starts_with("WITH nearest_chunks"));
+        assert!(!sql.contains("annIndex"));
+        assert!(sql.contains("READ_FROM_STORAGE(TIFLASH[c])"));
+        assert!(sql.contains("WHERE a.status = 'published' AND u.name = ?"));
+        assert!(!sql.contains("tag_descendants"));
+    }
+
+    #[test]
+    fn build_search_sql_with_tags_places_tag_filter_after_ann_cte() {
+        let ids = vec!["id1".to_string(), "id2".to_string()];
+        let sql = build_search_sql(Some(&ids), Some(&TagFilterMode::And));
+        let nearest_position = sql.find("nearest_chunks AS").unwrap();
+        let filter_position = sql.find("AND EXISTS").unwrap();
+        assert!(sql.starts_with("WITH RECURSIVE tag_descendants"));
+        assert!(filter_position > nearest_position);
+        assert_eq!(sql.matches("AND EXISTS").count(), 2);
     }
 }

@@ -64,6 +64,36 @@ export interface TagFacetsOptions {
   signal?: AbortSignal;
 }
 
+/** セマンティック検索のヒット記事。既存 ArticleSummary に距離を足したもの。 */
+export interface SearchArticleResult extends ArticleSummary {
+  /** cosine distance (0..2)。API 側の `distance` フィールドを 1:1 で写す */
+  distance: number;
+}
+
+export interface SearchArticlesResult {
+  articles: SearchArticleResult[];
+  /** サーバがエコーする検索語 */
+  query: string;
+  /** サーバに渡された上限件数 */
+  limit: number;
+  /** サーバに渡されたオフセット */
+  offset: number;
+  /** 候補プール内の合致記事総数（ページネーション用） */
+  totalCount: number;
+}
+
+export interface SearchArticlesOptions {
+  /** タグ絞り込み。フルパス（例: "tech/rust"）で指定する */
+  tags?: string[];
+  /** AND（デフォルト）または OR。API のデフォルトが AND のため OR 時のみ送信する */
+  mode?: 'and' | 'or';
+  /** 上限件数。省略時は API のデフォルト（20）に従う */
+  limit?: number;
+  /** オフセット（ページネーション用）。省略時は 0 */
+  offset?: number;
+  signal?: AbortSignal;
+}
+
 /** 写真の留め具（壁に貼るイメージ）。投稿時に管理画面で選ぶ */
 export type MomentFastener = 'clip' | 'tape';
 
@@ -166,6 +196,33 @@ export async function getTagFacets(
 
   if (!res.ok) {
     throw new Error(`Failed to fetch tag facets: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * `/users/{userName}/articles/search` を呼び出し、セマンティック検索結果を返す。
+ * `q` が空文字のとき呼び出しは想定しない（呼び出し側でガードする）。
+ * タグと mode 併用時も同じ endpoint に query として付与する。
+ */
+export async function searchArticles(
+  userName: string,
+  q: string,
+  opts: SearchArticlesOptions = {},
+): Promise<SearchArticlesResult> {
+  const queryParts: string[] = [`q=${encodeURIComponent(q)}`];
+  if (opts.limit !== undefined) queryParts.push(`limit=${opts.limit}`);
+  if (opts.offset !== undefined && opts.offset > 0) queryParts.push(`offset=${opts.offset}`);
+  if (opts.tags && opts.tags.length > 0) {
+    queryParts.push(...buildTagsQuery(opts.tags, opts.mode));
+  }
+
+  const url = `${API_BASE_URL}/users/${userName}/articles/search?${queryParts.join('&')}`;
+  const res = await fetch(url, { cache: 'no-store', signal: opts.signal });
+
+  if (!res.ok) {
+    throw new Error(`Failed to search articles: ${res.status}`);
   }
 
   return res.json();

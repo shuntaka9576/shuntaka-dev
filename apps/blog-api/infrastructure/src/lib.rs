@@ -1,4 +1,5 @@
 pub mod cloudinary;
+pub mod embedding;
 pub mod error;
 pub mod github;
 pub mod lambda;
