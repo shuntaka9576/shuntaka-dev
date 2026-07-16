@@ -31,6 +31,7 @@
 
 ## 注意
 
+- `LIMIT` / `OFFSET` は MySQL / TiDB 仕様でセッション変数 `@var` を受け付けない（リテラル整数 or prepared placeholder のみ）。playground では `LIMIT 20 OFFSET 0` のように直接数値を書き換える運用にしている
 - `WITH RECURSIVE` は MySQL 8.0+ / TiDB 6.x+ で有効。Workbench の古い接続では拒否される
 - `/*+ USE_INDEX(...) */` / `/*+ READ_FROM_STORAGE(TIFLASH[c]) */` / `/*+ MAX_EXECUTION_TIME(...) */` は TiDB 固有ヒント。stock MySQL では単なるコメント扱い
 - `VEC_COSINE_DISTANCE` / `VECTOR(2048)` / `article_embedding_chunks` は TiDB Vector 機能。08_users_articles_search.sql は TiDB 以外では実行不可

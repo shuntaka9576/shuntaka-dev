@@ -10,13 +10,14 @@
 --   playground では全 0 のダミーを 2048 個並べたい場合は
 --     SET @v = CONCAT('[', REPEAT('0,', 2047), '0]');
 --   のように組み立てるとよい。
+--
+--   LIMIT / OFFSET は MySQL / TiDB 仕様で @var を受け付けないため
+--   （リテラル整数 or prepared placeholder のみ）、各クエリの
+--   `LIMIT 50` (candidate) / `LIMIT 10 OFFSET 0` (page) を直接書き換える。
 -- ────────────────────────────────────
 
-SET @user_name       = 'shuntaka';
-SET @limit           = 10;
-SET @offset          = 0;
-SET @candidate_limit = 50;    -- 実装では limit と MAX を取る
-SET @vector          = CONCAT('[', REPEAT('0,', 2047), '0]');
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
 
 
 -- ────────────────────────────────────
@@ -29,7 +30,7 @@ WITH nearest_chunks AS (
            VEC_COSINE_DISTANCE(c.embedding, @vector) AS distance
       FROM article_embedding_chunks AS c
      ORDER BY VEC_COSINE_DISTANCE(c.embedding, @vector)
-     LIMIT @candidate_limit
+     LIMIT 50
 ),
 ranked_articles AS (
     SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
@@ -49,7 +50,7 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
   FROM ranked_articles
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
- LIMIT @limit OFFSET @offset;
+ LIMIT 10 OFFSET 0;
 
 
 -- ────────────────────────────────────
@@ -72,7 +73,7 @@ nearest_chunks AS (
            VEC_COSINE_DISTANCE(c.embedding, @vector) AS distance
       FROM article_embedding_chunks AS c
      ORDER BY VEC_COSINE_DISTANCE(c.embedding, @vector)
-     LIMIT @candidate_limit
+     LIMIT 50
 ),
 ranked_articles AS (
     SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
@@ -98,7 +99,7 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
   FROM ranked_articles
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
- LIMIT @limit OFFSET @offset;
+ LIMIT 10 OFFSET 0;
 
 
 -- ────────────────────────────────────
@@ -117,7 +118,7 @@ nearest_chunks AS (
            VEC_COSINE_DISTANCE(c.embedding, @vector) AS distance
       FROM article_embedding_chunks AS c
      ORDER BY VEC_COSINE_DISTANCE(c.embedding, @vector)
-     LIMIT @candidate_limit
+     LIMIT 50
 ),
 ranked_articles AS (
     SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
@@ -140,4 +141,4 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
   FROM ranked_articles
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
- LIMIT @limit OFFSET @offset;
+ LIMIT 10 OFFSET 0;

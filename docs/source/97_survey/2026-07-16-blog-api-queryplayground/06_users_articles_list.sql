@@ -6,11 +6,12 @@
 
 -- ────────────────────────────────────
 -- 共通パラメータ
+--   LIMIT / OFFSET は MySQL / TiDB 仕様で @var を受け付けない
+--   （リテラル整数 or prepared placeholder のみ）ため、各クエリの LIMIT 20 OFFSET 0
+--   の数値を直接書き換える運用にしている。
 -- ────────────────────────────────────
 
 SET @user_name = 'shuntaka';
-SET @limit  = 20;
-SET @offset = 0;
 
 -- ────────────────────────────────────
 -- (A) フィルタなし
@@ -23,7 +24,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
  WHERE a.user_id = (SELECT user_id FROM users WHERE name = @user_name)
    AND a.status = 'published'
  ORDER BY a.published_at DESC, a.article_id DESC
- LIMIT @limit OFFSET @offset;
+ LIMIT 20 OFFSET 0;
 
 -- COUNT
 SELECT COUNT(*)
@@ -55,7 +56,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                  JOIN tag_descendants td ON at0.tag_id = td.tag_id AND td.root_tag_id = @tag_id_1
                 WHERE at0.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
- LIMIT @limit OFFSET @offset;
+ LIMIT 20 OFFSET 0;
 
 
 -- ────────────────────────────────────
@@ -85,7 +86,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                  JOIN tag_descendants td ON at1.tag_id = td.tag_id AND td.root_tag_id = @tag_id_b
                 WHERE at1.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
- LIMIT @limit OFFSET @offset;
+ LIMIT 20 OFFSET 0;
 
 
 -- ────────────────────────────────────
@@ -109,7 +110,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                  JOIN tag_descendants td ON ats.tag_id = td.tag_id
                 WHERE ats.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
- LIMIT @limit OFFSET @offset;
+ LIMIT 20 OFFSET 0;
 
 
 -- ────────────────────────────────────

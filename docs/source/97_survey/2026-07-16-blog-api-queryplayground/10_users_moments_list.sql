@@ -3,8 +3,9 @@
 -- 撮影時刻 captured_at 降順（同時刻は moment_id 降順でタイブレーク）で
 -- カーソルベースにページングする。
 
+-- LIMIT は MySQL / TiDB 仕様で @var を受け付けないため
+-- （リテラル整数 or prepared placeholder のみ）、各クエリの LIMIT 20 を直接書き換える。
 SET @user_name = 'shuntaka';
-SET @limit     = 20;
 
 -- ────────────────────────────────────
 -- (A) カーソルなし（初回）
@@ -15,7 +16,7 @@ SELECT m.moment_id, m.text, m.image_key, m.fastener, m.fastener_color, m.capture
  WHERE m.user_id = (SELECT user_id FROM users WHERE name = @user_name)
    AND m.status  = 'published'
  ORDER BY m.captured_at DESC, m.moment_id DESC
- LIMIT @limit;
+ LIMIT 20;
 
 
 -- ────────────────────────────────────
@@ -33,4 +34,4 @@ SELECT m.moment_id, m.text, m.image_key, m.fastener, m.fastener_color, m.capture
    AND m.status  = 'published'
    AND (m.captured_at, m.moment_id) < (@cursor_captured_at, @cursor_moment_id)
  ORDER BY m.captured_at DESC, m.moment_id DESC
- LIMIT @limit;
+ LIMIT 20;
