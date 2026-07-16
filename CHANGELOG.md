@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0716.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.1...2026.0716.2) - 2026-07-16
+
+- perf: 日本語Webフォントをシステムフォントへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/680
+
 ## [2026.0716.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.0...2026.0716.1) - 2026-07-16
 
 - feat: GitHub webhookでarticle embedding chunksを差し替える by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/673
