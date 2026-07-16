@@ -4,6 +4,34 @@
 
 ![アーキテクチャ図](assets/architecture.drawio.png)
 
+### VPC 内 Lambda の共通 egress ゲートウェイ
+
+`tidb-proxy.internal` (ECS Fargate) は 1 ホスト名で複数サービスへの出口を担う[^tidb-proxy-name]。ホスト名は AWS Cloud Map の private DNS namespace `internal` + service `tidb-proxy` で解決され、ECS task の ENI 直 IP が A レコードとして登録される。Lambda 側はホスト名ではなくポート番号で行き先を選ぶ。
+
+[^tidb-proxy-name]: 名前は TiDB 専用プロキシを連想させるが、実態は VPC 内の Lambda から Tailnet / インターネット / OTel 集約への出口を束ねる汎用 egress ゲートウェイ。初期は TiDB への tsnet 中継のみを担っていた名残でこの名前になっている。正確には `vpc-egress-gateway` に近い。
+
+Lambda 側 (どの URL を叩くか)。
+
+| Lambda が使う URL                   | ポート | 出口                                      |
+| ----------------------------------- | -----: | ----------------------------------------- |
+| `mysql://tidb-proxy.internal:13306` |  13306 | Tailnet の `tidb.<tailnet>:4000`          |
+| `http://tidb-proxy.internal:3128`   |   3128 | インターネット全般 (CONNECT 443 のみ許可) |
+| `http://tidb-proxy.internal:18080`  |  18080 | Tailnet の `plamo-embedding.<tailnet>:80` |
+| `http://tidb-proxy.internal:4318`   |   4318 | メトリクス / トレース集約先               |
+
+ECS task 側 (誰が受けるか)。1 task に 3 コンテナが同居し、`awsvpc` で network namespace を共有するので `localhost` で相互に届く。
+
+| コンテナ         | listen ポート | 役割                                                                   |
+| ---------------- | ------------- | ---------------------------------------------------------------------- |
+| `tidb-proxy`     | 13306 / 18080 | Go forwarder。`tsnet.Server` 1 つで Tailnet に参加し L4 中継する       |
+| （同上）         | 3128          | squid。インターネットへの HTTPS forward proxy (CONNECT 443 のみ)       |
+| `otel-collector` | 4317 / 4318   | AWS Distro for OpenTelemetry。gRPC (4317) / HTTP (4318) を受ける       |
+| `log-router`     | -             | FireLens (Fluent Bit)。他コンテナの stdout を CloudWatch / Firehose へ |
+
+Lambda 側の 13306 / 18080 は `tidb-proxy` コンテナの forwarder が、3128 は同コンテナの squid が受ける (同一コンテナ内で forwarder と squid が併存)。4318 は別コンテナの `otel-collector` が受け、network namespace 共有によって同じ `tidb-proxy.internal` ホスト名から到達できる。
+
+Tailnet に参加しているのは forwarder の `tsnet.Server` 1 つだけで、Tailscale ACL は `tag:proxy` 1 デバイスに集約される。Lambda の `HTTP_PROXY` 経由でループしないよう `NO_PROXY` に `tidb-proxy.internal` を含めており、`PLAMO_EMBED_ENDPOINT` (18080) も squid を経由せず forwarder に直接 TCP 接続する。
+
 ### 必要機材
 
 自作MiniPCクラスタ (k8s + TiDB + Tailscale) を構成する機材。
