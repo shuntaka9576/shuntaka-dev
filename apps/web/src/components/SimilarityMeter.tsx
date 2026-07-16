@@ -17,7 +17,7 @@ export function SimilarityMeter({ distance, className = '' }: SimilarityMeterPro
 
   return (
     <div
-      className={`inline-flex shrink-0 items-center gap-1.5 text-[length:var(--fs-caption)] text-[var(--color-text-muted)] ${className}`}
+      className={`font-latin-ui inline-flex shrink-0 items-center gap-1.5 text-[length:var(--fs-caption)] text-[var(--color-text-muted)] ${className}`}
       role="img"
       aria-label={`類似度 ${percent} パーセント`}
     >

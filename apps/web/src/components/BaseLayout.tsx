@@ -44,7 +44,7 @@ export function BaseLayout({
           className={`mx-auto flex items-center justify-between px-8 pt-3 pb-1 max-sm:px-4 ${widthClass}`}
         >
           <ProgressLink href="/">
-            <div className="text-2xl font-semibold">shuntaka.dev</div>
+            <div className="font-latin-ui text-2xl font-semibold">shuntaka.dev</div>
           </ProgressLink>
           <div className="flex items-center gap-3">
             <ToggleSwitch />
@@ -59,7 +59,7 @@ export function BaseLayout({
           aria-label="カテゴリーナビゲーション"
         >
           <div className={`mx-auto flex items-baseline px-8 max-sm:px-4 max-sm:pt-3 ${widthClass}`}>
-            <div>
+            <div className="font-latin-ui">
               <div className="inline-block mr-2">
                 <ProgressLink href="/" className={isPostsActive ? tabActiveClass : ''}>
                   posts

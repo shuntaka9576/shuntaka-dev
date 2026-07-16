@@ -85,7 +85,7 @@ function MomentsPageMock() {
         <div
           className={`mx-auto flex items-center justify-between px-8 pt-3 pb-1 max-sm:px-4 ${widthClass}`}
         >
-          <div className="text-2xl font-semibold">shuntaka.dev</div>
+          <div className="font-latin-ui text-2xl font-semibold">shuntaka.dev</div>
           <ToggleSwitch />
         </div>
       </div>
