@@ -108,7 +108,7 @@ moments（180 字 + 写真必須の一文投稿）は写真が主役の情緒的
 - タグ絞り込みは画面下部中央の `FloatingTagFilter`（`position: fixed`）。アイコンのみの円形トリガー + IDE のファイルツリー風パネル（`TagFilterTree`、フォルダ/タグの stroke アイコン + チェブロン展開）。一覧側はフローティングバーとの重なりを避ける bottom padding を確保する。
 - 記事ページ = 左コンテンツ + `--layout-sidebar-w` 固定の右 TOC サイドバーを `flex justify-between` で並べる。`lg` 以下でサイドバーは折りたたまれる。
 - TOC の sticky オフセットは `top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5))` で計算する。マジックナンバー禁止。
-- フッターは `position: absolute; bottom: 0;` で body 下部に `--layout-footer-h` 分の余白を予約。ヘッダーは sticky **にしない**。
+- フッターは `position: absolute; bottom: 0;` で body 下部に `--layout-footer-h` 分の余白を予約し、上辺に `--color-border-subtle` の 1px 区切り線を引く。ヘッダーは sticky **にしない**。
 - **`display: grid` を使わない.** マルチカラムは Flex + `gap`。
 
 ### 透過 / blur
