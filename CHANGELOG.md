@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0716.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.0...2026.0716.1) - 2026-07-16
+
+- feat: GitHub webhookでarticle embedding chunksを差し替える by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/673
+
 ## [2026.0716.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0713.4...2026.0716.0) - 2026-07-16
 
 - fix(deps): update aws-sdk-js-v3 monorepo to ^3.1086.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/630
