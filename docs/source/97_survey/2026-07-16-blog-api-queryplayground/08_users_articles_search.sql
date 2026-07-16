@@ -8,21 +8,27 @@
 -- 共通パラメータ
 --   embedding は VECTOR(2048)。JSON 配列文字列で渡す（sqlx 実装と同じ）。
 --   playground では全 0 のダミーを 2048 個並べたい場合は
---     SET @v = CONCAT('[', REPEAT('0,', 2047), '0]');
+--     SET @vector = CONCAT('[', REPEAT('0,', 2047), '0]');
 --   のように組み立てるとよい。
+--
+--   playground はステートメントごとに接続を切ることがあり、その場合は
+--   セッション変数 (@user_name / @vector / @tag_id_a など) が引き継がれない。
+--   そのため各セクションを BEGIN ... COMMIT で括り、同一トランザクション内で
+--   SET と本体クエリを一括送信する。
 --
 --   LIMIT / OFFSET は MySQL / TiDB 仕様で @var を受け付けないため
 --   （リテラル整数 or prepared placeholder のみ）、各クエリの
 --   `LIMIT 50` (candidate) / `LIMIT 10 OFFSET 0` (page) を直接書き換える。
 -- ────────────────────────────────────
 
-SET @user_name = 'shuntaka';
-SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
-
 
 -- ────────────────────────────────────
 -- (A) フィルタなし
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
 
 WITH nearest_chunks AS (
     SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
@@ -51,6 +57,7 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -58,8 +65,11 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
 --   ranked_articles CTE の WHERE に EXISTS を積む
 -- ────────────────────────────────────
 
-SELECT tag_id INTO @tag_id_a FROM tags WHERE name = 'tech';
-SELECT tag_id INTO @tag_id_b FROM tags WHERE name = 'misc';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
+SELECT @tag_id_a := tag_id FROM tags WHERE name = 'tech';
+SELECT @tag_id_b := tag_id FROM tags WHERE name = 'misc';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -100,11 +110,18 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
 -- (C) タグ 2 件 OR フィルタ
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
+SELECT @tag_id_a := tag_id FROM tags WHERE name = 'tech';
+SELECT @tag_id_b := tag_id FROM tags WHERE name = 'misc';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -142,3 +159,4 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
