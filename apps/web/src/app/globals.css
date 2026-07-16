@@ -1,6 +1,7 @@
+/* cspell:ignore Kaku Meiryo */
 @import 'tailwindcss';
 
-/* Tailwind の font-* クラスも配信ウェイト (400/600) に寄せる。--fw-* トークンと同じマッピング */
+/* Tailwind の font-* クラスも使用ウェイト (400/600) に寄せる。--fw-* トークンと同じマッピング */
 @theme {
   --font-weight-light: 400;
   --font-weight-normal: 400;
@@ -98,7 +99,7 @@
   --lh-body: 1.9;
 
   /* Font weight
-     配信ウェイトは 400/600 の 2 本のみ (フォント転送量削減。DESIGN.md Typography 参照)。
+     Latin UI 用 Inter は 400/600 の 2 本のみ配信する。日本語はシステムフォントを使う。
      セマンティックトークンは維持し、実値をどちらかに寄せる */
   --fw-light: 400;
   --fw-regular: 400;
@@ -106,7 +107,13 @@
   --fw-semibold: 600;
   --fw-bold: 600;
 
-  /* Mono font stack (sans is supplied by next/font: --font-roboto, --font-noto-sans-jp) */
+  /* Sans: 日本語本文は OS 標準、英字中心のブランド UI だけ Latin-only Inter */
+  --font-base:
+    -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo,
+    sans-serif, 'Segoe UI Emoji';
+  --font-latin-ui: 'Inter', BlinkMacSystemFont, Arial, sans-serif;
+
+  /* Mono font stack */
   --font-mono:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
@@ -242,23 +249,16 @@ html {
 
 body {
   height: 100%;
-  font-family:
-    'Gen Interface JP',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-base);
   font-weight: var(--fw-light);
   word-wrap: break-word;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+/* Zenn と同様、ロゴ・英語ナビ・日付や数値など Latin 中心の UI にだけ適用する */
+.font-latin-ui {
+  font-family: var(--font-latin-ui);
 }
 
 a {
@@ -566,6 +566,7 @@ a:hover {
 }
 
 .article-time {
+  font-family: var(--font-latin-ui);
   text-align: left;
 }
 

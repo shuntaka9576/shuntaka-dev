@@ -46,7 +46,7 @@ export const ArticleCard = memo(function ArticleCard({
         <div className="mb-2 flex justify-between">
           <div className="min-w-0">
             <div className="pt-2 pr-2 pb-4 text-base font-normal">{article.title}</div>
-            <div className="flex items-center gap-x-2 text-xs font-light">
+            <div className="font-latin-ui flex items-center gap-x-2 text-xs font-light">
               <span className="shrink-0">{formatDate(article.publishedAt)}</span>
               {hasDistance && (
                 <>
@@ -57,7 +57,7 @@ export const ArticleCard = memo(function ArticleCard({
             </div>
             {tags && tags.length > 0 && (
               <div className="overflow-x-auto">
-                <div className="flex items-center gap-x-2 text-xs font-light">
+                <div className="font-latin-ui flex items-center gap-x-2 text-xs font-light">
                   {tags.map((tag) => (
                     <span
                       key={tag.path}

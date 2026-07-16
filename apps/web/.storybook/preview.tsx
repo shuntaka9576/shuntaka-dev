@@ -1,5 +1,7 @@
 import { withThemeByDataAttribute } from '@storybook/addon-themes';
 import type { Preview } from '@storybook/nextjs-vite';
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-600.css';
 import { NavigationProgressProvider } from '../src/components/NavigationProgressProvider';
 import { ThemeProvider } from '../src/components/ThemeProvider';
 import '../src/app/globals.css';

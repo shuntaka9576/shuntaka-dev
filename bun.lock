@@ -85,6 +85,7 @@
       "name": "@shuntaka-dev/web",
       "version": "0.1.0",
       "dependencies": {
+        "@fontsource/inter": "^5.2.8",
         "@microsoft/clarity": "^1.0.2",
         "@vercel/analytics": "^2.0.1",
         "@vercel/speed-insights": "^2.0.0",
@@ -550,6 +551,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@fontsource-variable/geist": ["@fontsource-variable/geist@5.2.9", "", {}, "sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ=="],
+
+    "@fontsource/inter": ["@fontsource/inter@5.2.8", "", {}, "sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg=="],
 
     "@hono/node-server": ["@hono/node-server@2.0.9", "", { "peerDependencies": { "hono": "^4" } }, "sha512-cNMw3ziCdDcx0+ldta60zvUL5XO0OLt521n2hjPp0PB0ugczDCEczXsf33qQbkKIXWGFQ03f0LC85u6YK8pCLA=="],
 

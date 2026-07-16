@@ -40,7 +40,7 @@ export function TagCloud({ nodes, selected, onToggleTag }: TagCloudProps) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="font-latin-ui flex flex-col gap-4">
       {flatByRoot.map(({ root, flat }) => {
         return (
           <section key={root.path}>
