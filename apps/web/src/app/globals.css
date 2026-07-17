@@ -480,6 +480,7 @@ a:hover {
 .prose sup.footnote-ref a {
   padding: 0 0.1em;
   text-decoration: none;
+  scroll-margin-top: var(--space-3);
 }
 
 .prose .footnotes {
@@ -500,6 +501,7 @@ a:hover {
 
 .prose .footnotes ol > li {
   margin-bottom: var(--space-1);
+  scroll-margin-top: var(--space-3);
 }
 
 .prose .footnotes li p {
