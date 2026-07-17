@@ -511,6 +511,14 @@ a:hover {
   text-decoration: none;
 }
 
+/* ジャンプ先を可視化する。参照と脚注が近接していてスクロールが
+   発生しない（ページ末尾で clamp される）ケースでも戻り先が分かる */
+.prose sup.footnote-ref a:target,
+.prose .footnotes li:target {
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
+}
+
 /* Message container styles (global, legacy compatible) */
 .message {
   position: relative;
