@@ -476,6 +476,51 @@ a:hover {
   font-style: italic;
 }
 
+/* Footnotes (comrak footnotes 拡張 + Zenn 風タイトル) */
+.prose sup.footnote-ref a {
+  padding: 0 0.1em;
+  text-decoration: none;
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes {
+  margin-top: var(--space-8);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--fs-caption);
+}
+
+.prose .footnotes-title {
+  display: block;
+  font-weight: var(--fw-bold);
+}
+
+.prose .footnotes ol {
+  margin-top: var(--space-2);
+}
+
+.prose .footnotes ol > li {
+  margin-bottom: var(--space-1);
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes li p {
+  margin: 0;
+  line-height: var(--lh-list);
+}
+
+.prose .footnote-backref {
+  text-decoration: none;
+}
+
+/* ジャンプ先を可視化する。参照と脚注が近接していてスクロールが
+   発生しない（ページ末尾で clamp される）ケースでも戻り先が分かる */
+.prose sup.footnote-ref a:target,
+.prose .footnotes li:target {
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
+}
+
 /* Message container styles (global, legacy compatible) */
 .message {
   position: relative;
