@@ -301,6 +301,8 @@
                 "id": "custom.cellOptions",
                 "value": { "type": "gauge", "mode": "gradient" }
               },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 16 },
               { "id": "custom.width", "value": 140 }
             ]
           },
