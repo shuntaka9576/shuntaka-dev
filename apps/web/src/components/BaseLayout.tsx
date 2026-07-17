@@ -82,7 +82,7 @@ export function BaseLayout({
 
       {/* Page Body */}
       <div
-        className={`mx-auto px-8 pt-2 pb-[var(--layout-footer-h)] max-sm:px-4 max-sm:pt-3 ${widthClass}`}
+        className={`mx-auto px-8 pt-2 pb-[calc(var(--layout-footer-h)+2rem)] max-sm:px-4 max-sm:pt-3 ${widthClass}`}
       >
         {children}
       </div>
