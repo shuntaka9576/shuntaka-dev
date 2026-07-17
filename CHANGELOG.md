@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.0717.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.2...2026.0717.0) - 2026-07-17
+
+- feat: 検索ショートカット追加とフッター区切り線 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/681
+- style: 本文末尾とフッター区切り線の間に余白を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/683
+
 ## [2026.0716.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.1...2026.0716.2) - 2026-07-16
 
 - perf: 日本語Webフォントをシステムフォントへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/680
