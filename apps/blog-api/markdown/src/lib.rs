@@ -1040,6 +1040,14 @@ fn add_footnotes_title(html: &str) -> String {
     )
 }
 
+/// 脚注の戻りリンク「↩」に異体字セレクタ U+FE0E を付け、iOS で
+/// Apple Color Emoji として描画されるのを防ぐ (markdown-it-footnote と同じ対策)
+fn add_text_presentation_to_backrefs(html: &str) -> String {
+    static BACKREF_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(data-footnote-backref[^>]*>)↩").unwrap());
+    BACKREF_RE.replace_all(html, "${1}↩\u{fe0e}").to_string()
+}
+
 /// Markdown to HTML converter with syntax highlighting
 pub struct MarkdownConverter {
     syntect_adapter: &'static SyntectAdapter,
@@ -1094,6 +1102,9 @@ impl MarkdownConverter {
 
         // 脚注セクションに Zenn 風のタイトルを挿入
         html = add_footnotes_title(&html);
+
+        // 脚注の戻りリンクを iOS でもテキスト表示にする
+        html = add_text_presentation_to_backrefs(&html);
 
         html
     }
@@ -1343,8 +1354,9 @@ mod tests {
         assert!(html.contains(r#"<span class="footnotes-title">脚注</span>"#));
         assert!(html.contains(r#"<li id="fn-1">"#));
         assert!(html.contains("脚注の内容。"));
-        // 脚注から本文へ戻るリンク
+        // 脚注から本文へ戻るリンク (U+FE0E 付きで iOS の絵文字化を防ぐ)
         assert!(html.contains(r#"class="footnote-backref""#));
+        assert!(html.contains("↩\u{fe0e}</a>"));
     }
 
     #[test]

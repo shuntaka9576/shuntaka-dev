@@ -235,13 +235,13 @@ export const ARTICLE_FULL_HTML = `<p>この記事は Storybook 用のサンプ�
 <span class="footnotes-title">脚注</span>
 <ol>
 <li id="fn-1">
-<p>一つ目の脚注です。 <a href="#fnref-1" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="1" aria-label="Back to reference 1">↩</a></p>
+<p>一つ目の脚注です。 <a href="#fnref-1" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="1" aria-label="Back to reference 1">↩︎</a></p>
 </li>
 <li id="fn-note">
-<p>名前付きの脚注です。 <a href="#fnref-note" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="2" aria-label="Back to reference 2">↩</a></p>
+<p>名前付きの脚注です。 <a href="#fnref-note" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="2" aria-label="Back to reference 2">↩︎</a></p>
 </li>
 <li id="fn-2">
-<p><a href="https://zenn.dev/zenn/articles/markdown-guide#%E8%84%9A%E6%B3%A8" target="_blank" rel="noopener noreferrer">Zenn の脚注記法</a> と同じ書き方です。 <a href="#fnref-2" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="3" aria-label="Back to reference 3">↩</a></p>
+<p><a href="https://zenn.dev/zenn/articles/markdown-guide#%E8%84%9A%E6%B3%A8" target="_blank" rel="noopener noreferrer">Zenn の脚注記法</a> と同じ書き方です。 <a href="#fnref-2" class="footnote-backref" data-footnote-backref data-footnote-backref-idx="3" aria-label="Back to reference 3">↩︎</a></p>
 </li>
 </ol>
 </section>`;
