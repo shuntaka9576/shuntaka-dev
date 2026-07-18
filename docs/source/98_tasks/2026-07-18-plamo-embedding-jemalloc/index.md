@@ -37,9 +37,21 @@ ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:10000
 ```
 
-- `background_thread:true` が肝で、glibc と違いアプリがアイドルでもバックグラウンドスレッドが free 済み dirty page を約 10 秒の decay で OS へ返却する
+- jemalloc の返却は「free したら即」ではなく「free 済みページが 10 秒間再利用されなければ OS へ返す」という遅延解放で、この待ち時間が decay (`dirty_decay_ms:10000` = 10 秒)。直後のバーストは確保済みページをそのまま再利用できて速く、使われなくなったぶんだけが確実に返る
+- `background_thread:true` が肝で、この返却を専属のバックグラウンドスレッドが行う。glibc と違い、アプリがアイドルで malloc / free が一切呼ばれなくなっても返却が進む
 - jemalloc は 8MiB 以上の確保を専用 arena で扱い free 時に即返すため、推論アクティベーションのような大きなブロックが滞留しない
 - `.so` のパスは amd64 固定ビルド前提 (build-and-push.sh 参照)
+
+### LD_PRELOAD で malloc が差し替わる仕組み
+
+環境変数 2 つで Python が jemalloc を「使ってくれる」ように見えるが、Python 側は何も知らないし何の協力もしていない。プロセス内の malloc がまるごと jemalloc にすり替わっている。
+
+- `LD_PRELOAD` は Python ではなく動的リンカ (ld.so) の機能。指定した .so を他のどのライブラリよりも先にプロセスへマップする。シンボル解決は「先にロードされたものが勝つ」ため、libjemalloc.so.2 がエクスポートする `malloc` / `free` / `calloc` / `realloc` / `posix_memalign` が glibc (libc.so.6) の同名関数より優先される
+- 結果、プロセス内で malloc を呼ぶすべてのコードが、書き換えも再コンパイルもなしに jemalloc へ着地する。CPython 本体、PyTorch の C++ 部分、C 拡張 (sentencepiece 等) すべてが対象。今回の主役であるテンソル確保は c10 の CPUAllocator が `posix_memalign` を呼ぶので、数 MiB〜数十 MiB のアクティベーションバッファがまさにここを通る
+- 反映確認で `/proc/1/maps` に libjemalloc.so.2 を探すのは、「プロセスにマップ済み = malloc が差し替わっている」ことの確認
+- `MALLOC_CONF` は jemalloc 自身が初期化時に読む設定用環境変数 (glibc は見ない)。逆に glibc 向けの `MALLOC_ARENA_MAX` 等は、malloc が glibc を通らなくなった時点で意味を失う
+- 効くのは動的リンクされたバイナリのみ (python は動的リンク)。静的リンクバイナリや setuid バイナリには効かない
+- CPython は小さな Python オブジェクト用に pymalloc という独自レイヤーを持つが、これは OS から直接 mmap でアリーナを取る別経路。滞留していたのは PyTorch 側の malloc 経由の確保なので、そこが差し替われば十分
 
 ### 検討した代替案
 
@@ -73,7 +85,31 @@ kubectl -n plamo-embedding exec <pod> -- sh -c '
   grep -E "^anon " /sys/fs/cgroup/memory.stat'
 ```
 
+## 効果 (10 万チャンク backfill での実測、途中経過)
+
+反映直後から約 9 万チャンクの backfill (同時 4) を開始し、2 時間 40 分経過時点 (2026-07-18 06:47 UTC) の実測。
+
+|                                 | glibc (前回 1 万投入)                           | jemalloc (今回) |
+| ------------------------------- | ----------------------------------------------- | --------------- |
+| ベースライン (モデルロード直後) | 5.45〜5.72GiB                                   | 約 4.3GiB       |
+| 投入中の memory.peak            | 開始 1 時間前後で約 6.1GiB、最終 7.31 / 7.81GiB | 5.01 / 5.12GiB  |
+| 8Gi limit への余裕              | 200MiB 弱                                       | 約 3GiB         |
+
+滞留の解消に加えて、当初「下がらない」と想定していた memory.peak も 7.81GiB → 5.12GiB へ大きく下がった。
+
+![glibc と jemalloc の RSS 推移の違い](glibc-vs-jemalloc-rss-timeline.png)
+
+種明かしは、cgroup の memory.peak が記録している値の意味にある。peak は「同時に本当に必要だった量」ではなく「常駐ページ量の最大値」である。glibc では free 済みページが常駐に残り、断片化 (スレッドごとの arena 分散、リクエストごとに異なる確保サイズ) のせいで次のバーストが残骸を完全には再利用できず、バーストのたびに「実需要 + 過去の残骸」が常駐へ積み重なる。glibc 時代の peak 7.81GiB は同時 4 の実需要ではなく、この滞留込みの高水位だった。
+
+![glibc と jemalloc のヒープページ挙動の違い](glibc-vs-jemalloc-heap-pages.png)
+
+jemalloc は「free 済みページが 10 秒間再利用されなければ OS へ返す」ため、常駐は常に「実需要 + 直近 10 秒分」程度に保たれ、peak が実需要を超えて育たない。今回の peak 5.1GiB はベース 4.3GiB + 同時 4 のアクティベーション約 0.8GiB という実需要そのもので、この約 0.8GiB は旧 6Gi limit 時代の OOMKill (常駐約 5.5GiB + 同時リクエストで 6Gi 超え) とも整合する。
+
+なお jemalloc で解消できたこと自体が「リークではなく滞留だった」ことの証明になっている。リーク (参照喪失で free されないメモリ) はアロケータから見ると使用中のため、差し替えても OS へは返せない。
+
+backfill 完走時 (約 86 時間) の peak と、完了後アイドルでベースラインへ戻るかは完走後に追記する。
+
 ## 注意
 
-- jemalloc に替えても **memory.peak は下がらない**。ピークは同時 4 リクエスト分のアクティベーションが実際に必要としたメモリで、node3 側の実測 7.81GiB は上限 8Gi (PR #684 で引き上げ) まで 200MiB 弱しか余裕がない。並列度を上げる余地の判断はアイドル時の実測ではなく memory.peak で行う
+- 当初は「jemalloc に替えても memory.peak は下がらない (ピーク = 同時 4 の実需要)」と想定していたが、実測では 7.81GiB → 5.12GiB へ大きく下がった (上の「効果」参照)。glibc 時代の peak は実需要に滞留が積み上がった値だった。並列度を上げる余地の判断を memory.peak で行う方針は変わらない (jemalloc 化後の peak はほぼ実需要そのものを示すため、むしろ判断材料として素直になった)
 - メモリを OS へ返すぶん、アイドル後の初回バーストはページ再確保でわずかに遅くなる (この QPS では誤差レベル)
