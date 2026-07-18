@@ -18,10 +18,14 @@
     const components = document.querySelector('#pagefind-search #pagefind-components');
 
     try {
+      const bundlePath = '/pagefind/';
+      const res = await fetch(`${bundlePath}pagefind.js`, { method: 'HEAD' });
+      if (!res.ok) throw new Error('search bundle not available');
+
       await import("./{{ pathto('pagefind/pagefind-component-ui.js', 1) }}");
       window.PagefindComponents.configureInstance('default', {
         baseUrl: '/',
-        bundlePath: '/pagefind/',
+        bundlePath,
       });
       components.innerHTML = `
         <pagefind-modal-trigger hidden placeholder="ドキュメントを検索"></pagefind-modal-trigger>
