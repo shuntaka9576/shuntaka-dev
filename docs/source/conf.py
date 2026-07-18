@@ -28,9 +28,9 @@ html_search_language = "ja"
 # https://github.com/mgaitan/sphinxcontrib-mermaid?tab=readme-ov-file#markdown-support
 myst_fence_as_directive = ["mermaid"]
 
-# MyST の追加記法 (取り消し線 / ::: 記法のアドモニション / 定義リスト)
-# cspell:ignore deflist
-myst_enable_extensions = ["strikethrough", "colon_fence", "deflist"]
+# MyST の追加記法 (取り消し線 / ::: 記法のアドモニション / 定義リスト / $ 数式)
+# cspell:ignore deflist dollarmath
+myst_enable_extensions = ["strikethrough", "colon_fence", "deflist", "dollarmath"]
 
 # H1〜H3 の見出しに自動 slug を付けて `foo.md#slug` のアンカー参照を有効にする
 myst_heading_anchors = 3
