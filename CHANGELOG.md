@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0718.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.1...2026.0718.2) - 2026-07-18
+
+- fix: モバイルでのインラインコードの見た目と脚注戻るリンクの絵文字化を修正する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/702
+
 ## [2026.0718.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.0...2026.0718.1) - 2026-07-18
 
 - fix: plamo embeddingのアイドル時メモリ滞留をjemallocで解消する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/698
