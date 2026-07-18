@@ -6,6 +6,7 @@ FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
+      libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -31,6 +32,15 @@ ARG MODEL_ID=pfnet/plamo-embedding-1b
 ENV MODEL_ID=${MODEL_ID}
 RUN python -c "from huggingface_hub import snapshot_download; \
   snapshot_download(repo_id='${MODEL_ID}')"
+
+# glibc malloc は同時推論で確保したアクティベーションの free 済みヒープを OS へ
+# 返さず、backfill 後もアイドル RSS がピーク近くに張り付く (uvicorn の threadpool
+# が arena を分散させるのと、大きめ確保で mmap 閾値が動的に引き上がるため)。
+# jemalloc に差し替え、background_thread でアイドル中も dirty page を purge して
+# 投入完了後にメモリ水準が戻るようにする。パスは amd64 固定ビルド前提
+# (build-and-push.sh 参照)。
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:10000
 
 EXPOSE 8080
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
