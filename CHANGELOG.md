@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.0718.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.0...2026.0718.1) - 2026-07-18
+
+- fix: plamo embeddingのアイドル時メモリ滞留をjemallocで解消する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/698
+- fix: ベクトル検索のページネーション破綻を pre-filter exact + 固定候補窓で再設計する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/701
+
 ## [2026.0717.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0717.0...2026.0717.1) - 2026-07-17
 
 - fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/662
