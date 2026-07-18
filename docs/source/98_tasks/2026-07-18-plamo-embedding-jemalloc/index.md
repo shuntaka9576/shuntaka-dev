@@ -55,10 +55,15 @@ image 再ビルドのコストが低いため、一番挙動がきれいな jema
 ```bash
 ./cluster/manifests/plamo-embedding/build-and-push.sh
 kubectl -n plamo-embedding rollout restart deployment/plamo-embedding
+kubectl -n plamo-embedding rollout status deployment/plamo-embedding --timeout=10m
 
-# jemalloc がロードされているか確認
+# jemalloc がロードされているか確認 (必ず rollout 完了後に実行)
 kubectl -n plamo-embedding exec deploy/plamo-embedding -- grep -m1 jemalloc /proc/1/maps
 ```
+
+> ロールアウト中に `exec deploy/...` を実行すると旧 image の Pod に入ることがあり、grep が exit 1 になる。maxSurge=0 のローリング更新は image pull (数 GB) を挟んで Pod 1 台ずつ数分かかるため、必ず `rollout status` の完了を待ってから確認する。
+>
+> 実測 (2026-07-18 反映直後): 両 Pod とも `/proc/1/maps` に libjemalloc.so.2 を確認。memory.current は node2 / node3 とも約 4.3GiB (モデルロード直後のベースライン)。
 
 効果確認は、次回 backfill 完了から 1 分ほど置いて Pod の RSS (または cgroup の anon) が投入前水準へ戻ることを見る。
 
