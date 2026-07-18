@@ -410,11 +410,17 @@ input[type='search']::-webkit-search-decoration {
   color: var(--color-text);
 }
 
+/* インラインコードは等幅フォントが和文より大きく見えるため縮小し、
+   ベースラインを僅かに上げて和文と揃える (zenn-content-css 準拠) */
 .prose code:not([class]) {
-  padding: 0 0.4em;
+  padding: 0.2em 0.4em;
+  margin: 0 0.2em;
+  font-size: 0.85em;
+  vertical-align: 0.08em;
   color: var(--color-code-inline-fg);
   background-color: var(--color-code-inline-bg);
   border-radius: var(--radius-sm);
+  text-autospace: no-autospace;
 }
 
 .prose pre {
@@ -424,6 +430,7 @@ input[type='search']::-webkit-search-decoration {
   border-radius: var(--radius-md);
   overflow-x: auto;
   margin: 1rem 0;
+  text-autospace: no-autospace;
 }
 
 .prose pre code {
