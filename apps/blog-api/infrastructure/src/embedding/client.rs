@@ -248,6 +248,90 @@ impl EmbeddingClient for EmbeddingClientImpl {
     }
 }
 
+/// クエリ embedding キャッシュの既定容量。1 エントリ 2048 次元 f32 = 8KB 程度なので
+/// 256 件で約 2MB。Lambda のインスタンスメモリに対して十分小さい
+pub const QUERY_EMBEDDING_CACHE_CAPACITY: usize = 256;
+
+/// embed_query の結果をクエリ文字列単位でキャッシュする decorator。
+///
+/// 検索のページ送りは同一クエリで offset だけ変えて再リクエストされるため、
+/// (1) 推論コストの節約と、(2) ページ間で同一のクエリベクトルを使うことによる
+/// 順序の決定論性の担保、の両方を目的とする。容量超過時は挿入順（FIFO）で追い出す。
+/// Lambda ではインスタンス単位のキャッシュになる点に注意（別インスタンスに
+/// 当たった場合は再推論になるが、embedding 推論はほぼ決定的なので実害は境界順位の
+/// 揺れ可能性程度に留まる）。
+///
+/// embed_document / chunk_document は都度内容が異なるためキャッシュしない。
+pub struct CachedEmbeddingClient {
+    inner: std::sync::Arc<dyn EmbeddingClient>,
+    capacity: usize,
+    cache: std::sync::Mutex<QueryEmbeddingCache>,
+}
+
+#[derive(Default)]
+struct QueryEmbeddingCache {
+    map: std::collections::HashMap<String, Vec<f32>>,
+    order: std::collections::VecDeque<String>,
+}
+
+impl CachedEmbeddingClient {
+    pub fn new(inner: std::sync::Arc<dyn EmbeddingClient>, capacity: usize) -> Self {
+        Self {
+            inner,
+            capacity: capacity.max(1),
+            cache: std::sync::Mutex::new(QueryEmbeddingCache::default()),
+        }
+    }
+}
+
+#[async_trait]
+impl EmbeddingClient for CachedEmbeddingClient {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        if let Some(hit) = self
+            .cache
+            .lock()
+            .expect("embedding cache lock poisoned")
+            .map
+            .get(text)
+            .cloned()
+        {
+            return Ok(hit);
+        }
+
+        // lock は await をまたいで保持しない（同一クエリの同時 miss は二重推論を許容）
+        let vector = self.inner.embed_query(text).await?;
+
+        let mut cache = self.cache.lock().expect("embedding cache lock poisoned");
+        if !cache.map.contains_key(text) {
+            if cache.map.len() >= self.capacity
+                && let Some(oldest) = cache.order.pop_front()
+            {
+                cache.map.remove(&oldest);
+            }
+            cache.order.push_back(text.to_string());
+            cache.map.insert(text.to_string(), vector.clone());
+        }
+        Ok(vector)
+    }
+
+    async fn embed_document(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        self.inner.embed_document(text).await
+    }
+
+    async fn chunk_document(
+        &self,
+        title: &str,
+        description: &str,
+        content: &str,
+        max_tokens: u32,
+        overlap_tokens: u32,
+    ) -> Result<Vec<DocumentChunk>, EmbeddingError> {
+        self.inner
+            .chunk_document(title, description, content, max_tokens, overlap_tokens)
+            .await
+    }
+}
+
 /// tidb-embedder と同じ JSON レイアウトで SHA-256 を計算する。TS 側は
 /// `JSON.stringify({version, maxTokens, overlapTokens, title, description, content})`
 /// を hash 元にしているため、Rust 側の struct 順序と rename もこれに揃える。
@@ -338,5 +422,61 @@ mod tests {
         let expected_payload = r#"{"version":"plamo-markdown-1024-v1","maxTokens":1024,"overlapTokens":128,"title":"title","description":"desc","content":"content"}"#;
         let expected: String = hex::encode(Sha256::digest(expected_payload.as_bytes()));
         assert_eq!(hash, expected);
+    }
+
+    #[derive(Default)]
+    struct CountingClient {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait]
+    impl EmbeddingClient for CountingClient {
+        async fn embed_query(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            self.calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(vec![text.len() as f32])
+        }
+
+        async fn embed_document(&self, _text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            unreachable!("not exercised in cache tests")
+        }
+
+        async fn chunk_document(
+            &self,
+            _title: &str,
+            _description: &str,
+            _content: &str,
+            _max_tokens: u32,
+            _overlap_tokens: u32,
+        ) -> Result<Vec<DocumentChunk>, EmbeddingError> {
+            unreachable!("not exercised in cache tests")
+        }
+    }
+
+    #[tokio::test]
+    async fn cached_embed_query_reuses_vector_for_same_query() {
+        let inner = std::sync::Arc::new(CountingClient::default());
+        let cached = CachedEmbeddingClient::new(inner.clone(), 2);
+
+        let first = cached.embed_query("rust axum").await.unwrap();
+        let second = cached.embed_query("rust axum").await.unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(inner.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_embed_query_evicts_oldest_beyond_capacity() {
+        let inner = std::sync::Arc::new(CountingClient::default());
+        let cached = CachedEmbeddingClient::new(inner.clone(), 2);
+
+        cached.embed_query("a").await.unwrap();
+        cached.embed_query("b").await.unwrap();
+        cached.embed_query("c").await.unwrap(); // 容量超過で "a" を追い出す
+        cached.embed_query("a").await.unwrap(); // miss になり再推論
+        assert_eq!(inner.calls.load(std::sync::atomic::Ordering::SeqCst), 4);
+
+        cached.embed_query("c").await.unwrap(); // "c" はまだキャッシュ内
+        assert_eq!(inner.calls.load(std::sync::atomic::Ordering::SeqCst), 4);
     }
 }

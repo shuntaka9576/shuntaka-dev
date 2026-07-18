@@ -91,7 +91,8 @@ function FilterPagination({
  *   3. どちらも無い → SSR 済みの children (通常一覧 + Pagination)
  *
  * ローディング / エラー / 0 件表示はそれぞれの provider の state から組み立てる。
- * 検索結果に関しては手動 pagination しない（API が上位 20 件を返す仕様）。
+ * 検索・タグ絞り込みとも onClick ベースのページネーションを表示する
+ * （検索の totalCount は offset 非依存で安定するため、総ページ数は揺れない）。
  */
 export function FilteredArticleList({ userName, children }: FilteredArticleListProps) {
   const {

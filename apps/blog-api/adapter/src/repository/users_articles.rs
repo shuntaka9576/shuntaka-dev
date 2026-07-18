@@ -286,19 +286,29 @@ fn build_list_filter_parts(tag_ids: &[String], mode: &TagFilterMode) -> (String,
     (cte, conditions)
 }
 
-/// ANN候補取得を必ず先に行い、公開条件・ユーザー・タグを外側でpost-filterするSQLを組み立てる。
-fn build_search_sql(tag_ids: Option<&[String]>, mode: Option<&TagFilterMode>) -> String {
-    let (with_prefix, filter_conditions) = match tag_ids {
-        None => ("WITH ".to_string(), String::new()),
-        Some(ids) => {
-            let (filter_cte, conditions) =
-                build_list_filter_parts(ids, mode.expect("tag filter mode must exist"));
-            (format!("{filter_cte},\n"), format!("\n{conditions}"))
-        }
-    };
+/// 検索のみ（タグ無し）モードの HNSW 候補チャンク数。offset に依存させない定数に
+/// することで、どのページも同一の候補集合を見ることになり、total_count
+/// （窓内ユニーク記事数）と順序がページ間で安定する。これが旧方式
+/// （`(limit + offset) × multiplier` で窓が拡大しページ数が増殖）との本質的な違い。
+const SEARCH_CANDIDATE_POOL: u64 = 1000;
 
-    format!(
-        r#"{with_prefix}nearest_chunks AS (
+/// 検索SQLを組み立てる。モードで方式が分かれる:
+/// * タグなし: HNSW ANN + 固定候補窓（`SEARCH_CANDIDATE_POOL`）。窓の中で記事に
+///   dedupe し、窓内の全順序に対して LIMIT/OFFSET でページを切り出す
+/// * タグあり: タグ・公開条件を pre-filter してから残チャンク全件に exact 距離計算。
+///   候補窓なし。total_count はタグファセットの件数と一致する真値
+///
+/// どちらも ORDER BY distance, article_id の決定的な全順序に対する
+/// LIMIT ? OFFSET ? で、過剰取得 → 後絞りはしない。
+fn build_search_sql(tag_ids: Option<&[String]>, mode: Option<&TagFilterMode>) -> String {
+    match tag_ids {
+        None => build_untagged_search_sql(),
+        Some(ids) => build_tagged_search_sql(ids, mode.expect("tag filter mode must exist")),
+    }
+}
+
+fn build_untagged_search_sql() -> String {
+    r#"WITH nearest_chunks AS (
     SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
            c.article_id,
            VEC_COSINE_DISTANCE(c.embedding, ?) AS distance
@@ -315,7 +325,7 @@ ranked_articles AS (
       FROM nearest_chunks AS nc
       JOIN articles AS a ON a.article_id = nc.article_id
       JOIN users AS u ON u.user_id = a.user_id
-     WHERE a.status = 'published' AND u.name = ?{filter_conditions}
+     WHERE a.status = 'published' AND u.name = ?
 )
 SELECT article_id, title, slug, user_id, thumbnail, description, status,
        published_at, created_at, updated_at, distance,
@@ -323,6 +333,31 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
   FROM ranked_articles
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
+ LIMIT ? OFFSET ?"#
+        .to_string()
+}
+
+fn build_tagged_search_sql(tag_ids: &[String], mode: &TagFilterMode) -> String {
+    let (filter_cte, conditions) = build_list_filter_parts(tag_ids, mode);
+    format!(
+        r#"{filter_cte},
+scored AS (
+    SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
+           c.article_id,
+           MIN(VEC_COSINE_DISTANCE(c.embedding, ?)) AS distance
+      FROM article_embedding_chunks AS c
+      JOIN articles AS a ON a.article_id = c.article_id
+      JOIN users AS u ON u.user_id = a.user_id
+     WHERE a.status = 'published' AND u.name = ?
+{conditions}
+     GROUP BY c.article_id
+)
+SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
+       a.status, a.published_at, a.created_at, a.updated_at, s.distance,
+       COUNT(*) OVER() AS total_count
+  FROM scored AS s
+  JOIN articles AS a ON a.article_id = s.article_id
+ ORDER BY s.distance, a.article_id
  LIMIT ? OFFSET ?"#
     )
 }
@@ -604,13 +639,11 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         user_name: &str,
         vector: &[f32],
         tag_filter: Option<&TagFilter>,
-        candidate_limit: u64,
         limit: u64,
         offset: u64,
     ) -> Result<ArticleSearchResultPage, anyhow::Error> {
         let pool = self.db.pool();
         let vector_json = serde_json::to_string(vector)?;
-        let candidate_limit = candidate_limit.max(limit);
 
         let resolved_ids: Option<Vec<String>> = match tag_filter {
             None => None,
@@ -642,22 +675,24 @@ impl UsersArticlesRepository for UsersArticlesRepositoryImpl {
         };
         let filter_mode = tag_filter.map(|filter| &filter.mode);
 
-        // user/status filterをHNSWの内側に置くとTiFlash全走査になるため、まずchunkの
-        // ANN候補を取得する。外側で公開記事へ絞り、同一記事は最小distanceだけを残す。
         let search_sql = build_search_sql(resolved_ids.as_deref(), filter_mode);
 
         let mut query =
             sqlx::query_as::<_, ArticleSearchRow>(sqlx::AssertSqlSafe(search_sql.as_str()));
         if let Some(ids) = &resolved_ids {
+            // タグあり (exact): CTE ids → vector → user_name → (AND 時: root ids)
             for id in ids {
                 query = query.bind(id.as_str());
             }
+            query = query.bind(&vector_json).bind(user_name);
+        } else {
+            // タグなし (HNSW): vector ×2 → 固定候補窓 → user_name
+            query = query
+                .bind(&vector_json)
+                .bind(&vector_json)
+                .bind(SEARCH_CANDIDATE_POOL)
+                .bind(user_name);
         }
-        query = query
-            .bind(&vector_json)
-            .bind(&vector_json)
-            .bind(candidate_limit)
-            .bind(user_name);
         if let (Some(ids), Some(TagFilterMode::And)) = (&resolved_ids, filter_mode) {
             for id in ids {
                 query = query.bind(id.as_str());
@@ -912,23 +947,36 @@ mod tests {
     }
 
     #[test]
-    fn build_search_sql_without_tags_keeps_filters_outside_ann() {
+    fn build_search_sql_without_tags_uses_hnsw_with_fixed_pool() {
         let sql = build_search_sql(None, None);
         assert!(sql.starts_with("WITH nearest_chunks"));
-        assert!(!sql.contains("annIndex"));
         assert!(sql.contains("READ_FROM_STORAGE(TIFLASH[c])"));
+        assert!(
+            sql.contains("ORDER BY VEC_COSINE_DISTANCE(c.embedding, ?)\n     LIMIT ?"),
+            "HNSW top-K（候補窓 LIMIT は定数 SEARCH_CANDIDATE_POOL をバインド）"
+        );
         assert!(sql.contains("WHERE a.status = 'published' AND u.name = ?"));
         assert!(!sql.contains("tag_descendants"));
+        assert!(sql.contains("LIMIT ? OFFSET ?"), "固定窓内のページネーション");
     }
 
     #[test]
-    fn build_search_sql_with_tags_places_tag_filter_after_ann_cte() {
+    fn build_search_sql_with_tags_filters_before_exact_scoring() {
         let ids = vec!["id1".to_string(), "id2".to_string()];
         let sql = build_search_sql(Some(&ids), Some(&TagFilterMode::And));
-        let nearest_position = sql.find("nearest_chunks AS").unwrap();
         let filter_position = sql.find("AND EXISTS").unwrap();
+        let group_by_position = sql.find("GROUP BY c.article_id").unwrap();
         assert!(sql.starts_with("WITH RECURSIVE tag_descendants"));
-        assert!(filter_position > nearest_position);
+        assert!(
+            filter_position < group_by_position,
+            "タグ条件は距離集計より前（pre-filter）に入る"
+        );
+        assert!(
+            !sql.contains("nearest_chunks"),
+            "タグありは候補窓なしの exact 計算"
+        );
+        assert!(sql.contains("MIN(VEC_COSINE_DISTANCE(c.embedding, ?))"));
         assert_eq!(sql.matches("AND EXISTS").count(), 2);
+        assert!(sql.contains("LIMIT ? OFFSET ?"));
     }
 }

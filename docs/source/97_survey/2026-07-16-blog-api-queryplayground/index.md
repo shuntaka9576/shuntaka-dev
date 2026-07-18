@@ -15,24 +15,25 @@
 
 ## ファイル
 
-| ファイル                       | 出典 (`adapter/src/repository/`) | 概要                                                       |
-| ------------------------------ | -------------------------------- | ---------------------------------------------------------- |
-| 00_health.sql                  | `health.rs`                      | `SELECT 1` ヘルスチェック                                  |
-| 01_users.sql                   | `users.rs`                       | `github_installation_id` から user 解決                    |
-| 02_articles_admin_read.sql     | `articles.rs`                    | 管理側: `user_id + slug` から記事詳細（タグは再帰 CTE）    |
-| 03_articles_admin_write.sql    | `articles.rs`                    | 管理側: `articles` の INSERT / UPDATE                      |
-| 04_articles_tags_sync.sql      | `articles.rs`                    | 管理側: `articles_tags` の DELETE ALL + INSERT IGNORE 同期 |
-| 05_tag_article_counts_sync.sql | `articles.rs`                    | 管理側: `tag_article_counts` の user 単位再集計            |
-| 06_users_articles_list.sql     | `users_articles.rs`              | 公開側: user 単位記事一覧（フィルタなし / AND / OR）       |
-| 07_users_articles_detail.sql   | `users_articles.rs`              | 公開側: `user_name + slug` から記事詳細                    |
-| 08_users_articles_search.sql   | `users_articles.rs`              | 公開側: TiFlash HNSW を使ったベクトル検索                  |
-| 09_tag_facets.sql              | `users_articles.rs`              | 公開側: タグファセット集計（フィルタなし / with フィルタ） |
-| 10_users_moments_list.sql      | `users_moments.rs`               | 公開側: moments 一覧（カーソルなし / カーソルあり）        |
+| ファイル                            | 出典 (`adapter/src/repository/`) | 概要                                                                       |
+| ----------------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| 00_health.sql                       | `health.rs`                      | `SELECT 1` ヘルスチェック                                                  |
+| 01_users.sql                        | `users.rs`                       | `github_installation_id` から user 解決                                    |
+| 02_articles_admin_read.sql          | `articles.rs`                    | 管理側: `user_id + slug` から記事詳細（タグは再帰 CTE）                    |
+| 03_articles_admin_write.sql         | `articles.rs`                    | 管理側: `articles` の INSERT / UPDATE                                      |
+| 04_articles_tags_sync.sql           | `articles.rs`                    | 管理側: `articles_tags` の DELETE ALL + INSERT IGNORE 同期                 |
+| 05_tag_article_counts_sync.sql      | `articles.rs`                    | 管理側: `tag_article_counts` の user 単位再集計                            |
+| 06_users_articles_list.sql          | `users_articles.rs`              | 公開側: user 単位記事一覧（フィルタなし / AND / OR）                       |
+| 07_users_articles_detail.sql        | `users_articles.rs`              | 公開側: `user_name + slug` から記事詳細                                    |
+| 08_users_articles_search.sql        | `users_articles.rs`              | 公開側: ベクトル検索（検索のみ: HNSW 固定窓 / タグ併用: pre-filter exact） |
+| 09_tag_facets.sql                   | `users_articles.rs`              | 公開側: タグファセット集計（フィルタなし / with フィルタ）                 |
+| 10_users_moments_list.sql           | `users_moments.rs`               | 公開側: moments 一覧（カーソルなし / カーソルあり）                        |
+| 11_ann_candidate_window_problem.sql | 旧実装（現行コードに無し）       | 旧 HNSW 方式で total_count が候補窓依存になる問題の再現                    |
 
 ## 注意
 
 - `LIMIT` / `OFFSET` は MySQL / TiDB 仕様でセッション変数 `@var` を受け付けない（リテラル整数 or prepared placeholder のみ）。playground では `LIMIT 20 OFFSET 0` のように直接数値を書き換える運用にしている
 - `WITH RECURSIVE` は MySQL 8.0+ / TiDB 6.x+ で有効。Workbench の古い接続では拒否される
 - `/*+ USE_INDEX(...) */` / `/*+ READ_FROM_STORAGE(TIFLASH[c]) */` / `/*+ MAX_EXECUTION_TIME(...) */` は TiDB 固有ヒント。stock MySQL では単なるコメント扱い
-- `VEC_COSINE_DISTANCE` / `VECTOR(2048)` / `article_embedding_chunks` は TiDB Vector 機能。08_users_articles_search.sql は TiDB 以外では実行不可
+- `VEC_COSINE_DISTANCE` / `VECTOR(2048)` / `article_embedding_chunks` は TiDB Vector 機能。08_users_articles_search.sql と 11_ann_candidate_window_problem.sql は TiDB 以外では実行不可
 - `article_embedding_chunks.embedding` は 2048 次元の PLaMo Embedding。playground では `[0, 0, ...]` 相当のダミー vector を渡している

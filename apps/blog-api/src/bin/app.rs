@@ -5,7 +5,10 @@ use api::route::users_articles::build_users_articles_routers;
 use api::route::users_moments::build_users_moments_routers;
 use api::route::webhooks::build_webhooks_routers;
 use infrastructure::{
-    embedding::client::{EmbeddingClient, EmbeddingClientImpl},
+    embedding::client::{
+        CachedEmbeddingClient, EmbeddingClient, EmbeddingClientImpl,
+        QUERY_EMBEDDING_CACHE_CAPACITY,
+    },
     lambda::{LambdaSelfInvoker, SelfInvoker},
 };
 use registry::{AppRegistry, WebhookConfig};
@@ -83,13 +86,20 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         .await
         .map(|invoker| Arc::new(invoker) as Arc<dyn SelfInvoker>);
 
+    // 検索のページ送りで同一クエリの embedding を再推論しないよう、また
+    // ページ間で同一ベクトル（= 同一の候補集合・順序）を保証するため cache を挟む
     let embedding_client = app_config
         .embedding
         .endpoint
         .as_deref()
         .map(EmbeddingClientImpl::new)
         .transpose()?
-        .map(|client| Arc::new(client) as Arc<dyn EmbeddingClient>);
+        .map(|client| {
+            Arc::new(CachedEmbeddingClient::new(
+                Arc::new(client),
+                QUERY_EMBEDDING_CACHE_CAPACITY,
+            )) as Arc<dyn EmbeddingClient>
+        });
 
     let registry = AppRegistry::new(pool, webhook_config, self_invoker, embedding_client).await;
 

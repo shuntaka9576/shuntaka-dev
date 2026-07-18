@@ -281,6 +281,14 @@ a:hover {
   outline: none;
 }
 
+/* SearchInput: 独自のクリアボタンを置いているため、ブラウザネイティブの
+   検索キャンセルボタンを消す（残すと × が2つ並ぶ） */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Article prose styles */
 .prose {
   line-height: var(--lh-body);

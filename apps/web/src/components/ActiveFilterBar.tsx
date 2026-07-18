@@ -11,10 +11,11 @@ import { useTagFilter } from '@/components/TagFilterProvider';
  */
 export function ActiveFilterBar() {
   const { selected, mode, totalCount, toggleTag, clear: clearTags } = useTagFilter();
-  const { submittedQuery, results, clearQuery } = useSearch();
+  const { submittedQuery, searchTotalCount, clearQuery } = useSearch();
 
   const searching = submittedQuery.length > 0;
-  const hitCount = searching ? (results?.length ?? 0) : totalCount;
+  // 検索中はスコープ内の全マッチ記事数を出す（results.length はページ内件数なので使わない）
+  const hitCount = searching ? searchTotalCount : totalCount;
 
   const clearAll = () => {
     clearTags();
