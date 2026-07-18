@@ -73,7 +73,9 @@ spec:
               cpu: '500m'
               memory: '4Gi'
             limits:
-              memory: '6Gi'
+              # 常駐約5.5GiB + 同時リクエスト時のアクティベーションで6Giでは
+              # OOMKillされた(2026-07-17)ため8Giへ引き上げ
+              memory: '8Gi'
 ---
 apiVersion: v1
 kind: Service

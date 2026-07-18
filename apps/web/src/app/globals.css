@@ -1,6 +1,7 @@
+/* cspell:ignore Kaku Meiryo */
 @import 'tailwindcss';
 
-/* Tailwind の font-* クラスも配信ウェイト (400/600) に寄せる。--fw-* トークンと同じマッピング */
+/* Tailwind の font-* クラスも使用ウェイト (400/600) に寄せる。--fw-* トークンと同じマッピング */
 @theme {
   --font-weight-light: 400;
   --font-weight-normal: 400;
@@ -98,7 +99,7 @@
   --lh-body: 1.9;
 
   /* Font weight
-     配信ウェイトは 400/600 の 2 本のみ (フォント転送量削減。DESIGN.md Typography 参照)。
+     Latin UI 用 Inter は 400/600 の 2 本のみ配信する。日本語はシステムフォントを使う。
      セマンティックトークンは維持し、実値をどちらかに寄せる */
   --fw-light: 400;
   --fw-regular: 400;
@@ -106,7 +107,13 @@
   --fw-semibold: 600;
   --fw-bold: 600;
 
-  /* Mono font stack (sans is supplied by next/font: --font-roboto, --font-noto-sans-jp) */
+  /* Sans: 日本語本文は OS 標準、英字中心のブランド UI だけ Latin-only Inter */
+  --font-base:
+    -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo,
+    sans-serif, 'Segoe UI Emoji';
+  --font-latin-ui: 'Inter', BlinkMacSystemFont, Arial, sans-serif;
+
+  /* Mono font stack */
   --font-mono:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
@@ -242,23 +249,16 @@ html {
 
 body {
   height: 100%;
-  font-family:
-    'Gen Interface JP',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-base);
   font-weight: var(--fw-light);
   word-wrap: break-word;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+/* Zenn と同様、ロゴ・英語ナビ・日付や数値など Latin 中心の UI にだけ適用する */
+.font-latin-ui {
+  font-family: var(--font-latin-ui);
 }
 
 a {
@@ -279,6 +279,14 @@ a:hover {
 /* SearchInput: 親 div の focus-within ボーダーがフォーカス表示を担うので input 自身の outline は消す */
 [role='search'] input:focus-visible {
   outline: none;
+}
+
+/* SearchInput: 独自のクリアボタンを置いているため、ブラウザネイティブの
+   検索キャンセルボタンを消す（残すと × が2つ並ぶ） */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* Article prose styles */
@@ -402,11 +410,17 @@ a:hover {
   color: var(--color-text);
 }
 
+/* インラインコードは等幅フォントが和文より大きく見えるため縮小し、
+   ベースラインを僅かに上げて和文と揃える (zenn-content-css 準拠) */
 .prose code:not([class]) {
-  padding: 0 0.4em;
+  padding: 0.2em 0.4em;
+  margin: 0 0.2em;
+  font-size: 0.85em;
+  vertical-align: 0.08em;
   color: var(--color-code-inline-fg);
   background-color: var(--color-code-inline-bg);
   border-radius: var(--radius-sm);
+  text-autospace: no-autospace;
 }
 
 .prose pre {
@@ -416,6 +430,7 @@ a:hover {
   border-radius: var(--radius-md);
   overflow-x: auto;
   margin: 1rem 0;
+  text-autospace: no-autospace;
 }
 
 .prose pre code {
@@ -474,6 +489,51 @@ a:hover {
 
 .prose em {
   font-style: italic;
+}
+
+/* Footnotes (comrak footnotes 拡張 + Zenn 風タイトル) */
+.prose sup.footnote-ref a {
+  padding: 0 0.1em;
+  text-decoration: none;
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes {
+  margin-top: var(--space-8);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--fs-caption);
+}
+
+.prose .footnotes-title {
+  display: block;
+  font-weight: var(--fw-bold);
+}
+
+.prose .footnotes ol {
+  margin-top: var(--space-2);
+}
+
+.prose .footnotes ol > li {
+  margin-bottom: var(--space-1);
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes li p {
+  margin: 0;
+  line-height: var(--lh-list);
+}
+
+.prose .footnote-backref {
+  text-decoration: none;
+}
+
+/* ジャンプ先を可視化する。参照と脚注が近接していてスクロールが
+   発生しない（ページ末尾で clamp される）ケースでも戻り先が分かる */
+.prose sup.footnote-ref a:target,
+.prose .footnotes li:target {
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
 }
 
 /* Message container styles (global, legacy compatible) */
@@ -566,6 +626,7 @@ a:hover {
 }
 
 .article-time {
+  font-family: var(--font-latin-ui);
   text-align: left;
 }
 

@@ -13,6 +13,7 @@
     "clean": "rm -rf .next .turbo storybook-static"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
     "@microsoft/clarity": "^1.0.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
@@ -26,17 +27,17 @@
   },
   "devDependencies": {
     "@next/env": "16.2.10",
-    "@storybook/addon-themes": "^10.5.0",
-    "@storybook/nextjs-vite": "^10.5.0",
-    "@tailwindcss/postcss": "^4.3.2",
+    "@storybook/addon-themes": "^10.5.2",
+    "@storybook/nextjs-vite": "^10.5.2",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/nprogress": "^0.2.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/rss": "^0.0.32",
-    "storybook": "^10.5.0",
-    "tailwindcss": "^4.3.2",
+    "storybook": "^10.5.2",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vercel": "56.2.0",
-    "vite": "^8.1.4"
+    "vercel": "56.3.1",
+    "vite": "^8.1.5"
   }
 }

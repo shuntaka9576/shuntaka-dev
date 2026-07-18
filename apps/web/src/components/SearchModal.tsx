@@ -86,7 +86,10 @@ function ModalPagination({
   if (totalPages <= 1) return null;
   const items = buildPageItems(currentPage, totalPages);
   return (
-    <nav className="mt-6 flex items-center justify-center text-sm sm:mt-8" aria-label="pagination">
+    <nav
+      className="font-latin-ui mt-6 flex items-center justify-center text-sm sm:mt-8"
+      aria-label="pagination"
+    >
       <ul className="flex items-center gap-1 sm:gap-2">
         {items.map((item, idx) =>
           item === 'ellipsis' ? (
@@ -220,6 +223,7 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
               onClear={clearQuery}
               onSubmit={submitNow}
               loading={searchLoading}
+              placeholder={filtering ? '選択中のタグ内を検索' : '記事を検索'}
               autoFocus
             />
           </div>
@@ -233,7 +237,9 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
           >
             <TagIcon />
             {filtering && (
-              <span className="text-[length:var(--fs-caption)] font-medium">{selected.length}</span>
+              <span className="font-latin-ui text-[length:var(--fs-caption)] font-medium">
+                {selected.length}
+              </span>
             )}
           </button>
           <button

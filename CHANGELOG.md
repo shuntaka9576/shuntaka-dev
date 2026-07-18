@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026.0718.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.0...2026.0718.1) - 2026-07-18
+
+- fix: plamo embeddingのアイドル時メモリ滞留をjemallocで解消する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/698
+- fix: ベクトル検索のページネーション破綻を pre-filter exact + 固定候補窓で再設計する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/701
+
+## [2026.0717.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0717.0...2026.0717.1) - 2026-07-17
+
+- fix(deps): update iac/aws by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/662
+- fix(deps): update aws-sdk-js-v3 monorepo to ^3.1089.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/664
+- chore(deps): update dependency @hono/node-server to ^2.0.10 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/666
+- chore(deps): update tailwindcss monorepo to ^4.3.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/678
+- chore(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/667
+- chore(deps): update dependency @scalar/hono-api-reference to ^0.11.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/686
+- fix(deps): update dependency @smithy/node-http-handler to ^4.9.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/679
+- chore(deps): update dependency vite-plus to ^0.2.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/687
+- chore(deps): update github/codeql-action action to v4.37.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/692
+- chore(deps): update dependency ruff to >=0.15.22 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/691
+- fix(deps): update tools/dsql-cli to ^3.1090.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/689
+- chore(deps): update rust to v1.97.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/688
+- chore(deps): update dependency vite to ^8.1.5 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/677
+- feat: Markdownの脚注記法をサポートする by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/695
+
+## [2026.0717.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.2...2026.0717.0) - 2026-07-17
+
+- feat: 検索ショートカット追加とフッター区切り線 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/681
+- style: 本文末尾とフッター区切り線の間に余白を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/683
+
+## [2026.0716.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.1...2026.0716.2) - 2026-07-16
+
+- perf: 日本語Webフォントをシステムフォントへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/680
+
 ## [2026.0716.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0716.0...2026.0716.1) - 2026-07-16
 
 - feat: GitHub webhookでarticle embedding chunksを差し替える by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/673

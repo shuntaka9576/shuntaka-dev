@@ -6,6 +6,8 @@
 - 関連: [apps/web: エラーフォールバック起因の First Load JS 削減](../2026-07-12-web-error-fallback-bundle-size/index.md)（JS 側の削減。本エントリはフォント側）
 - ステータス: 対応済み（2026-07-12。GTM は別件として未着手）
 
+> 2026-07-17 に日本語 Web フォント自体を撤去し、Zenn と同じ「日本語はシステムフォント、Latin UI だけ Inter」へ移行した。現在の構成は [日本語 Web フォント撤去（Zenn 方式へ移行）](../2026-07-17-web-system-font-migration/index.md) を参照。
+
 ## 起票理由
 
 本番トップページの HAR（Chrome DevTools で取得）を分析した結果、総転送量 約 1.07 MiB のうち **フォント (cdn.jsdelivr.net) が 561.5 KiB で全体の 52%** を占めていた。JS 共有チャンクの調査（関連エントリ）とは独立に、フォント配信だけで大きな削減余地がある。

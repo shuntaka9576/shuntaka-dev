@@ -3,4 +3,5 @@ export const USER_NAME = process.env.NEXT_PUBLIC_USER_NAME || 'shuntaka';
 export const SITE_TITLE = 'shuntaka.dev';
 export const SITE_DESCRIPTION =
   'shuntaka.devは、技術・開発・ガジェットについてshuntakaが思ったことをシェアするブログです。';
+/** 一覧・タグ絞り込み・検索共通の1ページあたり件数 */
 export const ARTICLES_PER_PAGE = 10;

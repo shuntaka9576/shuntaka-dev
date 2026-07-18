@@ -2,7 +2,6 @@
 name = "docs"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 requires-python = ">=3.14.6"
 dependencies = [
   "myst-parser>=5.1.0",
@@ -14,7 +13,12 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.15.21", "sphinx-autobuild>=2025.8.25"]
+dev = ["ruff>=0.15.22", "sphinx-autobuild>=2025.8.25"]
 
 [tool.uv]
 override-dependencies = ["sphinx>=9.0.4"]
+
+# docs は Sphinx ドキュメント用プロジェクトで Python パッケージではないため、
+# setuptools のパッケージ自動検出（source / node_modules を誤検出する）を無効化する。
+[tool.setuptools]
+py-modules = []

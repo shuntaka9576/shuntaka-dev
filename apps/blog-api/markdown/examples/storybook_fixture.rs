@@ -158,6 +158,16 @@ https://x.com/shuntaka_jp/status/2007605987881169264
 ## SpeakerDeck 埋め込み
 
 @[sd](ceec399cc51849d0889601c597dd030b,1,560/420,1.3)
+
+## 脚注
+
+本文中に脚注[^1]を書けます。名前付きの脚注[^note]や、リンクを含む脚注[^2]も使えます。
+
+[^1]: 一つ目の脚注です。
+
+[^note]: 名前付きの脚注です。
+
+[^2]: [Zenn の脚注記法](https://zenn.dev/zenn/articles/markdown-guide#%E8%84%9A%E6%B3%A8) と同じ書き方です。
 "##;
 
 fn main() {

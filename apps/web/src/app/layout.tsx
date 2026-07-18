@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-600.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -66,12 +68,6 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_BOOT_SCRIPT }} />
       </head>
       <GoogleTagManager />
-      {/* フォント CSS は self-host (public/fonts/gen-interface-jp/)。woff2 は CSS 内の URL 経由で
-          jsDelivr CDN から取得するため preconnect は維持。配信ウェイトは 400/600 の 2 本
-          (経緯と再生成手順: docs/source/98_tasks/2026-07-12-web-font-delivery-optimization) */}
-      <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-      <link rel="stylesheet" href="/fonts/gen-interface-jp/400.css" precedence="default" />
-      <link rel="stylesheet" href="/fonts/gen-interface-jp/600.css" precedence="default" />
       <body>
         <GoogleTagManagerNoscript />
         <ThemeProvider>

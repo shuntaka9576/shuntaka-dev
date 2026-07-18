@@ -96,7 +96,7 @@ export const MomentCard = memo(function MomentCard({ moment, tilt = 'left' }: Mo
             className="aspect-square w-40 object-cover max-sm:w-28"
             loading="lazy"
           />
-          <figcaption className="py-1.5 text-center text-xs text-[var(--color-text-muted)]">
+          <figcaption className="font-latin-ui py-1.5 text-center text-xs text-[var(--color-text-muted)]">
             {formatDate(moment.capturedAt)}
           </figcaption>
         </figure>

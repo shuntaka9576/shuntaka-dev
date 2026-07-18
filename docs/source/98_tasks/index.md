@@ -7,6 +7,9 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-07-18 | [ベクトル検索ページネーションの破綻分析と pre-filter exact 方式への再設計](2026-07-18-vector-search-pagination-redesign/index.md)                                 |
+| 2026-07-18 | [PLaMo Embedding の投入後メモリ滞留 (glibc malloc) を jemalloc で解消](2026-07-18-plamo-embedding-jemalloc/index.md)                                              |
+| 2026-07-17 | [apps/web: 日本語 Web フォント撤去（Zenn 方式へ移行）](2026-07-17-web-system-font-migration/index.md)                                                             |
 | 2026-07-15 | [TiDB Self-Managed で日本語全文検索を実現する方法 (Vector + TiFlash 採用)](2026-07-15-tidb-fts-kuromoji-patterns/index.md)                                        |
 | 2026-07-15 | [Sphinx 日本語検索を Pagefind へ置き換える](2026-07-15-sphinx-pagefind-search/index.md)                                                                           |
 | 2026-07-14 | [moments の日付を EXIF 撮影時刻 (captured_at) に移行](2026-07-14-moments-exif-captured-at/index.md)                                                               |

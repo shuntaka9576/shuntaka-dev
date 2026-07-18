@@ -1,3 +1,5 @@
+<!-- cspell:ignore Kaku Meiryo -->
+
 # shuntaka.dev デザインシステム
 
 **shuntaka.dev**（髙橋俊一 / shuntaka による、読み物中心の静かな日本語テックブログ）のデザインシステム。ブランドは 1 つのマスコット **抹茶カップ (ochaIcon)**、1 色のアクセント **マゼンタピンク (`--color-accent`)**、そして GitHub-Dark 風のダークモードで構成される。
@@ -34,10 +36,11 @@ shuntaka.dev は、日本人ソフトウェアエンジニアの個人テック�
 
 ### Typography
 
-- **本文 / 見出し:** [Gen Interface JP](https://gen.typesetting.jp/)（400 / 600 の 2 weight 配信）。Inter（欧文）と Noto Sans JP（和文）を合成した OFL ライセンスの UI 書体で、欧文と和文を 1 ファミリーで賄う。CSS は self-host（`public/fonts/gen-interface-jp/{400,600}.css`。woff2 の URL は jsDelivr CDN に書き換え済み）で、Google Fonts と同じ unicode-range サブセット化により必要な woff2 だけが動的にロードされる。CSS 上は `font-family: 'Gen Interface JP', …` として参照。配信ウェイトを 2 本に絞った経緯は `docs/source/98_tasks/2026-07-12-web-font-delivery-optimization` を参照（旧 5 weight 時代はフォントだけでページ転送量の 52% を占めていた）。
+- **本文 / 見出し:** OS 標準の日本語サンセリフ。macOS / iOS は Hiragino、Windows は Meiryo を優先するシステムスタックで、記事本文・見出し・記事タイトルの日本語 Web フォントは配信しない。
+- **Latin UI:** [Inter](https://rsms.me/inter/) の Latin-only 400 / 600。`@fontsource/inter` から self-host し、ロゴ `shuntaka.dev`、英語ナビ、日付・ページ番号など英数字中心の UI に `.font-latin-ui` で限定適用する。記事本文と日本語タイトルには適用しない。
 - **Mono:** システムスタック（`ui-monospace, SFMono-Regular, …`）。
 - **スケール.** 9 段階の `--fs-display` / `--fs-h1` / `--fs-h2` / `--fs-h3` / `--fs-h4` / `--fs-body-lg` / `--fs-body` / `--fs-caption` / `--fs-code`。実値は `globals.css` と Storybook `Design System/Tokens` を参照。
-- **Weight ladder.** 実配信は 400（text）/ 600（emphasis）の 2 段階。セマンティックトークンは 5 つのまま維持し、実値をどちらかに寄せている（`--fw-light` / `--fw-regular` → 400、`--fw-medium` / `--fw-semibold` / `--fw-bold` → 600。Tailwind の `font-*` クラスも `globals.css` の `@theme` で同じ値に上書き済み）。要素ごとの割り当ては以下:
+- **Weight ladder.** Latin UI の実配信とシステムフォントの指定は 400（text）/ 600（emphasis）の 2 段階。セマンティックトークンは 5 つのまま維持し、実値をどちらかに寄せている（`--fw-light` / `--fw-regular` → 400、`--fw-medium` / `--fw-semibold` / `--fw-bold` → 600。Tailwind の `font-*` クラスも `globals.css` の `@theme` で同じ値に上書き済み）。要素ごとの割り当ては以下:
 
   | 要素                                                                                                                               | Weight         |
   | ---------------------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -105,7 +108,7 @@ moments（180 字 + 写真必須の一文投稿）は写真が主役の情緒的
 - タグ絞り込みは画面下部中央の `FloatingTagFilter`（`position: fixed`）。アイコンのみの円形トリガー + IDE のファイルツリー風パネル（`TagFilterTree`、フォルダ/タグの stroke アイコン + チェブロン展開）。一覧側はフローティングバーとの重なりを避ける bottom padding を確保する。
 - 記事ページ = 左コンテンツ + `--layout-sidebar-w` 固定の右 TOC サイドバーを `flex justify-between` で並べる。`lg` 以下でサイドバーは折りたたまれる。
 - TOC の sticky オフセットは `top: calc(var(--layout-header-h) + var(--layout-nav-h) + var(--space-5))` で計算する。マジックナンバー禁止。
-- フッターは `position: absolute; bottom: 0;` で body 下部に `--layout-footer-h` 分の余白を予約。ヘッダーは sticky **にしない**。
+- フッターは `position: absolute; bottom: 0;` で body 下部に `calc(var(--layout-footer-h) + 2rem)` 分の余白を予約する（+2rem はコンテンツ末尾と区切り線の間の呼吸）。上辺に `--color-border-subtle` の 1px 区切り線を引く。ヘッダーは sticky **にしない**。
 - **`display: grid` を使わない.** マルチカラムは Flex + `gap`。
 
 ### 透過 / blur
@@ -169,8 +172,8 @@ moments（180 字 + 写真必須の一文投稿）は写真が主役の情緒的
 
 ## 留意点
 
-- **フォント.** 本番は `apps/web/src/app/layout.tsx` の `<head>` に self-host の `<link rel="stylesheet">` を 2 本（`/fonts/gen-interface-jp/{400,600}.css`）読み込ませている。woff2 は CSS 内の URL 経由で jsDelivr CDN から取得（`preconnect` 維持）。書体名は `Gen Interface JP` で、`globals.css` の `body { font-family: 'Gen Interface JP', … }` から参照する。和文グリフの中身は Noto Sans JP（合成元）なので、CDN 障害時もシステムフォントスタックへフォールバックすれば見た目の劣化は最小限。
-- **Hiragino Sans (Figma) → Gen Interface JP（本番）.** Figma が macOS デフォルトの Hiragino Sans で表示するのは下書き確認用。本番は環境を問わず動く Gen Interface JP（和文は Noto Sans JP 合成）に統一する。
+- **フォント.** `layout.tsx` と Storybook `preview.tsx` が `@fontsource/inter/latin-{400,600}.css` を読み込み、ビルド時に Latin-only Inter を自ドメイン配信へ取り込む。日本語は `--font-base` のシステムスタック、限定的な英数字 UI は `--font-latin-ui` を参照する。外部フォント CDN と `preconnect` は使わない。
+- **Figma と本番.** Figma の Hiragino Sans 表示は本番の macOS / iOS と同じ方向性。Windows などでは各 OS のシステムフォントへフォールバックするため、プラットフォーム間で字形差が生じることを許容する。
 - **Dark mode.** トークンは `<html>` の `[data-theme='dark']` で切り替わり、`ToggleSwitch` がそれを操作する。明示的な theme が保存されていないとき `prefers-color-scheme: dark` も尊重する。
 
 ---

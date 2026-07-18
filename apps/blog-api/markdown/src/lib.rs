@@ -1031,6 +1031,23 @@ where
         .to_string()
 }
 
+/// comrak が出力する脚注セクションの冒頭に Zenn 風のタイトルを挿入する
+/// (zenn-editor の footnote_block_open カスタマイズに相当)
+fn add_footnotes_title(html: &str) -> String {
+    html.replace(
+        "<section class=\"footnotes\" data-footnotes>",
+        "<section class=\"footnotes\" data-footnotes>\n<span class=\"footnotes-title\">脚注</span>",
+    )
+}
+
+/// 脚注の戻りリンク「↩」に異体字セレクタ U+FE0E を付け、iOS で
+/// Apple Color Emoji として描画されるのを防ぐ (markdown-it-footnote と同じ対策)
+fn add_text_presentation_to_backrefs(html: &str) -> String {
+    static BACKREF_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(data-footnote-backref[^>]*>)↩").unwrap());
+    BACKREF_RE.replace_all(html, "${1}↩\u{fe0e}").to_string()
+}
+
 /// Markdown to HTML converter with syntax highlighting
 pub struct MarkdownConverter {
     syntect_adapter: &'static SyntectAdapter,
@@ -1083,6 +1100,12 @@ impl MarkdownConverter {
         // 外部リンクに target="_blank" を追加
         html = self.add_target_blank_to_external_links(&html);
 
+        // 脚注セクションに Zenn 風のタイトルを挿入
+        html = add_footnotes_title(&html);
+
+        // 脚注の戻りリンクを iOS でもテキスト表示にする
+        html = add_text_presentation_to_backrefs(&html);
+
         html
     }
 
@@ -1109,6 +1132,7 @@ impl MarkdownConverter {
         options.extension.table = true;
         options.extension.autolink = true;
         options.extension.tasklist = true;
+        options.extension.footnotes = true;
         options.extension.header_id_prefix = Some("".to_string());
 
         // Render options
@@ -1317,6 +1341,59 @@ mod tests {
             html,
             "<div class=\"message \"><p>here be dragons</p>\n</div>\n"
         );
+    }
+
+    #[test]
+    fn test_footnote_basic() {
+        let markdown = "本文中の脚注[^1]。\n\n[^1]: 脚注の内容。";
+        let html = convert_markdown_to_html(markdown);
+        // 本文側の参照
+        assert!(html.contains(r##"<sup class="footnote-ref"><a href="#fn-1" id="fnref-1" data-footnote-ref>1</a></sup>"##));
+        // 末尾の脚注セクション (Zenn 風タイトル付き)
+        assert!(html.contains(r#"<section class="footnotes" data-footnotes>"#));
+        assert!(html.contains(r#"<span class="footnotes-title">脚注</span>"#));
+        assert!(html.contains(r#"<li id="fn-1">"#));
+        assert!(html.contains("脚注の内容。"));
+        // 脚注から本文へ戻るリンク (U+FE0E 付きで iOS の絵文字化を防ぐ)
+        assert!(html.contains(r#"class="footnote-backref""#));
+        assert!(html.contains("↩\u{fe0e}</a>"));
+    }
+
+    #[test]
+    fn test_footnote_named() {
+        let markdown = "named footnote[^note].\n\n[^note]: named content.";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains(r##"href="#fn-note""##));
+        assert!(html.contains(r#"<li id="fn-note">"#));
+    }
+
+    #[test]
+    fn test_footnote_with_external_link() {
+        let markdown = "ref[^1].\n\n[^1]: see [example](https://example.com).";
+        let html = convert_markdown_to_html(markdown);
+        // 脚注内の外部リンクにも target="_blank" が付く
+        assert!(html.contains(
+            r#"<a href="https://example.com" target="_blank" rel="noopener noreferrer">"#
+        ));
+    }
+
+    #[test]
+    fn test_footnote_undefined_ref_stays_literal() {
+        let markdown = "undefined ref[^nope].";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains("[^nope]"));
+        assert!(!html.contains("footnotes"));
+    }
+
+    #[test]
+    fn test_footnote_not_in_code_block() {
+        let markdown = "```\n[^1]: not a footnote\n```\n\nref[^1].\n\n[^1]: real footnote.";
+        let html = convert_markdown_to_html(markdown);
+        // コードブロック内の脚注記法は変換されない
+        assert!(html.contains("[^1]: not a footnote"));
+        // コードブロック外は変換される
+        assert!(html.contains(r#"<li id="fn-1">"#));
+        assert!(html.contains("real footnote."));
     }
 
     #[test]
