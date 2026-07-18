@@ -46,6 +46,8 @@ ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:10000
 
 環境変数 2 つで Python が jemalloc を「使ってくれる」ように見えるが、Python 側は何も知らないし何の協力もしていない。プロセス内の malloc がまるごと jemalloc にすり替わっている。
 
+![LD_PRELOAD による malloc interposition の流れ](ld-preload-malloc-interposition.png)
+
 - `LD_PRELOAD` は Python ではなく動的リンカ (ld.so) の機能。指定した .so を他のどのライブラリよりも先にプロセスへマップする。シンボル解決は「先にロードされたものが勝つ」ため、libjemalloc.so.2 がエクスポートする `malloc` / `free` / `calloc` / `realloc` / `posix_memalign` が glibc (libc.so.6) の同名関数より優先される
 - 結果、プロセス内で malloc を呼ぶすべてのコードが、書き換えも再コンパイルもなしに jemalloc へ着地する。CPython 本体、PyTorch の C++ 部分、C 拡張 (sentencepiece 等) すべてが対象。今回の主役であるテンソル確保は c10 の CPUAllocator が `posix_memalign` を呼ぶので、数 MiB〜数十 MiB のアクティベーションバッファがまさにここを通る
 - 反映確認で `/proc/1/maps` に libjemalloc.so.2 を探すのは、「プロセスにマップ済み = malloc が差し替わっている」ことの確認
