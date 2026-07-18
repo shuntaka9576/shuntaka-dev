@@ -24,3 +24,6 @@ urlencoding.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 hex.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

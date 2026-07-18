@@ -18,8 +18,8 @@ import { buildLocationSearch, parseSearchParam } from '@/lib/searchQuery';
 /** 検索 fetch の debounce（ms）。過剰な API 呼び出しを避けつつ体感速度は保つ */
 const DEBOUNCE_MS = 300;
 
-/** 検索結果の1ページあたり件数。通常の記事一覧と揃える */
-const DEFAULT_LIMIT = ARTICLES_PER_PAGE;
+/** 検索結果の1ページあたり件数。一覧・タグ絞り込みと揃える */
+const PAGE_SIZE = ARTICLES_PER_PAGE;
 
 interface SearchContextValue {
   /** input が現在保持している値。debounce 前 */
@@ -36,8 +36,10 @@ interface SearchContextValue {
   modalOpen: boolean;
   /** 検索結果の現在ページ番号（1-based） */
   searchPage: number;
-  /** 検索結果の総ページ数 */
+  /** 検索結果の総ページ数。totalCount は offset 非依存で安定するため分母として使える */
   searchTotalPages: number;
+  /** スコープ内の全マッチ記事数（ページ内件数ではない）。未取得なら 0 */
+  searchTotalCount: number;
   setQuery: (next: string) => void;
   /** debounce をキャンセルして即時に submittedQuery を確定する（Enter キー用） */
   submitNow: () => void;
@@ -80,17 +82,21 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
   const [retryCount, setRetryCount] = useState(0);
   const [searchPage, setSearchPageState] = useState(1);
   const [searchTotalPages, setSearchTotalPages] = useState(1);
+  const [searchTotalCount, setSearchTotalCount] = useState(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** タグ / mode の変更検知用。変わっていたら searchPage を 1 に戻してから fetch する */
+  const prevScopeRef = useRef<{ selected: string[]; mode: 'and' | 'or' } | null>(null);
 
-  // 直リンク・戻る/進むで URL から q を復元する
+  // 直リンク・戻る/進むで URL から q を復元する。ページは常に 1 から
   useEffect(() => {
     const applyFromLocation = () => {
       const params = new URLSearchParams(window.location.search);
       const q = parseSearchParam(params.get('q'));
       setQueryState(q);
       setSubmittedQuery(q);
+      setSearchPageState(1);
     };
     applyFromLocation();
     window.addEventListener('popstate', applyFromLocation);
@@ -99,14 +105,27 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
 
   // submittedQuery / 選択タグ / mode / searchPage / retry が変わったら fetch する
   useEffect(() => {
+    const prevScope = prevScopeRef.current;
+    prevScopeRef.current = { selected, mode };
+
     if (!submittedQuery) {
       // 未検索状態にリセット
       setResults(null);
       setError(null);
       setLoading(false);
       setSearchTotalPages(1);
+      setSearchTotalCount(0);
       abortRef.current?.abort();
       abortRef.current = null;
+      return;
+    }
+
+    // タグ / mode が変わったら結果集合ごと変わるため 1 ページ目から取り直す。
+    // setState だけ行い、この effect が page=1 で再実行されるのに任せる（二重 fetch 防止）
+    const scopeChanged =
+      prevScope !== null && (prevScope.selected !== selected || prevScope.mode !== mode);
+    if (scopeChanged && searchPage !== 1) {
+      setSearchPageState(1);
       return;
     }
 
@@ -118,19 +137,21 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
     setLoading(true);
     setError(null);
 
-    const offset = (searchPage - 1) * DEFAULT_LIMIT;
+    const offset = (searchPage - 1) * PAGE_SIZE;
 
     searchArticles(userName, submittedQuery, {
       tags: selected,
       mode,
-      limit: DEFAULT_LIMIT,
+      limit: PAGE_SIZE,
       offset,
       signal: controller.signal,
     })
       .then((res) => {
         setResults(res.articles);
-        const pages = res.totalCount === 0 ? 1 : Math.ceil(res.totalCount / DEFAULT_LIMIT);
+        // totalCount は offset 非依存で安定するため、そのまま分母にできる
+        const pages = res.totalCount === 0 ? 1 : Math.ceil(res.totalCount / PAGE_SIZE);
         setSearchTotalPages(pages);
+        setSearchTotalCount(res.totalCount);
         setLoading(false);
       })
       .catch((err) => {
@@ -189,6 +210,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
     setQueryState('');
     pushSearchUrl('');
     setSubmittedQuery('');
+    setSearchPageState(1);
   }, [pushSearchUrl]);
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
@@ -231,6 +253,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       modalOpen,
       searchPage,
       searchTotalPages,
+      searchTotalCount,
       setQuery,
       submitNow,
       clearQuery,
@@ -248,6 +271,7 @@ export function SearchProvider({ userName, children }: SearchProviderProps) {
       modalOpen,
       searchPage,
       searchTotalPages,
+      searchTotalCount,
       setQuery,
       submitNow,
       clearQuery,

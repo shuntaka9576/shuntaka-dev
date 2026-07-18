@@ -16,11 +16,11 @@ const DEFAULT_PER_PAGE: u32 = 10;
 const MAX_PER_PAGE: u32 = 500;
 const DEFAULT_SEARCH_LIMIT: u32 = 20;
 const MAX_SEARCH_LIMIT: u32 = 100;
-const MAX_SEARCH_OFFSET: u32 = 200;
+// offset は決定的な集合（タグなし: 固定候補窓 / タグあり: exact 全マッチ集合）への
+// 通常ページングで、コストは offset に比例しない。上限は候補窓と同オーダーの
+// abuse 防止ガードとしてのみ置く
+const MAX_SEARCH_OFFSET: u32 = 1000;
 const MAX_SEARCH_QUERY_CHARS: usize = 500;
-const SEARCH_CANDIDATE_MULTIPLIER: u32 = 10;
-const TAGGED_SEARCH_CANDIDATE_MULTIPLIER: u32 = 30;
-const MAX_SEARCH_CANDIDATES: u32 = 3000;
 
 // 公開済み記事しか返さない API のため、CDN / ブラウザ双方でキャッシュを許可する
 const CACHE_CONTROL_PUBLIC: (HeaderName, HeaderValue) = (
@@ -60,9 +60,9 @@ pub struct UsersArticlesSearchQuery {
     pub tags: Option<String>,
     /// Tag filter mode: "and" (default) or "or".
     pub mode: Option<String>,
-    /// Maximum number of unique articles to return per page (default 20, max 100).
+    /// Maximum number of articles to return per page (default 20, max 100).
     pub limit: Option<u32>,
-    /// Number of results to skip for pagination (default 0, max 200).
+    /// Number of results to skip for pagination (default 0, max 1000).
     pub offset: Option<u32>,
 }
 
@@ -145,6 +145,8 @@ pub struct UsersArticlesSearchResponse {
     pub query: String,
     pub limit: u32,
     pub offset: u32,
+    /// スコープ（タグ pre-filter 適用後）内の全マッチ記事数。exact 計算のため常に正確で、
+    /// offset に依存しない（ページネーションの分母として安定）
     pub total_count: u64,
 }
 
@@ -230,16 +232,6 @@ fn parse_search_offset(raw: Option<u32>) -> Result<u32, AppError> {
         return Err(AppError::bad_request("offset exceeds maximum"));
     }
     Ok(offset)
-}
-
-fn search_candidate_limit(limit: u32, offset: u32, has_tag_filter: bool) -> u32 {
-    let effective = limit.saturating_add(offset);
-    let multiplier = if has_tag_filter {
-        TAGGED_SEARCH_CANDIDATE_MULTIPLIER
-    } else {
-        SEARCH_CANDIDATE_MULTIPLIER
-    };
-    effective.saturating_mul(multiplier).min(MAX_SEARCH_CANDIDATES)
 }
 
 // ─────────────────────────────────────────
@@ -354,7 +346,6 @@ pub async fn get_users_articles_search(
     let limit = parse_search_limit(query.limit)?;
     let offset = parse_search_offset(query.offset)?;
     let tag_filter = parse_tag_filter(query.tags.as_deref(), query.mode.as_deref());
-    let candidate_limit = search_candidate_limit(limit, offset, tag_filter.is_some());
 
     let embedding_client = registry.embedding_client().ok_or_else(|| {
         AppError::service_unavailable("PLaMO embedding service is not configured")
@@ -370,7 +361,6 @@ pub async fn get_users_articles_search(
             &name,
             &vector,
             tag_filter.as_ref(),
-            u64::from(candidate_limit),
             u64::from(limit),
             u64::from(offset),
         )
@@ -631,16 +621,4 @@ mod tests {
         assert!(parse_search_offset(Some(MAX_SEARCH_OFFSET + 1)).is_err());
     }
 
-    #[test]
-    fn search_candidates_expand_when_tags_are_present() {
-        assert_eq!(search_candidate_limit(20, 0, false), 200);
-        assert_eq!(search_candidate_limit(20, 0, true), 600);
-        assert_eq!(search_candidate_limit(MAX_SEARCH_LIMIT, 0, true), 3000);
-    }
-
-    #[test]
-    fn search_candidates_expand_with_offset() {
-        assert_eq!(search_candidate_limit(20, 20, false), 400);
-        assert_eq!(search_candidate_limit(20, 20, true), 1200);
-    }
 }

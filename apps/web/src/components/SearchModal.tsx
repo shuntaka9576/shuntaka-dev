@@ -223,6 +223,7 @@ export function SearchModal({ userName, defaultArticles }: SearchModalProps) {
               onClear={clearQuery}
               onSubmit={submitNow}
               loading={searchLoading}
+              placeholder={filtering ? '選択中のタグ内を検索' : '記事を検索'}
               autoFocus
             />
           </div>

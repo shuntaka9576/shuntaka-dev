@@ -78,7 +78,11 @@ export interface SearchArticlesResult {
   limit: number;
   /** サーバに渡されたオフセット */
   offset: number;
-  /** 候補プール内の合致記事総数（ページネーション用） */
+  /**
+   * スコープ内の全マッチ記事数（タグ併用時: ファセット件数と一致する真値 /
+   * 検索のみ: 固定候補窓内のユニーク記事数）。offset に依存せず安定するため
+   * ページネーションの分母に使える
+   */
   totalCount: number;
 }
 
