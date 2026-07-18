@@ -1,8 +1,11 @@
 -- 出典: apps/blog-api/adapter/src/repository/users_articles.rs
 -- UsersArticlesRepositoryImpl::find_tag_facets
 -- タグファセット集計。フィルタ有無で 2 系統に分岐する。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。同一トランザクション内で SET と本体クエリを
+-- 一括送信するため、各セクションを BEGIN ... COMMIT で囲む。
 
-SET @user_name = 'shuntaka';
 
 -- ────────────────────────────────────
 -- (A) フィルタなし: パネル初期表示 / SSR 埋め込み用
@@ -10,6 +13,9 @@ SET @user_name = 'shuntaka';
 --   `type` 列は廃止済み概念（新規書き込みは定数 'all'）だが、旧 per-type 行が
 --   残っている間も合算できるよう SUM で読む。
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
 
 WITH RECURSIVE tag_paths AS (
     SELECT tag_id, name AS path FROM tags WHERE parent_tag_id IS NULL
@@ -24,6 +30,7 @@ SELECT tp.path, CAST(SUM(tac.article_count) AS SIGNED) AS cnt
  GROUP BY tac.tag_id, tp.path
 HAVING cnt > 0
  ORDER BY cnt DESC, tp.path ASC;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -33,7 +40,9 @@ HAVING cnt > 0
 --     （集計前に JOIN してパス文字列で GROUP BY すると 5 倍以上遅い / 詳細はコード内コメント）
 -- ────────────────────────────────────
 
-SET @tag_id_1 = '00000000-0000-0000-0000-000000000001';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_1  = '00000000-0000-0000-0000-000000000001';
 
 WITH RECURSIVE
 tag_paths AS (
@@ -70,14 +79,17 @@ FROM (
 ) agg
 JOIN tag_paths tp ON tp.tag_id = agg.anc_tag_id
 ORDER BY agg.cnt DESC, tp.path ASC;
+COMMIT;
 
 
 -- ────────────────────────────────────
 -- (C) タグ 2 件 AND
 -- ────────────────────────────────────
 
-SET @tag_id_a = '00000000-0000-0000-0000-000000000001';
-SET @tag_id_b = '00000000-0000-0000-0000-000000000002';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_a  = '00000000-0000-0000-0000-000000000001';
+SET @tag_id_b  = '00000000-0000-0000-0000-000000000002';
 
 WITH RECURSIVE
 tag_paths AS (
@@ -117,11 +129,17 @@ FROM (
 ) agg
 JOIN tag_paths tp ON tp.tag_id = agg.anc_tag_id
 ORDER BY agg.cnt DESC, tp.path ASC;
+COMMIT;
 
 
 -- ────────────────────────────────────
 -- (D) タグ 2 件 OR
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_a  = '00000000-0000-0000-0000-000000000001';
+SET @tag_id_b  = '00000000-0000-0000-0000-000000000002';
 
 WITH RECURSIVE
 tag_paths AS (
@@ -158,3 +176,4 @@ FROM (
 ) agg
 JOIN tag_paths tp ON tp.tag_id = agg.anc_tag_id
 ORDER BY agg.cnt DESC, tp.path ASC;
+COMMIT;

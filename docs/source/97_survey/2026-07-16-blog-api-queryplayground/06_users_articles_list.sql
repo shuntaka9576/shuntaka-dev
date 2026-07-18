@@ -6,16 +6,22 @@
 
 -- ────────────────────────────────────
 -- 共通パラメータ
+--   playground はステートメントごとに接続を切ることがあり、その場合は
+--   セッション変数が引き継がれない。同一トランザクション内で SET と本体クエリを
+--   一括送信するため、各セクションを BEGIN ... COMMIT で囲む。
+--
 --   LIMIT / OFFSET は MySQL / TiDB 仕様で @var を受け付けない
 --   （リテラル整数 or prepared placeholder のみ）ため、各クエリの LIMIT 20 OFFSET 0
 --   の数値を直接書き換える運用にしている。
 -- ────────────────────────────────────
 
-SET @user_name = 'shuntaka';
 
 -- ────────────────────────────────────
 -- (A) フィルタなし
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
 
 SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
        a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
@@ -31,6 +37,7 @@ SELECT COUNT(*)
   FROM articles a
  WHERE a.user_id = (SELECT user_id FROM users WHERE name = @user_name)
    AND a.status = 'published';
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -38,7 +45,9 @@ SELECT COUNT(*)
 --     leaf 名で tag_id を解決してから流す（前段クエリは 09_tag_facets.sql / 実装参照）
 -- ────────────────────────────────────
 
-SET @tag_id_1 = '00000000-0000-0000-0000-000000000001';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_1  = '00000000-0000-0000-0000-000000000001';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_1)
@@ -57,6 +66,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 WHERE at0.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
  LIMIT 20 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -64,8 +74,10 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
 --   EXISTS を tag_id ごとに 1 個ずつ生やして AND 連結
 -- ────────────────────────────────────
 
-SET @tag_id_a = '00000000-0000-0000-0000-000000000001';
-SET @tag_id_b = '00000000-0000-0000-0000-000000000002';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_a  = '00000000-0000-0000-0000-000000000001';
+SET @tag_id_b  = '00000000-0000-0000-0000-000000000002';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -87,12 +99,18 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 WHERE at1.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
  LIMIT 20 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
 -- (D) タグ 2 件 OR
 --   全 tag_id の子孫を 1 つの CTE にまとめて EXISTS 1 個で判定
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @tag_id_a  = '00000000-0000-0000-0000-000000000001';
+SET @tag_id_b  = '00000000-0000-0000-0000-000000000002';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -111,6 +129,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
                 WHERE ats.article_id = a.article_id)
  ORDER BY a.published_at DESC, a.article_id DESC
  LIMIT 20 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -120,6 +139,7 @@ SELECT /*+ USE_INDEX(a, idx_articles_user_status_type_published_at_id) */
 --   IN () のプレースホルダは 3 件並べた例を書いておく。
 -- ────────────────────────────────────
 
+BEGIN;
 SET @aid_1 = '00000000-0000-0000-0000-0000000000a1';
 SET @aid_2 = '00000000-0000-0000-0000-0000000000a2';
 SET @aid_3 = '00000000-0000-0000-0000-0000000000a3';
@@ -136,6 +156,7 @@ SELECT at2.article_id,
   JOIN tag_paths tp ON at2.tag_id = tp.tag_id
  WHERE at2.article_id IN (@aid_1, @aid_2, @aid_3)
  GROUP BY at2.article_id;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -144,9 +165,11 @@ SELECT at2.article_id,
 --   leaf 名（"tech/aws/lambda" なら "lambda"）だけで解決する（tags.name はグローバル一意）。
 -- ────────────────────────────────────
 
+BEGIN;
 SET @leaf_1 = 'lambda';
 SET @leaf_2 = 'rust';
 
 SELECT tag_id, name
   FROM tags
  WHERE name IN (@leaf_1, @leaf_2);
+COMMIT;

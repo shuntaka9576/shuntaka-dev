@@ -1,7 +1,12 @@
 -- 出典: apps/blog-api/adapter/src/repository/users_articles.rs
 -- UsersArticlesRepositoryImpl::find_published_by_user_name_and_slug
 -- 公開側の記事詳細。常に 1 行なので相関サブクエリ方式でタグを 1 行にまとめる。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。同一トランザクション内で SET と本体クエリを
+-- 一括送信するため BEGIN ... COMMIT で囲む。
 
+BEGIN;
 SET @slug      = '20260108-shuntaka-blog-rearchitecture';
 SET @user_name = 'shuntaka';
 
@@ -36,3 +41,4 @@ JOIN users u ON a.user_id = u.user_id
 WHERE a.status = 'published'
   AND a.slug   = @slug
   AND u.name   = @user_name;
+COMMIT;

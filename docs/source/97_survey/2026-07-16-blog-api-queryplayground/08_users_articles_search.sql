@@ -26,8 +26,13 @@
 -- 共通パラメータ
 --   embedding は VECTOR(2048)。JSON 配列文字列で渡す（sqlx 実装と同じ）。
 --   playground では全 0 のダミーを 2048 個並べたい場合は
---     SET @v = CONCAT('[', REPEAT('0,', 2047), '0]');
+--     SET @vector = CONCAT('[', REPEAT('0,', 2047), '0]');
 --   のように組み立てるとよい。
+--
+--   playground はステートメントごとに接続を切ることがあり、その場合は
+--   セッション変数 (@user_name / @vector / @tag_id_a など) が引き継がれない。
+--   そのため各セクションを BEGIN ... COMMIT で括り、同一トランザクション内で
+--   SET と本体クエリを一括送信する。
 --
 --   LIMIT / OFFSET は MySQL / TiDB 仕様で @var を受け付けないため
 --   （リテラル整数 or prepared placeholder のみ）、
@@ -35,15 +40,16 @@
 --   （page N は OFFSET (N-1)*10。候補窓の 1000 はページによらず固定のまま）。
 -- ────────────────────────────────────
 
-SET @user_name = 'shuntaka';
-SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
-
 
 -- ────────────────────────────────────
 -- (A) 検索のみ（タグ無し）: HNSW ANN + 固定候補窓
 --   nearest_chunks の LIMIT 1000 は SEARCH_CANDIDATE_POOL 定数。
 --   offset が変わっても窓は変えない。これが旧方式との唯一かつ本質的な違い。
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
 
 WITH nearest_chunks AS (
     SELECT /*+ READ_FROM_STORAGE(TIFLASH[c]) */
@@ -72,6 +78,7 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
  WHERE chunk_rank = 1
  ORDER BY distance, article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
@@ -80,8 +87,11 @@ SELECT article_id, title, slug, user_id, thumbnail, description, status,
 --   タグで絞った小集合が対象なので HNSW 不使用の総当たりで成立する。
 -- ────────────────────────────────────
 
-SELECT tag_id INTO @tag_id_a FROM tags WHERE name = 'tech';
-SELECT tag_id INTO @tag_id_b FROM tags WHERE name = 'misc';
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
+SELECT @tag_id_a := tag_id FROM tags WHERE name = 'tech';
+SELECT @tag_id_b := tag_id FROM tags WHERE name = 'misc';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id, tag_id AS root_tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -113,11 +123,18 @@ SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
   JOIN articles AS a ON a.article_id = s.article_id
  ORDER BY s.distance, a.article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────
 -- (C) 検索 + タグ 2 件 OR: pre-filter + exact
 -- ────────────────────────────────────
+
+BEGIN;
+SET @user_name = 'shuntaka';
+SET @vector    = CONCAT('[', REPEAT('0,', 2047), '0]');
+SELECT @tag_id_a := tag_id FROM tags WHERE name = 'tech';
+SELECT @tag_id_b := tag_id FROM tags WHERE name = 'misc';
 
 WITH RECURSIVE tag_descendants AS (
     SELECT tag_id FROM tags WHERE tag_id IN (@tag_id_a, @tag_id_b)
@@ -146,6 +163,7 @@ SELECT a.article_id, a.title, a.slug, a.user_id, a.thumbnail, a.description,
   JOIN articles AS a ON a.article_id = s.article_id
  ORDER BY s.distance, a.article_id
  LIMIT 10 OFFSET 0;
+COMMIT;
 
 
 -- ────────────────────────────────────

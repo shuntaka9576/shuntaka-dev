@@ -6,10 +6,13 @@
 --
 -- `type` カラムは廃止済み概念だが、既存 PK (user_id, type, tag_id) が NOT NULL なので
 -- 定数 'all' を入れる。読み取り側は type を横断して SUM する（09_tag_facets.sql 参照）。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。SET と本体クエリを同一トランザクションで
+-- 一括送信するため BEGIN ... ROLLBACK で囲む。
 
+BEGIN;
 SET @user_id = '00000000-0000-0000-0000-000000000000';
-
-START TRANSACTION;
 
 DELETE FROM tag_article_counts WHERE user_id = @user_id;
 

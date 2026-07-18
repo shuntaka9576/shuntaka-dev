@@ -5,6 +5,10 @@
 --   (a) 04_articles_tags_sync.sql
 --   (b) 05_tag_article_counts_sync.sql
 -- と組み合わせて実行される。playground で試すときは ROLLBACK 前提。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。SET と本体クエリを同一トランザクションで
+-- 一括送信するため、各ブロックを BEGIN ... ROLLBACK で囲む。
 
 -- ────────────────────────────────────
 -- (1) UPDATE: 既存記事の更新
@@ -13,6 +17,7 @@
 --   published_at は初回 publish 遷移時のみ NOW に更新（それ以外は既存値を渡し直す）
 -- ────────────────────────────────────
 
+BEGIN;
 SET @title         = '書き換え後タイトル';
 SET @content       = '# markdown 本文';
 SET @content_html  = NULL;             -- 生成済みの HTML を渡すなら文字列
@@ -22,8 +27,6 @@ SET @status        = 'published';      -- 'draft' | 'published'
 SET @published_at  = '2026-01-08 00:00:00';  -- 既存値 or 初 publish 時の now
 SET @updated_at    = NOW();
 SET @article_id    = '00000000-0000-0000-0000-000000000000';
-
-START TRANSACTION;
 
 UPDATE articles
    SET title        = @title,
@@ -44,6 +47,7 @@ ROLLBACK;
 -- (2) INSERT: 新規記事の作成
 -- ────────────────────────────────────
 
+BEGIN;
 SET @new_article_id = UUID();
 SET @user_id        = '00000000-0000-0000-0000-000000000000';
 SET @new_title      = '新規記事タイトル';
@@ -55,8 +59,6 @@ SET @new_description = '要約';
 SET @new_status     = 'draft';                -- 'draft' | 'published'
 SET @new_published_at = NULL;                 -- draft は NULL、published は NOW
 SET @now            = NOW();
-
-START TRANSACTION;
 
 INSERT INTO articles (
     article_id,

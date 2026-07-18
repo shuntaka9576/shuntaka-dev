@@ -9,13 +9,16 @@
 --
 -- 実運用ではトランザクション内でループ実行される。playground では
 -- 単一タグパス "tech/aws/lambda" を投入する例を並べる。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。SET と本体クエリを同一トランザクションで
+-- 一括送信するため BEGIN ... ROLLBACK で囲む。
 
+BEGIN;
 SET @article_id = '00000000-0000-0000-0000-000000000000';
 SET @tag_lvl1   = 'tech';    -- 最上位（parent_tag_id IS NULL）
 SET @tag_lvl2   = 'aws';     -- 2 段目
 SET @tag_lvl3   = 'lambda';  -- 3 段目（leaf）
-
-START TRANSACTION;
 
 -- (1) 対象記事のタグ関連を消す
 DELETE FROM articles_tags WHERE article_id = @article_id;

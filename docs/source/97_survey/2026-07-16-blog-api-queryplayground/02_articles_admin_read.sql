@@ -2,7 +2,12 @@
 -- ArticlesRepositoryImpl::find_by_user_id_and_slug
 -- 管理側 upsert 前の既存判定で呼ばれる。タグは隣接リストを再帰 CTE でフルパスに展開し
 -- GROUP_CONCAT で 1 行にまとめて返す。
+--
+-- playground はステートメントごとに接続を切ることがあり、その場合は
+-- セッション変数が引き継がれない。同一トランザクション内で SET と本体クエリを
+-- 一括送信するため BEGIN ... COMMIT で囲む。
 
+BEGIN;
 SET @user_id = '00000000-0000-0000-0000-000000000000';  -- users.user_id (CHAR(36))
 SET @slug    = '20260108-shuntaka-blog-rearchitecture';
 
@@ -35,3 +40,4 @@ SELECT
 FROM articles a
 WHERE a.user_id = @user_id
   AND a.slug    = @slug;
+COMMIT;
