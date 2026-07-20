@@ -22,7 +22,7 @@
     "https-proxy-agent": "^9.1.0",
     "iron-webcrypto": "^2.0.0",
     "jose": "^6.2.3",
-    "kysely": "^0.29.3",
+    "kysely": "^0.29.4",
     "mysql2": "^3.23.0",
     "ulid": "^3.0.2",
     "zod": "^4.4.3"
