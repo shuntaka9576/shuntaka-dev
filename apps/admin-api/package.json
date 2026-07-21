@@ -18,7 +18,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1089.0",
     "@hono/zod-openapi": "^1.5.1",
     "@smithy/node-http-handler": "^4.9.7",
-    "hono": "^4.12.30",
+    "hono": "^4.12.31",
     "https-proxy-agent": "^9.1.0",
     "iron-webcrypto": "^2.0.0",
     "jose": "^6.2.3",
