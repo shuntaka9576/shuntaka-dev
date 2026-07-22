@@ -22,8 +22,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-tweet": "^3.3.1",
-    "rss": "^1.2.2",
-    "tocbot": "^4.36.8"
+    "rss": "^1.2.2"
   },
   "devDependencies": {
     "@next/env": "16.2.11",

@@ -1031,6 +1031,22 @@ where
         .to_string()
 }
 
+/// 見出しの先頭にアンカーリンク（# 記号）を挿入する。
+/// クリック時の挙動（リンクコピー）はフロントエンド側で実装する
+fn add_heading_anchors(html: &str) -> String {
+    static HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"<(h[1-6]) id="([^"]*)">"#).unwrap());
+    HEADING_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            format!(
+                r##"<{tag} id="{id}"><a class="heading-anchor" href="#{id}" aria-label="この見出しへのリンクをコピー">#</a>"##,
+                tag = &caps[1],
+                id = &caps[2],
+            )
+        })
+        .to_string()
+}
+
 /// comrak が出力する脚注セクションの冒頭に Zenn 風のタイトルを挿入する
 /// (zenn-editor の footnote_block_open カスタマイズに相当)
 fn add_footnotes_title(html: &str) -> String {
@@ -1096,6 +1112,9 @@ impl MarkdownConverter {
 
         // Convert remaining markdown
         let mut html = self.convert_simple(&with_containers);
+
+        // 見出しにアンカーリンク（#）を挿入
+        html = add_heading_anchors(&html);
 
         // 外部リンクに target="_blank" を追加
         html = self.add_target_blank_to_external_links(&html);
@@ -1232,6 +1251,22 @@ mod tests {
         assert!(html.contains("<h1"));
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<em>italic</em>"));
+    }
+
+    #[test]
+    fn test_heading_anchor() {
+        let markdown = "## はじめに\n\n本文";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains(
+            r##"<h2 id="はじめに"><a class="heading-anchor" href="#はじめに" aria-label="この見出しへのリンクをコピー">#</a>はじめに"##
+        ));
+    }
+
+    #[test]
+    fn test_heading_anchor_inside_details() {
+        let markdown = ":::details 詳細\n\n### 内側見出し\n\n:::";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains(r##"<a class="heading-anchor" href="#内側見出し""##));
     }
 
     #[test]

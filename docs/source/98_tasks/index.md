@@ -7,6 +7,7 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-07-22 | [目次の刷新（tocbot 撤去）+ 見出しアンカー（# リンクコピー）追加](2026-07-22-toc-heading-anchor-rework/index.md)                                                  |
 | 2026-07-18 | [ベクトル検索ページネーションの破綻分析と pre-filter exact 方式への再設計](2026-07-18-vector-search-pagination-redesign/index.md)                                 |
 | 2026-07-18 | [PLaMo Embedding の投入後メモリ滞留 (glibc malloc) を jemalloc で解消](2026-07-18-plamo-embedding-jemalloc/index.md)                                              |
 | 2026-07-17 | [apps/web: 日本語 Web フォント撤去（Zenn 方式へ移行）](2026-07-17-web-system-font-migration/index.md)                                                             |
