@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026.0722.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.2...2026.0722.0) - 2026-07-22
+
+- fix(deps): update dependency hono to ^4.12.31 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/707
+- fix(deps): update apps/web by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/705
+- fix(deps): update aws-sdk-js-v3 monorepo to ^3.1092.0 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/697
+- chore(deps): update dependency @tanstack/router-plugin to ^1.168.23 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/696
+- fix(deps): update dependency shadcn to ^4.13.1 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/694
+- fix(deps): update dependency kysely to ^0.29.4 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/693
+- feat: 目次を刷新し見出しアンカーを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/712
+- chore(deps): update module google.golang.org/grpc to v1.82.1 [security] by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/708
+
 ## [2026.0718.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.1...2026.0718.2) - 2026-07-18
 
 - fix: モバイルでのインラインコードの見た目と脚注戻るリンクの絵文字化を修正する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/702
