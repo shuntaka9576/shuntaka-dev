@@ -690,9 +690,16 @@ input[type='search']::-webkit-search-decoration {
   width: var(--layout-sidebar-w);
 }
 
+/* 1024px 以下はサイドバーを本文上部の目次アコーディオンに切り替える。
+   sticky の基準を記事全体を含む .article-body に取らせるため、
+   ラッパーの .right-sidebar は display: contents で消す */
 @media (max-width: 1024px) {
+  .article-body {
+    flex-direction: column;
+  }
+
   .right-sidebar {
-    display: none;
+    display: contents;
   }
 }
 
@@ -712,64 +719,121 @@ input[type='search']::-webkit-search-decoration {
   line-height: var(--lh-list);
 }
 
-.toc > ol.toc-list {
-  position: relative;
-}
-
-.toc > ol::before {
-  position: absolute;
-  content: '';
-  width: 2px;
-  background: var(--toc-list-color);
-  top: 10px;
-  bottom: 0;
-  left: 2px;
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-}
-
 .toc ol li {
-  position: relative;
   color: var(--toc-list-text-color);
-}
-
-.toc ol li::before {
-  position: absolute;
-  content: '';
-  top: 8px;
-  height: 8px;
-  width: 8px;
-  left: -1px;
-  background: var(--toc-list-color);
-}
-
-.toc ol li.is-active-li::before {
-  background: var(--toc-list-color-active);
 }
 
 .toc ol li.is-active-li {
   color: var(--toc-list-color-active);
 }
 
-.toc ol ol li::before {
-  height: 6px;
-  width: 6px;
-  left: 0;
-  border-radius: var(--radius-full);
-}
-
-.toc ol ol ol li::before {
-  height: 4px;
-  width: 4px;
-  left: 1px;
-  border-radius: var(--radius-full);
-}
-
 .toc a {
-  position: relative;
-  padding-left: 0.8em;
   overflow: hidden;
   display: block;
   text-overflow: ellipsis;
+}
+
+/* ネスト階層はファイルツリー風の連続した罫線（角丸 L 字コネクタ）で表現する。
+   文字（├──）だと行間で縦線が途切れるため CSS で描く */
+.toc ol ol {
+  padding-left: 0.55em;
+}
+
+.toc ol ol > li {
+  position: relative;
+  padding-left: 1em;
+}
+
+/* 各項目へ分岐する L 字（テキスト行の中央まで） */
+.toc ol ol > li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0.65em;
+  height: calc(var(--lh-list) * 0.5em);
+  border-left: 1px solid var(--toc-list-color);
+  border-bottom: 1px solid var(--toc-list-color);
+  border-bottom-left-radius: 6px;
+}
+
+/* 最後の子以外は縦線を下まで伸ばして連続させる */
+.toc ol ol > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--toc-list-color);
+}
+
+/* モバイル用目次（上部固定の「目次」ボタン + モーダル） */
+.toc-mobile-trigger {
+  display: none;
+  align-items: center;
+  gap: 0.25em;
+  background: var(--color-surface);
+  border: 1px solid var(--article-area-border-color);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-text-muted);
+  line-height: var(--lh-list);
+  cursor: pointer;
+}
+
+.toc-mobile-trigger svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* 上部固定の「目次」ボタン（top: space-2 + 高さ約 37px）の直下に出す */
+.toc-mobile-dialog {
+  margin: 0;
+  position: fixed;
+  top: calc(var(--space-2) + 37px + var(--space-1));
+  right: var(--space-4);
+  left: auto;
+  width: min(80vw, 320px);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--article-area-border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: inherit;
+}
+
+.toc-mobile-dialog::backdrop {
+  background: rgb(0 0 0 / 20%);
+}
+
+.toc-mobile-dialog .toc {
+  position: static;
+  max-width: 100%;
+  max-height: none;
+  border: none;
+  padding: 0;
+}
+
+/* 初期フォーカスの受け皿（tabindex=-1）にリングを出さない。リンクのキーボード操作時は通常どおり */
+.toc-mobile-dialog .toc:focus {
+  outline: none;
+}
+
+@media (max-width: 1024px) {
+  .toc-desktop {
+    display: none;
+  }
+
+  .toc-mobile-trigger {
+    display: inline-flex;
+    order: -1;
+    position: sticky;
+    top: var(--space-2);
+    z-index: 10;
+    align-self: flex-end;
+    margin-bottom: var(--space-2);
+  }
 }
 
 /* Toggle Switch */
@@ -1024,6 +1088,30 @@ input[type='search']::-webkit-search-decoration {
 
 .prose pre .copy-btn .copy-icon {
   display: flex;
+}
+
+/* 見出しアンカー（# クリックでリンクコピー） */
+.prose .heading-anchor {
+  position: relative;
+  margin-right: 0.35em;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.prose .heading-anchor:hover {
+  color: var(--color-accent);
+}
+
+.prose .heading-anchor .copied-float {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 2px);
+  font-size: 12px;
+  font-weight: var(--fw-regular);
+  color: var(--color-success-icon);
+  white-space: nowrap;
+  animation: float-up 0.8s ease-out forwards;
+  pointer-events: none;
 }
 
 .prose pre .copy-btn .copied-float {

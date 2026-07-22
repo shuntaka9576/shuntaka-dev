@@ -90,7 +90,36 @@ export function ArticleContent({ html }: ArticleContentProps) {
     const container = contentRef.current;
     if (!container) return;
 
+    const showCopiedFloat = (host: Element) => {
+      const floatingText = document.createElement('span');
+      floatingText.className = 'copied-float';
+      floatingText.textContent = 'Copied!';
+      host.appendChild(floatingText);
+
+      setTimeout(() => {
+        floatingText.remove();
+      }, 800);
+    };
+
     const handleCopyClick = (e: MouseEvent) => {
+      // 見出しアンカー（#）: ジャンプせずに hash を更新し、共有用 URL をコピーする
+      const headingAnchor = (e.target as Element).closest('.heading-anchor');
+      if (headingAnchor) {
+        e.preventDefault();
+        const href = headingAnchor.getAttribute('href');
+        if (!href) return;
+
+        const url = new URL(href, window.location.href);
+        window.history.pushState(null, '', url.hash);
+        navigator.clipboard.writeText(url.toString()).then(
+          () => showCopiedFloat(headingAnchor),
+          (err) => {
+            console.error('Failed to copy:', err);
+          },
+        );
+        return;
+      }
+
       const button = (e.target as Element).closest(
         '.github-embed-copy, .code-block-copy, .copy-btn',
       );
@@ -100,16 +129,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
       if (!code) return;
 
       navigator.clipboard.writeText(code).then(
-        () => {
-          const floatingText = document.createElement('span');
-          floatingText.className = 'copied-float';
-          floatingText.textContent = 'Copied!';
-          button.appendChild(floatingText);
-
-          setTimeout(() => {
-            floatingText.remove();
-          }, 800);
-        },
+        () => showCopiedFloat(button),
         (err) => {
           console.error('Failed to copy:', err);
         },
@@ -128,7 +148,14 @@ export function ArticleContent({ html }: ArticleContentProps) {
     const hash = window.location.hash;
     if (!hash) return;
 
-    const id = hash.slice(1);
+    // location.hash はパーセントエンコードされたまま返るため、
+    // 日本語見出し ID と突き合わせるにはデコードが必要
+    let id: string;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch {
+      id = hash.slice(1);
+    }
     let attempts = 0;
     const maxAttempts = 10;
     let timerId: ReturnType<typeof setTimeout> | null = null;
