@@ -11,11 +11,11 @@
 
 ダッシュボードの SQL Statements で以下の傾向が出ていた。
 
-| クエリ | Latency | Max Memory |
-| --- | ---: | ---: |
-| `SELECT * FROM articles;` | 421ms〜1.1s | 3.3〜3.7 MiB |
-| `SELECT * FROM articles LIMIT 30;` | 458.1ms | 953.9 KiB |
-| `SELECT * FROM articles LIMIT 10;` | 300.6ms | 551.0 KiB |
+| クエリ                             |     Latency |   Max Memory |
+| ---------------------------------- | ----------: | -----------: |
+| `SELECT * FROM articles;`          | 421ms〜1.1s | 3.3〜3.7 MiB |
+| `SELECT * FROM articles LIMIT 30;` |     458.1ms |    953.9 KiB |
+| `SELECT * FROM articles LIMIT 10;` |     300.6ms |    551.0 KiB |
 
 行数ではなく Max Memory（≒結果セットサイズ）にレイテンシが比例している点が気になった。
 
