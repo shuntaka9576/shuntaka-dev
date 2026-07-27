@@ -52,7 +52,12 @@
   ],
   "packageRules": [
     {
-      "matchUpdateTypes": ["patch", "minor", "major"],
+      "description": "patch/minor は月曜午前の週1バッチでPR作成（平日の割り込み削減。脆弱性対応は vulnerabilityAlerts で即時のまま）",
+      "matchUpdateTypes": ["patch", "minor"],
+      "schedule": ["before 9am on monday"]
+    },
+    {
+      "matchUpdateTypes": ["major"],
       "schedule": ["at any time"]
     },
     {
