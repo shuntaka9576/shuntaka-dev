@@ -15,6 +15,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | proxy のアクセス・エラーログを検索したい | クエリリファレンス     |
 | 検索がヒットしない・表示が変             | ハマりどころ           |
 | MiniPC を再起動したい                    | ノード再起動           |
+| OS パッケージを更新したい                | ノード再起動           |
 | 本番 DB のバックアップ / dev への複製    | バックアップとリストア |
 
 ## ボトルネック切り分け
@@ -146,6 +147,8 @@ mysql -h "tidb.${TAILNET}" -P 4000 -u root -D blog_dev \
 
 MiniPC（node1〜3）を OS 再起動するときの手順。ノード配置の前提は [構築計画](../98_tasks/2026-06-25-construction-plan/index.md) の「ノード別配置の想定」を参照。
 
+apt による OS パッケージ更新（ログイン時の `39 updates can be applied immediately` や `*** System restart required ***` への対応）も本手順で行う。reboot の直前に【OS 更新時のみ】と書かれたステップを挟むだけで、cordon → 退避 → 再起動 → uncordon の流れは同じ。
+
 ### 前提と原則
 
 | 項目             | 内容                                                                                                                                                       |
@@ -167,6 +170,13 @@ export NODE=node2
 # 自動起動の enable 確認（3 つとも enabled であること）
 ssh "$NODE" 'systemctl is-enabled kubelet containerd tailscaled'
 
+# 【OS 更新時のみ】k8s パッケージが hold されていること
+# （kubelet / kubeadm / kubectl の 3 つが出ること。apt upgrade で k8s が上がらない保証）
+ssh "$NODE" 'apt-mark showhold'
+
+# 【OS 更新時のみ】何が再起動要求を出しているか（カーネル更新なら linux-* が並ぶ）
+ssh "$NODE" 'cat /var/run/reboot-required.pkgs'
+
 # tidb-public の Tailscale proxy Pod がどのノードに載っているか確認する。
 # 再起動対象ノードに載っている場合、そのノード停止中は
 # Fargate proxy → tidb.<tailnet>:4000 のブログ DB 経路が止まる
@@ -182,12 +192,18 @@ kubectl -n tidb-cluster get pods -o wide
 ```bash
 kubectl cordon "$NODE"
 
-# 【事前確認で ts-tidb-public が対象ノードに載っていた場合のみ】
-# proxy Pod を消して別ノードへ退避させる（ブログ DB 経路のダウンを数十秒に抑える）。
-# Tailscale のデバイス状態は Secret 保存のため、移動しても `tidb` の
-# ホスト名・identity は維持される。SPOF 許容方針なので、退避せず数分止めてもよい
+# 【事前確認で ts-tidb-public / ts-plamo-embedding-public が対象ノードに載っていた場合のみ】
+# proxy Pod を消して別ノードへ退避させる（ブログ DB / 検索 API 経路のダウンを数十秒に抑える）。
+# Tailscale のデバイス状態は Secret 保存のため、移動してもホスト名・identity は維持される。
+# SPOF 許容方針なので、退避せず数分止めてもよい
 kubectl -n tailscale delete pod ts-tidb-public-<suffix>-0
 kubectl -n tailscale get pods -o wide   # 別ノードで Running になるまで待つ
+
+# 【OS 更新時のみ】パッケージを更新してから再起動する。
+# カーネル更新は新パッケージの追加インストールを伴うため、
+# apt-get upgrade（新規インストールを保留する）ではなく apt upgrade を使う
+ssh "$NODE" 'sudo apt update && sudo apt upgrade -y'
+ssh "$NODE" 'sudo apt autoremove -y'    # 旧カーネルの掃除
 
 ssh "$NODE" 'sudo reboot'
 
@@ -202,6 +218,9 @@ kubectl -n tidb-cluster get pods -o wide
 
 - `kubectl drain` でノード丸ごと退避するのは不可。TiKV / PD は local PV に紐付いていて他ノードへ移動できず、Pending で待つだけの無駄な churn が起きる。動かすのは tailscale proxy Pod だけでよい
 - `ts-node-grafana-public` / `ts-tidb-dashboard-public` / tailscale operator / hubble-ui は退避不要。観測系なので再起動の数分止まっても実害はない（operator は既存 proxy の通信に関与しない）
+- `ts-plamo-embedding-public` はセマンティック検索 API の経路（検索クエリの埋め込み生成にリクエスト時に呼ばれる）。対象ノードに載っている場合、停止中は検索 API が 502 になる。数分の断を避けたいときは ts-tidb-public と同様に delete で退避する。plamo-embedding 本体（Deployment, node2/node3 に 1 Pod ずつ）は退避不要 — 反対側ノードのレプリカが Service 経由で受ける
+- containerd も Ubuntu apt 管理なので更新対象に含まれるが、cordon 済みかつ直後に再起動するため気にしなくてよい。ログイン時の「Expanded Security Maintenance (ESM)」のメッセージは Ubuntu Pro の宣伝で対応不要
+- reboot 発行後、効いていないように見えても **reboot を再発行しない**。起動直後のノードに届いて再起動が連鎖する（実績: 2026-07-27 に node3 が 4 回再起動）。復帰確認は `kubectl get nodes -w` の Ready 遷移か `ssh "$NODE" 'last reboot -n 3'` で行う
 
 ### control plane（node1）の再起動
 
@@ -221,6 +240,9 @@ kubectl -n kube-system get pods            # control plane / cilium / coredns �
 kubectl -n tidb-cluster get pods -o wide   # PD / TiKV / TiDB が Running
 kubectl -n tailscale get pods -o wide      # tidb-public の proxy Pod が Running
 curl -s https://api.shuntaka.dev/health/db # ブログ DB 経路の疎通
+
+# 【OS 更新時のみ】再起動要求が消えていること（何も出なければ OK）
+ssh "$NODE" 'cat /var/run/reboot-required 2>/dev/null'
 ```
 
 ## クエリリファレンス
