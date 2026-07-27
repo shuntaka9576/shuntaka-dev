@@ -34,7 +34,7 @@ bun run serve
 - `src/index.ts` — エントリポイント。Bun.serve (HTTP + WebSocket) と stdin NDJSON ループ。記事一覧クリック (WS open) はパス検証後に stdout 通知 + ファイル内容の即時レンダリング
 - `src/protocol.ts` — Lua↔サーバー↔ブラウザ間メッセージの型定義（唯一の型ソース）
 - `src/markdown.ts` — markdown-wasm のローダーを使った 2 パス変換（URL 列挙 → fetch → リソース注入）。成功はプロセス寿命、失敗は 30 秒 TTL でキャッシュ
-- `src/articles.ts` — frontmatter の除去/title 抽出（blog-api の ArticleFrontmatter::parse と同じ切り出し方）と記事一覧の列挙
+- `src/articles.ts` — frontmatter の除去/title 抽出（blog-api の ArticleFrontmatter::parse と同じ切り出し方）と記事一覧の列挙。日付は git log 1 回で集めた初回/最終コミット日時（未コミットのみ fs 日時にフォールバック）
 - `src/template.ts` — shell ページ（記事一覧 + pc/mobile 切り替え + iframe）と view ページ（本番と同じ article-body レイアウト）、globals.css の取り込み（Tailwind ディレクティブのみ除去）
 - `static/client.js` — shell 側。WS 受信を iframe に注入し、記事一覧の描画・ソート・pc/mobile 切り替えを行う
 - `static/toc.js` — view (iframe) 側。apps/web の TableOfContents.tsx を移植した目次（スクロール追従・モバイルモーダル込み）

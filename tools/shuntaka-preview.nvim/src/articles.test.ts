@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,5 +65,39 @@ describe('listArticles', () => {
 
   test('存在しないディレクトリは空配列', () => {
     expect(listArticles('/no/such/dir')).toEqual([]);
+  });
+
+  test('git 管理下では初回/最終コミット日時を使い、未コミットのファイルは fs 日時に落ちる', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shuntaka-preview-git-'));
+    const git = (args: string[], dateEnv?: string) =>
+      execFileSync('git', ['-C', dir, ...args], {
+        env: {
+          ...process.env,
+          ...(dateEnv ? { GIT_AUTHOR_DATE: dateEnv, GIT_COMMITTER_DATE: dateEnv } : {}),
+        },
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    git(['init', '-q']);
+    git(['config', 'user.email', 'test@example.com']);
+    git(['config', 'user.name', 'test']);
+
+    const createdDate = '2026-01-01T00:00:00Z';
+    const updatedDate = '2026-02-01T00:00:00Z';
+    writeFileSync(join(dir, 'a.md'), '---\ntitle: "記事A"\n---\nv1');
+    git(['add', '.']);
+    git(['commit', '-q', '-m', 'add'], createdDate);
+    writeFileSync(join(dir, 'a.md'), '---\ntitle: "記事A"\n---\nv2');
+    git(['add', '.']);
+    git(['commit', '-q', '-m', 'update'], updatedDate);
+    // mtime はコミット日時より新しいが、git 管理下なのでコミット日時が優先される
+    writeFileSync(join(dir, 'draft.md'), '# 未コミットの下書き');
+
+    const entries = listArticles(dir);
+    const a = entries.find((e) => e.name === 'a.md');
+    expect(a?.createdAt).toBe(Date.parse(createdDate));
+    expect(a?.updatedAt).toBe(Date.parse(updatedDate));
+
+    const draft = entries.find((e) => e.name === 'draft.md');
+    expect(draft?.updatedAt).toBeGreaterThan(Date.parse(updatedDate));
   });
 });

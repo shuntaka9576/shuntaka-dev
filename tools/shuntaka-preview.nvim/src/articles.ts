@@ -1,12 +1,13 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from 'node:child_process';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 
 export type ArticleEntry = {
   path: string;
   name: string;
   title: string;
-  createdAt: number; // epoch ms (birthtime)
-  updatedAt: number; // epoch ms (mtime)
+  createdAt: number; // epoch ms (初回コミット日時。git 管理外はファイルの birthtime)
+  updatedAt: number; // epoch ms (最終コミット日時。git 管理外はファイルの mtime)
 };
 
 // blog-api の ArticleFrontmatter::parse と同じ切り出し方（先頭 --- 〜 \n---）で
@@ -45,12 +46,76 @@ export function isPathInDir(path: string, dir: string): boolean {
   return resolve(path).startsWith(resolve(dir) + sep);
 }
 
+// git log を 1 回だけ流して、dir 配下の各ファイルの最終コミット (updated) と
+// 初回コミット (created) の日時を集める。mtime/birthtime は clone や checkout でも
+// 変わってノイズになるため、git 管理下では常にコミット日時を使う。
+// git リポジトリでなければ null (呼び出し側でファイルシステムの日時にフォールバック)
+export function gitTimes(
+  dir: string,
+): Map<string, { createdAt: number; updatedAt: number }> | null {
+  try {
+    const opts: ExecFileSyncOptionsWithStringEncoding = {
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    };
+    const root = execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], opts).trim();
+    // --name-only のパスは repo root 相対。\x01 をコミット日時の行マーカーにする
+    const log = execFileSync(
+      'git',
+      [
+        '-C',
+        dir,
+        '-c',
+        'core.quotepath=false',
+        'log',
+        '--format=%x01%ct',
+        '--name-only',
+        '--',
+        '.',
+      ],
+      opts,
+    );
+    const times = new Map<string, { createdAt: number; updatedAt: number }>();
+    let commitAt = 0;
+    for (const line of log.split('\n')) {
+      if (line.startsWith('\x01')) {
+        commitAt = Number(line.slice(1)) * 1000;
+        continue;
+      }
+      if (line === '') {
+        continue;
+      }
+      const path = join(root, line);
+      const entry = times.get(path);
+      if (entry) {
+        // log は新しい順なので、後に出るコミットほど古い = created を上書きしていく
+        entry.createdAt = commitAt;
+      } else {
+        times.set(path, { createdAt: commitAt, updatedAt: commitAt });
+      }
+    }
+    return times;
+  } catch {
+    return null;
+  }
+}
+
 export function listArticles(dir: string): ArticleEntry[] {
   let names: string[];
   try {
     names = readdirSync(dir);
   } catch {
     return [];
+  }
+  const committed = gitTimes(dir);
+  // git の返すパスは symlink 解決済み (macOS の /var → /private/var 等) のため、
+  // ルックアップ用に dir も realpath へ正規化する
+  let lookupDir = dir;
+  try {
+    lookupDir = realpathSync(dir);
+  } catch {
+    // 解決できなければそのまま
   }
   const entries: ArticleEntry[] = [];
   for (const name of names) {
@@ -64,12 +129,17 @@ export function listArticles(dir: string): ArticleEntry[] {
         continue;
       }
       const text = readFileSync(path, 'utf-8');
+      // 未コミットの新規ファイルは git に日時が無いのでファイルシステムの日時を使う
+      const times = committed?.get(join(lookupDir, name)) ?? {
+        createdAt: Math.round(st.birthtimeMs || st.ctimeMs),
+        updatedAt: Math.round(st.mtimeMs),
+      };
       entries.push({
         path,
         name,
         title: extractTitle(text) ?? name.replace(/\.md$/, ''),
-        createdAt: Math.round(st.birthtimeMs || st.ctimeMs),
-        updatedAt: Math.round(st.mtimeMs),
+        createdAt: times.createdAt,
+        updatedAt: times.updatedAt,
       });
     } catch {
       // 読めないファイルは一覧から外す
