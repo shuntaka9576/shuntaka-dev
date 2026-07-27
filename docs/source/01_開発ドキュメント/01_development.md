@@ -837,17 +837,15 @@ bun run build:wasm
 git add pkg
 ```
 
-lazy.nvim はモノレポのサブディレクトリを直接プラグイン扱いできないため、`init` で runtimepath に追加する。
+lazy.nvim はモノレポのサブディレクトリを直接プラグイン扱いできないため、`config` の require 直前で runtimepath に追加する（`init` での追加はスペック追加後の初回セッションでインストールが init フェーズより後に走るため間に合わない）。
 
 ```lua
 {
   "shuntaka9576/shuntaka-dev",
   name = "shuntaka-preview.nvim",
   cmd = { "ShuntakaPreview", "ShuntakaPreviewStop" },
-  init = function(plugin)
+  config = function(plugin)
     vim.opt.rtp:append(plugin.dir .. "/tools/shuntaka-preview.nvim")
-  end,
-  config = function()
     require("shuntaka-preview").setup({})
   end,
 }

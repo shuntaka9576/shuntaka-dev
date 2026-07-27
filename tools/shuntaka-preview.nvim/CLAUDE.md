@@ -45,7 +45,7 @@ bun run serve
 
 - wasm の公開 API は `collectResourceUrls` / `convertMarkdownWithResources` の 2 つ（2 パス方式）。wasm 内で同期 HTTP ができないため、fetch は TS 側で行う。content-html-backfill と同じパターン
 - `pkg/` はコミットする方針（content-html-backfill は毎回ビルドするので gitignore、こちらは導入マシンに Rust toolchain を要求しないため）。`build:wasm` が wasm-pack の自動生成する `pkg/.gitignore` を削除する
-- lazy.nvim はモノレポのサブディレクトリを直接扱えないため、spec の `init` で `vim.opt.rtp:append(plugin.dir .. "/tools/shuntaka-preview.nvim")` する。`plugin/` ディレクトリは作らず、コマンド登録は `setup()` で行う
+- lazy.nvim はモノレポのサブディレクトリを直接扱えないため、spec の `config` で require の直前に `vim.opt.rtp:append(plugin.dir .. "/tools/shuntaka-preview.nvim")` する（`init` での追加は初回インストールセッションで間に合わない）。`plugin/` ディレクトリは作らず、コマンド登録は `setup()` で行う
 - プレビューは記事ページのラッパー構造 (`article-content > article-content-wrapper > .prose`) のみ再現。article-header や目次等のサイト chrome、X ポスト埋め込み (react-tweet) は対象外
 - ダークモードは `data-theme` を触らず `prefers-color-scheme` 任せ（本番の未設定時デフォルトと同じ挙動）
 
