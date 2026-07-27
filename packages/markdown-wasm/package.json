@@ -1,0 +1,18 @@
+{
+  "name": "markdown-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../apps/blog-api/markdown --release --target nodejs --out-dir ../../../packages/markdown-wasm/pkg && rm -f pkg/.gitignore",
+    "build:wasm:fresh": "wasm-pack build ../../apps/blog-api/markdown --dev --target nodejs --out-dir ../../../packages/markdown-wasm/.pkg-fresh",
+    "test": "bun run build:wasm:fresh && bun test src/",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.15.0"
+  }
+}

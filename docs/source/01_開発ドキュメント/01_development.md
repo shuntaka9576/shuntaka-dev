@@ -792,16 +792,28 @@ bun run load --host tidb.$TAILNET --database blog_test --tsv-dir ./out --paralle
 
 同じ `--seed` を渡せば内容は決定的に再現される（default `42`）。`--content-size` は 1 記事あたりの目標バイト数で、paragraph 合成が閾値を超えた時点で打ち切るため実サイズは目標をやや上回る。`--workers 1` にすると子プロセス不使用の直書き single-process 経路に切り替わる。
 
-### content-html-backfill
+### markdown-wasm
 
-`articles.content_html` を blog-api と同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で生成して埋め戻す。UPDATE は `content_html` カラムのみで、`updated_at` は変更しない（webhook 再実行での埋め戻しは upsert が `updated_at` を更新してしまうため使わない）。
+`apps/blog-api/markdown` crate を wasm-pack でビルドした成果物（`pkg/`）と、TS 向けのローダー・2 パスフェッチヘルパを集約した共有 workspace パッケージ。content-html-backfill と shuntaka-preview.nvim はここを参照するため、リポジトリ内の wasm 成果物とビルド定義はこの 1 ヶ所だけになる。
 
-wasm ビルド（初回、および markdown crate を変更したとき。`rustup target add wasm32-unknown-unknown` 済みが前提）
+`pkg/` は release ビルドをコミットしてあり、利用側はビルド不要。markdown crate を変更したときだけ再ビルドして差分をコミットする（`rustup target add wasm32-unknown-unknown` 済みが前提。wasm-pack が生成する `pkg/.gitignore` は build:wasm 内で削除される）。
 
 ```bash
-cd tools/content-html-backfill
+cd packages/markdown-wasm
 bun run build:wasm
+git add pkg
 ```
+
+テストは同一スイートをコミット済み `pkg/` と CI で都度 dev ビルドする `.pkg-fresh/` の両方に対して実行する（CI の `turbo test` でも実行）。wasm バイナリはビルドマシンの絶対パスを含みバイト比較で鮮度検証ができないため、挙動の一致で担保する。crate の挙動を変えたらテストも更新し、古い `pkg/` のままだとコミット済み pkg 側のテストが落ちて再ビルドが強制される。
+
+```bash
+cd packages/markdown-wasm
+bun run test
+```
+
+### content-html-backfill
+
+`articles.content_html` を blog-api と同じ変換ロジック（markdown-wasm 経由）で生成して埋め戻す。UPDATE は `content_html` カラムのみで、`updated_at` は変更しない（webhook 再実行での埋め戻しは upsert が `updated_at` を更新してしまうため使わない）。
 
 content_html が NULL の記事だけ埋め戻す
 
@@ -817,25 +829,13 @@ bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --all --dry-run --out-dir ./out
 ```
 
-wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` でも実行される）
-
-```bash
-bun run test
-```
-
 ### shuntaka-preview.nvim
 
 ブログと同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で Markdown をローカルプレビューする Neovim プラグイン。バッファ変更のライブ反映、カーソル行割合ベースのスクロール同期、リンクカード・GitHub 埋め込みの実フェッチ（URL 単位キャッシュ）、frontmatter の除去（本番の webhook と同じ扱い）に対応する。スタイルは `apps/web/src/app/globals.css` をそのまま配信し、本番と同じ `article-body` レイアウト（コンテナ幅 1200px + 右サイドバー目次）で表示する。目次は `TableOfContents.tsx` を移植したもので、スクロール追従と 1024px 以下のモーダル目次も本番と同じ挙動になる。
 
 プレビュー画面は左に記事一覧サイドバー、右上に pc / mobile のビューポート切り替えを持つ。記事一覧はプレビュー中ファイルと同じディレクトリ（`setup({ articles_dir = ... })` で上書き可）の `*.md` を frontmatter の title 付きで列挙し、更新日・作成日・ファイル名でソートできる。一覧をクリックするとブラウザ側の表示が切り替わり、Neovim 側も `:edit` で追従する。逆に Neovim で別の markdown バッファへ移った場合もプレビューが追従する。mobile 表示は iframe の幅を 390px に切り替えるため、media query も本番同様に効く。タブの favicon は本番アイコンの色相を変えたもので、本番タブと見分けられる。
 
-wasm 成果物（`pkg/`）はコミット済みのため、導入マシンは Neovim 0.10+ と bun があれば動く。markdown crate を変更したときだけ再ビルドして `pkg/` の差分をコミットする（wasm-pack が生成する `pkg/.gitignore` は build:wasm 内で削除される）。
-
-```bash
-cd tools/shuntaka-preview.nvim
-bun run build:wasm
-git add pkg
-```
+wasm は markdown-wasm のコミット済み `pkg/` を相対 import で参照するため、導入マシンは Neovim 0.10+ と bun があれば動く（`bun install` も不要。markdown crate 変更時の再ビルドは markdown-wasm 側で行う）。
 
 lazy.nvim はモノレポのサブディレクトリを直接プラグイン扱いできないため、`config` の require 直前で runtimepath に追加する（`init` での追加はスペック追加後の初回セッションでインストールが init フェーズより後に走るため間に合わない）。
 

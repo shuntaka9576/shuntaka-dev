@@ -20,7 +20,8 @@
     "**/go.mod",
     "**/go.sum",
     "tools/dsql-cli/dsl-tidb/backfill/**",
-    "tools/shuntaka-preview.nvim/pkg/**",
+    "packages/markdown-wasm/pkg/**",
+    "packages/markdown-wasm/.pkg-fresh/**",
     "CHANGELOG.md"
   ],
   "language": "en",

@@ -21,10 +21,9 @@
       "cache": true,
       "passThroughEnv": ["*"]
     },
-    "content-html-backfill#test": {
+    "markdown-wasm#test": {
       "dependsOn": [],
-      "cache": false,
-      "passThroughEnv": ["*"]
+      "cache": false
     },
     "shuntaka-preview.nvim#test": {
       "dependsOn": [],

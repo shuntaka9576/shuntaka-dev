@@ -17,7 +17,7 @@ node_modules
 .cspellcache
 
 # wasm-pack 生成物 (content-html-backfill)
-tools/content-html-backfill/pkg
+packages/markdown-wasm/.pkg-fresh
 
 # cdk
 cdk.context.json
