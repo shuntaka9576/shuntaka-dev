@@ -177,6 +177,7 @@
     "infile",
     "innodb",
     "ipadic",
+    "jawiki",
     "jemalloc",
     "jeprof",
     "jsonata",
@@ -415,7 +416,8 @@
     "xlarge",
     "zenn",
     "zipf",
-    "zizmor"
+    "zizmor",
+    "zstd"
   ],
   "flagWords": [],
   "dictionaries": ["npm", "node", "typescript", "html", "css", "bash"]
