@@ -1,0 +1,15 @@
+{
+  "name": "shuntaka-preview.nvim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../apps/blog-api/markdown --release --target nodejs --out-dir ../../../tools/shuntaka-preview.nvim/pkg && rm -f pkg/.gitignore",
+    "serve": "bun src/index.ts",
+    "test": "bun test src/",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.15.0"
+  }
+}

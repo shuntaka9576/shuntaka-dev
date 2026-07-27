@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG RUST_VERSION=1.96
+ARG RUST_VERSION=1.97
 
 # ---- Rust deps cache (cargo-chef) ----
 FROM lukemathwalker/cargo-chef:latest-rust-${RUST_VERSION} AS chef

@@ -26,6 +26,10 @@
       "cache": false,
       "passThroughEnv": ["*"]
     },
+    "shuntaka-preview.nvim#test": {
+      "dependsOn": [],
+      "cache": false
+    },
     "//#spell-check": {
       "dependsOn": [],
       "cache": true

@@ -823,6 +823,47 @@ wasm 成果物のテスト（dev ビルド → bun test。CI の `turbo test` �
 bun run test
 ```
 
+### shuntaka-preview.nvim
+
+ブログと同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で Markdown をローカルプレビューする Neovim プラグイン。バッファ変更のライブ反映、カーソル行割合ベースのスクロール同期、リンクカード・GitHub 埋め込みの実フェッチ（URL 単位キャッシュ）、frontmatter の除去（本番の webhook と同じ扱い）に対応する。スタイルは `apps/web/src/app/globals.css` をそのまま配信し、本番と同じ `article-body` レイアウト（コンテナ幅 1200px + 右サイドバー目次）で表示する。目次は `TableOfContents.tsx` を移植したもので、スクロール追従と 1024px 以下のモーダル目次も本番と同じ挙動になる。
+
+プレビュー画面は左に記事一覧サイドバー、右上に pc / mobile のビューポート切り替えを持つ。記事一覧はプレビュー中ファイルと同じディレクトリ（`setup({ articles_dir = ... })` で上書き可）の `*.md` を frontmatter の title 付きで列挙し、更新日・作成日・ファイル名でソートできる。一覧をクリックするとブラウザ側の表示が切り替わり、Neovim 側も `:edit` で追従する。逆に Neovim で別の markdown バッファへ移った場合もプレビューが追従する。mobile 表示は iframe の幅を 390px に切り替えるため、media query も本番同様に効く。タブの favicon は本番アイコンの色相を変えたもので、本番タブと見分けられる。
+
+wasm 成果物（`pkg/`）はコミット済みのため、導入マシンは Neovim 0.10+ と bun があれば動く。markdown crate を変更したときだけ再ビルドして `pkg/` の差分をコミットする（wasm-pack が生成する `pkg/.gitignore` は build:wasm 内で削除される）。
+
+```bash
+cd tools/shuntaka-preview.nvim
+bun run build:wasm
+git add pkg
+```
+
+lazy.nvim はモノレポのサブディレクトリを直接プラグイン扱いできないため、`init` で runtimepath に追加する。
+
+```lua
+{
+  "shuntaka9576/shuntaka-dev",
+  name = "shuntaka-preview.nvim",
+  cmd = { "ShuntakaPreview", "ShuntakaPreviewStop" },
+  init = function(plugin)
+    vim.opt.rtp:append(plugin.dir .. "/tools/shuntaka-preview.nvim")
+  end,
+  config = function()
+    require("shuntaka-preview").setup({})
+  end,
+}
+```
+
+使い方は markdown バッファで `:ShuntakaPreview`（ブラウザが自動で開く）、終了は `:ShuntakaPreviewStop`。setup のオプションは `port`（既定 0 = エフェメラル）、`debounce_ms`（既定 150）、`open_browser`（既定 true）、`bun_cmd`（既定 bun）、`articles_dir`（既定 nil = プレビュー中ファイルと同じディレクトリ）。
+
+article-header（タイトル・日付）等のサイト chrome は再現しない。X ポスト埋め込みは react-tweet をサーバーに同梱していないためプレースホルダのまま表示される。
+
+サーバー単体のテスト（コミット済み pkg/ を使用。CI の `turbo test` でも実行される）
+
+```bash
+cd tools/shuntaka-preview.nvim
+bun run test
+```
+
 ### tidb-embedder
 
 PLaMo Embedding Service の document embedding を使い、`articles.embedding` が NULL の記事を埋め戻す。API 応答が2048次元の有限値配列であることを検証し、`embedding` カラムだけを更新するため `updated_at` は変更しない。

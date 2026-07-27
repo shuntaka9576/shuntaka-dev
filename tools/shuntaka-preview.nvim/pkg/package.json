@@ -1,0 +1,11 @@
+{
+  "name": "markdown",
+  "version": "0.1.0",
+  "files": [
+    "markdown_bg.wasm",
+    "markdown.js",
+    "markdown.d.ts"
+  ],
+  "main": "markdown.js",
+  "types": "markdown.d.ts"
+}
