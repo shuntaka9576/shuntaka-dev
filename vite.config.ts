@@ -16,6 +16,7 @@ export default defineConfig({
       '**/target',
       '**/next-env.d.ts',
       '**/storybook-static',
+      'tools/shuntaka-preview.nvim/pkg',
     ],
     options: {
       typeAware: true,
@@ -46,6 +47,7 @@ export default defineConfig({
       '**/next-env.d.ts',
       '**/node_modules/**',
       '**/storybook-static',
+      'tools/shuntaka-preview.nvim/pkg',
     ],
     singleQuote: true,
   },
