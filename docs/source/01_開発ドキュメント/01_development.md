@@ -833,7 +833,7 @@ bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --all --
 
 ブログと同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で Markdown をローカルプレビューする Neovim プラグイン。バッファ変更のライブ反映、カーソル行割合ベースのスクロール同期、リンクカード・GitHub 埋め込みの実フェッチ（URL 単位キャッシュ）、frontmatter の除去（本番の webhook と同じ扱い）に対応する。スタイルは `apps/web/src/app/globals.css` をそのまま配信し、本番と同じ `article-body` レイアウト（コンテナ幅 1200px + 右サイドバー目次）で表示する。目次は `TableOfContents.tsx` を移植したもので、スクロール追従と 1024px 以下のモーダル目次も本番と同じ挙動になる。
 
-プレビュー画面は左に記事一覧サイドバー、右上に pc / mobile のビューポート切り替えを持つ。記事一覧はプレビュー中ファイルと同じディレクトリ（`setup({ articles_dir = ... })` で上書き可）の `*.md` を frontmatter の title 付きで列挙し、更新日・作成日・ファイル名でソートできる。一覧をクリックするとブラウザ側の表示が切り替わり、Neovim 側も `:edit` で追従する。逆に Neovim で別の markdown バッファへ移った場合もプレビューが追従する。mobile 表示は iframe の幅を 390px に切り替えるため、media query も本番同様に効く。タブの favicon は本番アイコンの色相を変えたもので、本番タブと見分けられる。
+プレビュー画面は左に記事一覧サイドバー、右上に pc / mobile のビューポート切り替えを持つ。記事一覧はプレビュー中ファイルと同じディレクトリ（`setup({ articles_dir = ... })` で上書き可）の `*.md` を frontmatter の title 付きで列挙し、更新日・作成日・ファイル名でソートできる。日付は git のコミット日時（更新 = 最終コミット、作成 = 初回コミット。mtime だと clone や checkout でも変わってノイズになるため）で、未コミットのファイルだけファイルシステムの日時になる。一覧をクリックするとブラウザ側の表示が切り替わり、Neovim 側も `:edit` で追従する。逆に Neovim で別の markdown バッファへ移った場合もプレビューが追従する。mobile 表示は iframe の幅を 390px に切り替えるため、media query も本番同様に効く。タブの favicon は本番アイコンの色相を変えたもので、本番タブと見分けられる。
 
 wasm は markdown-wasm のコミット済み `pkg/` を相対 import で参照するため、導入マシンは Neovim 0.10+ と bun があれば動く（`bun install` も不要。markdown crate 変更時の再ビルドは markdown-wasm 側で行う）。
 

@@ -320,6 +320,7 @@
     "pymysql",
     "pypi",
     "qlapi",
+    "quotepath",
     "rdbms",
     "rearchitecture",
     "relabelings",
