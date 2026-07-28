@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026.0728.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0722.0...2026.0728.0) - 2026-07-28
+
+- feat: ブログと同じレンダリングで Markdown をプレビューする Neovim プラグインを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/725
+- refactor: markdown crate の wasm 成果物を packages/markdown-wasm に一本化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/730
+- feat: プレビューの記事一覧の日付を git コミット日時ベースに変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/731
+- feat: labs 機能を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/733
+
 ## [2026.0722.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.2...2026.0722.0) - 2026-07-22
 
 - fix(deps): update dependency hono to ^4.12.31 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/707
