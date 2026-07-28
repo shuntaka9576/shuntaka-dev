@@ -1,0 +1,15 @@
+/* cspell:ignore Kaku Meiryo */
+@import 'tailwindcss';
+@import './article.css';
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Hiragino Kaku Gothic ProN',
+    'Hiragino Sans',
+    Meiryo,
+    sans-serif;
+  color: var(--color-text);
+}
