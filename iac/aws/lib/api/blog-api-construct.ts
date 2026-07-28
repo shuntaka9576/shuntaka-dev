@@ -22,6 +22,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class BlogAPIConstruct extends Construct {
+  /** webApiLambda 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
+  public readonly webApiLambdaRoleArn: string;
+
   constructor(
     scope: Construct,
     id: string,
@@ -31,6 +34,10 @@ export class BlogAPIConstruct extends Construct {
       domain: string;
       /** moments 画像の配信ベース URL（例: https://images.shuntaka.dev） */
       imagesBaseUrl: string;
+      /** lab 章コンテンツの GitHub リポジトリ (例: shuntaka9576/lab-contents-dev) */
+      labRepoFullName: string;
+      /** lab 画像バケットの物理名 (AdminStack 所有。S3 権限は AdminStack 側で付与) */
+      labImagesBucketName: string;
       hostedZone: route53.IHostedZone;
       certificate: acm.ICertificate;
       databaseName: string;
@@ -212,12 +219,19 @@ export class BlogAPIConstruct extends Construct {
         CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
         CLOUDINARY_API_SECRET: cloudinaryApiSecret,
         IMAGES_BASE_URL: props.imagesBaseUrl,
+        LAB_REPO_FULL_NAME: props.labRepoFullName,
+        LAB_IMAGES_BUCKET_NAME: props.labImagesBucketName,
       },
     });
 
     webApiLambda.role?.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
     );
+
+    // lab 画像バケットへの S3 権限はここでは付与しない。バケットは AdminStack 所有
+    // (CloudFront OAC のポリシー書き戻しで循環依存になるため) のため、
+    // AdminStack 側でこのロール ARN を受け取って iam.Policy をアタッチする。
+    this.webApiLambdaRoleArn = webApiLambda.role!.roleArn;
 
     // webhook の実処理を自分自身へ Event invoke で逃がすための権限。
     // 経路は squid (HTTPS_PROXY) の CONNECT トンネル経由で Lambda API に到達する。

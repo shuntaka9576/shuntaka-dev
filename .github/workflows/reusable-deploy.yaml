@@ -126,6 +126,12 @@ jobs:
               VITE_PREVIEW_BASE_URL="https://${SITE_FQDN}" \
               bun run build
           )
+          # labs-web (SvelteKit adapter-static)。/labs 配下のマイクロフロントエンド。
+          # ビルド成果物が無い場合 admin stack 側は warning でスキップするため必ずここで作る
+          (
+            cd ../../apps/labs-web
+            bun run build
+          )
           bunx cdk deploy "${PREFIX}-st-admin" -c "stageName=${STAGE_NAME}" --require-approval never
         env:
           STAGE_NAME: ${{ inputs.stageName }}

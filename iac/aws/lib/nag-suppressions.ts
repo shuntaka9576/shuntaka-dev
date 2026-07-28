@@ -225,6 +225,20 @@ export const applyAdminStackSuppressions = (stack: cdk.Stack): void => {
         'admin-api Lambda が presigned PUT URL の署名者として images/moments/ prefix 配下へ PutObject するための権限。key は投稿ごとに ULID で動的に決まるため prefix ワイルドカードが必要。',
     },
     {
+      id: 'AwsSolutions-IAM5[Resource::<LabImagesBucket1946917D.Arn>/lab-assets/*]',
+      reason:
+        'blog-api (MainStack) Lambda が labs 同期時に lab-assets/ prefix 配下へ PutObject / GetObject するための権限。key は lab / チャプターごとに動的に決まるため prefix ワイルドカードが必要。HeadObject は GetObject 権限でカバーされる。',
+    },
+    {
+      // Action::s3:Abort* 等のワイルドカード findings は SpaBucket の suppression で
+      // 既にルール単位 (resource 非依存) に acknowledge 済みのため、ここでは
+      // labs-web 用 BucketDeployment (custom resource は SpaDeployment と共用) が
+      // 新たに生む Resource:: finding のみ追加する。
+      // cspell:disable-next-line -- CFN 論理 ID (自動生成トークン)
+      id: 'AwsSolutions-IAM5[Resource::<LabsSpaBucketD4EEFDA2.Arn>/*]',
+      reason: bucketDeploymentWildcardReason,
+    },
+    {
       id: 'AwsSolutions-IAM5[Resource::*]',
       reason:
         'BucketDeployment の custom resource が SPA 更新時に実行する cloudfront:CreateInvalidation はリソースレベル制限非対応の API。',

@@ -8,6 +8,9 @@ import { BlogAPIConstruct } from './blog-api-construct.js';
 import { ObservabilityConstruct } from './observability-construct.js';
 
 export class MainStack extends cdk.Stack {
+  /** blog-api Lambda 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
+  public readonly blogApiLambdaRoleArn: string;
+
   constructor(
     scope: Construct,
     id: string,
@@ -18,6 +21,10 @@ export class MainStack extends cdk.Stack {
       domain: {
         api: string;
         images: string;
+      };
+      labs: {
+        repoFullName: string;
+        imagesBucketName: string;
       };
       ssmParameters: {
         globalDns: {
@@ -110,11 +117,13 @@ export class MainStack extends cdk.Stack {
     const otelServiceName = `blog-api-${props.stageName.long}`;
 
     // WebApp: Lambda + API Gateway + Route53
-    new BlogAPIConstruct(this, 'BlogAPI', {
+    const blogApi = new BlogAPIConstruct(this, 'BlogAPI', {
       physicalPrefix,
       stageName: props.stageName.long,
       domain: props.domain.api,
       imagesBaseUrl: `https://${props.domain.images}`,
+      labRepoFullName: props.labs.repoFullName,
+      labImagesBucketName: props.labs.imagesBucketName,
       hostedZone,
       certificate: tokyoCertificate,
       // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。
@@ -128,6 +137,7 @@ export class MainStack extends cdk.Stack {
         otelServiceName,
       },
     });
+    this.blogApiLambdaRoleArn = blogApi.webApiLambdaRoleArn;
 
     // Observability: CloudWatch dashboard + SELECT 1 定期プローブ
     new ObservabilityConstruct(this, 'Observability', {
