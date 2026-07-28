@@ -133,6 +133,12 @@
       "matchFileNames": ["apps/web/**"],
       "matchPackageNames": ["typescript"],
       "allowedVersions": "<7"
+    },
+    {
+      "description": "plamo-embedding の python は torch 2.5.1 に cp314 wheel が無いため 3.13 系まで（3.14 化は torch>=2.9 への更新とセットで行う）",
+      "matchFileNames": ["cluster/manifests/plamo-embedding/**"],
+      "matchPackageNames": ["python"],
+      "allowedVersions": "<3.14"
     }
   ]
 }

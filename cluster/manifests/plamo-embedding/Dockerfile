@@ -2,7 +2,8 @@
 
 # CPU 版 PyTorch を linux/amd64 向けにインストール (MiniPC cluster は Ryzen 7 7730U)。
 # amd64 wheel は https://download.pytorch.org/whl/cpu に登録済み。
-FROM python:3.14-slim
+# python 3.14 は torch 2.5.1 の cp314 wheel が存在せずビルド不能 (renovate.json で <3.14 に制限)。
+FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
