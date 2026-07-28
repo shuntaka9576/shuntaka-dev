@@ -378,7 +378,7 @@
     },
     {
       "id": 5,
-      "title": "Pod restart count (累積)",
+      "title": "Pod restart count (累積) と最終 restart",
       "type": "table",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
@@ -387,8 +387,43 @@
           "format": "table",
           "instant": true,
           "refId": "A"
+        },
+        {
+          "expr": "max by (namespace, pod) (kube_pod_container_status_last_terminated_timestamp{namespace=~\"$namespace\"}) * 1000 > 0",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "max by (namespace, pod, reason) (kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\"})",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
         }
       ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value #C": true },
+            "renameByName": {
+              "Value #A": "restarts",
+              "Value #B": "last restart",
+              "reason": "last reason"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "last restart" },
+            "properties": [{ "id": "unit", "value": "dateTimeAsLocal" }]
+          }
+        ]
+      },
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 46 }
     },
     {
@@ -533,6 +568,26 @@
         "sortBy": [{ "displayName": "Namespace", "desc": false }]
       },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 }
+    },
+    {
+      "id": 7,
+      "title": "Pod restart events (10分窓の restart 増分)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[10m])) > 0",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 55 }
     }
   ]
 }
