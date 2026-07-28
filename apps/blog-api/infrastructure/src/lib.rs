@@ -1,3 +1,4 @@
+pub mod aws;
 pub mod cloudinary;
 pub mod embedding;
 pub mod error;

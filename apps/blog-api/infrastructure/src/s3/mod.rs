@@ -34,9 +34,9 @@ impl S3LabImageStore {
     pub async fn from_env() -> Option<Self> {
         std::env::var("AWS_LAMBDA_FUNCTION_NAME").ok()?;
 
-        let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .load()
-            .await;
+        // squid (HTTPS_PROXY) の CONNECT トンネルを通すため proxy 反映済み config を使う。
+        // 素の defaults().load() だと VPC 内から S3 に到達できず head/put が失敗する
+        let config = crate::aws::load_sdk_config().await;
 
         Some(Self {
             client: aws_sdk_s3::Client::new(&config),
