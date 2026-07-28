@@ -460,6 +460,7 @@ cilium status --wait
 
 - `tag:k8s` — Tailscale Operator 本体と、Operator が立てる Proxy Pod (ts-\*) の両方が名乗るタグ
 - `tag:proxy` — AWS 側の tidb-proxy (ECS Fargate) が名乗るタグ。blog-api → TiDB (`:4000`) と PLaMo Embedding Service (`:80`) の経路（auth key は SSM `/shared/shuntaka/tailscale/proxy-auth-key`、90 日ローテーション。経緯は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)、PLaMo 経路は [TiDB Vector 検索実装](../98_tasks/2026-07-15-tidb-vector-search-implementation/index.md) Phase 6-5）
+- `autogroup:self:22` — メンバーが自分の所有端末へ SSH (tcp/22) するための許可。ACL はデフォルト deny のため、このルールが無いとユーザー端末間の SSH over Tailscale が通らない（経緯は [SSH over Tailscale 不通の調査と ACL 修正](../98_tasks/2026-07-28-tailscale-ssh-acl/index.md)）
 
 ```json
 {
@@ -477,6 +478,11 @@ cilium status --wait
       "action": "accept",
       "src": ["autogroup:member"],
       "dst": ["tag:k8s:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:self:22"]
     },
     {
       "action": "accept",
