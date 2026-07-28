@@ -1,3 +1,4 @@
+use base64::Engine;
 use comrak::Options;
 use comrak::plugins::syntect::SyntectAdapter;
 use regex::Regex;
@@ -995,6 +996,29 @@ fn preprocess_embeds(markdown: &str) -> String {
         .to_string()
 }
 
+/// インタラクティブウィジェット記法 (`:::widget <name>` 〜 `:::`) を
+/// `<div class="lab-widget" data-widget="<name>" data-payload="<base64>"></div>` に変換する。
+/// labs-web 側が hydration するプレースホルダで、ブログの X 埋め込みと同じパターン。
+/// ペイロード（YAML）は Markdown として一切解釈させない契約のため、
+/// escape_invalid_html_tags や GitHub/X 埋め込みなど行ベースで走査する他の前処理より必ず先に実行する
+/// (labs-web の preview/server.ts extractWidgets と同一契約)
+fn process_widgets(markdown: &str) -> String {
+    static WIDGET_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?m)^:::widget ([a-z0-9-]+)[ \t]*\r?\n([\s\S]*?)\r?\n:::[ \t]*$").unwrap()
+    });
+
+    WIDGET_RE
+        .replace_all(markdown, |caps: &regex::Captures| {
+            let name = &caps[1];
+            let payload = &caps[2];
+            let encoded = base64::engine::general_purpose::STANDARD.encode(payload.as_bytes());
+            format!(
+                r#"<div class="lab-widget" data-widget="{name}" data-payload="{encoded}"></div>"#
+            )
+        })
+        .to_string()
+}
+
 /// Process custom container syntax (:::details, :::message)
 fn process_containers<F>(markdown: &str, convert_inner: F) -> String
 where
@@ -1089,8 +1113,12 @@ impl MarkdownConverter {
     }
 
     pub fn convert_with_fetcher(&self, markdown: &str, fetcher: &dyn ResourceFetcher) -> String {
+        // ウィジェット記法 (:::widget) を最初に処理する。ペイロードを他の前処理に一切触れさせないため
+        // (以降の escape_invalid_html_tags や GitHub/X 埋め込み等の走査対象からは placeholder div になった後の文字列しか見えない)
+        let with_widgets = process_widgets(markdown);
+
         // Escape invalid HTML-like tags (e.g., <script> in headings)
-        let escaped = escape_invalid_html_tags(markdown);
+        let escaped = escape_invalid_html_tags(&with_widgets);
 
         // Process GitHub embeds (fetch code and render)
         let with_github = process_github_embeds(&escaped, self, fetcher);
@@ -1376,6 +1404,67 @@ mod tests {
             html,
             "<div class=\"message \"><p>here be dragons</p>\n</div>\n"
         );
+    }
+
+    // Widget container tests
+
+    #[test]
+    fn test_widget_basic() {
+        let markdown = ":::widget engine-steps\nnum: 1\ntitle: \"A が BEGIN\"\n:::";
+        let html = convert_markdown_to_html(markdown);
+        let expected_payload =
+            base64::engine::general_purpose::STANDARD.encode("num: 1\ntitle: \"A が BEGIN\"");
+        assert_eq!(
+            html,
+            format!(
+                "<div class=\"lab-widget\" data-widget=\"engine-steps\" data-payload=\"{expected_payload}\"></div>\n"
+            )
+        );
+    }
+
+    #[test]
+    fn test_widget_body_not_interpreted_as_markdown() {
+        let markdown = ":::widget engine-steps\n# heading\n[link](http://example.com)\n:::";
+        let html = convert_markdown_to_html(markdown);
+        // 本文が markdown として解釈されず、base64 payload に閉じ込められていること
+        assert!(!html.contains("<h1"));
+        assert!(!html.contains("<a href"));
+        let expected_payload = base64::engine::general_purpose::STANDARD
+            .encode("# heading\n[link](http://example.com)");
+        assert!(html.contains(&format!(r#"data-payload="{expected_payload}""#)));
+    }
+
+    #[test]
+    fn test_widget_followed_by_message_container() {
+        let markdown =
+            ":::widget engine-steps\nnum: 1\n:::\n\n::: message info\nhere be dragons\n:::";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains(r#"<div class="lab-widget" data-widget="engine-steps""#));
+        assert!(html.contains("<div class=\"message info\"><p>here be dragons</p>\n</div>"));
+    }
+
+    #[test]
+    fn test_widget_multiple_blocks() {
+        let markdown = ":::widget alpha\nfoo: 1\n:::\n\n:::widget beta\nbar: 2\n:::";
+        let html = convert_markdown_to_html(markdown);
+        assert!(html.contains(r#"data-widget="alpha""#));
+        assert!(html.contains(r#"data-widget="beta""#));
+    }
+
+    #[test]
+    fn test_widget_japanese_payload() {
+        let markdown = ":::widget engine-steps\ntitle: \"日本語のペイロード\"\n:::";
+        let html = convert_markdown_to_html(markdown);
+        let expected_payload =
+            base64::engine::general_purpose::STANDARD.encode("title: \"日本語のペイロード\"");
+        assert!(html.contains(&format!(r#"data-payload="{expected_payload}""#)));
+    }
+
+    #[test]
+    fn test_widget_without_start_line_is_untouched() {
+        let markdown = "plain paragraph\nwith no widget block";
+        let html = convert_markdown_to_html(markdown);
+        assert!(!html.contains("lab-widget"));
     }
 
     #[test]
