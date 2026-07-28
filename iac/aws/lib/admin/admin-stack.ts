@@ -437,6 +437,9 @@ function handler(event) {
       new s3deploy.BucketDeployment(this, 'LabsSpaDeployment', {
         sources: [s3deploy.Source.asset(labsSpaDistPath)],
         destinationBucket: labsSpaBucket,
+        // CloudFront は /labs/* の URI をそのまま S3 キーとして転送する
+        // (prefix strip はしない) ため、成果物も labs/ 配下に置く
+        destinationKeyPrefix: 'labs',
         distribution,
         distributionPaths: ['/labs/*'],
       });

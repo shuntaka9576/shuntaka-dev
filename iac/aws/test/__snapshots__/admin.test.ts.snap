@@ -1631,7 +1631,7 @@ function handler(event) {
             "Value": "true",
           },
           {
-            "Key": "aws-cdk:cr-owned:633a3dc9",
+            "Key": "aws-cdk:cr-owned:labs:633a3dc9",
             "Value": "true",
           },
         ],
@@ -1782,6 +1782,7 @@ function handler(event) {
     "LabsSpaDeploymentCustomResource6744D6E7": {
       "DeletionPolicy": "Delete",
       "Properties": {
+        "DestinationBucketKeyPrefix": "labs",
         "DestinationBucketName": {
           "Ref": "LabsSpaBucketD4EEFDA2",
         },
