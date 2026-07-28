@@ -5,7 +5,7 @@
   - [GitHub webhook の非同期化](../2026-07-13-webhook-async-self-invoke/index.md)（articles 同期の現行フロー）
   - [logs 管理画面のアーキテクチャ決定](../2026-07-12-logs-admin-architecture/index.md)（admin.shuntaka.dev の基盤）
   - コンテンツ元: `~/repos/github.com/shuntaka9576/lab-backup-2026-0530`（旧 lab サイトのバックアップ）
-- ステータス: 実装中（Phase 0: ローカルプレビュー実装済み・体験確認中）
+- ステータス: 完了（2026-07-28 リリース 2026.0728.0 で prd 反映済み）
 
 ## 起票理由
 
@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`lab_chapters` (
 - [x] Phase E: dev 用 GitHub App のインストールに `lab-contents-dev` を追加 → push して dev（blog_dev / shuntaka.tech）で同期確認
       ※ 必ず Phase C（分岐デプロイ）の後。先にインストールすると lab の push が articles 同期として走り、Event invoke がエラーリトライする
 - [x] Phase F: admin-api の labs read API + `apps/labs-web` 新設（Svelte 5 + SvelteKit adapter-static、CloudFront `/labs/*` 合成、admin-web は returnTo 対応とナビリンクのみ）
-- [ ] Phase G: prd 反映（blog_prd DDL → デプロイ → prd 用 GitHub App に `lab-contents` を追加 → 同期・表示確認）、開発ドキュメント（01_development.md）への手順追記
+- [x] Phase G: prd 反映（blog_prd DDL → デプロイ → prd 用 GitHub App に `lab-contents` を追加 → 同期・表示確認）、開発ドキュメント（01_development.md）への手順追記
 
 ## スコープ外（将来タスク候補）
 
@@ -372,6 +372,12 @@ curl -s -o /dev/null -w '%{http_code}\n' 'https://images.shuntaka.dev/lab-assets
 - インフラの切り戻しは通常のリリースフロー（revert PR → タグリリース）に従う
 
 ## 作業ログ
+
+### 2026-07-28（Phase G / リリース）
+
+- blog_prd へ DDL 適用（labs / lab_chapters）
+- PR #733 をマージ後、リリース 2026.0728.0（PR #737）で prd デプロイ。blog_prd に 3 labs / 8 章同期、images.shuntaka.dev/lab-assets の画像配信 200、admin.shuntaka.dev/labs/ 200 / /api/labs 401 を確認
+- チェンジログ整理のハマりどころ: 当初、リリース PR の不要項目を除くために CalVer タグを手動で打ったが、これは **tagpr が管理する成果物の模倣**で、tagpr の追従状態を壊す悪手だった（置き去りリリース PR #717 と重複 PR #736 が発生し、いずれもクローズして手動タグも削除）。正解は `.github/release.yml` の除外設定を使い、**対象 PR に `skip-changelog` ラベルを付けて tagpr を再実行する**だけ。tagpr まわりはタグ・リリース PR を手で作らず、ラベル操作と再実行のみで扱うこと
 
 ### 2026-07-28
 
