@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0728.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0728.0...2026.0728.1) - 2026-07-28
+
+- feat: labs 機能を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/733
+
 ## [2026.0722.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.2...2026.0722.0) - 2026-07-22
 
 - fix(deps): update dependency hono to ^4.12.31 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/707
