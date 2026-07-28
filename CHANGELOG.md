@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026.0728.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0722.0...2026.0728.0) - 2026-07-28
+
+- chore(deps): update github-actions by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/709
+- chore(deps): update python docker tag to v3.14 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/670
+- chore(deps): update dependency turbo to ^2.10.7 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/718
+- chore(deps): update dependency @vitejs/plugin-react to ^6.0.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/715
+- fix(deps): update dependency @smithy/node-http-handler to ^4.9.11 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/714
+- chore(deps): update dependency prettier to ^3.9.6 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/711
+- chore(deps): update dependency @hono/node-server to ^2.0.12 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/710
+- chore(deps): update dependency rust to v1.97 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/690
+- chore(deps): update secretlint monorepo to ^13.0.4 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/713
+- chore(deps): update aws/agent-toolkit-for-aws digest to 554656f by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/601
+- chore(renovate): patch/minor のPR作成を月曜午前の週1バッチに変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/721
+- chore(deps): update astral-sh/setup-uv action to v9 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/724
+- chore(deps): update dependency vite-plus to ^0.2.6 - autoclosed by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/720
+- chore(deps): update aws-actions/configure-aws-credentials action to v6.2.3 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/719
+- feat: ブログと同じレンダリングで Markdown をプレビューする Neovim プラグインを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/725
+- docs: shuntaka-preview.nvim の lazy.nvim 導入例を config での rtp 追加に修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/727
+- docs: ノード OS 更新手順の追記と 2026-07-27 実施記録を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/726
+- refactor: markdown crate の wasm 成果物を packages/markdown-wasm に一本化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/730
+- feat: プレビューの記事一覧の日付を git コミット日時ベースに変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/731
+- feat: labs 機能を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/733
+
 ## [2026.0722.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0718.2...2026.0722.0) - 2026-07-22
 
 - fix(deps): update dependency hono to ^4.12.31 by @renovate[bot] in https://github.com/shuntaka9576/shuntaka-dev/pull/707
