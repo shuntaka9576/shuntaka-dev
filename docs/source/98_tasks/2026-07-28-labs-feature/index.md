@@ -289,12 +289,11 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`lab_chapters` (
 
 - [x] Phase A: DB スキーマ追加（10/11 SQL 作成 → blog_dev 適用 → tbls doc-gen）
 - [x] Phase B: blog-api の lab 同期実装（config / 分岐 / Trees API / S3 / 変換 / upsert・delete）+ ユニットテスト
-- [ ] Phase C: CDK 変更（バケット / grant / env / CloudFront behavior）→ dev デプロイ
-      ※ コード実装・synth・スナップショット検証まで完了（2026-07-28）。dev デプロイのみ未実施
-- [ ] Phase D: コンテンツリポジトリ `lab-contents-dev` / `lab-contents` 作成、lab-backup から db / raft / security を MDX 化して lab-contents-dev へ移植（画像パスを `images/...` 相対に統一、handson コードも同 repo へ）
-- [ ] Phase E: dev 用 GitHub App のインストールに `lab-contents-dev` を追加 → push して dev（blog_dev / shuntaka.tech）で同期確認
+- [x] Phase C: CDK 変更（バケット / grant / env / CloudFront behavior）→ dev デプロイ
+- [x] Phase D: コンテンツリポジトリ `lab-contents-dev` / `lab-contents` 作成、lab-backup から db / raft / security を MDX 化して lab-contents-dev へ移植（画像パスを `images/...` 相対に統一、handson コードも同 repo へ）
+- [x] Phase E: dev 用 GitHub App のインストールに `lab-contents-dev` を追加 → push して dev（blog_dev / shuntaka.tech）で同期確認
       ※ 必ず Phase C（分岐デプロイ）の後。先にインストールすると lab の push が articles 同期として走り、Event invoke がエラーリトライする
-- [ ] Phase F: admin-api の labs read API + `apps/labs-web` 新設（Svelte 5 + SvelteKit adapter-static、CloudFront `/labs/*` 合成、admin-web は returnTo 対応とナビリンクのみ）
+- [x] Phase F: admin-api の labs read API + `apps/labs-web` 新設（Svelte 5 + SvelteKit adapter-static、CloudFront `/labs/*` 合成、admin-web は returnTo 対応とナビリンクのみ）
 - [ ] Phase G: prd 反映（blog_prd DDL → デプロイ → prd 用 GitHub App に `lab-contents` を追加 → 同期・表示確認）、開発ドキュメント（01_development.md）への手順追記
 
 ## スコープ外（将来タスク候補）
@@ -303,6 +302,74 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`lab_chapters` (
 - ブログ本体（shuntaka.dev）への lab 公開、全文検索・ベクトル検索への組み込み
 - S3 上の孤児画像のクリーンアップ（削除章の画像は当面残置）
 - 旧 lab-backup リポジトリ・旧 AWS リソース（LabSite スタック群）の後片付け
+
+## 本番適用手順（Phase G）
+
+dev で全フェーズ検証済みの状態から prd へ反映する手順。順序厳守（特に手順 5 は 4 のデプロイ完了後）。
+
+### 1. blog_prd へ DDL 適用
+
+```sh
+export TAILNET=$(tailscale status --json | jq -r '.MagicDNSSuffix')
+cd tools/dsql-cli/dsl-tidb
+sed 's|${SCHEMA}|blog_prd|g' schema/10_labs.sql | mysql -h tidb.$TAILNET -P 4000 -u root
+sed 's|${SCHEMA}|blog_prd|g' schema/11_lab_chapters.sql | mysql -h tidb.$TAILNET -P 4000 -u root
+
+# 確認
+mysql -h tidb.$TAILNET -P 4000 -u root -e 'SHOW CREATE TABLE blog_prd.labs\G SHOW CREATE TABLE blog_prd.lab_chapters\G'
+```
+
+CREATE TABLE IF NOT EXISTS のみで冪等。既存テーブルへの ALTER は無いため blog_prd の他テーブルに影響しない。
+
+### 2. PR #733 を Ready 化してマージ
+
+マージで main push → dev CDK の自動デプロイが走る（デプロイ済み内容と同一なので冪等）。
+
+### 3. tagpr リリース PR のマージ（人間が実施）
+
+main マージ後に tagpr が作成・追従するリリース PR（`tagpr` ラベル付き）をマージすると、CalVer タグ → prd CDK（st-tidb-proxy → main → admin の順）→ Vercel 本番の順にデプロイされる。prd 側に入るもの:
+
+- p-st-main: blog-api に `LAB_REPO_FULL_NAME=shuntaka9576/lab-contents` / `LAB_IMAGES_BUCKET_NAME=p-st-lab-assets`
+- p-st-admin: LabImagesBucket（p-st-lab-assets、RETAIN）/ LabsSpaBucket + labs-web SPA / `/labs/*` `/lab-assets/*` behavior / labs read API 入り admin-api
+
+### 4. prd デプロイの完了確認
+
+```sh
+gh run list --workflow=tagpr.yaml --limit 1   # または Actions 画面
+curl -s -o /dev/null -w '%{http_code}\n' https://admin.shuntaka.dev/labs/        # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://admin.shuntaka.dev/api/labs     # 401 (認証必須)
+```
+
+### 5. prd 用 GitHub App に lab-contents を追加（人間が実施）
+
+GitHub Settings → Developer settings → GitHub Apps → prd 用 App（webhook URL が api.shuntaka.dev のもの）→ Install App → Repository access に `lab-contents` を追加。installation_id は変わらないため users テーブルの更新は不要。**必ず手順 4 の完了後に行う**（先に追加すると push が articles 同期として走りエラーリトライになる）。
+
+### 6. lab-contents へコンテンツを push
+
+dev で検証済みの lab-contents-dev の内容をそのまま prd リポジトリへ push する。
+
+```sh
+cd ~/repos/github.com/shuntaka9576/lab-contents-dev
+git remote add prd git@github.com:shuntaka9576/lab-contents.git   # 初回のみ
+git push prd main
+```
+
+以後の運用も同じ流れ（lab-contents-dev で執筆・dev 確認 → 確定分を `git push prd main`）。公開したい本は config.yaml の `published: true` を忘れずに。
+
+### 7. prd 同期の確認
+
+```sh
+mysql -h tidb.$TAILNET -P 4000 -u root -e "SELECT l.slug, l.published, COUNT(c.chapter_id) FROM blog_prd.labs l LEFT JOIN blog_prd.lab_chapters c ON c.lab_id = l.lab_id GROUP BY l.slug, l.published ORDER BY l.slug;"
+curl -s -o /dev/null -w '%{http_code}\n' 'https://images.shuntaka.dev/lab-assets/001-db-transaction-exercises/images/deadlock/deadlock-compare.png'  # 200
+```
+
+ブラウザで https://admin.shuntaka.dev/labs/ にログインして一覧・章・画像・engine-steps ウィジェットを確認。
+
+### 切り戻し
+
+- 同期を止める: prd 用 App の Repository access から lab-contents を外す（既存の articles 同期には影響なし）
+- 表示を消す: lab-contents 側で labs/ 配下を空にして push すれば全 lab がハード削除される。テーブル自体は残しても他機能に影響なし
+- インフラの切り戻しは通常のリリースフロー（revert PR → タグリリース）に従う
 
 ## 作業ログ
 
@@ -328,6 +395,12 @@ CREATE TABLE IF NOT EXISTS `${SCHEMA}`.`lab_chapters` (
 - Phase C 着手時に OAC の循環依存を発見し、lab 画像バケットの所有を MainStack → AdminStack に変更（詳細は「画像バケットの所有スタック」セクション）
 - Phase C のコード実装完了（dev デプロイ前まで）。config に `labs.contentsRepoFullName` / `labs.imagesBucketName`（`<prefix>-lab-assets`）を stage 別に追加、blog-api Lambda に env 2 個注入 + ロール ARN 公開、AdminStack に LabImagesBucket / LabsSpaBucket / `/labs/*` `/lab-assets/*` behavior / BlogApiLabAssetsPolicy / HostGuardFunction 拡張（`/labs` → `/labs/` 301、`/labs/*` の SPA fallback）。labs-web の build 成果物が無い場合は addWarning でスキップ（CI 整備までの暫定。admin-web の addError は維持）。スナップショット差分は加算のみで既存リソースの変更・置換なし、`d-st-admin` → `d-st-main` の一方向依存を manifest で確認
 - lint 整備: `docs/scripts/check-search.ts` の floating promise を修正（labs-web workspace 追加の bun install で型定義が更新され顕在化した既存問題）、cspell 辞書に splitn / tinyint / handson / qwik を追加。ルート `bun run lint` グリーン
+- デプロイ方針: PR はマージせず、`deploy.yaml` の workflow_dispatch（ref: PR ブランチ / stageName=dev / stack=all）で PR の状態のまま dev に反映して動作確認する。reusable-deploy の admin ステップに labs-web ビルドを追加
+- 7 コミットに分割して push、Draft PR #733（`feat/labs`）を作成。ブランチを lab-combine → feat/labs にリネームした際、GitHub のブランチリネームで PR #732 が CLOSED になったため作り直した（リネームは PR 作成前に行うこと）。workflow_dispatch で dev デプロイを起動
+- Phase D 完了。db 全 5 章の完全移植（occ 深掘り復元 / write-skew 完全版差し替え / deadlock / deleted-at-index / glossary、engine-steps ウィジェット計 34 個）、security 事例集 1 章、handson コード（Rust workspace、solution のテスト pass 確認済み）を lab-contents-dev へ。あわせて lab slug の命名規則を **連番 + 説明的 kebab 名**（`001-db-transaction-exercises` / `002-raft-minimal-implementation` / `003-security-incident-cases`）に決定。一覧 API が slug 昇順のため連番がそのまま表示順になる。リネームは同期の「旧 lab 削除 + 新規作成」で自然に反映されることを dev で確認（旧プレフィックスの S3 画像は設計どおり孤児として残置）
+- Phase F 完了。admin-api に read-only の labs ルート 3 本（sessionAuth 配下、Kysely 手書き型追加）、labs-web に 401 → `/login?returnTo=` フルページ遷移、admin-web に returnTo 対応（同一オリジンパスのみ）と labs ナビリンクを実装し dev デプロイ。`/api/labs` が 404 → 401 に変わったことを確認。未ログインで `/labs/` を開くとログイン画面へ誘導され、ログイン後に戻る動線が繋がった
+- Phase E 完了。lab-contents-dev / lab-contents の private リポジトリを作成し、dev 用 GitHub App にインストール後の push で E2E 同期を確認（blog_dev に labs 2 件 / lab_chapters 4 件、S3 に画像 10 枚、images.shuntaka.tech/lab-assets/ で全画像 200）。ハマりどころ 2 件: (1) 新設の S3 クライアントが proxy 反映済み config を使っておらず `infrastructure::aws::load_sdk_config()` に共通化。(2) 真因は **s3:ListBucket が無いロールの HeadObject は存在しないキーに 404 ではなく 403 を返す S3 仕様**で、未アップロード判定に入れず全画像スキップになっていた。ListBucket（prefix 条件付き）のポリシー追加 + head 失敗時はアップロード試行にフォールバックする二段構えで解消
+- dev デプロイ完了（Phase C 完了）。ハマりどころ 2 件: (1) adminStack が mainStack に依存したことで、admin デプロイの synth でも main stack の env 未設定エラー注釈が効くようになり、reusable-deploy の admin ステップに GH_APP_ID 等の env を追加して解消。(2) CloudFront の `/labs/*` behavior は URI をそのまま S3 キーとして転送するため、labs SPA は `destinationKeyPrefix: 'labs'` で labs/ 配下に配置する必要があった（直下配置だと 403）。`admin.shuntaka.tech/labs/` 200 / `/labs` → `/labs/` 301 を確認
 - Phase B 完了。kernel（model/lab.rs, repository/labs.rs）/ adapter（repository/labs.rs）/ infrastructure（github: Trees API recursive + raw blob 取得、s3: aws-sdk-s3 で `github-sha` メタデータ差分アップロード）/ api（`process_lab_push_event`、画像 URL 書き換え、削除同期）を実装。cargo test 全 150 件 pass / clippy -D warnings クリーン（レビュー側でも独立に再実行して確認）
 - 設計判断（実装時の発見による逸脱）: `GithubPushEnvelope.kind` は従来「封筒スキーマ識別のマジック値」だったが、articles/labs のルーティング用途に転用した。`/events` 側は kind == "labs" のみ labs 分岐、それ以外は articles にフォールバック（旧デプロイの in-flight 封筒も従来挙動で処理される）。kind の厳密一致チェックは撤去したが、安全性は封筒内 HMAC 署名の再検証（分岐前に実施）が引き続き担保する
 - 削除セマンティクス: lab は「labs/<slug>/ 配下が tree に存在するか」、章は「参照ファイルが tree に存在するか」を keep 基準とし、フェッチ失敗やパース失敗など一時エラーでは削除しないフェイルセーフにした（hard delete 導入に伴う誤削除防止）
