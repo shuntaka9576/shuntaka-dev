@@ -18,6 +18,10 @@ function AuthedLayout() {
               <Link to="/moments" className="text-sm font-semibold">
                 moments
               </Link>
+              {/* labs は別 SPA (SvelteKit) なので Router を通さずフルページ遷移 */}
+              <a href="/labs/" className="text-sm font-semibold">
+                labs
+              </a>
               <ButtonLink to="/moments/new" size="sm" data-testid="header-new-moment">
                 新規投稿
               </ButtonLink>

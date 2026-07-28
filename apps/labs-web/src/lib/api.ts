@@ -28,6 +28,14 @@ export type ChapterDetail = {
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { 'X-Requested-With': 'fetch' } });
+  if (res.status === 401) {
+    // 未認証は admin-web のログイン画面へフルページ遷移で誘導し、
+    // ログイン後に returnTo で現在地に戻ってくる
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    location.assign(`/login?returnTo=${returnTo}`);
+    // 遷移が始まるので解決しない Promise を返してエラーページ描画を抑止する
+    return new Promise<never>(() => {});
+  }
   if (!res.ok) {
     throw new Error(`GET ${path} failed: ${res.status}`);
   }
