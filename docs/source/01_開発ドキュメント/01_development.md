@@ -604,6 +604,8 @@ ADMIN_API_PORT=43001
 ADMIN_WEB_PORT=43002
 ORIGIN_ALLOWLIST=http://localhost:43002
 STORYBOOK_PORT=43005
+LABS_WEB_PORT=43006
+LABS_API_PORT=43007
 EOF
 
 direnv allow .
@@ -611,17 +613,19 @@ direnv allow .
 
 ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。main の既定は 4300x 帯に揃えて衝突を避けている。
 
-| 変数                   | 内容                        | main（既定）             |
-| ---------------------- | --------------------------- | ------------------------ |
-| `WEB_PORT`             | Next.js devサーバーポート   | 43000                    |
-| `ADMIN_API_PORT`       | admin-api devサーバーポート | 43001                    |
-| `ADMIN_WEB_PORT`       | admin-web Vite devポート    | 43002                    |
-| `API_PORT` / `PORT`    | Rust APIポート              | 43003                    |
-| `DOCS_PORT`            | Sphinxドキュメントポート    | 43004                    |
-| `STORYBOOK_PORT`       | Storybook devポート         | 43005                    |
-| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL           | `http://localhost:43000` |
-| `NEXT_PUBLIC_API_URL`  | API URL                     | `http://localhost:43003` |
-| `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin  | `http://localhost:43002` |
+| 変数                   | 内容                           | main（既定）             |
+| ---------------------- | ------------------------------ | ------------------------ |
+| `WEB_PORT`             | Next.js devサーバーポート      | 43000                    |
+| `ADMIN_API_PORT`       | admin-api devサーバーポート    | 43001                    |
+| `ADMIN_WEB_PORT`       | admin-web Vite devポート       | 43002                    |
+| `API_PORT` / `PORT`    | Rust APIポート                 | 43003                    |
+| `DOCS_PORT`            | Sphinxドキュメントポート       | 43004                    |
+| `STORYBOOK_PORT`       | Storybook devポート            | 43005                    |
+| `LABS_WEB_PORT`        | labs-web (SvelteKit) devポート | 43006                    |
+| `LABS_API_PORT`        | labs プレビュー API ポート     | 43007                    |
+| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL              | `http://localhost:43000` |
+| `NEXT_PUBLIC_API_URL`  | API URL                        | `http://localhost:43003` |
+| `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin     | `http://localhost:43002` |
 
 新規worktreeではブランチ名から10000-19999の範囲でポートがサービスごとに決定的に生成される。同じブランチ名なら常に同じポートになる（連番ではない）。現worktreeに割り当てられたポートは `bun run port` で確認できる。
 
