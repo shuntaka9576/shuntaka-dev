@@ -2,6 +2,8 @@
 **/.venv
 **/cdk.out
 **/dist
+**/build
+**/.svelte-kit
 **/docs/build
 .turbo
 **/.next
