@@ -186,6 +186,13 @@ export class AdminStack extends cdk.Stack {
           actions: ['s3:PutObject', 's3:GetObject'],
           resources: [`${labImagesBucket.bucketArn}/lab-assets/*`],
         }),
+        // ListBucket が無いと存在しないキーへの HeadObject が 404 ではなく 403 になり、
+        // 「未アップロード」を判定できない (S3 の仕様)
+        new iam.PolicyStatement({
+          actions: ['s3:ListBucket'],
+          resources: [labImagesBucket.bucketArn],
+          conditions: { StringLike: { 's3:prefix': ['lab-assets/*'] } },
+        }),
       ],
     });
 

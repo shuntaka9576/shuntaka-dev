@@ -759,6 +759,23 @@ exports[`AdminStack > snapshot 1`] = `
                 ],
               },
             },
+            {
+              "Action": "s3:ListBucket",
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": [
+                    "lab-assets/*",
+                  ],
+                },
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "LabImagesBucket1946917D",
+                  "Arn",
+                ],
+              },
+            },
           ],
           "Version": "2012-10-17",
         },

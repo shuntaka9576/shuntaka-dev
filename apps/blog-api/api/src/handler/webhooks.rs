@@ -786,14 +786,16 @@ async fn sync_lab_images(
     for (relative_path, blob_sha) in images {
         let key = lab_image_s3_key(lab_slug, relative_path);
 
+        // head 失敗はスキップではなく「未アップロード扱い」でフォールバックする。
+        // 権限不足等の恒常的な問題なら直後の put が失敗してログに出るため隠れない
         let current_sha = match store.head_github_sha(&bucket, &key).await {
             Ok(sha) => sha,
             Err(e) => {
                 warn!(
-                    "Failed to head lab image, skipping: key={}, error={}",
+                    "Failed to head lab image, attempting upload: key={}, error={}",
                     key, e
                 );
-                continue;
+                None
             }
         };
 
