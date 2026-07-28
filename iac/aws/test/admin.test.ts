@@ -84,6 +84,9 @@ describe('AdminStack', () => {
       imagesDomain: 'images.example.com',
       databaseName: 'blog_dev',
       spaDistPath: path.resolve(__dirname, 'fixtures/admin-spa'),
+      labsSpaDistPath: path.resolve(__dirname, 'fixtures/labs-spa'),
+      labImagesBucketName: 'tp-dev-lab-assets',
+      blogApiLambdaRoleArn: 'arn:aws:iam::123456789012:role/tp-dev-blog-api-role',
       ssmParameters: {
         globalDns: { hostedZoneId: '/test/hosted-zone-id' },
         virginia: { certificateArn: '/test/virginia/certificate-arn' },

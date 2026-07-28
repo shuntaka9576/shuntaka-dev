@@ -5,6 +5,7 @@ import { sessionAuth } from './auth/middleware.js';
 import { createRouter } from './lib/router.js';
 import { authRoutes } from './routes/auth.js';
 import { imageRoutes } from './routes/images.js';
+import { labRoutes } from './routes/labs.js';
 import { meRoutes } from './routes/me.js';
 import { momentRoutes } from './routes/moments.js';
 
@@ -17,6 +18,8 @@ app.use('/me', sessionAuth);
 app.use('/moments', sessionAuth);
 app.use('/moments/*', sessionAuth);
 app.use('/images/*', sessionAuth);
+app.use('/labs', sessionAuth);
+app.use('/labs/*', sessionAuth);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -30,7 +33,8 @@ const routes = app
   .route('/', authRoutes)
   .route('/', meRoutes)
   .route('/', momentRoutes)
-  .route('/', imageRoutes);
+  .route('/', imageRoutes)
+  .route('/', labRoutes);
 
 // admin-web が hc<AppType> で型共有するための export
 export type AppType = typeof routes;

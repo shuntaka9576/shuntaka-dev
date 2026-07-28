@@ -1,8 +1,10 @@
+pub mod aws;
 pub mod cloudinary;
 pub mod embedding;
 pub mod error;
 pub mod github;
 pub mod lambda;
 pub mod observability;
+pub mod s3;
 pub mod ssm;
 pub mod webhook;

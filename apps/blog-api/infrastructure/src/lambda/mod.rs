@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use aws_sdk_lambda::primitives::Blob;
 use aws_sdk_lambda::types::InvocationType;
-use aws_smithy_http_client::{Connector, proxy::ProxyConfig, tls};
-use aws_smithy_runtime_api::client::http::{SharedHttpConnector, http_client_fn};
 
 use crate::error::LambdaInvokeError;
 
@@ -28,25 +26,8 @@ impl LambdaSelfInvoker {
     pub async fn from_env() -> Option<Self> {
         let function_name = std::env::var("AWS_LAMBDA_FUNCTION_NAME").ok()?;
 
-        // blog-api の Lambda は NAT なしの VPC 内で動くため、Lambda API への経路は
-        // squid (HTTPS_PROXY) の CONNECT トンネルを通す。SDK のデフォルト HTTP
-        // クライアントはプロキシ環境変数を見ない (ProxyConfig::disabled) ので、
-        // from_env を明示したコネクタを組む。
-        let http_client = http_client_fn(|settings, _components| {
-            let connector = Connector::builder()
-                .proxy_config(ProxyConfig::from_env())
-                .connector_settings(settings.clone())
-                .tls_provider(tls::Provider::Rustls(
-                    tls::rustls_provider::CryptoMode::AwsLc,
-                ))
-                .build();
-            SharedHttpConnector::new(connector)
-        });
-
-        let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .http_client(http_client)
-            .load()
-            .await;
+        // squid (HTTPS_PROXY) の CONNECT トンネルを通すため proxy 反映済み config を使う
+        let config = crate::aws::load_sdk_config().await;
 
         Some(Self {
             client: aws_sdk_lambda::Client::new(&config),

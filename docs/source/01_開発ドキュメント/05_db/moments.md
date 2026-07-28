@@ -14,11 +14,12 @@ CREATE TABLE `moments` (
   `fastener` enum('clip','tape') NOT NULL DEFAULT 'clip',
   `fastener_color` enum('pink','blue','yellow','green') DEFAULT NULL,
   `status` enum('published','draft') NOT NULL DEFAULT 'published',
+  `captured_at` datetime(6) NOT NULL,
   `published_at` datetime(6) DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`moment_id`) /*T![clustered_index] CLUSTERED */,
-  KEY `idx_moments_feed` (`user_id`,`status`,`published_at`,`moment_id`)
+  KEY `idx_moments_feed` (`user_id`,`status`,`captured_at`,`moment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
 ```
 
@@ -35,6 +36,7 @@ CREATE TABLE `moments` (
 | fastener       | enum('clip','tape')                  | clip                 | false    |                                                  |          |                   |         |
 | fastener_color | enum('pink','blue','yellow','green') |                      | true     |                                                  |          |                   |         |
 | status         | enum('published','draft')            | published            | false    |                                                  |          |                   |         |
+| captured_at    | datetime(6)                          |                      | false    |                                                  |          |                   |         |
 | published_at   | datetime(6)                          |                      | true     |                                                  |          |                   |         |
 | created_at     | datetime(6)                          | CURRENT_TIMESTAMP(6) | false    |                                                  |          |                   |         |
 | updated_at     | datetime(6)                          | CURRENT_TIMESTAMP(6) | false    | DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6) |          |                   |         |
@@ -47,10 +49,10 @@ CREATE TABLE `moments` (
 
 ## Indexes
 
-| Name             | Definition                                                                  |
-| ---------------- | --------------------------------------------------------------------------- |
-| idx_moments_feed | KEY idx_moments_feed (user_id, status, published_at, moment_id) USING BTREE |
-| PRIMARY          | PRIMARY KEY (moment_id) USING BTREE                                         |
+| Name             | Definition                                                                 |
+| ---------------- | -------------------------------------------------------------------------- |
+| idx_moments_feed | KEY idx_moments_feed (user_id, status, captured_at, moment_id) USING BTREE |
+| PRIMARY          | PRIMARY KEY (moment_id) USING BTREE                                        |
 
 ## Relations
 

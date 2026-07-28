@@ -87,6 +87,19 @@ for (const { name, wasm } of targets) {
       expect(html).toContain('class="message info"');
     });
 
+    test('ウィジェット記法 (:::widget) が data-payload に base64 encode される', () => {
+      const html = wasm.convertMarkdownWithResources(
+        ':::widget engine-steps\nnum: 1\ntitle: "テスト"\n:::',
+        {},
+      );
+      expect(html).toContain('class="lab-widget"');
+      expect(html).toContain('data-widget="engine-steps"');
+      const payload = html.match(/data-payload="([^"]+)"/)?.[1];
+      expect(Buffer.from(payload ?? '', 'base64').toString('utf-8')).toBe(
+        'num: 1\ntitle: "テスト"',
+      );
+    });
+
     test('resources に不正な型を渡すとエラーになる', () => {
       expect(() =>
         wasm.convertMarkdownWithResources('# Title', 123 as unknown as Record<string, string>),

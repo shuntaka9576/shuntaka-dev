@@ -51,6 +51,13 @@ interface AppParameter {
     admin: string;
     images: string;
   };
+  labs: {
+    // 章コンテンツを管理する GitHub private リポジトリ (stage ごとに別リポジトリ)
+    contentsRepoFullName: string;
+    // lab 画像バケットの物理名 (AdminStack 所有。MainStack の blog-api には
+    // env 経由で同じ文字列を渡すためクロススタック参照が発生しない)
+    imagesBucketName: string;
+  };
   ssm: {
     oidc: {
       providerArn: string;
@@ -167,6 +174,10 @@ const stageConfig: {
       admin: 'admin.shuntaka.tech',
       images: 'images.shuntaka.tech',
     },
+    labs: {
+      contentsRepoFullName: 'shuntaka9576/lab-contents-dev',
+      imagesBucketName: `${stageName.dev.shortName}-${commonParameters.projectName.short}-lab-assets`,
+    },
   },
   prd: {
     ...commonParameters,
@@ -179,6 +190,10 @@ const stageConfig: {
       api: 'api.shuntaka.dev',
       admin: 'admin.shuntaka.dev',
       images: 'images.shuntaka.dev',
+    },
+    labs: {
+      contentsRepoFullName: 'shuntaka9576/lab-contents',
+      imagesBucketName: `${stageName.prd.shortName}-${commonParameters.projectName.short}-lab-assets`,
     },
   },
 };

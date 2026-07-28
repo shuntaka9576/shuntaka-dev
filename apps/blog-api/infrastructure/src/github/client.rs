@@ -4,7 +4,9 @@ use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use reqwest::Client;
 
 use crate::error::GitHubError;
-use crate::github::types::{AccessTokenResponse, GitHubContentItem, GitHubFileContent, JwtClaims};
+use crate::github::types::{
+    AccessTokenResponse, GitHubContentItem, GitHubFileContent, GitTreeResponse, JwtClaims,
+};
 use crate::observability::observe_external_request;
 
 #[async_trait]
@@ -28,6 +30,27 @@ pub trait GitHubAppClient: Send + Sync {
     ) -> Result<GitHubFileContent, GitHubError>;
 
     fn decode_content(&self, content: &GitHubFileContent) -> Result<String, GitHubError>;
+
+    /// labs 同期用。git_ref (push イベントの after SHA またはブランチ名) 配下の
+    /// ファイルツリーを再帰的に 1 リクエストで取得する。images/ のようなネストした
+    /// ディレクトリも contents API を辿らず一括で列挙できる。
+    async fn get_tree_recursive(
+        &self,
+        owner: &str,
+        repo: &str,
+        git_ref: &str,
+        token: &str,
+    ) -> Result<GitTreeResponse, GitHubError>;
+
+    /// labs 同期用。blob sha からファイルの生バイト列を取得する (画像用)。
+    /// get_content の base64 (1MB 制限) と異なり raw Accept ヘッダーでサイズ制限なく取得する。
+    async fn get_blob_raw(
+        &self,
+        owner: &str,
+        repo: &str,
+        file_sha: &str,
+        token: &str,
+    ) -> Result<Vec<u8>, GitHubError>;
 }
 
 pub struct GitHubAppClientImpl {
@@ -169,5 +192,78 @@ impl GitHubAppClient for GitHubAppClientImpl {
         let cleaned = content.content.replace(['\n', '\r'], "");
         let decoded = base64::engine::general_purpose::STANDARD.decode(cleaned)?;
         String::from_utf8(decoded).map_err(GitHubError::from)
+    }
+
+    async fn get_tree_recursive(
+        &self,
+        owner: &str,
+        repo: &str,
+        git_ref: &str,
+        token: &str,
+    ) -> Result<GitTreeResponse, GitHubError> {
+        observe_external_request(
+            "github",
+            "get_tree_recursive",
+            "GET",
+            "repos/{owner}/{repo}/git/trees/{ref}",
+            async {
+                let response = self
+                    .http_client
+                    .get(format!(
+                        "https://api.github.com/repos/{owner}/{repo}/git/trees/{git_ref}?recursive=1"
+                    ))
+                    .header("Authorization", format!("token {token}"))
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "blog-api")
+                    .send()
+                    .await?;
+
+                if !response.status().is_success() {
+                    let status = response.status().as_u16();
+                    let message = response.text().await.unwrap_or_default();
+                    return Err(GitHubError::Api { status, message });
+                }
+
+                response.json().await.map_err(GitHubError::from)
+            },
+        )
+        .await
+    }
+
+    async fn get_blob_raw(
+        &self,
+        owner: &str,
+        repo: &str,
+        file_sha: &str,
+        token: &str,
+    ) -> Result<Vec<u8>, GitHubError> {
+        observe_external_request(
+            "github",
+            "get_blob_raw",
+            "GET",
+            "repos/{owner}/{repo}/git/blobs/{sha}",
+            async {
+                let response = self
+                    .http_client
+                    .get(format!(
+                        "https://api.github.com/repos/{owner}/{repo}/git/blobs/{file_sha}"
+                    ))
+                    .header("Authorization", format!("token {token}"))
+                    .header("Accept", "application/vnd.github.raw+json")
+                    .header("User-Agent", "blog-api")
+                    .send()
+                    .await?;
+
+                if !response.status().is_success() {
+                    let status = response.status().as_u16();
+                    let message = response.text().await.unwrap_or_default();
+                    return Err(GitHubError::Api { status, message });
+                }
+
+                let bytes = response.bytes().await?;
+                Ok(bytes.to_vec())
+            },
+        )
+        .await
     }
 }

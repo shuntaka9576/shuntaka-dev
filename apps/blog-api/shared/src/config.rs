@@ -32,6 +32,11 @@ impl AppConfig {
                 .unwrap_or_else(|_| "blog/og/ogp".to_string()),
             // moments 画像の配信ベース URL（例: https://images.shuntaka.dev）
             images_base_url: std::env::var("IMAGES_BASE_URL").unwrap_or_default(),
+            // lab-contents リポジトリの full_name（例: shuntaka9576/lab-contents-dev）。
+            // 空文字なら lab 同期は発動せず、push は常に articles として処理される。
+            lab_repo_full_name: std::env::var("LAB_REPO_FULL_NAME").unwrap_or_default(),
+            // lab 教材画像を配信する S3 バケット名。空文字なら画像同期をスキップする。
+            lab_images_bucket: std::env::var("LAB_IMAGES_BUCKET_NAME").unwrap_or_default(),
         };
 
         let embedding = EmbeddingConfig {
@@ -73,4 +78,6 @@ pub struct WebhookConfig {
     pub cloudinary_api_secret: String,
     pub ogp_public_id: String,
     pub images_base_url: String,
+    pub lab_repo_full_name: String,
+    pub lab_images_bucket: String,
 }

@@ -10,6 +10,7 @@ use infrastructure::{
         QUERY_EMBEDDING_CACHE_CAPACITY,
     },
     lambda::{LambdaSelfInvoker, SelfInvoker},
+    s3::{LabImageStore, S3LabImageStore},
 };
 use registry::{AppRegistry, WebhookConfig};
 use std::net::{Ipv4Addr, SocketAddr};
@@ -78,6 +79,8 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         cloudinary_api_secret: app_config.webhook.cloudinary_api_secret,
         ogp_public_id: app_config.webhook.ogp_public_id,
         images_base_url: app_config.webhook.images_base_url,
+        lab_repo_full_name: app_config.webhook.lab_repo_full_name,
+        lab_images_bucket: app_config.webhook.lab_images_bucket,
     };
 
     // Lambda 上でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
@@ -85,6 +88,12 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
     let self_invoker = LambdaSelfInvoker::from_env()
         .await
         .map(|invoker| Arc::new(invoker) as Arc<dyn SelfInvoker>);
+
+    // Lambda 上でのみ Some。lab 教材画像の S3 同期に使う。
+    // ローカル開発では None となり、画像同期はスキップされる。
+    let lab_image_store = S3LabImageStore::from_env()
+        .await
+        .map(|store| Arc::new(store) as Arc<dyn LabImageStore>);
 
     // 検索のページ送りで同一クエリの embedding を再推論しないよう、また
     // ページ間で同一ベクトル（= 同一の候補集合・順序）を保証するため cache を挟む
@@ -101,7 +110,14 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
             )) as Arc<dyn EmbeddingClient>
         });
 
-    let registry = AppRegistry::new(pool, webhook_config, self_invoker, embedding_client).await;
+    let registry = AppRegistry::new(
+        pool,
+        webhook_config,
+        self_invoker,
+        embedding_client,
+        lab_image_store,
+    )
+    .await;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

@@ -893,6 +893,8 @@ exports[`MainStack > snapshot 1`] = `
             "HTTPS_PROXY": "http://tidb-proxy.internal:3128",
             "HTTP_PROXY": "http://tidb-proxy.internal:3128",
             "IMAGES_BASE_URL": "https://images.example.com",
+            "LAB_IMAGES_BUCKET_NAME": "tp-dev-lab-assets",
+            "LAB_REPO_FULL_NAME": "shuntaka9576/lab-contents-dev",
             "NO_PROXY": "169.254.169.254,localhost,127.0.0.1,tidb-proxy.internal",
             "OTEL_EXPORTER_OTLP_ENDPOINT": "http://tidb-proxy.internal:4318",
             "OTEL_SERVICE_NAME": "blog-api-development",

@@ -2,15 +2,18 @@
 
 ## Tables
 
-| Name                                        | Columns | Comment | Type       |
-| ------------------------------------------- | ------- | ------- | ---------- |
-| [articles](articles.md)                     | 13      |         | BASE TABLE |
-| [articles_tags](articles_tags.md)           | 2       |         | BASE TABLE |
-| [tags](tags.md)                             | 3       |         | BASE TABLE |
-| [users](users.md)                           | 6       |         | BASE TABLE |
-| [tag_article_counts](tag_article_counts.md) | 4       |         | BASE TABLE |
-| [moments](moments.md)                       | 10      |         | BASE TABLE |
-| [admin_sessions](admin_sessions.md)         | 8       |         | BASE TABLE |
+| Name                                                    | Columns | Comment | Type       |
+| ------------------------------------------------------- | ------- | ------- | ---------- |
+| [lab_chapters](lab_chapters.md)                         | 9       |         | BASE TABLE |
+| [articles](articles.md)                                 | 13      |         | BASE TABLE |
+| [article_embedding_chunks](article_embedding_chunks.md) | 10      |         | BASE TABLE |
+| [labs](labs.md)                                         | 8       |         | BASE TABLE |
+| [articles_tags](articles_tags.md)                       | 2       |         | BASE TABLE |
+| [tag_article_counts](tag_article_counts.md)             | 4       |         | BASE TABLE |
+| [tags](tags.md)                                         | 3       |         | BASE TABLE |
+| [users](users.md)                                       | 6       |         | BASE TABLE |
+| [admin_sessions](admin_sessions.md)                     | 8       |         | BASE TABLE |
+| [moments](moments.md)                                   | 11      |         | BASE TABLE |
 
 ## Relations
 
@@ -24,12 +27,26 @@ erDiagram
 "tag_article_counts" }o--|| "users" : "Additional Relation"
 "tag_article_counts" }o--|| "tags" : "Additional Relation"
 
+"lab_chapters" {
+  char_36_ chapter_id PK
+}
 "articles" {
   char_36_ article_id PK
   char_36_ user_id
 }
+"article_embedding_chunks" {
+  char_36_ chunk_id PK
+}
+"labs" {
+  char_36_ lab_id PK
+}
 "articles_tags" {
   char_36_ article_id PK
+  char_36_ tag_id PK
+}
+"tag_article_counts" {
+  char_36_ user_id PK
+  varchar_20_ type PK
   char_36_ tag_id PK
 }
 "tags" {
@@ -38,17 +55,12 @@ erDiagram
 "users" {
   char_36_ user_id PK
 }
-"tag_article_counts" {
-  char_36_ user_id PK
-  varchar_20_ type PK
-  char_36_ tag_id PK
+"admin_sessions" {
+  varchar_64_ sid PK
 }
 "moments" {
   char_26_ moment_id PK
   char_36_ user_id
-}
-"admin_sessions" {
-  varchar_64_ sid PK
 }
 ```
 

@@ -40,8 +40,16 @@ export class AdminStack extends cdk.Stack {
       adminDomain: string;
       imagesDomain: string;
       databaseName: string;
+      // lab 画像バケットの物理名。MainStack の blog-api にも config 経由で同じ
+      // 文字列を渡しているため、ここではクロススタック token を受け取らない
+      labImagesBucketName: string;
+      // blog-api (MainStack) の Lambda 実行ロール ARN。lab-assets/* への
+      // 書き込み権限をここでアタッチする (バケット所有側で完結させ循環依存を避ける)
+      blogApiLambdaRoleArn: string;
       // テストでは fixture に差し替える
       spaDistPath?: string;
+      // labs-web (SvelteKit adapter-static) のビルド成果物パス。テストでは fixture に差し替える
+      labsSpaDistPath?: string;
       ssmParameters: {
         globalDns: { hostedZoneId: string };
         virginia: { certificateArn: string };
@@ -140,6 +148,52 @@ export class AdminStack extends cdk.Stack {
       enforceSSL: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+    });
+
+    // ---- labs-web SPA バケット (admin-web とはバケットを分け、互いの BucketDeployment が prune し合わないようにする) ----
+    const labsSpaBucket = new s3.Bucket(this, 'LabsSpaBucket', {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    // ---- lab 画像バケット (認証なし公開。CloudFront OAC の bucket policy 書き戻しが
+    // distribution と同一スタックで閉じるよう、MainStack ではなくここで所有する) ----
+    const labImagesBucket = new s3.Bucket(this, 'LabImagesBucket', {
+      bucketName: props.labImagesBucketName,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      // 教材画像のため prd は残す (moments images バケットと同じ割り切り)
+      removalPolicy: isPrd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isPrd,
+    });
+
+    // blog-api (MainStack) の Lambda ロールへ lab-assets/* の書き込み・読み取りを許可する。
+    // MainStack 側でこのバケットへ grantPut すると OAC のポリシー書き戻しとの間で
+    // 循環依存になるため、バケットを所有するこちら側でロールを import して付与する
+    const importedBlogApiRole = iam.Role.fromRoleArn(
+      this,
+      'ImportedBlogApiRole',
+      props.blogApiLambdaRoleArn,
+    );
+    new iam.Policy(this, 'BlogApiLabAssetsPolicy', {
+      roles: [importedBlogApiRole],
+      statements: [
+        new iam.PolicyStatement({
+          actions: ['s3:PutObject', 's3:GetObject'],
+          resources: [`${labImagesBucket.bucketArn}/lab-assets/*`],
+        }),
+        // ListBucket が無いと存在しないキーへの HeadObject が 404 ではなく 403 になり、
+        // 「未アップロード」を判定できない (S3 の仕様)
+        new iam.PolicyStatement({
+          actions: ['s3:ListBucket'],
+          resources: [labImagesBucket.bucketArn],
+          conditions: { StringLike: { 's3:prefix': ['lab-assets/*'] } },
+        }),
+      ],
     });
 
     // ---- admin-api Lambda (Hono。VPC 配置は blog-api と同じ SSM import パターン) ----
@@ -265,8 +319,8 @@ export class AdminStack extends cdk.Stack {
       certificateArn,
     );
 
-    // Host チェック (admin 以外 403) + SPA fallback。default と /api/* の両 behavior に
-    // アタッチし、images ホストで管理画面・API を露出させない
+    // Host チェック (admin 以外 403) + SPA fallback。default と /api/* / /labs/* の
+    // behavior にアタッチし、images ホストで管理画面・API・labs を露出させない
     const hostGuardFunction = new cloudfront.Function(this, 'HostGuardFunction', {
       functionName: `${props.physicalPrefix}-admin-host-guard`,
       runtime: cloudfront.FunctionRuntime.JS_2_0,
@@ -279,6 +333,21 @@ function handler(event) {
   }
   var uri = request.uri;
   if (uri.startsWith('/api/')) {
+    return request;
+  }
+  // '/labs/*' behavior にマッチしないため default に落ちる。SPA ルートへ寄せる
+  if (uri === '/labs') {
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: { location: { value: '/labs/' } },
+    };
+  }
+  if (uri.startsWith('/labs/')) {
+    if (uri.includes('.')) {
+      return request;
+    }
+    request.uri = '/labs/index.html';
     return request;
   }
   if (uri.includes('.')) {
@@ -331,6 +400,23 @@ function handler(event) {
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
+        '/labs/*': {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(labsSpaBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          functionAssociations: [
+            {
+              function: hostGuardFunction,
+              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+            },
+          ],
+        },
+        // lab 教材画像。/images/* (moments) と同じく認証なしの公開配信のためガードなし
+        '/lab-assets/*': {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(labImagesBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
       },
     });
 
@@ -348,6 +434,27 @@ function handler(event) {
       // main stack の missingLambdaEnvVars と同じ流儀で、この stack のデプロイだけをブロックする
       cdk.Annotations.of(this).addError(
         `admin-web のビルド成果物が見つかりません: ${spaDistPath} (apps/admin-web で bun run build を実行してください)`,
+      );
+    }
+
+    // ---- labs-web SPA 資材の投入 (apps/labs-web の SvelteKit adapter-static 出力が前提) ----
+    const labsSpaDistPath =
+      props.labsSpaDistPath ?? path.resolve(__dirname, '../../../../apps/labs-web/build');
+    if (existsSync(labsSpaDistPath)) {
+      new s3deploy.BucketDeployment(this, 'LabsSpaDeployment', {
+        sources: [s3deploy.Source.asset(labsSpaDistPath)],
+        destinationBucket: labsSpaBucket,
+        // CloudFront は /labs/* の URI をそのまま S3 キーとして転送する
+        // (prefix strip はしない) ため、成果物も labs/ 配下に置く
+        destinationKeyPrefix: 'labs',
+        distribution,
+        distributionPaths: ['/labs/*'],
+      });
+    } else {
+      // CI がまだ labs-web のビルドを組み込んでいないため、admin-web (addError) とは
+      // 異なり warning に留めてデプロイをブロックしない。エラー化は CI 整備後に別途対応する
+      cdk.Annotations.of(this).addWarning(
+        `labs-web のビルド成果物が見つかりません: ${labsSpaDistPath} (apps/labs-web で bun run build を実行してください。当面は warning のみでデプロイを継続します)`,
       );
     }
 

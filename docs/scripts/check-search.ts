@@ -101,7 +101,7 @@ try {
   }
 } finally {
   await instance.destroy();
-  server.stop(true);
+  await server.stop(true);
 }
 
 if (failed) {

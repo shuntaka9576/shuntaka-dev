@@ -38,6 +38,10 @@ describe('MainStack', () => {
         api: 'api.example.com',
         images: 'images.example.com',
       },
+      labs: {
+        repoFullName: 'shuntaka9576/lab-contents-dev',
+        imagesBucketName: 'tp-dev-lab-assets',
+      },
       ssmParameters: {
         globalDns: {
           hostedZoneId: '/test/hosted-zone-id',

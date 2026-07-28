@@ -43,8 +43,37 @@ export interface UsersTable {
   updated_at: ColumnType<Date, never, never>;
 }
 
+// dsl-tidb/schema/10_labs.sql の手書き型。blog-api の webhook 同期が書き込み、
+// admin-api は読み取りのみ行う
+export interface LabsTable {
+  lab_id: string;
+  user_id: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  // TINYINT(1)。mysql2 は number で返す
+  published: number;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
+// dsl-tidb/schema/11_lab_chapters.sql の手書き型
+export interface LabChaptersTable {
+  chapter_id: string;
+  lab_id: string;
+  slug: string;
+  title: string;
+  position: number;
+  content: string;
+  content_html: string | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
 export interface Database {
   moments: MomentsTable;
   admin_sessions: AdminSessionsTable;
   users: UsersTable;
+  labs: LabsTable;
+  lab_chapters: LabChaptersTable;
 }

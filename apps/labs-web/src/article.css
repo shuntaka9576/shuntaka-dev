@@ -1,0 +1,761 @@
+/* labs-web preview 用の記事表示スタイル。
+   apps/web/src/app/globals.css から prose / message / code-block / link-card /
+   github-embed セクションを抽出し、参照しているデザイントークンをここに同梱した。
+   本実装時に共有方法（コピー継続 or packages 化）を再検討する。 */
+
+:root {
+  --color-text: #525457;
+  --color-text-muted: #57595b8a;
+  --color-border: #c4c4c4;
+  --color-border-subtle: rgba(162, 177, 202, 0.3);
+  --color-link: #5c6eb1;
+  --color-link-hover: #6686ff;
+  --color-link-visited: #6200ac;
+  --color-code-tab-bg: #2b303b;
+  --color-code-tab-fg: #9da5b4;
+  --color-success-bg: #e7f7ed;
+  --color-success-border: #16a34a;
+  --color-warning-bg: #fff2b8;
+  --color-warning-border: #fcc800;
+  --color-success-icon: #3fb950;
+  --tag-th-background-color: #f7fafc;
+  --tag-th-color: #525457;
+  --tag-td-background-color: #fff;
+  --tag-th-td-border-color: #525457;
+  --tag-h2-border-line-color: #c4c4c4;
+  --tag-h2-border-line-after-color: #525457;
+  --tag-blockquote-color: #ddd;
+  --tag-blockquote-font-color: #777;
+  --github-embed-border: #d0d7de;
+  --github-embed-header-bg: #f6f8fa;
+  --github-embed-code-bg: #ffffff;
+  --github-embed-link: #0969da;
+  --github-embed-meta: #656d76;
+  --article-area-border-color: #fff;
+  --lh-heading: 1.4;
+  --lh-list: 1.7;
+  --lh-body: 1.9;
+  --fw-regular: 400;
+  --fw-medium: 600;
+  --fw-bold: 600;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-8: 3rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.625rem;
+  --radius-full: 9999px;
+  --motion-base: 250ms;
+  --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Article prose styles */
+.prose {
+  line-height: var(--lh-body);
+}
+
+.prose h1 {
+  font-size: 1.7em;
+  font-weight: var(--fw-medium);
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.2em;
+  position: relative;
+  border-bottom: solid 1px var(--color-border);
+}
+
+.prose h1:not(:first-child) {
+  margin-top: 2.3em;
+}
+
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: var(--fw-medium);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.4em;
+  border-bottom: solid 1px var(--tag-h2-border-line-color);
+  position: relative;
+}
+
+.prose h2::after {
+  content: '';
+  display: block;
+  position: absolute;
+  bottom: -1px;
+  width: 20%;
+  border-bottom: 1px solid var(--tag-h2-border-line-after-color);
+}
+
+.prose h3 {
+  font-size: 1.4em;
+  font-weight: var(--fw-regular);
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.prose h4 {
+  font-size: 1.1em;
+  font-weight: var(--fw-regular);
+}
+
+.prose h5 {
+  font-size: 1em;
+  font-weight: var(--fw-regular);
+}
+
+.prose h6 {
+  font-size: 0.85em;
+  font-weight: var(--fw-regular);
+}
+
+/* Responsive heading sizes */
+@media (max-width: 576px) {
+  .prose h1 {
+    font-size: 1.6em;
+  }
+  .prose h2 {
+    font-size: 1.4em;
+  }
+  .prose h3 {
+    font-size: 1.2em;
+  }
+  .prose h4 {
+    font-size: 1.1em;
+  }
+  .prose h5 {
+    font-size: 1em;
+  }
+  .prose h6 {
+    font-size: 0.85em;
+  }
+}
+
+.prose p {
+  margin-block-start: 1em;
+  margin-block-end: 1em;
+  line-height: var(--lh-body);
+}
+
+.prose a {
+  color: var(--color-link);
+  word-break: break-all;
+}
+
+.prose a:hover {
+  color: var(--color-link-hover);
+}
+
+.prose a:visited {
+  color: var(--color-link-visited);
+}
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-top: 10px;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-top: 10px;
+}
+
+.prose ul > li,
+.prose ol > li {
+  margin-bottom: 13px;
+}
+
+.prose ul li::marker {
+  color: var(--color-text);
+}
+
+/* インラインコードは等幅フォントが和文より大きく見えるため縮小し、
+   ベースラインを僅かに上げて和文と揃える (zenn-content-css 準拠) */
+.prose code:not([class]) {
+  padding: 0.2em 0.4em;
+  margin: 0 0.2em;
+  font-size: 0.85em;
+  vertical-align: 0.08em;
+  color: var(--color-code-inline-fg);
+  background-color: var(--color-code-inline-bg);
+  border-radius: var(--radius-sm);
+  text-autospace: no-autospace;
+}
+
+.prose pre {
+  background: var(--color-code-block-bg);
+  color: var(--color-code-block-fg);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 1rem 0;
+  text-autospace: no-autospace;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.prose blockquote {
+  position: relative;
+  border-left: 3px solid var(--tag-blockquote-color);
+  margin: 4px;
+  padding-left: 10px;
+  color: var(--tag-blockquote-font-color);
+}
+
+.prose blockquote p {
+  color: var(--tag-blockquote-font-color);
+}
+
+.prose table {
+  margin: 1.2rem auto;
+  width: auto;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  line-height: var(--lh-list);
+  word-break: normal;
+  display: block;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose th {
+  background-color: var(--tag-th-background-color);
+  color: var(--tag-th-color);
+  border: 1px solid var(--tag-th-td-border-color);
+  padding: 5px;
+}
+
+.prose td {
+  background-color: var(--tag-td-background-color);
+  border: 1px solid var(--tag-th-td-border-color);
+  padding: 10px;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  display: table;
+  margin: 1.5rem auto;
+}
+
+.prose strong {
+  font-weight: var(--fw-bold);
+}
+
+.prose em {
+  font-style: italic;
+}
+
+/* Footnotes (comrak footnotes 拡張 + Zenn 風タイトル) */
+.prose sup.footnote-ref a {
+  padding: 0 0.1em;
+  text-decoration: none;
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes {
+  margin-top: var(--space-8);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--fs-caption);
+}
+
+.prose .footnotes-title {
+  display: block;
+  font-weight: var(--fw-bold);
+}
+
+.prose .footnotes ol {
+  margin-top: var(--space-2);
+}
+
+.prose .footnotes ol > li {
+  margin-bottom: var(--space-1);
+  scroll-margin-top: var(--space-3);
+}
+
+.prose .footnotes li p {
+  margin: 0;
+  line-height: var(--lh-list);
+}
+
+.prose .footnote-backref {
+  text-decoration: none;
+}
+
+/* ジャンプ先を可視化する。参照と脚注が近接していてスクロールが
+   発生しない（ページ末尾で clamp される）ケースでも戻り先が分かる */
+.prose sup.footnote-ref a:target,
+.prose .footnotes li:target {
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
+}
+
+/* Message container styles (global, legacy compatible) */
+.message {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  font-size: 14.5px;
+  line-height: var(--lh-body);
+}
+
+.message > * {
+  margin: 0.5rem 0;
+}
+
+.message > *:first-child,
+.message > *:last-child {
+  margin: 0;
+}
+
+.message a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.message.error {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+
+.message.info {
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
+}
+
+.message.success {
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+}
+
+.message.warning {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+}
+
+/* SpeakerDeck embed */
+.block-embed-service-speakerdeck {
+  margin: 1.3rem 0;
+  width: 80%;
+}
+
+@media (max-width: 768px) {
+  .block-embed-service-speakerdeck {
+    width: 100%;
+  }
+}
+
+/* GitHub Embed Card */
+.github-embed-card {
+  border: 1px solid var(--github-embed-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.github-embed-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--github-embed-header-bg);
+  border-bottom: 1px solid var(--github-embed-border);
+  font-size: 0.875rem;
+}
+
+.github-embed-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.github-embed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.github-embed-header svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--github-embed-meta);
+  flex-shrink: 0;
+}
+
+.github-embed-header a {
+  color: var(--github-embed-link);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.github-embed-header a:hover {
+  text-decoration: underline;
+}
+
+.github-embed-path {
+  color: var(--github-embed-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-embed-rev {
+  color: var(--github-embed-meta);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.github-embed-lines {
+  color: var(--github-embed-meta);
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.github-embed-code pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background: transparent;
+  border-radius: 0;
+}
+
+.github-embed-code pre code {
+  background: none;
+  padding: 0;
+}
+
+.github-embed-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--github-embed-meta);
+  transition:
+    color var(--motion-base),
+    background-color var(--motion-base);
+}
+
+.github-embed-copy:hover {
+  color: var(--github-embed-link);
+  background-color: var(--github-embed-border);
+}
+
+.github-embed-copy svg {
+  width: 16px;
+  height: 16px;
+}
+
+.github-embed-copy-icon {
+  display: flex;
+}
+
+.github-embed-check-icon {
+  display: none;
+  color: var(--color-success-icon);
+}
+
+.github-embed-copy.copied .github-embed-copy-icon {
+  display: none;
+}
+
+.github-embed-copy.copied .github-embed-check-icon {
+  display: flex;
+}
+
+/* Code block with filename (tab style) */
+.code-block-container {
+  position: relative;
+  margin: 1rem 0;
+}
+
+.code-block-filename-container {
+  display: inline-block;
+  padding: 6px 16px;
+  background: var(--color-code-tab-bg);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+.code-block-filename {
+  color: var(--color-code-tab-fg);
+}
+
+.code-block-container pre {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+}
+
+.code-block-container pre[style] {
+  background: var(--color-code-tab-bg);
+}
+
+/* Generic copy button for all pre elements */
+.prose pre .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-code-tab-fg);
+  opacity: 0.4;
+  transition: opacity var(--motion-base);
+}
+
+.prose pre .copy-btn:hover {
+  opacity: 1;
+}
+
+.prose pre .copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.prose pre .copy-btn .copy-icon {
+  display: flex;
+}
+
+/* 見出しアンカー（# クリックでリンクコピー） */
+.prose .heading-anchor {
+  position: relative;
+  margin-right: 0.35em;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.prose .heading-anchor:hover {
+  color: var(--color-accent);
+}
+
+.prose .heading-anchor .copied-float {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 2px);
+  font-size: 12px;
+  font-weight: var(--fw-regular);
+  color: var(--color-success-icon);
+  white-space: nowrap;
+  animation: float-up 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+.prose pre .copy-btn .copied-float {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--color-success-icon);
+  white-space: nowrap;
+  animation: float-up 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-150%);
+  }
+}
+
+/* Link Card (OGP Card) - Zenn-style */
+.link-card-wrapper {
+  margin: 1rem 0;
+}
+
+/* Override prose styles for link cards */
+.prose .link-card-wrapper,
+.prose .link-card,
+.prose .link-card:hover,
+.prose .link-card:visited {
+  color: inherit;
+  text-decoration: none;
+}
+
+.prose .link-card-wrapper img,
+.prose .link-card img {
+  margin: 0;
+  display: block;
+}
+
+.link-card {
+  display: block;
+  position: relative;
+  border: 1px solid var(--github-embed-border);
+  border-radius: var(--radius-md);
+  overflow: visible;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    box-shadow var(--motion-base),
+    border-color var(--motion-base);
+}
+
+.link-card:hover {
+  border-color: var(--github-embed-link);
+  box-shadow: var(--shadow-2);
+}
+
+.link-card:visited {
+  color: inherit;
+}
+
+.link-card-text {
+  flex: 1;
+  padding: 10px 14px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.link-card-title {
+  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.link-card-description {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--github-embed-meta);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: var(--lh-heading);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.link-card-content {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.link-card-image {
+  flex-shrink: 0;
+  width: 180px;
+  height: 100px;
+  background: var(--github-embed-header-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.link-card-image img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0;
+  display: block;
+}
+
+.link-card-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 12px 8px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  background: var(--color-surface);
+  border: 1px solid var(--github-embed-border);
+  border-radius: var(--radius-full);
+}
+
+[data-theme='dark'] .link-card-footer {
+  background: #2d333b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .link-card-footer {
+    background: #2d333b;
+  }
+}
+
+.link-card-favicon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  display: block;
+}
+
+.link-card-domain {
+  font-size: 0.75rem;
+  color: var(--github-embed-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Link Card responsive */
+@media (max-width: 576px) {
+  .link-card-image {
+    width: 100px;
+    height: 80px;
+  }
+
+  .link-card-title {
+    font-size: 0.85rem;
+  }
+
+  .link-card-description {
+    font-size: 0.7rem;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .link-card-text {
+    padding: 8px 10px;
+  }
+
+  .link-card-footer {
+    margin: 4px 10px 6px;
+  }
+}

@@ -64,6 +64,10 @@ const mainStack = new MainStack(app, `${config.stageName.short}-${config.project
   stageName: config.stageName,
   fqdn: config.fqdn,
   domain: config.domain,
+  labs: {
+    repoFullName: config.labs.contentsRepoFullName,
+    imagesBucketName: config.labs.imagesBucketName,
+  },
   ssmParameters: config.ssm,
   lambda: config.lambda,
   env: {
@@ -112,6 +116,8 @@ const adminStack = new AdminStack(
     adminDomain: config.domain.admin,
     imagesDomain: config.domain.images,
     databaseName: `blog_${config.stageName.long}`,
+    labImagesBucketName: config.labs.imagesBucketName,
+    blogApiLambdaRoleArn: mainStack.blogApiLambdaRoleArn,
     ssmParameters: {
       globalDns: config.ssm.globalDns,
       virginia: config.ssm.virginia,
@@ -126,6 +132,9 @@ const adminStack = new AdminStack(
 );
 adminStack.addDependency(globalDnsStack);
 adminStack.addDependency(virginiaCertificateStack);
+// blogApiLambdaRoleArn の cross-stack 参照により暗黙の依存は発生するが、
+// 依存方向 (AdminStack → MainStack) を明示するため addDependency も付ける
+adminStack.addDependency(mainStack);
 
 const oidcProviderStack = new OidcProviderStack(app, `${config.projectName.short}-oidc-provider`, {
   ssmOidcProviderArn: config.ssm.oidc.providerArn,

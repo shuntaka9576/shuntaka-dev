@@ -26,6 +26,13 @@ export function LoginForm() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: sessionKeys.all });
+      // labs-web (別 SPA) からの誘導は returnTo で戻す。open redirect を防ぐため
+      // 同一オリジンのパスのみ許可し、フルページ遷移で戻す
+      const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+      if (returnTo?.startsWith('/') && !returnTo.startsWith('//')) {
+        window.location.assign(returnTo);
+        return;
+      }
       await navigate({ to: '/moments', replace: true });
     },
   });

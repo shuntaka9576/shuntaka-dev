@@ -1,0 +1,28 @@
+{
+  "name": "labs-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run preview/dev.ts",
+    "dev:web": "vite dev",
+    "dev:api": "bun run preview/server.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.46.5",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@tailwindcss/vite": "^4.1.16",
+    "hono": "^4.10.6",
+    "markdown-wasm": "workspace:*",
+    "svelte": "^5.42.2",
+    "svelte-check": "^4.3.3",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "yaml": "^2.8.1"
+  }
+}

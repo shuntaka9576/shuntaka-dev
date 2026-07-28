@@ -370,6 +370,31 @@ exports[`AdminStack > snapshot 1`] = `
               "TargetOriginId": "TestAdminStackAdminDistributionOrigin3A46AE305",
               "ViewerProtocolPolicy": "redirect-to-https",
             },
+            {
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "HostGuardFunctionE9AA689A",
+                      "FunctionARN",
+                    ],
+                  },
+                },
+              ],
+              "PathPattern": "/labs/*",
+              "TargetOriginId": "TestAdminStackAdminDistributionOrigin4593D3947",
+              "ViewerProtocolPolicy": "redirect-to-https",
+            },
+            {
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "Compress": true,
+              "PathPattern": "/lab-assets/*",
+              "TargetOriginId": "TestAdminStackAdminDistributionOrigin5B6FAF516",
+              "ViewerProtocolPolicy": "redirect-to-https",
+            },
           ],
           "Comment": "tp-dev-admin",
           "DefaultCacheBehavior": {
@@ -453,6 +478,42 @@ exports[`AdminStack > snapshot 1`] = `
                 "OriginAccessIdentity": "",
               },
             },
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "LabsSpaBucketD4EEFDA2",
+                  "RegionalDomainName",
+                ],
+              },
+              "Id": "TestAdminStackAdminDistributionOrigin4593D3947",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "AdminDistributionOrigin4S3OriginAccessControlA7AD8C04",
+                  "Id",
+                ],
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": "",
+              },
+            },
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "LabImagesBucket1946917D",
+                  "RegionalDomainName",
+                ],
+              },
+              "Id": "TestAdminStackAdminDistributionOrigin5B6FAF516",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "AdminDistributionOrigin5S3OriginAccessControl6C2FB7A1",
+                  "Id",
+                ],
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": "",
+              },
+            },
           ],
           "PriceClass": "PriceClass_200",
           "ViewerCertificate": {
@@ -484,6 +545,28 @@ exports[`AdminStack > snapshot 1`] = `
       "Properties": {
         "OriginAccessControlConfig": {
           "Name": "TestAdminStackAdminDistributOrigin3S3OriginAccessControl359697F1",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "AdminDistributionOrigin4S3OriginAccessControlA7AD8C04": {
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "TestAdminStackAdminDistributOrigin4S3OriginAccessControl341898AA",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "AdminDistributionOrigin5S3OriginAccessControl6C2FB7A1": {
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "TestAdminStackAdminDistributOrigin5S3OriginAccessControlC46C6231",
           "OriginAccessControlOriginType": "s3",
           "SigningBehavior": "always",
           "SigningProtocol": "sigv4",
@@ -650,6 +733,58 @@ exports[`AdminStack > snapshot 1`] = `
       },
       "Type": "AWS::Cognito::UserPool",
       "UpdateReplacePolicy": "Delete",
+    },
+    "BlogApiLabAssetsPolicy192B188A": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "LabImagesBucket1946917D",
+                        "Arn",
+                      ],
+                    },
+                    "/lab-assets/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": "s3:ListBucket",
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": [
+                    "lab-assets/*",
+                  ],
+                },
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "LabImagesBucket1946917D",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "BlogApiLabAssetsPolicy192B188A",
+        "Roles": [
+          "tp-dev-blog-api-role",
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "CookieSecret28A05618": {
       "DeletionPolicy": "Delete",
@@ -886,6 +1021,43 @@ exports[`AdminStack > snapshot 1`] = `
               "Effect": "Allow",
               "Resource": "*",
             },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LabsSpaBucketD4EEFDA2",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LabsSpaBucketD4EEFDA2",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -966,6 +1138,21 @@ function handler(event) {
   }
   var uri = request.uri;
   if (uri.startsWith('/api/')) {
+    return request;
+  }
+  // '/labs/*' behavior にマッチしないため default に落ちる。SPA ルートへ寄せる
+  if (uri === '/labs') {
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: { location: { value: '/labs/' } },
+    };
+  }
+  if (uri.startsWith('/labs/')) {
+    if (uri.includes('.')) {
+      return request;
+    }
+    request.uri = '/labs/index.html';
     return request;
   }
   if (uri.includes('.')) {
@@ -1239,6 +1426,407 @@ function handler(event) {
         "ToPort": 3128,
       },
       "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "LabImagesBucket1946917D": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "BucketName": "tp-dev-lab-assets",
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LabImagesBucketAutoDeleteObjectsCustomResource70B3BCA9": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "LabImagesBucketPolicyBAC0D7BD",
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "LabImagesBucket1946917D",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LabImagesBucketPolicyBAC0D7BD": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "LabImagesBucket1946917D",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LabImagesBucket1946917D",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LabImagesBucket1946917D",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LabImagesBucket1946917D",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LabImagesBucket1946917D",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "AdminDistribution4E89F8C0",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "LabImagesBucket1946917D",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "LabsSpaBucketAutoDeleteObjectsCustomResourceF8E01F11": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "LabsSpaBucketPolicyE4515BBD",
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "LabsSpaBucketD4EEFDA2",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LabsSpaBucketD4EEFDA2": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true",
+          },
+          {
+            "Key": "aws-cdk:cr-owned:labs:633a3dc9",
+            "Value": "true",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LabsSpaBucketPolicyE4515BBD": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "LabsSpaBucketD4EEFDA2",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LabsSpaBucketD4EEFDA2",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LabsSpaBucketD4EEFDA2",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LabsSpaBucketD4EEFDA2",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LabsSpaBucketD4EEFDA2",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "AdminDistribution4E89F8C0",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "LabsSpaBucketD4EEFDA2",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "LabsSpaDeploymentAwsCliLayer74DFB08F": {
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip",
+        },
+        "Description": "/opt/awscli/aws",
+      },
+      "Type": "AWS::Lambda::LayerVersion",
+    },
+    "LabsSpaDeploymentCustomResource6744D6E7": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DestinationBucketKeyPrefix": "labs",
+        "DestinationBucketName": {
+          "Ref": "LabsSpaBucketD4EEFDA2",
+        },
+        "DistributionId": {
+          "Ref": "AdminDistribution4E89F8C0",
+        },
+        "DistributionPaths": [
+          "/labs/*",
+        ],
+        "OutputObjectKeys": true,
+        "Prune": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn",
+          ],
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+        ],
+        "SourceObjectKeys": [
+          "6c2dd40405032b027f9fcb908ae9be5a0102bd8c871174d4160d4a82bc82a4c8.zip",
+        ],
+        "WaitForDistributionInvalidation": true,
+      },
+      "Type": "Custom::CDKBucketDeployment",
+      "UpdateReplacePolicy": "Delete",
     },
     "SpaBucket48E1059F": {
       "DeletionPolicy": "Delete",
