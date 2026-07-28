@@ -74,6 +74,11 @@ Cluster Pods ダッシュボード (`cluster/manifests/monitoring/dashboards/clu
 kubectl apply -k cluster/manifests/monitoring/dashboards/
 ```
 
+適用後の No data / 空欄は以下のケースでは正常。
+
+- events パネルは `> 0` で 0 を落としているため、選択中の時間レンジに restart が 1 件も無ければ No data になる。レンジを広げれば過去イベントが見える（7/27 のノード再起動分が 01:29〜01:39 UTC に出ることを確認済み）
+- rollout restart で Pod を再作成すると lastState が消えるため、`last restart` / `last reason` 列はその Pod が次に restart するまで空になる（restart カウンタも 0 に戻る）
+
 アドホックに CLI で見る場合は lastState の終了時刻を出す（直近1回分のみ）。
 
 ```bash
