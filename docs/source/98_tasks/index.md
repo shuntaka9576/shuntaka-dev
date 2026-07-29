@@ -8,13 +8,16 @@
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
 | 2026-07-28 | [SSH over Tailscale が自分の所有端末に繋がらない（ACL に autogroup:self ルールが無い）](2026-07-28-tailscale-ssh-acl/index.md)                                    |
+| 2026-07-28 | [plamo メモリ減少の原因調査 / restart カウンタ初期化 / restart 可視化](2026-07-28-plamo-memory-restart-visibility/index.md)                                       |
 | 2026-07-28 | [labs 機能（Zenn books 風ハンズオン教材）の GitHub 同期 + admin 閲覧](2026-07-28-labs-feature/index.md)                                                           |
 | 2026-07-27 | [MiniPC ノードの OS パッケージ更新 + 再起動（カーネル 6.8.0-134 → 136）](2026-07-27-node-os-update/index.md)                                                      |
 | 2026-07-27 | [bench_wiki の論理ダンプ退避と削除（TiFlash は blog 検索依存のため存続）](2026-07-27-bench-wiki-dump-drop/index.md)                                               |
 | 2026-07-22 | [目次の刷新（tocbot 撤去）+ 見出しアンカー（# リンクコピー）追加](2026-07-22-toc-heading-anchor-rework/index.md)                                                  |
 | 2026-07-18 | [ベクトル検索ページネーションの破綻分析と pre-filter exact 方式への再設計](2026-07-18-vector-search-pagination-redesign/index.md)                                 |
 | 2026-07-18 | [PLaMo Embedding の投入後メモリ滞留 (glibc malloc) を jemalloc で解消](2026-07-18-plamo-embedding-jemalloc/index.md)                                              |
+| 2026-07-17 | [Grafana Pod一覧のCPUゲージが空に見える表示を修正](2026-07-17-grafana-pod-cpu-gauge-max/index.md)                                                                 |
 | 2026-07-17 | [apps/web: 日本語 Web フォント撤去（Zenn 方式へ移行）](2026-07-17-web-system-font-migration/index.md)                                                             |
+| 2026-07-15 | [TiDB Vector 検索実装 (PLaMo Embedding 1B + TiFlash)](2026-07-15-tidb-vector-search-implementation/index.md)                                                      |
 | 2026-07-15 | [TiDB Self-Managed で日本語全文検索を実現する方法 (Vector + TiFlash 採用)](2026-07-15-tidb-fts-kuromoji-patterns/index.md)                                        |
 | 2026-07-15 | [Sphinx 日本語検索を Pagefind へ置き換える](2026-07-15-sphinx-pagefind-search/index.md)                                                                           |
 | 2026-07-14 | [moments の日付を EXIF 撮影時刻 (captured_at) に移行](2026-07-14-moments-exif-captured-at/index.md)                                                               |
@@ -25,6 +28,7 @@
 | 2026-07-12 | [apps/web: エラーフォールバック起因の First Load JS 削減（HashiBow 静的 SVG 化 + 記事ルート error.tsx 削除）](2026-07-12-web-error-fallback-bundle-size/index.md) |
 | 2026-07-11 | [リリースフロー刷新（preview 廃止 + tagpr CalVer + Vercel タグリリース）](2026-07-11-release-flow-tagpr-calver/index.md)                                          |
 | 2026-07-11 | [tech / note タブの posts 統合（type 概念の廃止 スコープ1）](2026-07-11-posts-tab-unification/index.md)                                                           |
+| 2026-07-10 | [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](2026-07-10-tidb-proxy-log-iceberg/index.md)                                       |
 | 2026-07-10 | [TiDB クラスタ v8.1.0 → v8.5.7 ローリングアップグレード](2026-07-10-tidb-cluster-upgrade/index.md)                                                                |
 | 2026-07-05 | [タグ絞り込みのサーバーサイド化（50万記事スケール対応）](2026-07-05-server-side-tag-filter/index.md)                                                              |
 | 2026-07-05 | [記事一覧へのタグ絞り込みUIの追加（apps/web）](2026-07-05-article-tag-filter-ui/index.md)                                                                         |
