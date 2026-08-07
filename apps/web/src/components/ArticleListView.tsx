@@ -9,7 +9,7 @@ import { SearchProvider } from '@/components/SearchProvider';
 import { SearchTriggerButton } from '@/components/SearchTriggerButton';
 import { TagFilterModal } from '@/components/TagFilterModal';
 import { TagFilterProvider } from '@/components/TagFilterProvider';
-import { getArticles, getTagFacets } from '@/lib/api';
+import { getCachedArticles, getCachedTagFacets } from '@/lib/cachedApi';
 import { ARTICLES_PER_PAGE, USER_NAME } from '@/lib/constants';
 
 interface ArticleListViewProps {
@@ -18,15 +18,15 @@ interface ArticleListViewProps {
 }
 
 export async function ArticleListView({ page, baseHref }: ArticleListViewProps) {
-  let articles: Awaited<ReturnType<typeof getArticles>>['articles'] = [];
+  let articles: Awaited<ReturnType<typeof getCachedArticles>>['articles'] = [];
   let totalPages = 1;
-  let initialFacets: Awaited<ReturnType<typeof getTagFacets>>['facets'] = [];
+  let initialFacets: Awaited<ReturnType<typeof getCachedTagFacets>>['facets'] = [];
   let error: string | null = null;
 
   try {
     const [pageResult, facetsResult] = await Promise.all([
-      getArticles(USER_NAME, { page, perPage: ARTICLES_PER_PAGE }),
-      getTagFacets(USER_NAME),
+      getCachedArticles(USER_NAME, { page, perPage: ARTICLES_PER_PAGE }),
+      getCachedTagFacets(USER_NAME),
     ]);
     articles = pageResult.articles;
     totalPages = pageResult.totalPages;

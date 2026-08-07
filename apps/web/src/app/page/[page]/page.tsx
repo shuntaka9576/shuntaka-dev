@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticleListView } from '@/components/ArticleListView';
-import { getArticles } from '@/lib/api';
+import { getCachedArticles } from '@/lib/cachedApi';
 import { ARTICLES_PER_PAGE, SITE_URL, USER_NAME } from '@/lib/constants';
 
 interface PageProps {
   params: Promise<{ page: string }>;
 }
+
+// ページ番号の検証と範囲外判定を完了してから描画する
+export const instant = false;
 
 function parsePage(raw: string): number | null {
   if (!/^[1-9]\d*$/.test(raw)) return null;
@@ -30,8 +33,8 @@ export default async function PostsPaginationPage({ params }: PageProps) {
   const page = parsePage(rawPage);
   if (page === null) notFound();
 
-  // 範囲外ページ判定用の全件フェッチ。sitemap と同じ URL のため Next の fetch dedup が効く
-  const probe = await getArticles(USER_NAME, { perPage: 'all' });
+  // 範囲外ページ判定用に全件取得する
+  const probe = await getCachedArticles(USER_NAME, { perPage: 'all' });
   if (probe.articles.length <= (page - 1) * ARTICLES_PER_PAGE) notFound();
 
   return <ArticleListView page={page} baseHref="/" />;
