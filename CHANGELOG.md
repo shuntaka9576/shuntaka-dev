@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0808.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0728.0...2026.0808.0) - 2026-08-08
+
+- feat: Next.js 16.3のISR改善に対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/748
+
 ## [2026.0728.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0722.0...2026.0728.0) - 2026-07-28
 
 - feat: ブログと同じレンダリングで Markdown をプレビューする Neovim プラグインを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/725
