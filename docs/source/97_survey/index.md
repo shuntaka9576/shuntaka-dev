@@ -7,6 +7,7 @@
 | 調査日     | タイトル                                                                                                                           |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                              |
+| 2026-08-09 | [Next.js 16.3 更新でクライアント JS が 104 KiB 減った理由](2026-08-09-next-16-3-bundle-size-reduction/index.md)                    |
 | 2026-07-28 | [MiniPC クラスタの消費電力実測と電気料金への影響](2026-07-28-minipc-power-measurement/index.md)                                    |
 | 2026-07-23 | [`SELECT * FROM articles` が 0.4〜1.1s かかる原因（転送律速）](2026-07-23-tidb-articles-select-star-transfer-latency/index.md)     |
 | 2026-07-19 | [TiDB ベクトル検索の最小教材 — コサイン類似度 / exact / TiFlash / HNSW / 再帰 CTE](2026-07-19-tidb-vector-search-101/index.md)     |
