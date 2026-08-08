@@ -5,15 +5,13 @@ import { ArticleContent } from '@/components/ArticleContent';
 import { BaseLayout } from '@/components/BaseLayout';
 import { ArticleJsonLd } from '@/components/JsonLd';
 import { TableOfContents } from '@/components/TableOfContents';
-import { getArticleBySlug } from '@/lib/api';
-import { SITE_URL } from '@/lib/constants';
-
-export const dynamicParams = true;
-export const revalidate = 30;
+import { getCachedArticleBySlug, getCachedArticles } from '@/lib/cachedApi';
+import { SITE_URL, USER_NAME } from '@/lib/constants';
 
 export async function generateStaticParams() {
-  // ビルド時は静的生成しない（リクエスト時にオンデマンドで生成）
-  return [];
+  // Cache Components のビルド検証用に最新記事だけ生成し、残りは初回アクセス時に生成する
+  const { articles } = await getCachedArticles(USER_NAME, { page: 1, perPage: 1 });
+  return articles.map(({ slug }) => ({ userName: USER_NAME, slug }));
 }
 
 interface ArticlePageProps {
@@ -25,7 +23,7 @@ interface ArticlePageProps {
 
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { userName, slug } = await params;
-  const article = await getArticleBySlug(userName, slug);
+  const article = await getCachedArticleBySlug(userName, slug);
 
   if (!article) {
     return { title: 'Article Not Found' };
@@ -74,7 +72,7 @@ function formatDate(dateString: string | null): string {
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const { userName, slug } = await params;
-  const article = await getArticleBySlug(userName, slug);
+  const article = await getCachedArticleBySlug(userName, slug);
 
   if (!article) {
     notFound();

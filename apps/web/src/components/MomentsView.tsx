@@ -1,17 +1,17 @@
 import { BaseLayout } from '@/components/BaseLayout';
 import { MomentsInfiniteFeed } from '@/components/MomentsInfiniteFeed';
 import { PageReady } from '@/components/PageReady';
-import { getMoments } from '@/lib/api';
+import { getCachedMoments } from '@/lib/cachedApi';
 import { USER_NAME } from '@/lib/constants';
 
 export async function MomentsView() {
-  let initialMoments: Awaited<ReturnType<typeof getMoments>>['moments'] = [];
+  let initialMoments: Awaited<ReturnType<typeof getCachedMoments>>['moments'] = [];
   let initialCursor: string | null = null;
   let error: string | null = null;
 
   try {
     // 1 ページ目のみサーバーで取得し、以降はクライアントの無限スクロールで継ぎ足す
-    const page = await getMoments(USER_NAME);
+    const page = await getCachedMoments(USER_NAME);
     initialMoments = page.moments;
     initialCursor = page.nextCursor;
   } catch (e) {

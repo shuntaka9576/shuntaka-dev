@@ -5,6 +5,20 @@ import type { NextConfig } from 'next';
 loadEnvConfig(process.cwd());
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
+  partialPrefetching: true,
+  cacheLife: {
+    blog: {
+      stale: 30,
+      revalidate: 30,
+      expire: 86400,
+    },
+    sitemap: {
+      stale: 60,
+      revalidate: 60,
+      expire: 86400,
+    },
+  },
   // dev サーバーへ localhost 以外のオリジン (Tailscale Funnel 等) からアクセスする場合に
   // .env.local の ALLOWED_DEV_ORIGINS (カンマ区切り) で許可する。本番ビルドには影響しない
   allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS?.split(','),

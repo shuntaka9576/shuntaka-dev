@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   },
 };
 
+// プレビューは検索パラメータの内容全体が揃ってから 1 枚を描画する
+export const instant = false;
+
 /** 写真 URL は moments の配信ドメイン（prd / dev）のみ許可する */
 const ALLOWED_IMAGE_HOSTS = new Set(['images.shuntaka.dev', 'images.shuntaka.tech']);
 

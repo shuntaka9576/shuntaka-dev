@@ -166,7 +166,7 @@ export async function getArticles(
   const url = `${API_BASE_URL}/users/${userName}/articles${query}`;
   const fetchOpts = opts.noCache
     ? { cache: 'no-store' as const, signal: opts.signal }
-    : { next: { revalidate: 30 }, signal: opts.signal };
+    : { signal: opts.signal };
 
   const res = await fetch(url, fetchOpts);
 
@@ -194,7 +194,7 @@ export async function getTagFacets(
   const url = `${API_BASE_URL}/users/${userName}/articles/tag-facets${query}`;
   const fetchOpts = opts.noCache
     ? { cache: 'no-store' as const, signal: opts.signal }
-    : { next: { revalidate: 30 }, signal: opts.signal };
+    : { signal: opts.signal };
 
   const res = await fetch(url, fetchOpts);
 
@@ -248,7 +248,7 @@ export async function getMoments(
   const url = `${API_BASE_URL}/users/${userName}/moments${query}`;
   const fetchOpts = opts.noCache
     ? { cache: 'no-store' as const, signal: opts.signal }
-    : { next: { revalidate: 30 }, signal: opts.signal };
+    : { signal: opts.signal };
 
   const res = await fetch(url, fetchOpts);
 
@@ -260,9 +260,7 @@ export async function getMoments(
 }
 
 export async function getArticleBySlug(userName: string, slug: string): Promise<Article | null> {
-  const res = await fetch(`${API_BASE_URL}/users/${userName}/articles/${slug}`, {
-    next: { revalidate: 30 },
-  });
+  const res = await fetch(`${API_BASE_URL}/users/${userName}/articles/${slug}`);
 
   if (res.status === 404) {
     return null;

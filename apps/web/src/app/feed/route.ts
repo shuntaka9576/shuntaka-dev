@@ -1,5 +1,5 @@
 import RSS from 'rss';
-import { getArticles } from '@/lib/api';
+import { getCachedArticles } from '@/lib/cachedApi';
 import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL, USER_NAME } from '@/lib/constants';
 
 export async function GET() {
@@ -11,7 +11,7 @@ export async function GET() {
     language: 'ja',
   });
 
-  const { articles } = await getArticles(USER_NAME, { perPage: 20 });
+  const { articles } = await getCachedArticles(USER_NAME, { perPage: 20 });
 
   articles.forEach((article) => {
     feed.item({
