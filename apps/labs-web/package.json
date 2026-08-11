@@ -11,6 +11,9 @@
     "preview": "vite preview",
     "type-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
+  "dependencies": {
+    "katex": "^0.18.1"
+  },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.46.5",

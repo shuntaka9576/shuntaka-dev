@@ -251,6 +251,12 @@
   font-style: italic;
 }
 
+.prose [data-math-style='display'] {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 /* Footnotes (comrak footnotes 拡張 + Zenn 風タイトル) */
 .prose sup.footnote-ref a {
   padding: 0 0.1em;

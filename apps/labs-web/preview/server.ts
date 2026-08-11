@@ -12,16 +12,16 @@ import { Hono } from 'hono';
 import { fetchResources, loadWasm } from 'markdown-wasm';
 import { parse as parseYaml } from 'yaml';
 
-// コンテンツは lab-contents-dev のローカルチェックアウトを参照する
+// コンテンツは lab-contents のローカルチェックアウトを参照する
 // （モノレポにはコンテンツ・画像を置かない）。LAB_CONTENTS_DIR で上書き可
 const CONTENTS_ROOT = process.env.LAB_CONTENTS_DIR
   ? resolve(process.env.LAB_CONTENTS_DIR)
-  : join(homedir(), 'repos/github.com/shuntaka9576/lab-contents-dev');
+  : join(homedir(), 'repos/github.com/shuntaka9576/lab-contents');
 const CONTENTS_DIR = join(CONTENTS_ROOT, 'labs');
 if (!existsSync(CONTENTS_DIR)) {
   console.error(
     `コンテンツディレクトリが見つかりません: ${CONTENTS_DIR}\n` +
-      'lab-contents-dev をローカルに用意するか、LAB_CONTENTS_DIR でリポジトリルートを指定してください',
+      'lab-contents をローカルに用意するか、LAB_CONTENTS_DIR でリポジトリルートを指定してください',
   );
   process.exit(1);
 }

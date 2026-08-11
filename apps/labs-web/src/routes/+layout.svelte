@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import 'katex/dist/katex.min.css';
   import { base } from '$app/paths';
 
   let { children } = $props();

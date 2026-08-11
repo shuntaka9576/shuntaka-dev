@@ -1180,6 +1180,7 @@ impl MarkdownConverter {
         options.extension.autolink = true;
         options.extension.tasklist = true;
         options.extension.footnotes = true;
+        options.extension.math_dollars = true;
         options.extension.header_id_prefix = Some("".to_string());
 
         // Render options
@@ -1279,6 +1280,25 @@ mod tests {
         assert!(html.contains("<h1"));
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<em>italic</em>"));
+    }
+
+    #[test]
+    fn test_inline_and_display_math() {
+        let markdown = "inline $x^2 + y^2$\n\n$$\n\\frac{1}{2}\\pi r^2\n$$";
+        let html = convert_markdown_to_html(markdown);
+
+        assert!(html.contains(r#"<span data-math-style="inline">x^2 + y^2</span>"#));
+        assert!(html.contains("<span data-math-style=\"display\">\n\\frac{1}{2}\\pi r^2\n</span>"));
+    }
+
+    #[test]
+    fn test_math_syntax_in_code_is_not_converted() {
+        let markdown = "`$x$`\n\n```text\n$$y$$\n```";
+        let html = convert_markdown_to_html(markdown);
+
+        assert!(html.contains("<code>$x$</code>"));
+        assert!(html.contains("$$y$$"));
+        assert!(!html.contains("data-math-style"));
     }
 
     #[test]
