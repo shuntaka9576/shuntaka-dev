@@ -82,6 +82,15 @@ for (const { name, wasm } of targets) {
       expect(html).toContain('main');
     });
 
+    test('インライン数式と別行数式が KaTeX 描画用の要素に変換される', () => {
+      const html = wasm.convertMarkdownWithResources(
+        'inline $x^2 + y^2$\n\n$$\n\\frac{1}{2}\\pi r^2\n$$',
+        {},
+      );
+      expect(html).toContain('<span data-math-style="inline">x^2 + y^2</span>');
+      expect(html).toContain('<span data-math-style="display">\n\\frac{1}{2}\\pi r^2\n</span>');
+    });
+
     test('カスタムコンテナ (:::message) が変換される', () => {
       const html = wasm.convertMarkdownWithResources('::: message info\nテスト\n:::', {});
       expect(html).toContain('class="message info"');

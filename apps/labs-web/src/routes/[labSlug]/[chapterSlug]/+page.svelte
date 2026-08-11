@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from '$app/paths';
+  import { renderMath } from '$lib/math';
   import { hydrateWidgets } from '$lib/widgets/hydrate';
   import type { PageProps } from './$types';
 
@@ -19,6 +20,7 @@
   $effect(() => {
     void data.chapter.contentHtml;
     if (!contentEl) return;
+    renderMath(contentEl);
     return hydrateWidgets(contentEl);
   });
 </script>

@@ -373,6 +373,10 @@ curl -s -o /dev/null -w '%{http_code}\n' 'https://images.shuntaka.dev/lab-assets
 
 ## 作業ログ
 
+### 2026-08-12
+
+- ローカルプレビューで本番反映前の `lab-contents` を直接確認できるよう、`preview/server.ts` の `LAB_CONTENTS_DIR` 未指定時の参照先を `~/repos/github.com/shuntaka9576/lab-contents-dev` から `~/repos/github.com/shuntaka9576/lab-contents` へ変更。必要な場合は引き続き `LAB_CONTENTS_DIR` で任意のリポジトリルートに切り替え可能
+
 ### 2026-07-28（Phase G / リリース）
 
 - blog_prd へ DDL 適用（labs / lab_chapters）
