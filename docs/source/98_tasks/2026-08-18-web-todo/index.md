@@ -25,6 +25,12 @@ Markdown由来の日次チェックリストとは別に、`やるべきこと`�
 
 日次チェックリストは前日・翌日ボタン、または`/todo?date=YYYY-MM-DD`で過去日を表示できる。チェック済み項目の末尾には、設定タイムゾーンでの完了時刻を表示する。過去日に当日分を誤生成しないよう、手動生成ボタンは当日だけ表示する。
 
+親項目をチェックすると配下の子・孫も同じ完了時刻で完了し、親のチェックを外すと配下も未完了へ戻す。子項目を個別に完了しても親は自動完了しない。
+
+`/todo/calendar`には月間カレンダーを表示する。各日には日次チェックリストの完了数・総数と朝活実績の有無を表示し、日付選択で該当日の`/todo`へ移動する。未来日は選択できない。
+
+朝活実績は9時を入力目安とする。細切れで発生する育児は時間配分から分離し、育児負荷を`なし・軽め・普通・重め`の4段階で記録する。別に自由時間を`0分・30分・1時間・1.5時間・2時間以上`から選び、その主な使い方を`怠け中心・運動中心・学習中心・運動＋学習`から選択する。自由記述は任意とする。10秒以内の入力を目標に、すべてボタン選択で完了できる。アプリ外への通知は行わない。
+
 ### チェックリスト生成
 
 - `/todo/settings` でIANAタイムゾーン、生成時刻、Markdownテンプレートを設定する
@@ -45,23 +51,24 @@ Markdown由来の日次チェックリストとは別に、`やるべきこと`�
 
 ## データモデル
 
-| テーブル              | 用途                                                       |
-| --------------------- | ---------------------------------------------------------- |
-| `todo_settings`       | タイムゾーン、毎朝の生成時刻、規約を含む入力Markdown原文   |
-| `todo_template_items` | 朝・寝る前の階層テンプレート。個人的な本文はここだけに保存 |
-| `todo_daily_items`    | 日付ごとのスナップショットと完了時刻                       |
-| `todo_meals`          | 日付 × 朝昼夜の献立。未定は行を持たない                    |
-| `todo_shopping_items` | 現在必要な買い物。同名は正規化して1件にまとめる            |
-| `todo_quick_items`    | 未完了なら翌日以降も持ち越す簡単なTODO                     |
+| テーブル                    | 用途                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| `todo_settings`             | タイムゾーン、毎朝の生成時刻、規約を含む入力Markdown原文   |
+| `todo_template_items`       | 朝・寝る前の階層テンプレート。個人的な本文はここだけに保存 |
+| `todo_daily_items`          | 日付ごとのスナップショットと完了時刻                       |
+| `todo_meals`                | 日付 × 朝昼夜の献立。未定は行を持たない                    |
+| `todo_shopping_items`       | 現在必要な買い物。同名は正規化して1件にまとめる            |
+| `todo_quick_items`          | 未完了なら翌日以降も持ち越す簡単なTODO                     |
+| `todo_morning_achievements` | 日付ごとの育児負荷、自由時間・使い方、自由記述             |
 
 既存方針に合わせてFKは持たず、ユーザー境界と整合性はAPI層で保証する。
 
 ## 実装箇所
 
-- `apps/admin-web`: `/todo`、`/todo/settings`、Markdown階層パーサー
+- `apps/admin-web`: `/todo`、`/todo/calendar`、`/todo/settings`、Markdown階層パーサー
 - `apps/admin-api`: 認証必須のtodo API、日次生成処理
 - `iac/aws/lib/admin/admin-stack.ts`: 5分間隔のEventBridgeルール
-- `tools/dsql-cli/dsl-tidb/schema/12_*.sql`〜`16_*.sql`: TiDB DDL
+- `tools/dsql-cli/dsl-tidb/schema/12_*.sql`〜`18_*.sql`: TiDB DDL
 
 ## 検証
 
@@ -76,7 +83,7 @@ bun --filter @shuntaka-dev/aws type-check
 bun --filter @shuntaka-dev/aws test
 ```
 
-- admin-api: 13 tests passed
+- admin-api: 16 tests passed
 - admin-web Markdown parser: 1 test passed
 - CDK: 9 tests passed、admin stack snapshot更新済み
 
@@ -97,7 +104,8 @@ for file in schema/12_todo_settings.sql \
   schema/14_todo_daily_items.sql \
   schema/15_todo_meals.sql \
   schema/16_todo_shopping_items.sql \
-  schema/17_todo_quick_items.sql; do
+  schema/17_todo_quick_items.sql \
+  schema/18_todo_morning_achievements.sql; do
   sed 's|${SCHEMA}|blog_dev|g' "$file"
 done | mysql -h "tidb.${TAILNET}" -P 4000 -u root -p
 
@@ -105,7 +113,7 @@ mysql -h "tidb.${TAILNET}" -P 4000 -u root -p -D blog_dev \
   -e "SHOW TABLES LIKE 'todo_%';"
 ```
 
-6テーブルが表示されることを確認する。DDLは`CREATE TABLE IF NOT EXISTS`だけなので再実行でき、既存テーブルへの変更はない。
+7テーブルが表示されることを確認する。DDLは`CREATE TABLE IF NOT EXISTS`だけなので再実行でき、既存テーブルへの変更はない。
 
 ### 2. devデプロイ・動作確認
 
@@ -133,8 +141,10 @@ aws events describe-rule --name d-st-todo-generation \
 2. 初回保存直後に当日分が生成される
 3. 子項目の階層、チェックON/OFF、完了時刻表示、過去日への移動が動く
 4. 簡単なTODOを2分類で追加でき、未完了項目が日付をまたいでも残り、完了・削除できる
-5. 献立の保存・未定への戻し、買い物の同名集約・除外が動く
-6. 設定した時刻の次の5分境界以降に、翌日分が1回だけ生成される
+5. 朝活実績の育児負荷、自由時間、主な使い方、自由記述が数タップで保存できる
+6. カレンダーの月移動、過去日選択、完了件数・朝活実績有無の表示が動く
+7. 献立の保存・未定への戻し、買い物の同名集約・除外が動く
+8. 設定した時刻の次の5分境界以降に、翌日分が1回だけ生成される
 
 DB側の確認は本文を端末へ表示しない集計だけにする。
 
@@ -187,7 +197,8 @@ for file in schema/12_todo_settings.sql \
   schema/14_todo_daily_items.sql \
   schema/15_todo_meals.sql \
   schema/16_todo_shopping_items.sql \
-  schema/17_todo_quick_items.sql; do
+  schema/17_todo_quick_items.sql \
+  schema/18_todo_morning_achievements.sql; do
   sed 's|${SCHEMA}|blog_prd|g' "$file"
 done | mysql -h "tidb.${TAILNET}" -P 4000 -u root -p
 
@@ -260,3 +271,7 @@ aws events disable-rule --name p-st-todo-generation
 - 2026-08-18: Playwrightで`http://localhost:43002/todo`を確認。ログイン画面へ遷移せず、チェックリスト・直近の献立・買い物リストの3セクションが表示された
 - 2026-08-18: `blog_dev`へ`todo_quick_items`を追加適用。未完了項目を日付に依存せず持ち越す簡単なTODOの保存先を確認
 - 2026-08-18: Playwrightで完了時刻表示、`?date=2026-08-17`への履歴移動、簡単なTODOの追加・完了・削除を確認。確認用TODOは削除し、日次チェック状態も元へ戻した
+- 2026-08-18: `blog_dev`へ`todo_morning_achievements`を追加適用。朝活実績の保存先を確認
+- 2026-08-18: 初期の比率入力UIでPlaywright検証後、育児を時間配分から分離する仕様へ変更。確認用レコード1件は条件を限定して削除した
+- 2026-08-18: ユーザー承認後、0件であることを確認した`blog_dev.todo_morning_achievements`だけをDROPし、育児負荷・自由時間・主な使い方を持つ最終DDLで再作成。再作成後も0件であることを確認
+- 2026-08-18: Playwrightで朝活実績を`重め・1.5時間・運動＋学習`として保存・再表示し、親チェックによる子項目の一括完了・一括解除を確認。確認用朝活レコードとチェック状態は元へ戻した

@@ -11,6 +11,7 @@ import {
   type MealType,
   type QuickTodoCategory,
   type QuickTodoItem,
+  type TodoDashboard,
   type TodoPeriod,
 } from '@/entities/todo';
 import { client } from '@/shared/api';
@@ -20,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { Textarea } from '@/shared/ui/textarea';
 
 const formatDate = (date: string): string => date.replaceAll('-', '/');
 const addDays = (date: string, days: number): string => {
@@ -179,6 +181,173 @@ function QuickTodoSection({
   );
 }
 
+type MorningAchievement = NonNullable<TodoDashboard['morningAchievement']>;
+type ParentingLoad = MorningAchievement['parentingLoad'];
+type MorningAllocation = MorningAchievement['allocation'];
+type FreeMinutes = MorningAchievement['freeMinutes'];
+
+const parentingLoadOptions: Array<{ value: ParentingLoad; label: string }> = [
+  { value: 'none', label: 'なし' },
+  { value: 'light', label: '軽め' },
+  { value: 'normal', label: '普通' },
+  { value: 'heavy', label: '重め' },
+];
+
+const freeMinutesOptions: Array<{ value: FreeMinutes; label: string }> = [
+  { value: 0, label: '0分' },
+  { value: 30, label: '30分' },
+  { value: 60, label: '1時間' },
+  { value: 90, label: '1.5時間' },
+  { value: 120, label: '2時間以上' },
+];
+
+const allocationOptions: Array<{
+  value: Exclude<MorningAllocation, 'none'>;
+  label: string;
+}> = [
+  { value: 'idle', label: '怠け中心' },
+  { value: 'exercise', label: '運動中心' },
+  { value: 'study', label: '学習中心' },
+  { value: 'exercise_study', label: '運動＋学習' },
+];
+
+const allocationRatios: Record<
+  MorningAllocation,
+  { idle: number; exercise: number; study: number }
+> = {
+  none: { idle: 0, exercise: 0, study: 0 },
+  idle: { idle: 80, exercise: 10, study: 10 },
+  exercise: { idle: 10, exercise: 80, study: 10 },
+  study: { idle: 10, exercise: 10, study: 80 },
+  exercise_study: { idle: 0, exercise: 50, study: 50 },
+};
+
+function MorningAchievementForm({
+  initialValue,
+  isSaving,
+  onSave,
+}: {
+  initialValue: MorningAchievement | null;
+  isSaving: boolean;
+  onSave: (value: MorningAchievement) => void;
+}) {
+  const [value, setValue] = useState<MorningAchievement>(
+    initialValue ?? {
+      parentingLoad: 'normal',
+      freeMinutes: 60,
+      allocation: 'study',
+      note: '',
+    },
+  );
+  const ratios = allocationRatios[value.allocation];
+  const freeTimeLabel = freeMinutesOptions.find(
+    (option) => option.value === value.freeMinutes,
+  )!.label;
+
+  return (
+    <form
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(value);
+      }}
+    >
+      <fieldset className="space-y-2">
+        <legend className="font-medium">1. 育児負荷</legend>
+        <div className="flex flex-wrap gap-2">
+          {parentingLoadOptions.map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={value.parentingLoad === option.value ? 'default' : 'outline'}
+              onClick={() => setValue((current) => ({ ...current, parentingLoad: option.value }))}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-2">
+        <legend className="font-medium">2. 自由時間</legend>
+        <div className="flex flex-wrap gap-2">
+          {freeMinutesOptions.map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={value.freeMinutes === option.value ? 'default' : 'outline'}
+              onClick={() =>
+                setValue((current) => ({
+                  ...current,
+                  freeMinutes: option.value,
+                  allocation:
+                    option.value === 0
+                      ? 'none'
+                      : current.allocation === 'none'
+                        ? 'study'
+                        : current.allocation,
+                }))
+              }
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-2">
+        <legend className="font-medium">3. 自由時間の主な使い方</legend>
+        <div className="flex flex-wrap gap-2">
+          {allocationOptions.map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={value.allocation === option.value ? 'default' : 'outline'}
+              disabled={value.freeMinutes === 0}
+              onClick={() => setValue((current) => ({ ...current, allocation: option.value }))}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="space-y-2">
+        <div
+          className="flex h-3 overflow-hidden rounded-full bg-muted"
+          aria-label={`怠け${ratios.idle}%、運動${ratios.exercise}%、学習${ratios.study}%`}
+        >
+          <div className="bg-slate-400" style={{ width: `${ratios.idle}%` }} />
+          <div className="bg-emerald-500" style={{ width: `${ratios.exercise}%` }} />
+          <div className="bg-sky-500" style={{ width: `${ratios.study}%` }} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          自由時間 {freeTimeLabel}：怠け {ratios.idle}%・運動 {ratios.exercise}%・学習{' '}
+          {ratios.study}%
+        </p>
+      </div>
+
+      <Label className="grid gap-1.5">
+        <span>4. 自由記述（任意）</span>
+        <Textarea
+          value={value.note}
+          maxLength={2000}
+          rows={3}
+          placeholder="今朝できたこと、気づいたこと"
+          onChange={(event) => setValue((current) => ({ ...current, note: event.target.value }))}
+        />
+      </Label>
+
+      <Button type="submit" disabled={isSaving}>
+        {isSaving ? '保存中…' : '朝活実績を保存'}
+      </Button>
+    </form>
+  );
+}
+
 export function TodoPage({
   date,
   onDateChange,
@@ -198,6 +367,17 @@ export function TodoPage({
         json: { completed: item.completedAt === null },
       });
       if (!response.ok) throw new Error('チェック状態の更新に失敗しました');
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: todoKeys.all }),
+  });
+
+  const saveMorningAchievement = useMutation({
+    mutationFn: async (value: MorningAchievement) => {
+      const response = await client.api.todo['morning-achievements'][':date'].$put({
+        param: { date: dashboard.data!.date },
+        json: value,
+      });
+      if (!response.ok) throw new Error('朝活実績の保存に失敗しました');
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: todoKeys.all }),
   });
@@ -295,6 +475,7 @@ export function TodoPage({
   const timeZone = data.settings?.timezone ?? 'Asia/Tokyo';
   const mutationError =
     toggleItem.error ??
+    saveMorningAchievement.error ??
     createQuickItem.error ??
     toggleQuickItem.error ??
     deleteQuickItem.error ??
@@ -310,9 +491,14 @@ export function TodoPage({
           <h1 className="text-2xl font-semibold">todo</h1>
           <p className="mt-1 text-sm text-muted-foreground">{formatDate(data.date)}</p>
         </div>
-        <ButtonLink to="/todo/settings" variant="outline">
-          設定
-        </ButtonLink>
+        <div className="flex items-center gap-2">
+          <ButtonLink to="/todo/calendar" variant="outline">
+            カレンダー
+          </ButtonLink>
+          <ButtonLink to="/todo/settings" variant="outline">
+            設定
+          </ButtonLink>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -385,6 +571,23 @@ export function TodoPage({
               </section>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>朝活実績</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            9時を目安に、育児負荷と自由時間の使い方を数タップで記録します。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <MorningAchievementForm
+            key={data.date}
+            initialValue={data.morningAchievement}
+            isSaving={saveMorningAchievement.isPending}
+            onSave={(value) => saveMorningAchievement.mutate(value)}
+          />
         </CardContent>
       </Card>
 

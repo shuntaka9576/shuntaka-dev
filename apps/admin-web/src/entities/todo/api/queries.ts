@@ -14,3 +14,16 @@ export function todoDashboardQuery(date?: string) {
     },
   });
 }
+
+export function todoCalendarQuery(month?: string) {
+  return queryOptions({
+    queryKey: [...todoKeys.all, 'calendar', month ?? 'current'],
+    queryFn: async () => {
+      const response = await client.api.todo.calendar.$get({
+        query: month === undefined ? {} : { month },
+      });
+      if (!response.ok) throw new Error('カレンダーの取得に失敗しました');
+      return response.json();
+    },
+  });
+}

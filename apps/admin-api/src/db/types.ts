@@ -73,6 +73,8 @@ export interface LabChaptersTable {
 export type TodoPeriod = 'morning' | 'bedtime';
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 export type TodoQuickCategory = 'task' | 'blog_idea';
+export type TodoParentingLoad = 'none' | 'light' | 'normal' | 'heavy';
+export type TodoMorningAllocation = 'none' | 'idle' | 'exercise' | 'study' | 'exercise_study';
 
 export interface TodoSettingsTable {
   user_id: string;
@@ -138,6 +140,18 @@ export interface TodoQuickItemsTable {
   updated_at: ColumnType<Date, never, never>;
 }
 
+export interface TodoMorningAchievementsTable {
+  achievement_id: string;
+  user_id: string;
+  achievement_date: string;
+  parenting_load: TodoParentingLoad;
+  free_minutes: number;
+  allocation: TodoMorningAllocation;
+  note: string | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
 export interface Database {
   moments: MomentsTable;
   admin_sessions: AdminSessionsTable;
@@ -150,4 +164,5 @@ export interface Database {
   todo_meals: TodoMealsTable;
   todo_shopping_items: TodoShoppingItemsTable;
   todo_quick_items: TodoQuickItemsTable;
+  todo_morning_achievements: TodoMorningAchievementsTable;
 }

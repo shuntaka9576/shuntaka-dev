@@ -9,14 +9,18 @@ import {
   createShoppingItemBodySchema,
   generateTodoResponseSchema,
   mealParamsSchema,
+  morningAchievementDateParamSchema,
   quickItemIdParamSchema,
   quickItemSchema,
   shoppingItemIdParamSchema,
   shoppingItemSchema,
+  todoCalendarQuerySchema,
+  todoCalendarSchema,
   todoDashboardQuerySchema,
   todoDashboardSchema,
   todoItemIdParamSchema,
   updateMealBodySchema,
+  updateMorningAchievementBodySchema,
   updateQuickItemBodySchema,
   updateTodoItemBodySchema,
   updateTodoSettingsBodySchema,
@@ -24,6 +28,7 @@ import {
 import { generateDailyTodosForUser } from '../todo/batch.js';
 import { validateTemplateItems } from '../todo/templates.js';
 import { addDays, isValidTimeZone, localDateTime } from '../todo/time.js';
+import { collectDescendantIds } from '../todo/tree.js';
 
 const dashboardRoute = createRoute({
   method: 'get',
@@ -33,6 +38,18 @@ const dashboardRoute = createRoute({
     200: {
       content: { 'application/json': { schema: todoDashboardSchema } },
       description: '当日のチェックリスト、直近3日分の献立、買い物リスト',
+    },
+  },
+});
+
+const calendarRoute = createRoute({
+  method: 'get',
+  path: '/todo/calendar',
+  request: { query: todoCalendarQuerySchema },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: todoCalendarSchema } },
+      description: '月ごとのチェックリスト生成・完了件数',
     },
   },
 });
@@ -71,6 +88,16 @@ const updateSettingsRoute = createRoute({
   path: '/todo/settings',
   request: { body: { content: { 'application/json': { schema: updateTodoSettingsBodySchema } } } },
   responses: { 204: { description: '設定とテンプレートを保存' } },
+});
+
+const updateMorningAchievementRoute = createRoute({
+  method: 'put',
+  path: '/todo/morning-achievements/{date}',
+  request: {
+    params: morningAchievementDateParamSchema,
+    body: { content: { 'application/json': { schema: updateMorningAchievementBodySchema } } },
+  },
+  responses: { 204: { description: '日付ごとの朝活実績を保存。空文字なら削除' } },
 });
 
 const generateRoute = createRoute({
@@ -128,6 +155,13 @@ const deleteShoppingRoute = createRoute({
 const normalizeShoppingName = (name: string): string =>
   name.normalize('NFKC').toLocaleLowerCase('ja-JP').replace(/\s+/g, ' ').trim();
 
+const nextMonth = (month: string): string => {
+  const [year = 0, monthNumber = 1] = month.split('-').map(Number);
+  return monthNumber === 12
+    ? `${year + 1}-01`
+    : `${year}-${String(monthNumber + 1).padStart(2, '0')}`;
+};
+
 export const todoRoutes = createRouter()
   .openapi(dashboardRoute, async (c) => {
     const userId = c.get('userId');
@@ -142,46 +176,53 @@ export const todoRoutes = createRouter()
     const date = c.req.valid('query').date ?? today;
     const lastDate = addDays(date, 2);
 
-    const [templates, checklistRows, quickTodoRows, mealRows, shoppingRows] = await Promise.all([
-      setting === undefined
-        ? Promise.resolve([])
-        : db
-            .selectFrom('todo_template_items')
-            .selectAll()
-            .where('user_id', '=', userId)
-            .orderBy('period')
-            .orderBy('position')
-            .execute(),
-      db
-        .selectFrom('todo_daily_items')
-        .selectAll()
-        .where('user_id', '=', userId)
-        .where('todo_date', '=', date)
-        .orderBy('period')
-        .orderBy('position')
-        .execute(),
-      db
-        .selectFrom('todo_quick_items')
-        .selectAll()
-        .where('user_id', '=', userId)
-        .orderBy('category')
-        .orderBy('created_at')
-        .execute(),
-      db
-        .selectFrom('todo_meals')
-        .selectAll()
-        .where('user_id', '=', userId)
-        .where('meal_date', '>=', date)
-        .where('meal_date', '<=', lastDate)
-        .orderBy('meal_date')
-        .execute(),
-      db
-        .selectFrom('todo_shopping_items')
-        .selectAll()
-        .where('user_id', '=', userId)
-        .orderBy('created_at')
-        .execute(),
-    ]);
+    const [templates, checklistRows, achievement, quickTodoRows, mealRows, shoppingRows] =
+      await Promise.all([
+        setting === undefined
+          ? Promise.resolve([])
+          : db
+              .selectFrom('todo_template_items')
+              .selectAll()
+              .where('user_id', '=', userId)
+              .orderBy('period')
+              .orderBy('position')
+              .execute(),
+        db
+          .selectFrom('todo_daily_items')
+          .selectAll()
+          .where('user_id', '=', userId)
+          .where('todo_date', '=', date)
+          .orderBy('period')
+          .orderBy('position')
+          .execute(),
+        db
+          .selectFrom('todo_morning_achievements')
+          .selectAll()
+          .where('user_id', '=', userId)
+          .where('achievement_date', '=', date)
+          .executeTakeFirst(),
+        db
+          .selectFrom('todo_quick_items')
+          .selectAll()
+          .where('user_id', '=', userId)
+          .orderBy('category')
+          .orderBy('created_at')
+          .execute(),
+        db
+          .selectFrom('todo_meals')
+          .selectAll()
+          .where('user_id', '=', userId)
+          .where('meal_date', '>=', date)
+          .where('meal_date', '<=', lastDate)
+          .orderBy('meal_date')
+          .execute(),
+        db
+          .selectFrom('todo_shopping_items')
+          .selectAll()
+          .where('user_id', '=', userId)
+          .orderBy('created_at')
+          .execute(),
+      ]);
 
     const mealByDate = new Map<string, Partial<Record<MealType, string>>>();
     for (const row of mealRows) {
@@ -217,6 +258,15 @@ export const todoRoutes = createRouter()
           position: row.position,
           completedAt: row.completed_at?.toISOString() ?? null,
         })),
+        morningAchievement:
+          achievement === undefined
+            ? null
+            : {
+                parentingLoad: achievement.parenting_load,
+                freeMinutes: achievement.free_minutes as 0 | 30 | 60 | 90 | 120,
+                allocation: achievement.allocation,
+                note: achievement.note ?? '',
+              },
         quickTodos: quickTodoRows.map((row) => ({
           itemId: row.quick_item_id,
           category: row.category,
@@ -241,6 +291,80 @@ export const todoRoutes = createRouter()
       },
       200,
     );
+  })
+  .openapi(calendarRoute, async (c) => {
+    const userId = c.get('userId');
+    const setting = await getDb()
+      .selectFrom('todo_settings')
+      .select('timezone')
+      .where('user_id', '=', userId)
+      .executeTakeFirst();
+    const today = localDateTime(new Date(), setting?.timezone ?? 'Asia/Tokyo').date;
+    const month = c.req.valid('query').month ?? today.slice(0, 7);
+    const firstDate = `${month}-01`;
+    const lastDate = addDays(`${nextMonth(month)}-01`, -1);
+    const [rows, achievements] = await Promise.all([
+      getDb()
+        .selectFrom('todo_daily_items')
+        .select(['todo_date', 'completed_at'])
+        .where('user_id', '=', userId)
+        .where('todo_date', '>=', firstDate)
+        .where('todo_date', '<=', lastDate)
+        .orderBy('todo_date')
+        .execute(),
+      getDb()
+        .selectFrom('todo_morning_achievements')
+        .select('achievement_date')
+        .where('user_id', '=', userId)
+        .where('achievement_date', '>=', firstDate)
+        .where('achievement_date', '<=', lastDate)
+        .execute(),
+    ]);
+    const counts = new Map<string, { total: number; completed: number }>();
+    for (const row of rows) {
+      const count = counts.get(row.todo_date) ?? { total: 0, completed: 0 };
+      count.total += 1;
+      if (row.completed_at !== null) count.completed += 1;
+      counts.set(row.todo_date, count);
+    }
+    const achievementDates = new Set(achievements.map((row) => row.achievement_date));
+    const dates = new Set([...counts.keys(), ...achievementDates]);
+    return c.json(
+      {
+        month,
+        today,
+        days: [...dates].sort().map((date) => ({
+          date,
+          ...(counts.get(date) ?? { total: 0, completed: 0 }),
+          hasMorningAchievement: achievementDates.has(date),
+        })),
+      },
+      200,
+    );
+  })
+  .openapi(updateMorningAchievementRoute, async (c) => {
+    const { date } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const userId = c.get('userId');
+    await getDb()
+      .insertInto('todo_morning_achievements')
+      .values({
+        achievement_id: ulid(),
+        user_id: userId,
+        achievement_date: date,
+        parenting_load: body.parentingLoad,
+        free_minutes: body.freeMinutes,
+        allocation: body.allocation,
+        note: body.note.trim() === '' ? null : body.note.trim(),
+      })
+      .onDuplicateKeyUpdate({
+        parenting_load: body.parentingLoad,
+        free_minutes: body.freeMinutes,
+        allocation: body.allocation,
+        note: body.note.trim() === '' ? null : body.note.trim(),
+      })
+      .execute();
+    return c.body(null, 204);
   })
   .openapi(createQuickItemRoute, async (c) => {
     const body = c.req.valid('json');
@@ -359,15 +483,33 @@ export const todoRoutes = createRouter()
   .openapi(updateItemRoute, async (c) => {
     const { id } = c.req.valid('param');
     const { completed } = c.req.valid('json');
-    const result = await getDb()
-      .updateTable('todo_daily_items')
-      .set({ completed_at: completed ? new Date() : null })
+    const userId = c.get('userId');
+    const db = getDb();
+    const target = await db
+      .selectFrom('todo_daily_items')
+      .select(['daily_item_id', 'todo_date'])
       .where('daily_item_id', '=', id)
-      .where('user_id', '=', c.get('userId'))
+      .where('user_id', '=', userId)
       .executeTakeFirst();
-    if (result.numUpdatedRows === 0n) {
+    if (target === undefined) {
       throw new HTTPException(404, { message: 'todo item not found' });
     }
+    const items = await db
+      .selectFrom('todo_daily_items')
+      .select(['daily_item_id', 'parent_daily_item_id'])
+      .where('user_id', '=', userId)
+      .where('todo_date', '=', target.todo_date)
+      .execute();
+    const itemIds = collectDescendantIds(
+      items.map((item) => ({ id: item.daily_item_id, parentId: item.parent_daily_item_id })),
+      id,
+    );
+    await db
+      .updateTable('todo_daily_items')
+      .set({ completed_at: completed ? new Date() : null })
+      .where('daily_item_id', 'in', itemIds)
+      .where('user_id', '=', userId)
+      .execute();
     return c.body(null, 204);
   })
   .openapi(updateMealRoute, async (c) => {

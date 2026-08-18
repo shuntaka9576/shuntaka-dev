@@ -1,4 +1,4 @@
-export { todoDashboardQuery, todoKeys } from './api/queries';
+export { todoCalendarQuery, todoDashboardQuery, todoKeys } from './api/queries';
 export {
   mealLabels,
   periodLabels,
