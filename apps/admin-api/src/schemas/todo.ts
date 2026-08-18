@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi';
 
 export const todoPeriodSchema = z.enum(['morning', 'bedtime']);
 export const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner']);
+export const todoQuickCategorySchema = z.enum(['task', 'blog_idea']);
 export const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const generationTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 
@@ -32,6 +33,14 @@ export const createShoppingItemBodySchema = z.object({
 });
 export const shoppingItemIdParamSchema = z.object({ id: z.string().length(26) });
 
+export const todoDashboardQuerySchema = z.object({ date: localDateSchema.optional() });
+export const createQuickItemBodySchema = z.object({
+  category: todoQuickCategorySchema,
+  title: z.string().trim().min(1).max(1000),
+});
+export const updateQuickItemBodySchema = z.object({ completed: z.boolean() });
+export const quickItemIdParamSchema = z.object({ id: z.string().length(26) });
+
 const todoSettingsSchema = z.object({
   timezone: z.string(),
   generationTime: generationTimeSchema,
@@ -61,11 +70,20 @@ export const shoppingItemSchema = z.object({
   quantity: z.string().nullable(),
 });
 
+export const quickItemSchema = z.object({
+  itemId: z.string(),
+  category: todoQuickCategorySchema,
+  title: z.string(),
+  completedAt: z.string().nullable(),
+});
+
 export const todoDashboardSchema = z
   .object({
     date: localDateSchema,
+    today: localDateSchema,
     settings: todoSettingsSchema.nullable(),
     checklist: z.array(dailyTodoItemSchema),
+    quickTodos: z.array(quickItemSchema),
     meals: z.array(mealSchema),
     shopping: z.array(shoppingItemSchema),
   })

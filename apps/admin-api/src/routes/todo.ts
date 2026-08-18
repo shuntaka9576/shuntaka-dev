@@ -5,14 +5,19 @@ import { getDb } from '../db/client.js';
 import type { MealType } from '../db/types.js';
 import { createRouter } from '../lib/router.js';
 import {
+  createQuickItemBodySchema,
   createShoppingItemBodySchema,
   generateTodoResponseSchema,
   mealParamsSchema,
+  quickItemIdParamSchema,
+  quickItemSchema,
   shoppingItemIdParamSchema,
   shoppingItemSchema,
+  todoDashboardQuerySchema,
   todoDashboardSchema,
   todoItemIdParamSchema,
   updateMealBodySchema,
+  updateQuickItemBodySchema,
   updateTodoItemBodySchema,
   updateTodoSettingsBodySchema,
 } from '../schemas/todo.js';
@@ -23,12 +28,42 @@ import { addDays, isValidTimeZone, localDateTime } from '../todo/time.js';
 const dashboardRoute = createRoute({
   method: 'get',
   path: '/todo',
+  request: { query: todoDashboardQuerySchema },
   responses: {
     200: {
       content: { 'application/json': { schema: todoDashboardSchema } },
       description: '当日のチェックリスト、直近3日分の献立、買い物リスト',
     },
   },
+});
+
+const createQuickItemRoute = createRoute({
+  method: 'post',
+  path: '/todo/quick-items',
+  request: { body: { content: { 'application/json': { schema: createQuickItemBodySchema } } } },
+  responses: {
+    201: {
+      content: { 'application/json': { schema: quickItemSchema } },
+      description: '日をまたいで持ち越す簡易TODOを追加',
+    },
+  },
+});
+
+const updateQuickItemRoute = createRoute({
+  method: 'patch',
+  path: '/todo/quick-items/{id}',
+  request: {
+    params: quickItemIdParamSchema,
+    body: { content: { 'application/json': { schema: updateQuickItemBodySchema } } },
+  },
+  responses: { 204: { description: '簡易TODOのチェック状態を更新' } },
+});
+
+const deleteQuickItemRoute = createRoute({
+  method: 'delete',
+  path: '/todo/quick-items/{id}',
+  request: { params: quickItemIdParamSchema },
+  responses: { 204: { description: '簡易TODOを削除' } },
 });
 
 const updateSettingsRoute = createRoute({
@@ -103,10 +138,11 @@ export const todoRoutes = createRouter()
       .where('user_id', '=', userId)
       .executeTakeFirst();
     const timezone = setting?.timezone ?? 'Asia/Tokyo';
-    const date = localDateTime(new Date(), timezone).date;
+    const today = localDateTime(new Date(), timezone).date;
+    const date = c.req.valid('query').date ?? today;
     const lastDate = addDays(date, 2);
 
-    const [templates, checklistRows, mealRows, shoppingRows] = await Promise.all([
+    const [templates, checklistRows, quickTodoRows, mealRows, shoppingRows] = await Promise.all([
       setting === undefined
         ? Promise.resolve([])
         : db
@@ -123,6 +159,13 @@ export const todoRoutes = createRouter()
         .where('todo_date', '=', date)
         .orderBy('period')
         .orderBy('position')
+        .execute(),
+      db
+        .selectFrom('todo_quick_items')
+        .selectAll()
+        .where('user_id', '=', userId)
+        .orderBy('category')
+        .orderBy('created_at')
         .execute(),
       db
         .selectFrom('todo_meals')
@@ -150,6 +193,7 @@ export const todoRoutes = createRouter()
     return c.json(
       {
         date,
+        today,
         settings:
           setting === undefined
             ? null
@@ -173,6 +217,12 @@ export const todoRoutes = createRouter()
           position: row.position,
           completedAt: row.completed_at?.toISOString() ?? null,
         })),
+        quickTodos: quickTodoRows.map((row) => ({
+          itemId: row.quick_item_id,
+          category: row.category,
+          title: row.title,
+          completedAt: row.completed_at?.toISOString() ?? null,
+        })),
         meals: [0, 1, 2].map((offset) => {
           const mealDate = addDays(date, offset);
           const meals = mealByDate.get(mealDate);
@@ -191,6 +241,51 @@ export const todoRoutes = createRouter()
       },
       200,
     );
+  })
+  .openapi(createQuickItemRoute, async (c) => {
+    const body = c.req.valid('json');
+    const quickItemId = ulid();
+    const userId = c.get('userId');
+    await getDb()
+      .insertInto('todo_quick_items')
+      .values({
+        quick_item_id: quickItemId,
+        user_id: userId,
+        category: body.category,
+        title: body.title,
+        completed_at: null,
+      })
+      .execute();
+    return c.json(
+      { itemId: quickItemId, category: body.category, title: body.title, completedAt: null },
+      201,
+    );
+  })
+  .openapi(updateQuickItemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { completed } = c.req.valid('json');
+    const result = await getDb()
+      .updateTable('todo_quick_items')
+      .set({ completed_at: completed ? new Date() : null })
+      .where('quick_item_id', '=', id)
+      .where('user_id', '=', c.get('userId'))
+      .executeTakeFirst();
+    if (result.numUpdatedRows === 0n) {
+      throw new HTTPException(404, { message: 'quick todo item not found' });
+    }
+    return c.body(null, 204);
+  })
+  .openapi(deleteQuickItemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await getDb()
+      .deleteFrom('todo_quick_items')
+      .where('quick_item_id', '=', id)
+      .where('user_id', '=', c.get('userId'))
+      .executeTakeFirst();
+    if (result.numDeletedRows === 0n) {
+      throw new HTTPException(404, { message: 'quick todo item not found' });
+    }
+    return c.body(null, 204);
   })
   .openapi(updateSettingsRoute, async (c) => {
     const userId = c.get('userId');

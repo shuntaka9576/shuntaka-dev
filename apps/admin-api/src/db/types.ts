@@ -72,6 +72,7 @@ export interface LabChaptersTable {
 
 export type TodoPeriod = 'morning' | 'bedtime';
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
+export type TodoQuickCategory = 'task' | 'blog_idea';
 
 export interface TodoSettingsTable {
   user_id: string;
@@ -127,6 +128,16 @@ export interface TodoShoppingItemsTable {
   updated_at: ColumnType<Date, never, never>;
 }
 
+export interface TodoQuickItemsTable {
+  quick_item_id: string;
+  user_id: string;
+  category: TodoQuickCategory;
+  title: string;
+  completed_at: Date | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
 export interface Database {
   moments: MomentsTable;
   admin_sessions: AdminSessionsTable;
@@ -138,4 +149,5 @@ export interface Database {
   todo_daily_items: TodoDailyItemsTable;
   todo_meals: TodoMealsTable;
   todo_shopping_items: TodoShoppingItemsTable;
+  todo_quick_items: TodoQuickItemsTable;
 }
