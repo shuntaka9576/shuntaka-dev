@@ -2,12 +2,15 @@ import { serve } from '@hono/node-server';
 import { Scalar } from '@scalar/hono-api-reference';
 import { Hono } from 'hono';
 
-// dev の env は bare clone 直下の .envrc (direnv) から継承される。
-// worktree ごとのポート等は .env.local が上書きするので任意で読む
-try {
-  process.loadEnvFile('.env.local');
-} catch {
-  // .env.local が無ければ direnv / シェルの環境変数のみで動く
+// dev の env は bare clone 直下の .envrc (direnv) から継承する。
+// direnv を再読込せず起動した場合にも対応するため、worktree ルートの
+// .env.local を直接読み、app 固有の .env.local があれば最後に上書きする。
+for (const envFile of ['../../.env.local', '.env.local']) {
+  try {
+    process.loadEnvFile(envFile);
+  } catch {
+    // ファイルが無ければ次へ進み、最終的に direnv / シェルの環境変数を使う
+  }
 }
 
 const { app } = await import('./app.js');

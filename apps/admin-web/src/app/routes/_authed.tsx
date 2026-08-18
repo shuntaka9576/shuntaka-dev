@@ -18,6 +18,9 @@ function AuthedLayout() {
               <Link to="/moments" className="text-sm font-semibold">
                 moments
               </Link>
+              <Link to="/todo" className="text-sm font-semibold">
+                todo
+              </Link>
               {/* labs は別 SPA (SvelteKit) なので Router を通さずフルページ遷移 */}
               <a href="/labs/" className="text-sm font-semibold">
                 labs

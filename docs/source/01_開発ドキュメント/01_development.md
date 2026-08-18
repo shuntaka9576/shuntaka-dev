@@ -571,6 +571,7 @@ export COGNITO_USER_POOL_ID=ap-northeast-1_XXXXXXXXX
 export COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 export COOKIE_SECRET=local-dev-cookie-secret-at-least-32-chars
 export DEV_INSECURE_COOKIES=1
+export DEV_AUTH_BYPASS=1 # localhost限定でCognitoログインを省略（任意）
 export IMAGES_BUCKET_NAME=d-st-admin-imagesbucket-xxxxxxxxxx
 export ORIGIN_ALLOWLIST=http://localhost:43002
 

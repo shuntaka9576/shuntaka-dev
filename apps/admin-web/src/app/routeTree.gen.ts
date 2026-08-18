@@ -14,6 +14,9 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedMomentsIndexRouteImport } from './routes/_authed.moments.index'
 import { Route as AuthedMomentsNewRouteImport } from './routes/_authed.moments.new'
+import { Route as AuthedTodoIndexRouteImport } from './routes/_authed.todo.index'
+import { Route as AuthedTodoCalendarRouteImport } from './routes/_authed.todo.calendar'
+import { Route as AuthedTodoSettingsRouteImport } from './routes/_authed.todo.settings'
 import { Route as AuthedMomentsMomentIdEditRouteImport } from './routes/_authed.moments.$momentId.edit'
 
 const IndexRoute = IndexRouteImport.update({
@@ -40,6 +43,21 @@ const AuthedMomentsNewRoute = AuthedMomentsNewRouteImport.update({
   path: '/moments/new',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedTodoIndexRoute = AuthedTodoIndexRouteImport.update({
+  id: '/todo/',
+  path: '/todo/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTodoCalendarRoute = AuthedTodoCalendarRouteImport.update({
+  id: '/todo/calendar',
+  path: '/todo/calendar',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTodoSettingsRoute = AuthedTodoSettingsRouteImport.update({
+  id: '/todo/settings',
+  path: '/todo/settings',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedMomentsMomentIdEditRoute =
   AuthedMomentsMomentIdEditRouteImport.update({
     id: '/moments/$momentId/edit',
@@ -51,14 +69,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/moments/new': typeof AuthedMomentsNewRoute
+  '/todo/calendar': typeof AuthedTodoCalendarRoute
+  '/todo/settings': typeof AuthedTodoSettingsRoute
   '/moments/': typeof AuthedMomentsIndexRoute
+  '/todo/': typeof AuthedTodoIndexRoute
   '/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/moments/new': typeof AuthedMomentsNewRoute
+  '/todo/calendar': typeof AuthedTodoCalendarRoute
+  '/todo/settings': typeof AuthedTodoSettingsRoute
   '/moments': typeof AuthedMomentsIndexRoute
+  '/todo': typeof AuthedTodoIndexRoute
   '/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRoutesById {
@@ -67,22 +91,43 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/moments/new': typeof AuthedMomentsNewRoute
+  '/_authed/todo/calendar': typeof AuthedTodoCalendarRoute
+  '/_authed/todo/settings': typeof AuthedTodoSettingsRoute
   '/_authed/moments/': typeof AuthedMomentsIndexRoute
+  '/_authed/todo/': typeof AuthedTodoIndexRoute
   '/_authed/moments/$momentId/edit': typeof AuthedMomentsMomentIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/moments/new' | '/moments/' | '/moments/$momentId/edit'
+    | '/'
+    | '/login'
+    | '/moments/new'
+    | '/todo/calendar'
+    | '/todo/settings'
+    | '/moments/'
+    | '/todo/'
+    | '/moments/$momentId/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/moments/new' | '/moments' | '/moments/$momentId/edit'
+  to:
+    | '/'
+    | '/login'
+    | '/moments/new'
+    | '/todo/calendar'
+    | '/todo/settings'
+    | '/moments'
+    | '/todo'
+    | '/moments/$momentId/edit'
   id:
     | '__root__'
     | '/'
     | '/_authed'
     | '/login'
     | '/_authed/moments/new'
+    | '/_authed/todo/calendar'
+    | '/_authed/todo/settings'
     | '/_authed/moments/'
+    | '/_authed/todo/'
     | '/_authed/moments/$momentId/edit'
   fileRoutesById: FileRoutesById
 }
@@ -129,6 +174,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMomentsNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/todo/': {
+      id: '/_authed/todo/'
+      path: '/todo'
+      fullPath: '/todo/'
+      preLoaderRoute: typeof AuthedTodoIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/todo/calendar': {
+      id: '/_authed/todo/calendar'
+      path: '/todo/calendar'
+      fullPath: '/todo/calendar'
+      preLoaderRoute: typeof AuthedTodoCalendarRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/todo/settings': {
+      id: '/_authed/todo/settings'
+      path: '/todo/settings'
+      fullPath: '/todo/settings'
+      preLoaderRoute: typeof AuthedTodoSettingsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/moments/$momentId/edit': {
       id: '/_authed/moments/$momentId/edit'
       path: '/moments/$momentId/edit'
@@ -141,13 +207,19 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedMomentsNewRoute: typeof AuthedMomentsNewRoute
+  AuthedTodoCalendarRoute: typeof AuthedTodoCalendarRoute
+  AuthedTodoSettingsRoute: typeof AuthedTodoSettingsRoute
   AuthedMomentsIndexRoute: typeof AuthedMomentsIndexRoute
+  AuthedTodoIndexRoute: typeof AuthedTodoIndexRoute
   AuthedMomentsMomentIdEditRoute: typeof AuthedMomentsMomentIdEditRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedMomentsNewRoute: AuthedMomentsNewRoute,
+  AuthedTodoCalendarRoute: AuthedTodoCalendarRoute,
+  AuthedTodoSettingsRoute: AuthedTodoSettingsRoute,
   AuthedMomentsIndexRoute: AuthedMomentsIndexRoute,
+  AuthedTodoIndexRoute: AuthedTodoIndexRoute,
   AuthedMomentsMomentIdEditRoute: AuthedMomentsMomentIdEditRoute,
 }
 
