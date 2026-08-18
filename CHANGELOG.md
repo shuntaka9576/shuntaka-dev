@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0818.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0811.0...2026.0818.0) - 2026-08-18
+
+- feat: 認証必須のweb todoを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/756
+
 ## [2026.0811.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0808.0...2026.0811.0) - 2026-08-11
 
 - feat: Labsの数式表示とローカルプレビューを改善 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/754
