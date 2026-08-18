@@ -70,10 +70,72 @@ export interface LabChaptersTable {
   updated_at: ColumnType<Date, never, never>;
 }
 
+export type TodoPeriod = 'morning' | 'bedtime';
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+export interface TodoSettingsTable {
+  user_id: string;
+  timezone: string;
+  generation_time: string;
+  source_markdown: string;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
+export interface TodoTemplateItemsTable {
+  template_item_id: string;
+  user_id: string;
+  period: TodoPeriod;
+  parent_template_item_id: string | null;
+  title: string;
+  position: number;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
+export interface TodoDailyItemsTable {
+  daily_item_id: string;
+  user_id: string;
+  todo_date: string;
+  source_template_id: string;
+  parent_daily_item_id: string | null;
+  period: TodoPeriod;
+  title: string;
+  position: number;
+  completed_at: Date | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
+export interface TodoMealsTable {
+  meal_id: string;
+  user_id: string;
+  meal_date: string;
+  meal_type: MealType;
+  content: string;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
+export interface TodoShoppingItemsTable {
+  shopping_item_id: string;
+  user_id: string;
+  name: string;
+  normalized_name: string;
+  quantity: string | null;
+  created_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, never, never>;
+}
+
 export interface Database {
   moments: MomentsTable;
   admin_sessions: AdminSessionsTable;
   users: UsersTable;
   labs: LabsTable;
   lab_chapters: LabChaptersTable;
+  todo_settings: TodoSettingsTable;
+  todo_template_items: TodoTemplateItemsTable;
+  todo_daily_items: TodoDailyItemsTable;
+  todo_meals: TodoMealsTable;
+  todo_shopping_items: TodoShoppingItemsTable;
 }

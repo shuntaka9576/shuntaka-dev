@@ -14,6 +14,8 @@ export const getDb = (): Kysely<Database> => {
         connectionLimit: 2,
         // DATETIME は UTC で保存・解釈する
         timezone: 'Z',
+        // todo の DATE はタイムゾーン変換せず YYYY-MM-DD のまま扱う
+        dateStrings: ['DATE'],
       }),
     }),
   });

@@ -8,6 +8,7 @@ import { imageRoutes } from './routes/images.js';
 import { labRoutes } from './routes/labs.js';
 import { meRoutes } from './routes/me.js';
 import { momentRoutes } from './routes/moments.js';
+import { todoRoutes } from './routes/todo.js';
 
 // CloudFront 側で prefix strip をしないため basePath で /api を持つ
 export const app = createRouter().basePath('/api');
@@ -20,6 +21,8 @@ app.use('/moments/*', sessionAuth);
 app.use('/images/*', sessionAuth);
 app.use('/labs', sessionAuth);
 app.use('/labs/*', sessionAuth);
+app.use('/todo', sessionAuth);
+app.use('/todo/*', sessionAuth);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -34,7 +37,8 @@ const routes = app
   .route('/', meRoutes)
   .route('/', momentRoutes)
   .route('/', imageRoutes)
-  .route('/', labRoutes);
+  .route('/', labRoutes)
+  .route('/', todoRoutes);
 
 // admin-web が hc<AppType> で型共有するための export
 export type AppType = typeof routes;

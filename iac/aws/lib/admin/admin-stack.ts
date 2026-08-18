@@ -9,6 +9,8 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -297,6 +299,19 @@ export class AdminStack extends cdk.Stack {
     );
     // presigned PUT URL の署名者として images バケットへの PutObject を許可
     imagesBucket.grantPut(adminApiLambda, 'images/moments/*');
+
+    // todo_settings の各 timezone / generation_time を5分ごとに評価し、
+    // 設定時刻を過ぎたユーザーの当日チェックリストを冪等生成する。
+    new events.Rule(this, 'TodoGenerationRule', {
+      ruleName: `${props.physicalPrefix}-todo-generation`,
+      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
+      targets: [
+        new eventsTargets.LambdaFunction(adminApiLambda, {
+          event: events.RuleTargetInput.fromObject({ task: 'generate-daily-todos' }),
+          retryAttempts: 2,
+        }),
+      ],
+    });
 
     // ---- API Gateway HTTP API ----
     const httpApi = new apigwv2.HttpApi(this, 'AdminHttpApi', {

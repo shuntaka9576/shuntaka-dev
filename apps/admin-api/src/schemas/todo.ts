@@ -1,0 +1,76 @@
+import { z } from '@hono/zod-openapi';
+
+export const todoPeriodSchema = z.enum(['morning', 'bedtime']);
+export const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner']);
+export const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const generationTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+
+export const todoTemplateInputSchema = z.object({
+  key: z.string().min(1).max(64),
+  parentKey: z.string().min(1).max(64).nullable(),
+  period: todoPeriodSchema,
+  title: z.string().trim().min(1).max(1000),
+  position: z.number().int().min(0),
+});
+
+export const updateTodoSettingsBodySchema = z.object({
+  timezone: z.string().min(1).max(64).default('Asia/Tokyo'),
+  generationTime: generationTimeSchema,
+  sourceMarkdown: z.string().min(1).max(100_000),
+  items: z.array(todoTemplateInputSchema).max(250),
+});
+
+export const updateTodoItemBodySchema = z.object({ completed: z.boolean() });
+export const todoItemIdParamSchema = z.object({ id: z.string().length(26) });
+
+export const mealParamsSchema = z.object({ date: localDateSchema, type: mealTypeSchema });
+export const updateMealBodySchema = z.object({ content: z.string().trim().max(1000) });
+
+export const createShoppingItemBodySchema = z.object({
+  name: z.string().trim().min(1).max(500),
+  quantity: z.string().trim().max(255).optional(),
+});
+export const shoppingItemIdParamSchema = z.object({ id: z.string().length(26) });
+
+const todoSettingsSchema = z.object({
+  timezone: z.string(),
+  generationTime: generationTimeSchema,
+  sourceMarkdown: z.string(),
+  items: z.array(todoTemplateInputSchema),
+});
+
+const dailyTodoItemSchema = z.object({
+  itemId: z.string(),
+  parentItemId: z.string().nullable(),
+  period: todoPeriodSchema,
+  title: z.string(),
+  position: z.number().int(),
+  completedAt: z.string().nullable(),
+});
+
+const mealSchema = z.object({
+  date: localDateSchema,
+  breakfast: z.string().nullable(),
+  lunch: z.string().nullable(),
+  dinner: z.string().nullable(),
+});
+
+export const shoppingItemSchema = z.object({
+  itemId: z.string(),
+  name: z.string(),
+  quantity: z.string().nullable(),
+});
+
+export const todoDashboardSchema = z
+  .object({
+    date: localDateSchema,
+    settings: todoSettingsSchema.nullable(),
+    checklist: z.array(dailyTodoItemSchema),
+    meals: z.array(mealSchema),
+    shopping: z.array(shoppingItemSchema),
+  })
+  .openapi('TodoDashboard');
+
+export const generateTodoResponseSchema = z.object({ date: localDateSchema, created: z.number() });
+
+export type TodoTemplateInput = z.infer<typeof todoTemplateInputSchema>;

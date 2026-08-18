@@ -2050,6 +2050,48 @@ function handler(event) {
       "Type": "Custom::CDKBucketDeployment",
       "UpdateReplacePolicy": "Delete",
     },
+    "TodoGenerationRuleAllowEventRuleTestAdminStackAdminApiLambda7AB29227FE63D804": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AdminApiLambda4D7DC36F",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "TodoGenerationRuleDCC99F12",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "TodoGenerationRuleDCC99F12": {
+      "Properties": {
+        "Name": "tp-dev-todo-generation",
+        "ScheduleExpression": "rate(5 minutes)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "AdminApiLambda4D7DC36F",
+                "Arn",
+              ],
+            },
+            "Id": "Target0",
+            "Input": "{"task":"generate-daily-todos"}",
+            "RetryPolicy": {
+              "MaximumRetryAttempts": 2,
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
     "UserPoolClientIdParam5DF0EADC": {
       "Properties": {
         "Name": "/test/admin/user-pool-client-id",
