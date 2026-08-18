@@ -275,3 +275,4 @@ aws events disable-rule --name p-st-todo-generation
 - 2026-08-18: 初期の比率入力UIでPlaywright検証後、育児を時間配分から分離する仕様へ変更。確認用レコード1件は条件を限定して削除した
 - 2026-08-18: ユーザー承認後、0件であることを確認した`blog_dev.todo_morning_achievements`だけをDROPし、育児負荷・自由時間・主な使い方を持つ最終DDLで再作成。再作成後も0件であることを確認
 - 2026-08-18: Playwrightで朝活実績を`重め・1.5時間・運動＋学習`として保存・再表示し、親チェックによる子項目の一括完了・一括解除を確認。確認用朝活レコードとチェック状態は元へ戻した
+- 2026-08-18: `Deploy` workflow run `32115530217`を`feat/web-todo`、`stageName=dev`、`stack=admin`で手動起動し、3分6秒で成功。`/todo`と`/todo/calendar`が200、未認証`/api/todo`が401、`d-st-todo-generation`が`ENABLED / rate(5 minutes)`であることを確認
