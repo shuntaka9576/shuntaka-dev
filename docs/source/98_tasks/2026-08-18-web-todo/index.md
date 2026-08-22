@@ -7,7 +7,7 @@
 
 ## 目的
 
-毎朝の決まった行動を当日分のチェックリストとして生成し、完了状態を記録する。あわせて、直近3日分の朝・昼・夜の献立と、現在必要な買い物を同じ画面で管理する。
+毎朝の決まった行動を当日分のチェックリストとして生成し、完了状態を記録する。あわせて、直近3日分の朝・昼・夜の献立と、買い物の必要・購入済み状態を同じ画面で管理する。
 
 チェックリスト本文は個人的な内容を含むため、公開リポジトリへ初期値・fixture・seed として置かない。認証後の設定画面から登録し、TiDB のみに保存する。
 
@@ -20,6 +20,8 @@
 3. 買い物リスト
 
 買い物が0件なら `買い物リスト：なし` と表示する。献立の空欄は `未定` として扱う。
+
+買い物項目は`購入済み`ボタンで打ち消し線を付け、リストへ残したままカゴへ入れた品を判別できる。`元に戻す`で未購入へ戻せ、不要になった項目は別の`削除`ボタンで取り除く。同名の品を再追加した場合は数量を更新して未購入へ戻す。
 
 Markdown由来の日次チェックリストとは別に、`やるべきこと`と`ブログネタ`の2分類を持つ簡単なTODOを表示する。簡単なTODOは日付で複製せず継続リストとして保持するため、未完了項目は翌日以降もそのまま持ち越される。追加、完了チェック、未完了への戻し、削除ができる。
 
@@ -57,7 +59,7 @@ Markdown由来の日次チェックリストとは別に、`やるべきこと`�
 | `todo_template_items`       | 朝・寝る前の階層テンプレート。個人的な本文はここだけに保存 |
 | `todo_daily_items`          | 日付ごとのスナップショットと完了時刻                       |
 | `todo_meals`                | 日付 × 朝昼夜の献立。未定は行を持たない                    |
-| `todo_shopping_items`       | 現在必要な買い物。同名は正規化して1件にまとめる            |
+| `todo_shopping_items`       | 買い物と購入済み時刻。同名は正規化して1件にまとめる        |
 | `todo_quick_items`          | 未完了なら翌日以降も持ち越す簡単なTODO                     |
 | `todo_morning_achievements` | 日付ごとの育児負荷、自由時間・使い方、自由記述             |
 
@@ -68,7 +70,7 @@ Markdown由来の日次チェックリストとは別に、`やるべきこと`�
 - `apps/admin-web`: `/todo`、`/todo/calendar`、`/todo/settings`、Markdown階層パーサー
 - `apps/admin-api`: 認証必須のtodo API、日次生成処理
 - `iac/aws/lib/admin/admin-stack.ts`: 5分間隔のEventBridgeルール
-- `tools/dsql-cli/dsl-tidb/schema/12_*.sql`〜`18_*.sql`: TiDB DDL
+- `tools/dsql-cli/dsl-tidb/schema/12_*.sql`〜`19_*.sql`: TiDB DDL
 
 ## 検証
 
@@ -105,15 +107,16 @@ for file in schema/12_todo_settings.sql \
   schema/15_todo_meals.sql \
   schema/16_todo_shopping_items.sql \
   schema/17_todo_quick_items.sql \
-  schema/18_todo_morning_achievements.sql; do
+  schema/18_todo_morning_achievements.sql \
+  schema/19_todo_shopping_items_completed_at.sql; do
   sed 's|${SCHEMA}|blog_dev|g' "$file"
 done | mysql -h "tidb.${TAILNET}" -P 4000 -u root -p
 
 mysql -h "tidb.${TAILNET}" -P 4000 -u root -p -D blog_dev \
-  -e "SHOW TABLES LIKE 'todo_%';"
+  -e "SHOW TABLES LIKE 'todo_%'; SHOW COLUMNS FROM todo_shopping_items LIKE 'completed_at';"
 ```
 
-7テーブルが表示されることを確認する。DDLは`CREATE TABLE IF NOT EXISTS`だけなので再実行でき、既存テーブルへの変更はない。
+7テーブルと`completed_at`カラムが表示されることを確認する。`19_todo_shopping_items_completed_at.sql`は既存テーブル向けの差分DDLなので、同じDBへは1回だけ適用する。
 
 ### 2. devデプロイ・動作確認
 
@@ -143,7 +146,7 @@ aws events describe-rule --name d-st-todo-generation \
 4. 簡単なTODOを2分類で追加でき、未完了項目が日付をまたいでも残り、完了・削除できる
 5. 朝活実績の育児負荷、自由時間、主な使い方、自由記述が数タップで保存できる
 6. カレンダーの月移動、過去日選択、完了件数・朝活実績有無の表示が動く
-7. 献立の保存・未定への戻し、買い物の同名集約・除外が動く
+7. 献立の保存・未定への戻し、買い物の同名集約・購入済み表示・未購入への戻し・削除が動く
 8. 設定した時刻の次の5分境界以降に、翌日分が1回だけ生成される
 
 DB側の確認は本文を端末へ表示しない集計だけにする。
@@ -198,12 +201,13 @@ for file in schema/12_todo_settings.sql \
   schema/15_todo_meals.sql \
   schema/16_todo_shopping_items.sql \
   schema/17_todo_quick_items.sql \
-  schema/18_todo_morning_achievements.sql; do
+  schema/18_todo_morning_achievements.sql \
+  schema/19_todo_shopping_items_completed_at.sql; do
   sed 's|${SCHEMA}|blog_prd|g' "$file"
 done | mysql -h "tidb.${TAILNET}" -P 4000 -u root -p
 
 mysql -h "tidb.${TAILNET}" -P 4000 -u root -p -D blog_prd \
-  -e "SHOW TABLES LIKE 'todo_%';"
+  -e "SHOW TABLES LIKE 'todo_%'; SHOW COLUMNS FROM todo_shopping_items LIKE 'completed_at';"
 ```
 
 ### 5. tagprリリースPRを人間がマージ
@@ -266,6 +270,8 @@ aws events disable-rule --name p-st-todo-generation
 
 ## 実施ログ
 
+- 2026-08-23: `bun run dump:prd`の初回実行は`article_embedding_chunks`読み出し中の接続切断で失敗したが、再実行で32MBの本番バックアップと全テーブルの件数検証が完了。その後`blog_prd.todo_shopping_items`へ`completed_at DATETIME(6) NULL`を追加し、既存の買い物1件が保持されていることを確認
+- 2026-08-23: `blog_dev.todo_shopping_items`へ`completed_at DATETIME(6) NULL`を追加適用。`SHOW COLUMNS`で定義を確認し、適用時点の買い物項目は0件だった
 - 2026-08-18: `blog_dev`へtodo用5テーブルをDDL適用。`SHOW TABLES LIKE 'todo_%'`で全テーブルを確認
 - 2026-08-18: ローカル認証バイパスを追加。ルート`.env.local`をadmin-apiが直接読むようにし、`/api/me`と`/api/todo`が200になることを確認
 - 2026-08-18: Playwrightで`http://localhost:43002/todo`を確認。ログイン画面へ遷移せず、チェックリスト・直近の献立・買い物リストの3セクションが表示された

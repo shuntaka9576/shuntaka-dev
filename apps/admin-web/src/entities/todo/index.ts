@@ -7,6 +7,7 @@ export {
   type MealType,
   type QuickTodoCategory,
   type QuickTodoItem,
+  type ShoppingItem,
   type TodoDashboard,
   type TodoPeriod,
 } from './model/todo';
