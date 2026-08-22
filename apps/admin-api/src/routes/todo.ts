@@ -22,6 +22,7 @@ import {
   updateMealBodySchema,
   updateMorningAchievementBodySchema,
   updateQuickItemBodySchema,
+  updateShoppingItemBodySchema,
   updateTodoItemBodySchema,
   updateTodoSettingsBodySchema,
 } from '../schemas/todo.js';
@@ -145,11 +146,21 @@ const createShoppingRoute = createRoute({
   },
 });
 
+const updateShoppingRoute = createRoute({
+  method: 'patch',
+  path: '/todo/shopping/{id}',
+  request: {
+    params: shoppingItemIdParamSchema,
+    body: { content: { 'application/json': { schema: updateShoppingItemBodySchema } } },
+  },
+  responses: { 204: { description: '買い物項目の購入済み状態を更新' } },
+});
+
 const deleteShoppingRoute = createRoute({
   method: 'delete',
   path: '/todo/shopping/{id}',
   request: { params: shoppingItemIdParamSchema },
-  responses: { 204: { description: '購入済み・不要な項目を除外' } },
+  responses: { 204: { description: '不要な買い物項目を削除' } },
 });
 
 const normalizeShoppingName = (name: string): string =>
@@ -287,6 +298,7 @@ export const todoRoutes = createRouter()
           itemId: row.shopping_item_id,
           name: row.name,
           quantity: row.quantity,
+          completedAt: row.completed_at?.toISOString() ?? null,
         })),
       },
       200,
@@ -547,8 +559,9 @@ export const todoRoutes = createRouter()
         name: body.name,
         normalized_name: normalizedName,
         quantity,
+        completed_at: null,
       })
-      .onDuplicateKeyUpdate({ name: body.name, quantity })
+      .onDuplicateKeyUpdate({ name: body.name, quantity, completed_at: null })
       .execute();
     const row = await db
       .selectFrom('todo_shopping_items')
@@ -556,7 +569,29 @@ export const todoRoutes = createRouter()
       .where('user_id', '=', userId)
       .where('normalized_name', '=', normalizedName)
       .executeTakeFirstOrThrow();
-    return c.json({ itemId: row.shopping_item_id, name: row.name, quantity: row.quantity }, 201);
+    return c.json(
+      {
+        itemId: row.shopping_item_id,
+        name: row.name,
+        quantity: row.quantity,
+        completedAt: row.completed_at?.toISOString() ?? null,
+      },
+      201,
+    );
+  })
+  .openapi(updateShoppingRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { completed } = c.req.valid('json');
+    const result = await getDb()
+      .updateTable('todo_shopping_items')
+      .set({ completed_at: completed ? new Date() : null })
+      .where('shopping_item_id', '=', id)
+      .where('user_id', '=', c.get('userId'))
+      .executeTakeFirst();
+    if (result.numUpdatedRows === 0n) {
+      throw new HTTPException(404, { message: 'shopping item not found' });
+    }
+    return c.body(null, 204);
   })
   .openapi(deleteShoppingRoute, async (c) => {
     const { id } = c.req.valid('param');

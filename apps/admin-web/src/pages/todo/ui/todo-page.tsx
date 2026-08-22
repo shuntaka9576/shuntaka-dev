@@ -11,6 +11,7 @@ import {
   type MealType,
   type QuickTodoCategory,
   type QuickTodoItem,
+  type ShoppingItem,
   type TodoDashboard,
   type TodoPeriod,
 } from '@/entities/todo';
@@ -463,6 +464,17 @@ export function TodoPage({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: todoKeys.all }),
   });
 
+  const toggleShopping = useMutation({
+    mutationFn: async (item: ShoppingItem) => {
+      const response = await client.api.todo.shopping[':id'].$patch({
+        param: { id: item.itemId },
+        json: { completed: item.completedAt === null },
+      });
+      if (!response.ok) throw new Error('買い物項目の購入状態の更新に失敗しました');
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: todoKeys.all }),
+  });
+
   const submitShopping = (event: FormEvent) => {
     event.preventDefault();
     if (shoppingName.trim() !== '') addShopping.mutate();
@@ -482,7 +494,8 @@ export function TodoPage({
     generate.error ??
     updateMeal.error ??
     addShopping.error ??
-    deleteShopping.error;
+    deleteShopping.error ??
+    toggleShopping.error;
 
   return (
     <div className="space-y-5">
@@ -674,19 +687,37 @@ export function TodoPage({
             <ul className="divide-y">
               {data.shopping.map((item) => (
                 <li key={item.itemId} className="flex items-center justify-between gap-3 py-2">
-                  <span className="text-sm">
+                  <span
+                    className={
+                      item.completedAt === null
+                        ? 'text-sm'
+                        : 'text-sm text-muted-foreground line-through'
+                    }
+                  >
                     {item.name}
                     {item.quantity === null ? '' : `（${item.quantity}）`}
                   </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={deleteShopping.isPending}
-                    onClick={() => deleteShopping.mutate(item.itemId)}
-                  >
-                    完了・除外
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={item.completedAt === null ? 'outline' : 'secondary'}
+                      aria-pressed={item.completedAt !== null}
+                      disabled={toggleShopping.isPending || deleteShopping.isPending}
+                      onClick={() => toggleShopping.mutate(item)}
+                    >
+                      {item.completedAt === null ? '購入済み' : '元に戻す'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={toggleShopping.isPending || deleteShopping.isPending}
+                      onClick={() => deleteShopping.mutate(item.itemId)}
+                    >
+                      削除
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -32,6 +32,7 @@ export const createShoppingItemBodySchema = z.object({
   name: z.string().trim().min(1).max(500),
   quantity: z.string().trim().max(255).optional(),
 });
+export const updateShoppingItemBodySchema = z.object({ completed: z.boolean() });
 export const shoppingItemIdParamSchema = z.object({ id: z.string().length(26) });
 
 export const todoDashboardQuerySchema = z.object({ date: localDateSchema.optional() });
@@ -100,6 +101,7 @@ export const shoppingItemSchema = z.object({
   itemId: z.string(),
   name: z.string(),
   quantity: z.string().nullable(),
+  completedAt: z.string().nullable(),
 });
 
 export const quickItemSchema = z.object({

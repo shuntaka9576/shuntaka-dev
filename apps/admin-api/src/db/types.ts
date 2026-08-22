@@ -126,6 +126,7 @@ export interface TodoShoppingItemsTable {
   name: string;
   normalized_name: string;
   quantity: string | null;
+  completed_at: Date | null;
   created_at: ColumnType<Date, never, never>;
   updated_at: ColumnType<Date, never, never>;
 }
