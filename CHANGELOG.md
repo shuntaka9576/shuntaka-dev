@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.0823.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0818.0...2026.0823.0) - 2026-08-23
+
+- feat: 買い物リストに購入済み状態を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/758
+- feat: Firehoseのバッファリングと定期VACUUMを実装 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/763
+
 ## [2026.0818.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0811.0...2026.0818.0) - 2026-08-18
 
 - feat: 認証必須のweb todoを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/756
