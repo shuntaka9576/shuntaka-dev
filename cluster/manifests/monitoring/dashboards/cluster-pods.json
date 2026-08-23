@@ -2,7 +2,7 @@
   "title": "Cluster Pods",
   "uid": "cluster-pods",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "editable": true,
   "tags": ["cluster", "pod"],
   "time": { "from": "now-1h", "to": "now" },
@@ -129,7 +129,7 @@
               "created_by_name": "Owner",
               "Value #B": "_PhaseFlag",
               "Value #C": "Ready",
-              "Value #D": "Restarts",
+              "Value #D": "Restarts (Pod lifetime)",
               "Value #E": "Age",
               "Value #F": "CPU",
               "Value #G": "Memory",
@@ -378,24 +378,25 @@
     },
     {
       "id": 5,
-      "title": "Pod restart count (累積) と最終 restart",
+      "title": "Container restarts (選択期間)",
+      "description": "同じ Pod 内でコンテナが再起動した回数。Deployment の rollout による Pod 再作成は含まない。",
       "type": "table",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (namespace, pod) (kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}) > 0",
+          "expr": "round(sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[$__range]))) > 0",
           "format": "table",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "max by (namespace, pod) (kube_pod_container_status_last_terminated_timestamp{namespace=~\"$namespace\"}) * 1000 > 0",
+          "expr": "(max by (namespace, pod) (max_over_time(kube_pod_container_status_last_terminated_timestamp{namespace=~\"$namespace\"}[$__range])) * 1000 > 0) and on (namespace, pod) (round(sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[$__range]))) > 0)",
           "format": "table",
           "instant": true,
           "refId": "B"
         },
         {
-          "expr": "max by (namespace, pod, reason) (kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\"})",
+          "expr": "(max by (namespace, pod, reason) (last_over_time(kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\"}[$__range])) > 0) and on (namespace, pod) (round(sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[$__range]))) > 0)",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -408,7 +409,7 @@
           "options": {
             "excludeByName": { "Time": true, "Value #C": true },
             "renameByName": {
-              "Value #A": "restarts",
+              "Value #A": "restarts in range",
               "Value #B": "last restart",
               "reason": "last reason"
             }
@@ -571,7 +572,8 @@
     },
     {
       "id": 7,
-      "title": "Pod restart events (10分窓の restart 増分)",
+      "title": "Container restart events (10分窓)",
+      "description": "同じ Pod 内で発生したコンテナ再起動の増分。Deployment の rollout による Pod 再作成は含まない。",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
@@ -588,6 +590,27 @@
         }
       },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 55 }
+    },
+    {
+      "id": 8,
+      "title": "Deployment rollout / spec change events (10分窓)",
+      "description": "Deployment generation の変化を表示する。rollout restart、イメージ更新、replica 数変更などの spec 更新を含む。",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "max by (namespace, deployment) (changes(kube_deployment_metadata_generation{namespace=~\"$namespace\"}[10m])) > 0",
+          "legendFormat": "{{namespace}}/{{deployment}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 63 }
     }
   ]
 }
