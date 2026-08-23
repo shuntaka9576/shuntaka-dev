@@ -209,10 +209,10 @@ bash scripts/maintain-tidb-proxy-iceberg.sh
 
 ### 3. 再発防止: VACUUM の定期実行
 
-バッファ間隔を延ばしても snapshot は増え続けるため、定期 `VACUUM` が必要。2026-08-23 に日次実行基盤を CDK へ追加した。ただし、初回の手動 `VACUUM` と運用確認が完了していないため、スケジュールはデフォルトで無効にしている。
+バッファ間隔を延ばしても snapshot は増え続けるため、定期 `VACUUM` が必要。2026-08-23 に日次実行基盤を CDK へ追加し、2026-08-24 に手動 `VACUUM` の正常完了と前後差分を確認できたためスケジュールを有効化した。
 
 ```text
-EventBridge Rule（毎日 03:00 JST、DISABLED）
+EventBridge Rule（毎日 03:00 JST、ENABLED）
   └─ Step Functions Standard
        └─ Athena StartQueryExecution.sync
             └─ VACUUM tidb_proxy_logs.logs
@@ -220,15 +220,15 @@ EventBridge Rule（毎日 03:00 JST、DISABLED）
 
 実装内容:
 
-- `getLogAnalyticsConfig().vacuum.scheduleEnabled` は `false`
-- EventBridge Rule の CloudFormation `State` は `DISABLED`
+- `getLogAnalyticsConfig().vacuum.scheduleEnabled` は `true`
+- EventBridge Rule の CloudFormation `State` は `ENABLED`
 - Lambda の最大実行時間 15 分を避けるため、Step Functions の Athena `.sync` integration で query の成功・失敗まで待機
-- State Machine と Athena task の timeout は 5 時間。Athena 側の DML timeout quota は別途 240 分への反映が必要
+- State Machine と Athena task の timeout は 5 時間。Athena 側の DML timeout quota は 240 分へ引き上げ済み
 - State Machine の実行ログは CloudWatch Logs に 14 日保持し、X-Ray tracing を有効化
 - VACUUM 用ロールには専用 S3 bucket に対する `s3:DeleteObject` を付与
 - EventBridge からの再試行は 0 回。失敗を隠して重複実行しない
 
-スケジュールが無効な間、State Machine と Athena query は自動実行されない。初回の手動 `VACUUM` が成功し、前後確認が完了してから `scheduleEnabled: true` へ変更する。
+日次実行は毎日 03:00 JST に開始する。Athena queryの完了までStep Functions Standardの `.sync` integrationで待機するが、Standard Workflowは実行時間ではなくstate transition数で課金されるため、40分前後の待機時間による実行時間課金は発生しない。
 
 #### synth / diff / deploy
 
@@ -241,7 +241,7 @@ bunx dotenv -- cdk diff st-tidb-proxy-logs -c stageName=dev
 bunx dotenv -- cdk deploy st-tidb-proxy-logs -c stageName=dev
 ```
 
-デプロイ後、定期実行が無効であることを確認する。
+デプロイ後、定期実行が有効であることを確認する。
 
 ```bash
 aws events describe-rule \
@@ -254,12 +254,12 @@ aws events describe-rule \
 
 ```json
 {
-  "State": "DISABLED",
+  "State": "ENABLED",
   "ScheduleExpression": "cron(0 18 * * ? *)"
 }
 ```
 
-初回対応完了後に定期実行を有効化する場合は、`iac/aws/lib/config.ts` の `scheduleEnabled` を `true` に変更し、同じ synth / diff / deploy を実行する。コンソールや `aws events enable-rule` だけで有効化すると CDK の次回 deploy で `DISABLED` に戻るため、Git 管理の設定を正とする。
+`iac/aws/lib/config.ts` の `scheduleEnabled: true` を正とする。障害対応などで一時停止する場合もコンソールや `aws events disable-rule` だけで変更せず、CDKの設定を変更してdeployし、次回deployで意図せず再有効化されないようにする。
 
 ### 4. 中長期対応: Iceberg を使う必要性の再評価
 
@@ -2340,7 +2340,396 @@ metadata は純減 19,880 objects、約 134.35 GB 削減となり、orphan files
 
 `Retryable: false` のため AWS SDK による自動 retry の対象ではないが、エラーメッセージは残りを処理するために次の `VACUUM` を実行するよう明示している。したがって、これは quota timeout ではなく、20,000 files 単位で処理を継続するための終了状態として扱う。
 
-残りの orphan files 数は metadata objects の総数と一致するとは限らない。次回も同じエラーなら、S3 の純減と実行時間を記録しながら `VACUUM` を反復する。240 分でも timeout する場合や純減が止まった場合は、Firehose の一時停止を含むメンテナンスウィンドウや AWS Support への問い合わせを検討する。
+#### 4 回目の VACUUM
+
+3 回目と同じく、20,000 files を削除した時点で `ICEBERG_VACUUM_MORE_RUNS_NEEDED` になった。実行時間は約 46 分 16 秒で、240 分の quota timeout には到達していない。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `476973a1-8ef3-47cc-8492-6b71982558cd`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 16:36:14 JST                   |
+| 完了             | 2026-08-23 17:22:29 JST                   |
+| Engine execution | 2,775,301 ms（約 46 分 15 秒）            |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>4 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T16:36:14.093000+09:00",
+    "CompletionDateTime": "2026-08-23T17:22:29.653000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2775301,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2775560,
+    "QueryQueueTimeInMillis": 95,
+    "ServicePreProcessingTimeInMillis": 80,
+    "QueryPlanningTimeInMillis": 6,
+    "ServiceProcessingTimeInMillis": 84,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。
+
+| 項目              |            実行前 |            実行後 | 差分             |
+| ----------------- | ----------------: | ----------------: | ---------------- |
+| data objects      |            58,973 |            58,977 | +4               |
+| data bytes        |       309,072,626 |       309,094,214 | +21,588          |
+| metadata objects  |           157,441 |           137,454 | -19,987          |
+| metadata bytes    | 1,565,310,916,416 | 1,192,049,586,860 | -373,261,329,556 |
+| current snapshots |            19,137 |            19,005 | -132             |
+
+metadata はさらに純減 19,987 objects、約 373.26 GB 削減となった。3 回目との累計では、40,000 files の削除により metadata が 39,867 objects、約 507.61 GB 純減している。data objects の +4 は実行中の Firehose 配信による変動範囲である。
+
+#### 5 回目の VACUUM
+
+5 回目も20,000 filesを削除した時点で `ICEBERG_VACUUM_MORE_RUNS_NEEDED` になった。実行時間は約42分08秒だった。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `103758fa-bc13-4d97-a191-5669579a2cd0`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 17:27:36 JST                   |
+| 完了             | 2026-08-23 18:09:44 JST                   |
+| Engine execution | 2,527,812 ms（約42分08秒）                |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>5 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T17:27:36.591000+09:00",
+    "CompletionDateTime": "2026-08-23T18:09:44.652000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2527812,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2528061,
+    "QueryQueueTimeInMillis": 97,
+    "ServicePreProcessingTimeInMillis": 54,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 98,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。
+
+| 項目              |            実行前 |          実行後 | 差分             |
+| ----------------- | ----------------: | --------------: | ---------------- |
+| data objects      |            58,977 |          58,980 | +3               |
+| data bytes        |       309,094,214 |     309,110,194 | +15,980          |
+| metadata objects  |           137,454 |         117,464 | -19,990          |
+| metadata bytes    | 1,192,049,586,860 | 910,000,995,313 | -282,048,591,547 |
+| current snapshots |            19,005 |          18,958 | -47              |
+
+metadata は純減 19,990 objects、約282.05 GB削減となった。3〜5回目の累計では60,000 filesの削除によりmetadataが59,857 objects、約789.66 GB純減している。
+
+#### 6 回目の VACUUM
+
+6 回目も20,000 filesを削除した時点で `ICEBERG_VACUUM_MORE_RUNS_NEEDED` になった。実行時間は約41分55秒だった。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `05e66484-6880-43bf-af7d-845ec7fc25a9`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 18:12:43 JST                   |
+| 完了             | 2026-08-23 18:54:37 JST                   |
+| Engine execution | 2,514,290 ms（約41分54秒）                |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>6 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T18:12:43.358000+09:00",
+    "CompletionDateTime": "2026-08-23T18:54:37.898000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2514290,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2514540,
+    "QueryQueueTimeInMillis": 96,
+    "ServicePreProcessingTimeInMillis": 41,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 113,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。
+
+| 項目              |          実行前 |          実行後 | 差分           |
+| ----------------- | --------------: | --------------: | -------------- |
+| data objects      |          58,980 |          58,982 | +2             |
+| data bytes        |     309,110,194 |     309,120,929 | +10,735        |
+| metadata objects  |         117,464 |          97,471 | -19,993        |
+| metadata bytes    | 910,000,995,313 | 907,997,934,720 | -2,003,060,593 |
+| current snapshots |          18,958 |          18,918 | -40            |
+
+metadata は純減19,993 objects、約2.00 GB削減となった。削除件数は前3回と同じ20,000 filesだが、今回は小さいmetadata filesが中心だったため容量の減少幅は小さい。3〜6回目の累計では80,000 filesの削除によりmetadataが79,850 objects、約791.66 GB純減している。
+
+#### 7 回目の VACUUM
+
+7 回目も20,000 filesを削除した時点で `ICEBERG_VACUUM_MORE_RUNS_NEEDED` になった。実行時間は約41分40秒だった。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `ea62b281-901d-4724-a940-68aa15178cc8`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 18:57:34 JST                   |
+| 完了             | 2026-08-23 19:39:14 JST                   |
+| Engine execution | 2,499,967 ms（約41分40秒）                |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>7 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T18:57:34.722000+09:00",
+    "CompletionDateTime": "2026-08-23T19:39:14.957000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2499967,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2500235,
+    "QueryQueueTimeInMillis": 108,
+    "ServicePreProcessingTimeInMillis": 44,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 116,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。
+
+| 項目              |          実行前 |          実行後 | 差分           |
+| ----------------- | --------------: | --------------: | -------------- |
+| data objects      |          58,983 |          58,985 | +2             |
+| data bytes        |     309,126,251 |     309,136,918 | +10,667        |
+| metadata objects  |          97,474 |          77,481 | -19,993        |
+| metadata bytes    | 908,016,701,639 | 906,192,063,215 | -1,824,638,424 |
+| current snapshots |          18,919 |          18,877 | -42            |
+
+metadata は純減19,993 objects、約1.82 GB削減となった。3〜7回目の累計では100,000 filesの削除によりmetadataが99,840 objects、約793.47 GB純減している。
+
+#### 8 回目の VACUUM
+
+8 回目も20,000 filesを削除した時点で `ICEBERG_VACUUM_MORE_RUNS_NEEDED` になった。実行時間は約42分14秒だった。ローカル端末が休止していたためスクリプトのポーリング結果の表示は翌朝になったが、Athena API上の完了日時は2026-08-23 20:25:51 JSTである。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `ef19989b-9580-4604-82d0-0bf91be7c021`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 19:43:38 JST                   |
+| 完了             | 2026-08-23 20:25:51 JST                   |
+| Engine execution | 2,533,623 ms（約42分14秒）                |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>8 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T19:43:38.022000+09:00",
+    "CompletionDateTime": "2026-08-23T20:25:51.896000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2533623,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2533874,
+    "QueryQueueTimeInMillis": 62,
+    "ServicePreProcessingTimeInMillis": 48,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 141,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前の値は19:42〜19:43 JST、実行後の値は端末復帰後の2026-08-24 04:06 JSTに取得した。この間もFirehoseの書き込みが継続しているため、次の差分はVACUUM単独の削除量ではなく約8時間分の新規書き込みを含む純増減である。
+
+| 項目              |          実行前 |          実行後 | 差分           |
+| ----------------- | --------------: | --------------: | -------------- |
+| data objects      |          58,985 |          59,016 | +31            |
+| data bytes        |     309,136,918 |     309,302,286 | +165,368       |
+| metadata objects  |          77,481 |          57,575 | -19,906        |
+| metadata bytes    | 906,192,063,215 | 904,956,431,645 | -1,235,631,570 |
+| current snapshots |          18,877 |          18,865 | -12            |
+
+metadata は新規書き込みを含めても純減19,906 objects、約1.24 GB削減となった。3〜8回目の累計では120,000 filesの削除によりmetadataが119,746 objects、約794.70 GB純減している。
+
+#### 9 回目の VACUUM（完了）
+
+9 回目は `SUCCEEDED` となり、`ICEBERG_VACUUM_MORE_RUNS_NEEDED` が解消した。実行時間は約40分36秒だった。
+
+| 項目             | 結果                                   |
+| ---------------- | -------------------------------------- |
+| QueryExecutionId | `ab1f8281-75e8-465d-a8e7-5a3a6c5edc94` |
+| 状態             | `SUCCEEDED`                            |
+| 開始             | 2026-08-24 04:07:36 JST                |
+| 完了             | 2026-08-24 04:48:12 JST                |
+| Engine execution | 2,435,849 ms（約40分36秒）             |
+| Data scanned     | 0 bytes                                |
+
+<details>
+<summary>9 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "SUCCEEDED",
+    "SubmissionDateTime": "2026-08-24T04:07:36.731000+09:00",
+    "CompletionDateTime": "2026-08-24T04:48:12.765000+09:00"
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2435849,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2436034,
+    "QueryQueueTimeInMillis": 89,
+    "ServicePreProcessingTimeInMillis": 54,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 42,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。実行中もFirehoseが配信を継続したため、data objectsが2件増えている。
+
+| 項目              |          実行前 |          実行後 | 差分            |
+| ----------------- | --------------: | --------------: | --------------- |
+| data objects      |          59,016 |          59,018 | +2              |
+| data bytes        |     309,302,286 |     309,313,388 | +11,102         |
+| metadata objects  |          57,575 |          55,457 | -2,118          |
+| metadata bytes    | 904,956,431,645 | 885,899,610,435 | -19,056,821,210 |
+| current snapshots |          18,865 |          18,389 | -476            |
+
+9 回目では残っていた対象を削除して正常完了し、metadataはさらに2,118 objects、約19.06 GB純減した。quota反映後の3〜9回目全体では、3〜8回目の120,000 files削除に加えて最終回の残存対象を削除し、次の結果となった。
+
+| 項目              |      3 回目実行前 |    9 回目実行後 | 差分               |
+| ----------------- | ----------------: | --------------: | ------------------ |
+| data objects      |            59,009 |          59,018 | +9                 |
+| data bytes        |       309,260,637 |     309,313,388 | +52,751            |
+| metadata objects  |           177,321 |          55,457 | -121,864（-68.7%） |
+| metadata bytes    | 1,699,657,790,869 | 885,899,610,435 | -813,758,180,434   |
+| current snapshots |            19,513 |          18,389 | -1,124             |
+
+最終的にmetadataは約813.76 GB（約47.9%）削減できた。dataの微増は処理中もFirehoseの配信が正常に継続したためである。残存55,457 objectsには、14日以内のtime travelに必要なsnapshot・manifest・metadata logと、継続配信で生成される現行ファイルが含まれる。Firehoseの900秒化は本番まで適用済みのため、適用前の約60秒周期で生成されたsnapshotが14日の保持期間外へ抜けた後に再度 `VACUUM` を実行し、定常状態まで減少したことを確認する。
 
 ## 対応チェックリスト
 
@@ -2353,14 +2742,14 @@ metadata は純減 19,880 objects、約 134.35 GB 削減となり、orphan files
 - [x] 保持期間を設定する Athena DDL を番号付き SQL で差分管理
 - [x] 初回適用・VACUUM・前後比較用スクリプトを作成
 - [x] 14 日保持の Athena DDL を適用
-- [ ] Athena 実行ロールの `s3:DeleteObject` 権限を確認
+- [x] Athena 実行ロールの `s3:DeleteObject` 権限を実削除結果で確認
 - [x] 30 分上限で `VACUUM` を再実行（2 回目も `Query timeout`）
 - [x] Athena DML query timeout quota を 240 分へ引き上げる（申請から約 5 時間 49 分で反映確認）
-- [x] quota 反映後に3回目の `VACUUM` を実行（20,000 files削除後、継続実行が必要）
-- [ ] `ICEBERG_VACUUM_MORE_RUNS_NEEDED` が解消するまで `VACUUM` を反復
-- [ ] 実行後の容量・クエリ・Firehose 配信を確認
+- [x] quota 反映後に3〜9回目の `VACUUM` を実行（9回目で `SUCCEEDED`）
+- [x] `ICEBERG_VACUUM_MORE_RUNS_NEEDED` が解消するまで `VACUUM` を反復
+- [x] 実行後の容量・クエリ・Firehose 配信を確認
 - [x] Firehose buffer interval 900 秒を CDK へ実装
-- [ ] Firehose buffer interval 900 秒を AWS 環境へデプロイ
-- [x] 定期 VACUUM を CDK へ実装（スケジュールはデフォルト無効）
-- [ ] 初回対応完了後に定期 VACUUM の有効化を判断
+- [x] Firehose buffer interval 900 秒を本番までデプロイ
+- [x] 定期 VACUUM を CDK へ実装
+- [x] 手動 VACUUM の正常完了後、日次スケジュールを有効化
 - [ ] 必要に応じて通常 S3 + partitioned Parquet への移行を判断

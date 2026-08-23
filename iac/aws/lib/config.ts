@@ -314,8 +314,8 @@ export const getLogAnalyticsConfig = (): LogAnalyticsParameter => {
       bufferIntervalSeconds: 900,
     },
     vacuum: {
-      // 初回 VACUUM と運用確認が完了するまで定期実行は有効化しない。
-      scheduleEnabled: false,
+      // 手動 VACUUM の正常完了を確認済み。14 日保持を継続するため日次実行する。
+      scheduleEnabled: true,
       // EventBridge Rule は UTC。毎日 03:00 JST に相当する。
       scheduleExpression: 'cron(0 18 * * ? *)',
     },

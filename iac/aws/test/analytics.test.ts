@@ -34,7 +34,7 @@ describe('TidbProxyLogAnalyticsStack', () => {
     template.hasResourceProperties('AWS::Events::Rule', {
       Name: 'tidb-proxy-logs-vacuum',
       ScheduleExpression: 'cron(0 18 * * ? *)',
-      State: 'DISABLED',
+      State: 'ENABLED',
     });
     template.hasResourceProperties('AWS::StepFunctions::StateMachine', {
       StateMachineName: 'tidb-proxy-logs-vacuum',

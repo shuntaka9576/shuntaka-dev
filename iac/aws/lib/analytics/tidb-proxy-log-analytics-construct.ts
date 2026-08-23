@@ -243,8 +243,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
     // ---- Iceberg VACUUM maintenance ----
     // Athena の VACUUM は初回に 30 分を超える可能性があり、Lambda の最大実行時間
     // では完了待機できない。Step Functions の Athena .sync integration で query の
-    // 成功 / 失敗まで追跡する。初回の手動 VACUUM と運用確認が完了するまでは
-    // EventBridge Rule を DISABLED で作成し、意図しない定期実行を防ぐ。
+    // 成功 / 失敗まで追跡する。EventBridge Rule の有効 / 無効は config で管理する。
     const vacuumExecutionLogGroup = new logs.LogGroup(this, 'VacuumExecutionLogGroup', {
       // cspell:disable-next-line -- Step Functions 用 CloudWatch Logs の AWS 予約 prefix
       logGroupName: `/aws/vendedlogs/states/${config.projectName}-vacuum`,
