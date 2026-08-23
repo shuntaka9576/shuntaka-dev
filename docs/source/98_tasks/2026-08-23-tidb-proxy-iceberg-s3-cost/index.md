@@ -2238,7 +2238,109 @@ aws service-quotas list-service-quotas \
   --output table
 ```
 
-240 分でも完了は保証できない。再び timeout する場合は、同じクエリの反復ではなく Firehose の一時停止を含むメンテナンスウィンドウや、AWS Support への問い合わせを検討する。
+#### quota 引き上げの実行結果
+
+2026-08-23 に 240 分への引き上げを申請し、同日中に実効 quota への反映を確認した。申請 ID、Support case ID、AWS account ID は公開文書には記録しない。
+
+| 項目                             | 結果                    |
+| -------------------------------- | ----------------------- |
+| 申請作成                         | 2026-08-23 08:03:21 JST |
+| `CASE_OPENED` への更新           | 2026-08-23 08:06:28 JST |
+| 30 分を最後に確認                | 2026-08-23 13:51:25 JST |
+| 240 分を最初に確認               | 2026-08-23 13:52:26 JST |
+| 申請から反映確認まで             | 約 5 時間 49 分         |
+| `CASE_OPENED` から反映確認まで   | 約 5 時間 46 分         |
+| 反映後の DML query timeout quota | 240 分                  |
+| 反映確認時点の申請ステータス     | `CASE_OPENED`           |
+
+監視は 60 秒間隔だったため、実際の反映時刻は **13:51:25 から 13:52:26 JST の間**である。申請作成からの正確な所要時間は 5 時間 48 分 4 秒から 5 時間 49 分 5 秒の範囲で、表では約 5 時間 49 分としている。
+
+申請ステータスは反映確認時点でも `CASE_OPENED` だったが、現在の実効値を取得する次のコマンドでは `240.0` を返した。quota の利用可否は申請ステータスではなく、この実効値で判断する。
+
+```bash
+aws service-quotas get-service-quota \
+  --service-code athena \
+  --quota-code L-E80DC288 \
+  --region ap-northeast-1 \
+  --query 'Quota.{Value:Value,QuotaName:QuotaName}' \
+  --output json
+```
+
+```json
+{
+  "Value": 240.0,
+  "QuotaName": "DML query timeout"
+}
+```
+
+#### 3 回目の VACUUM（240 分 quota 反映後）
+
+実効 quota が 240 分になったことを確認してから、3 回目の `VACUUM` を実行した。今回は timeout ではなく、Athena が 1 回の VACUUM で 20,000 files を削除した時点で、残りを次回の VACUUM で処理するよう要求して終了した。
+
+| 項目             | 結果                                      |
+| ---------------- | ----------------------------------------- |
+| QueryExecutionId | `21a4730d-66e0-44ac-93c9-8d8e6c1fa898`    |
+| 状態             | `FAILED`                                  |
+| 理由             | `ICEBERG_VACUUM_MORE_RUNS_NEEDED`         |
+| 開始             | 2026-08-23 14:11:22 JST                   |
+| 完了             | 2026-08-23 14:52:19 JST                   |
+| Engine execution | 2,456,687 ms（約 40 分 57 秒）            |
+| Data scanned     | 0 bytes                                   |
+| 削除済み files   | 20,000（Athena のエラーメッセージによる） |
+
+<details>
+<summary>3 回目の Athena 実行統計</summary>
+
+```json
+{
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files",
+    "SubmissionDateTime": "2026-08-23T14:11:22.963000+09:00",
+    "CompletionDateTime": "2026-08-23T14:52:19.927000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 2,
+      "ErrorType": 233,
+      "Retryable": false,
+      "ErrorMessage": "ICEBERG_VACUUM_MORE_RUNS_NEEDED: Removed 20000 files in this round of vacuum, but there are more files remaining. Please run another VACUUM command to process the remaining files"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 2456687,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 2456964,
+    "QueryQueueTimeInMillis": 97,
+    "ServicePreProcessingTimeInMillis": 44,
+    "QueryPlanningTimeInMillis": 4,
+    "ServiceProcessingTimeInMillis": 136,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+実行前後の S3 と current metadata は次のとおり。
+
+| 項目              |            実行前 |            実行後 | 差分             |
+| ----------------- | ----------------: | ----------------: | ---------------- |
+| data objects      |            59,009 |            58,973 | -36              |
+| data bytes        |       309,260,637 |       309,072,626 | -188,011         |
+| metadata objects  |           177,321 |           157,441 | -19,880          |
+| metadata bytes    | 1,699,657,790,869 | 1,565,310,916,416 | -134,346,874,453 |
+| current snapshots |            19,513 |            19,137 | -376             |
+
+metadata は純減 19,880 objects、約 134.35 GB 削減となり、orphan files の物理削除を初めて確認できた。Athena のメッセージにある削除数 20,000 と純減の差 120 objects は、実行中も Firehose が新しい metadata を書き込み続けている影響を含む。
+
+`Retryable: false` のため AWS SDK による自動 retry の対象ではないが、エラーメッセージは残りを処理するために次の `VACUUM` を実行するよう明示している。したがって、これは quota timeout ではなく、20,000 files 単位で処理を継続するための終了状態として扱う。
+
+残りの orphan files 数は metadata objects の総数と一致するとは限らない。次回も同じエラーなら、S3 の純減と実行時間を記録しながら `VACUUM` を反復する。240 分でも timeout する場合や純減が止まった場合は、Firehose の一時停止を含むメンテナンスウィンドウや AWS Support への問い合わせを検討する。
 
 ## 対応チェックリスト
 
@@ -2253,8 +2355,9 @@ aws service-quotas list-service-quotas \
 - [x] 14 日保持の Athena DDL を適用
 - [ ] Athena 実行ロールの `s3:DeleteObject` 権限を確認
 - [x] 30 分上限で `VACUUM` を再実行（2 回目も `Query timeout`）
-- [ ] Athena DML query timeout quota を 240 分へ引き上げる
-- [ ] quota 反映後に `VACUUM` を再実行して成功させる
+- [x] Athena DML query timeout quota を 240 分へ引き上げる（申請から約 5 時間 49 分で反映確認）
+- [x] quota 反映後に3回目の `VACUUM` を実行（20,000 files削除後、継続実行が必要）
+- [ ] `ICEBERG_VACUUM_MORE_RUNS_NEEDED` が解消するまで `VACUUM` を反復
 - [ ] 実行後の容量・クエリ・Firehose 配信を確認
 - [x] Firehose buffer interval 900 秒を CDK へ実装
 - [ ] Firehose buffer interval 900 秒を AWS 環境へデプロイ
