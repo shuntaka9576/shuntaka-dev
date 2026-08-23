@@ -980,7 +980,7 @@ LIMIT 100",
         "Description": "Run Athena VACUUM for the tidb-proxy Iceberg logs table",
         "Name": "tidb-proxy-logs-vacuum",
         "ScheduleExpression": "cron(0 18 * * ? *)",
-        "State": "DISABLED",
+        "State": "ENABLED",
         "Targets": [
           {
             "Arn": {
