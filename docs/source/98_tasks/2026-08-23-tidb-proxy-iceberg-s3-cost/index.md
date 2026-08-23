@@ -5,7 +5,7 @@
 - 起票日: 2026-08-23
 - 対象環境: dev / prd 共用ログ基盤
 - 対象: `tidb-proxy-logs-<account>` / Glue `tidb_proxy_logs.logs`
-- ステータス: 調査完了、snapshot 保持期間は 14 日に決定、初回 VACUUM 実行待ち
+- ステータス: snapshot 保持期間は 14 日で適用済み、30 分上限での VACUUM は 2 回とも Query timeout
 - 関連タスク: [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](../2026-07-10-tidb-proxy-log-iceberg/index.md)
 - 関連実装: `iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`
 
@@ -13,7 +13,7 @@
 
 S3 高額化の原因はログデータ本体ではなく、Amazon Data Firehose が約 60 秒ごとに作成する Apache Iceberg の snapshot と metadata JSON である。
 
-2026-08-23 の調査時点で、実ログデータは約 293 MiB しかないのに対し、`iceberg/logs/metadata/` は約 1.57 TiB まで増えていた。現在の metadata JSON は 58,433 件の snapshot 履歴を内包して約 57.8 MB あり、コミットのたびに履歴全体を含む新しい metadata JSON が作成される。古い snapshot を `VACUUM` していないため、メタデータ総量がほぼ二次関数的に増加している。
+2026-08-23 の調査時点で、実ログデータは約 293 MiB しかないのに対し、`iceberg/logs/metadata/` は約 1.54 TiB まで増えていた。現在の metadata JSON は 58,433 件の snapshot 履歴を内包して約 57.8 MB あり、コミットのたびに履歴全体を含む新しい metadata JSON が作成される。古い snapshot を `VACUUM` していないため、メタデータ総量がほぼ二次関数的に増加している。
 
 `iceberg/` に S3 Lifecycle の有効期限を直接設定する対応は行わない。Iceberg が参照中のファイルを S3 側だけで削除するとテーブルの整合性を壊すため、Athena の `VACUUM` で snapshot expiration と orphan file removal を行う。
 
@@ -195,7 +195,7 @@ bash scripts/maintain-tidb-proxy-iceberg.sh
 
 ### 2. 再発防止: バッファ間隔の延長
 
-`bufferingHints.intervalInSeconds` を 60 秒から 900 秒へ延長する。Firehose の値は hint だが、低トラフィック時のコミット頻度と S3 書き込み回数を最大で約 15 分の 1 に抑えられる。
+`bufferingHints.intervalInSeconds` を 60 秒から 900 秒へ延長する。Firehose の値は hint だが、低トラフィック時のコミット頻度と S3 書き込み回数を最大で約 15 分の 1 に抑えられる。2026-08-23 に CDK 実装済みだが、まだ AWS 環境へはデプロイしていない。
 
 ```diff
  bufferingHints: {
@@ -209,13 +209,57 @@ bash scripts/maintain-tidb-proxy-iceberg.sh
 
 ### 3. 再発防止: VACUUM の定期実行
 
-バッファ間隔を延ばしても snapshot は増え続けるため、定期 `VACUUM` が必要。日次実行を第一候補とし、実行後の snapshot 数・metadata 容量・失敗状態を監視する。
+バッファ間隔を延ばしても snapshot は増え続けるため、定期 `VACUUM` が必要。2026-08-23 に日次実行基盤を CDK へ追加した。ただし、初回の手動 `VACUUM` と運用確認が完了していないため、スケジュールはデフォルトで無効にしている。
 
-実装候補:
+```text
+EventBridge Rule（毎日 03:00 JST、DISABLED）
+  └─ Step Functions Standard
+       └─ Athena StartQueryExecution.sync
+            └─ VACUUM tidb_proxy_logs.logs
+```
 
-- EventBridge Scheduler から Lambda を起動し、Athena `StartQueryExecution` で `VACUUM` を実行
-- 実行結果は Athena `GetQueryExecution` で確認し、失敗時は CloudWatch Alarm / 通知へ接続
-- WorkGroup は既存の `tidb-proxy-logs` を使用
+実装内容:
+
+- `getLogAnalyticsConfig().vacuum.scheduleEnabled` は `false`
+- EventBridge Rule の CloudFormation `State` は `DISABLED`
+- Lambda の最大実行時間 15 分を避けるため、Step Functions の Athena `.sync` integration で query の成功・失敗まで待機
+- State Machine と Athena task の timeout は 5 時間。Athena 側の DML timeout quota は別途 240 分への反映が必要
+- State Machine の実行ログは CloudWatch Logs に 14 日保持し、X-Ray tracing を有効化
+- VACUUM 用ロールには専用 S3 bucket に対する `s3:DeleteObject` を付与
+- EventBridge からの再試行は 0 回。失敗を隠して重複実行しない
+
+スケジュールが無効な間、State Machine と Athena query は自動実行されない。初回の手動 `VACUUM` が成功し、前後確認が完了してから `scheduleEnabled: true` へ変更する。
+
+#### synth / diff / deploy
+
+リポジトリルートから実行する。
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk synth st-tidb-proxy-logs -c stageName=dev
+bunx dotenv -- cdk diff st-tidb-proxy-logs -c stageName=dev
+bunx dotenv -- cdk deploy st-tidb-proxy-logs -c stageName=dev
+```
+
+デプロイ後、定期実行が無効であることを確認する。
+
+```bash
+aws events describe-rule \
+  --name tidb-proxy-logs-vacuum \
+  --region ap-northeast-1 \
+  --query '{State:State,ScheduleExpression:ScheduleExpression}'
+```
+
+期待値:
+
+```json
+{
+  "State": "DISABLED",
+  "ScheduleExpression": "cron(0 18 * * ? *)"
+}
+```
+
+初回対応完了後に定期実行を有効化する場合は、`iac/aws/lib/config.ts` の `scheduleEnabled` を `true` に変更し、同じ synth / diff / deploy を実行する。コンソールや `aws events enable-rule` だけで有効化すると CDK の次回 deploy で `DISABLED` に戻るため、Git 管理の設定を正とする。
 
 ### 4. 中長期対応: Iceberg を使う必要性の再評価
 
@@ -312,13 +356,1889 @@ aws cloudwatch get-metric-statistics \
 
 ## 初回適用結果
 
-未実施。`scripts/maintain-tidb-proxy-iceberg.sh` の実行後に、以下を記録する。
+2026-08-23 06:11〜06:42 JST に `scripts/maintain-tidb-proxy-iceberg.sh` を実行した。
 
-- retention 設定 query の QueryExecutionId / 成否
-- VACUUM query の QueryExecutionId / 成否
-- 実行前後の data / metadata の object 数と容量
-- 実行前後の snapshot 数
-- Athena SELECT と Firehose 配信の正常性
+<details>
+<summary>初回実行のターミナルログ（クリックして展開）</summary>
+
+公開用に AWS アカウント ID のみ `<account>` へ置換している。その他は実行時の標準出力・標準エラーをそのまま記録した。
+
+```console
+== Target ==
+account_id=<account>
+region=ap-northeast-1
+work_group=tidb-proxy-logs
+database=tidb_proxy_logs
+bucket=tidb-proxy-logs-<account>
+
+== Before: data ==
+{
+    "Objects": 58551,
+    "Bytes": 306859273
+}
+== Before: metadata ==
+{
+    "Objects": 175938,
+    "Bytes": 1690780791917
+}
+== Before: current metadata ==
+metadata_location=s3://tidb-proxy-logs-<account>/iceberg/logs/metadata/58449-ef0c09c8-fbba-4a8b-aa27-82084f5a2887.metadata.json
+{
+  "snapshots": 58449,
+  "snapshot_log": 58449,
+  "metadata_log": 100,
+  "last_updated_ms": 1787433026084
+}
+
+== Apply 14-day snapshot retention ==
+query_execution_id=b529cfc0-5abf-496a-a726-9a5ca4e00da8
+state=RUNNING
+state=SUCCEEDED
+{
+  "query_execution_id": "b529cfc0-5abf-496a-a726-9a5ca4e00da8",
+  "state": "SUCCEEDED",
+  "submission_datetime": "2026-08-23T06:11:19.775000+09:00",
+  "completion_datetime": "2026-08-23T06:11:22.066000+09:00",
+  "engine_execution_ms": 2072,
+  "data_scanned_bytes": 0,
+  "output_location": "s3://tidb-proxy-logs-<account>/athena-results/b529cfc0-5abf-496a-a726-9a5ca4e00da8.txt"
+}
+
+== Vacuum Iceberg table ==
+query_execution_id=64c8fe82-ba90-46e2-b5b2-b8ae7692e58a
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=FAILED
+Query timeout
+```
+
+</details>
+
+### 実行前
+
+| Prefix                   | Object 数 |              合計サイズ |
+| ------------------------ | --------: | ----------------------: |
+| `iceberg/logs/data/`     |    58,551 |       306,859,273 bytes |
+| `iceberg/logs/metadata/` |   175,938 | 1,690,780,791,917 bytes |
+
+実行直前の current metadata は version 58,449。snapshot と snapshot log はともに 58,449 件、metadata log は 100 件だった。
+
+### 14 日保持設定
+
+`001-set-vacuum-retention-14d.sql` は成功した。
+
+| 項目             | 結果                                   |
+| ---------------- | -------------------------------------- |
+| QueryExecutionId | `b529cfc0-5abf-496a-a726-9a5ca4e00da8` |
+| 状態             | `SUCCEEDED`                            |
+| 開始             | 2026-08-23 06:11:19 JST                |
+| 完了             | 2026-08-23 06:11:22 JST                |
+| Engine execution | 2,072 ms                               |
+| Data scanned     | 0 bytes                                |
+
+これにより、time travel 用 snapshot の保持期間 14 日、最低保持数 1、過去 metadata file 100 件の設定は Iceberg metadata に反映された。
+
+### 初回 VACUUM
+
+`vacuum.sql` は約 30 分間 `RUNNING` の後、`Query timeout` で失敗した。
+
+| 項目             | 結果                                   |
+| ---------------- | -------------------------------------- |
+| QueryExecutionId | `64c8fe82-ba90-46e2-b5b2-b8ae7692e58a` |
+| 状態             | `FAILED`                               |
+| 理由             | `Query timeout`                        |
+
+SQL 構文エラーではなく、大量の snapshot / metadata objects を処理中に Athena の実行時間上限へ到達した。東京リージョンの DML query timeout quota は調査時点で 30 分だった。スクリプトは `set -e` と失敗状態の検出により、この時点で停止した。
+
+スクリプト内の「実行後」計測は未実施となったため、失敗後に読み取り専用コマンドで再計測した。
+
+| 項目                 |            実行前 |        timeout 後 | 差分           |
+| -------------------- | ----------------: | ----------------: | -------------- |
+| data objects         |            58,551 |            58,604 | +53            |
+| data bytes           |       306,859,273 |       307,137,080 | +277,807       |
+| metadata objects     |           175,938 |           176,099 | +161           |
+| metadata bytes       | 1,690,780,791,917 | 1,691,864,048,777 | +1,083,256,860 |
+| current snapshots    |            58,449 |            19,170 | -39,279        |
+| current snapshot log |            58,449 |            19,170 | -39,279        |
+| current metadata log |               100 |               100 | 変更なし       |
+
+current metadata の properties も次の値になっていた。
+
+```json
+{
+  "history.expire.max-snapshot-age-ms": "1209600000",
+  "history.expire.min-snapshots-to-keep": "1",
+  "write.metadata.previous-versions-max": "100"
+}
+```
+
+<details>
+<summary>Query timeout 後の再計測ログ（クリックして展開）</summary>
+
+公開用に AWS アカウント ID のみ `<account>` へ置換している。
+
+```console
+POST_FAILURE_DATA
+{
+    "Objects": 58604,
+    "Bytes": 307137080
+}
+POST_FAILURE_METADATA
+{
+    "Objects": 176099,
+    "Bytes": 1691864048777
+}
+POST_FAILURE_CURRENT
+s3://tidb-proxy-logs-<account>/iceberg/logs/metadata/58504-605709f4-ea46-41ca-8c70-b25f05945e45.metadata.json
+{
+  "snapshots": 19170,
+  "snapshot_log": 19170,
+  "metadata_log": 100,
+  "properties": {
+    "history.expire.max-snapshot-age-ms": "1209600000",
+    "write.metadata.previous-versions-max": "100",
+    "write.parquet.compression-codec": "zstd",
+    "history.expire.min-snapshots-to-keep": "1"
+  }
+}
+```
+
+</details>
+
+この結果から、14 日より古い snapshot の expiration と新しい metadata への commit は成功している。一方、過去 metadata objects の物理削除は完了しておらず、Firehose の継続書き込み分も加わって metadata 容量は約 1.08 GB 増加した。`VACUUM` は snapshot expiration 後の orphan file removal 中に timeout したと判断する。
+
+現時点では容量削減を確認できていない。再実行方法を決定するまでは、Iceberg prefix の手動削除を行わない。
+
+### 2 回目の VACUUM
+
+初回 `VACUUM` により current snapshots は 58,449 件から 19,170 件まで削減済み。2 回目は snapshot expiration 後の状態から開始できるため、まず現行の DML query timeout 30 分のまま再実行する。
+
+先に timeout quota を引き上げる案もあるが、初回で snapshot 数が約 3 分の 1 まで減っており、2 回目は初回より少ない処理量で完了する可能性がある。このため、まず 30 分上限のまま再実行して挙動を見ることにした。ただし、約 17.6 万個の metadata objects に対する orphan file removal が引き続きボトルネックになる可能性があり、30 分以内の完了を保証する判断ではない。
+
+AWS SSO 認証済みのリポジトリルートで次を実行する。
+
+```bash
+bash scripts/maintain-tidb-proxy-iceberg.sh
+```
+
+14 日保持の `ALTER TABLE SET TBLPROPERTIES` は同じ値で再適用しても問題ない。スクリプトを再利用し、実行前後の object 数・容量・snapshot 数を同じ形式で記録する。
+
+#### 2 回目の実行結果
+
+2026-08-23 07:15〜07:45 JST に再実行したが、初回と同じく約 30 分で `Query timeout` になった。
+
+<details>
+<summary>2回目のターミナルログ（クリックして展開）</summary>
+
+公開用に AWS アカウント ID のみ `<account>` へ置換している。ポーリング中の `state=RUNNING` も省略していない。
+
+```console
+== Target ==
+account_id=<account>
+region=ap-northeast-1
+work_group=tidb-proxy-logs
+database=tidb_proxy_logs
+bucket=tidb-proxy-logs-<account>
+
+== Before: data ==
+{
+    "Objects": 58614,
+    "Bytes": 307189470
+}
+== Before: metadata ==
+{
+    "Objects": 176130,
+    "Bytes": 1692057595448
+}
+== Before: current metadata ==
+metadata_location=s3://tidb-proxy-logs-<account>/iceberg/logs/metadata/58514-2828373f-46ea-41f7-8923-ae42132e3440.metadata.json
+{
+  "snapshots": 19180,
+  "snapshot_log": 19180,
+  "metadata_log": 100,
+  "last_updated_ms": 1787436868021
+}
+
+== Apply 14-day snapshot retention ==
+query_execution_id=91fd5d6a-74fb-452f-b515-dd3178689486
+state=RUNNING
+state=SUCCEEDED
+{
+  "query_execution_id": "91fd5d6a-74fb-452f-b515-dd3178689486",
+  "state": "SUCCEEDED",
+  "submission_datetime": "2026-08-23T07:15:22.697000+09:00",
+  "completion_datetime": "2026-08-23T07:15:23.306000+09:00",
+  "engine_execution_ms": 431,
+  "data_scanned_bytes": 0,
+  "output_location": "s3://tidb-proxy-logs-<account>/athena-results/91fd5d6a-74fb-452f-b515-dd3178689486.txt"
+}
+
+== Vacuum Iceberg table ==
+query_execution_id=0cf73a44-0b78-4fd7-810c-ac9c4484c628
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=RUNNING
+state=FAILED
+Query timeout
+```
+
+</details>
+
+<details>
+<summary>初回・2回目の Athena 実行統計（クリックして展開）</summary>
+
+```json
+{
+  "id": "64c8fe82-ba90-46e2-b5b2-b8ae7692e58a",
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "Query timeout",
+    "SubmissionDateTime": "2026-08-23T06:11:22.820000+09:00",
+    "CompletionDateTime": "2026-08-23T06:41:58.705000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 1,
+      "ErrorType": 206,
+      "Retryable": false,
+      "ErrorMessage": "Query timeout"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 1797318,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 1835885,
+    "QueryQueueTimeInMillis": 91,
+    "ServicePreProcessingTimeInMillis": 46,
+    "ServiceProcessingTimeInMillis": 38430,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+{
+  "id": "0cf73a44-0b78-4fd7-810c-ac9c4484c628",
+  "status": {
+    "State": "FAILED",
+    "StateChangeReason": "Query timeout",
+    "SubmissionDateTime": "2026-08-23T07:15:25.727000+09:00",
+    "CompletionDateTime": "2026-08-23T07:45:32.141000+09:00",
+    "AthenaError": {
+      "ErrorCategory": 1,
+      "ErrorType": 206,
+      "Retryable": false,
+      "ErrorMessage": "Query timeout"
+    }
+  },
+  "statistics": {
+    "EngineExecutionTimeInMillis": 1771820,
+    "DataScannedInBytes": 0,
+    "TotalExecutionTimeInMillis": 1806414,
+    "QueryQueueTimeInMillis": 85,
+    "ServicePreProcessingTimeInMillis": 47,
+    "ServiceProcessingTimeInMillis": 34462,
+    "ResultReuseInformation": {
+      "ReusedPreviousResult": false
+    }
+  },
+  "engine_version": {
+    "SelectedEngineVersion": "Athena engine version 3",
+    "EffectiveEngineVersion": "Athena engine version 3"
+  }
+}
+```
+
+</details>
+
+2 回目の開始前と timeout 後を比較した。
+
+| 項目                     |      2 回目開始前 |        timeout 後 | 差分         |
+| ------------------------ | ----------------: | ----------------: | ------------ |
+| metadata objects         |           176,130 |           176,233 | +103         |
+| metadata bytes           | 1,692,057,595,448 | 1,692,721,833,620 | +664,238,172 |
+| current snapshots        |            19,180 |            19,151 | -29          |
+| Athena DML timeout quota |             30 分 |             30 分 | 変更なし     |
+
+snapshot 数はほぼ変わらず、metadata objects と容量は Firehose の継続書き込みにより増加した。2 回目でも orphan file removal による物理削除は確認できず、同じ 30 分上限での再試行が完了する可能性は低い。
+
+両方とも query queue は 100 ms 未満、engine execution は約 29.5〜30 分、data scanned は 0 bytes だった。2 回目がキュー待ちや通常の SQL データスキャンで遅延したのではなく、初回と同じ Iceberg メンテナンス処理を実行時間上限まで行っている。初回で 14 日より古い snapshot の expiration は反映済みのため、2 回目に減らせる snapshot はほぼ残っていなかった。一方、orphan file removal が前回の checkpoint から再開された形跡はなく、timeout 後も旧 metadata objects の物理削除は確認できなかった。
+
+#### 3 回目の実行方針
+
+次回は東京リージョンの Athena DML query timeout quota を 30 分から 240 分へ引き上げ、現在値への反映を確認してから再実行する。120 分でも完了する可能性はあるが、2 回連続で 30 分上限へ到達し、物理削除が進んでいないため、再試行回数を減らす目的で公式上限の 240 分を選ぶ。
+
+調査時点の Quota Code は `L-E80DC288` で、quota は調整可能。
+
+```bash
+aws service-quotas request-service-quota-increase \
+  --service-code athena \
+  --quota-code L-E80DC288 \
+  --desired-value 240 \
+  --region ap-northeast-1
+```
+
+quota 申請後は申請状態を確認し、現在値が 240 分になってから `VACUUM` を再実行する。申請直後に即時反映されるとは限らない。
+
+```bash
+aws service-quotas list-service-quotas \
+  --service-code athena \
+  --region ap-northeast-1 \
+  --query "Quotas[?QuotaCode=='L-E80DC288'].[QuotaName,Value,QuotaCode,Adjustable]" \
+  --output table
+```
+
+240 分でも完了は保証できない。再び timeout する場合は、同じクエリの反復ではなく Firehose の一時停止を含むメンテナンスウィンドウや、AWS Support への問い合わせを検討する。
 
 ## 対応チェックリスト
 
@@ -330,9 +2250,14 @@ aws cloudwatch get-metric-statistics \
 - [x] time travel 保持期間を 14 日に決定
 - [x] 保持期間を設定する Athena DDL を番号付き SQL で差分管理
 - [x] 初回適用・VACUUM・前後比較用スクリプトを作成
+- [x] 14 日保持の Athena DDL を適用
 - [ ] Athena 実行ロールの `s3:DeleteObject` 権限を確認
-- [ ] `VACUUM tidb_proxy_logs.logs` を実行
+- [x] 30 分上限で `VACUUM` を再実行（2 回目も `Query timeout`）
+- [ ] Athena DML query timeout quota を 240 分へ引き上げる
+- [ ] quota 反映後に `VACUUM` を再実行して成功させる
 - [ ] 実行後の容量・クエリ・Firehose 配信を確認
-- [ ] Firehose buffer interval を 900 秒へ変更
-- [ ] 定期 VACUUM を IaC 化
+- [x] Firehose buffer interval 900 秒を CDK へ実装
+- [ ] Firehose buffer interval 900 秒を AWS 環境へデプロイ
+- [x] 定期 VACUUM を CDK へ実装（スケジュールはデフォルト無効）
+- [ ] 初回対応完了後に定期 VACUUM の有効化を判断
 - [ ] 必要に応じて通常 S3 + partitioned Parquet への移行を判断

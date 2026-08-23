@@ -2,6 +2,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cdk from 'aws-cdk-lib';
 import * as athena from 'aws-cdk-lib/aws-athena';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as firehose from 'aws-cdk-lib/aws-kinesisfirehose';
@@ -9,6 +11,8 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
+import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
 import { type LogAnalyticsParameter } from '../config.js';
 
@@ -193,7 +197,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         // insert-only のログ用途なので append-only (行更新の CDC 経路を持たない)。
         appendOnly: true,
         bufferingHints: {
-          intervalInSeconds: 60,
+          intervalInSeconds: config.firehose.bufferIntervalSeconds,
           sizeInMBs: 64,
         },
         s3BackupMode: 'FailedDataOnly',
@@ -234,6 +238,62 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
           },
         },
       },
+    });
+
+    // ---- Iceberg VACUUM maintenance ----
+    // Athena の VACUUM は初回に 30 分を超える可能性があり、Lambda の最大実行時間
+    // では完了待機できない。Step Functions の Athena .sync integration で query の
+    // 成功 / 失敗まで追跡する。初回の手動 VACUUM と運用確認が完了するまでは
+    // EventBridge Rule を DISABLED で作成し、意図しない定期実行を防ぐ。
+    const vacuumExecutionLogGroup = new logs.LogGroup(this, 'VacuumExecutionLogGroup', {
+      // cspell:disable-next-line -- Step Functions 用 CloudWatch Logs の AWS 予約 prefix
+      logGroupName: `/aws/vendedlogs/states/${config.projectName}-vacuum`,
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const vacuumQuery = new sfnTasks.AthenaStartQueryExecution(this, 'VacuumQuery', {
+      integrationPattern: sfn.IntegrationPattern.RUN_JOB,
+      queryString: `VACUUM ${config.glue.databaseName}.${config.glue.tableName}`,
+      queryExecutionContext: {
+        databaseName: config.glue.databaseName,
+      },
+      workGroup: config.athena.workGroupName,
+      resultConfiguration: {
+        outputLocation: {
+          bucketName: this.bucket.bucketName,
+          objectKey: 'athena-results/vacuum',
+        },
+      },
+      taskTimeout: sfn.Timeout.duration(cdk.Duration.hours(5)),
+    });
+    const vacuumStateMachine = new sfn.StateMachine(this, 'VacuumStateMachine', {
+      stateMachineName: `${config.projectName}-vacuum`,
+      definitionBody: sfn.DefinitionBody.fromChainable(vacuumQuery),
+      stateMachineType: sfn.StateMachineType.STANDARD,
+      timeout: cdk.Duration.hours(5),
+      logs: {
+        destination: vacuumExecutionLogGroup,
+        level: sfn.LogLevel.ALL,
+        includeExecutionData: true,
+      },
+      tracingEnabled: true,
+    });
+    // AthenaStartQueryExecution の自動生成ポリシーには S3 DeleteObject が含まれない。
+    // VACUUM が到達不能な Iceberg files を削除できるよう、専用 bucket のみに付与する。
+    this.bucket.grantDelete(vacuumStateMachine);
+    vacuumStateMachine.node.addDependency(glueTable);
+    vacuumStateMachine.node.addDependency(workGroup);
+
+    new events.Rule(this, 'VacuumSchedule', {
+      ruleName: `${config.projectName}-vacuum`,
+      description: 'Run Athena VACUUM for the tidb-proxy Iceberg logs table',
+      enabled: config.vacuum.scheduleEnabled,
+      schedule: events.Schedule.expression(config.vacuum.scheduleExpression),
+      targets: [
+        new eventsTargets.SfnStateMachine(vacuumStateMachine, {
+          retryAttempts: 0,
+        }),
+      ],
     });
 
     // ---- Athena Named Queries (よく使う検索の登録) ----

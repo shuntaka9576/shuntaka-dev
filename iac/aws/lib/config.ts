@@ -277,6 +277,11 @@ export interface LogAnalyticsParameter {
   };
   firehose: {
     deliveryStreamName: string;
+    bufferIntervalSeconds: number;
+  };
+  vacuum: {
+    scheduleEnabled: boolean;
+    scheduleExpression: string;
   };
   ssm: {
     // st-tidb-proxy スタックの出力を import する (読み取りのみ)
@@ -305,6 +310,14 @@ export const getLogAnalyticsConfig = (): LogAnalyticsParameter => {
     },
     firehose: {
       deliveryStreamName: 'tidb-proxy-logs',
+      // Firehose の Iceberg commit 頻度を抑え、metadata JSON の増加を抑制する。
+      bufferIntervalSeconds: 900,
+    },
+    vacuum: {
+      // 初回 VACUUM と運用確認が完了するまで定期実行は有効化しない。
+      scheduleEnabled: false,
+      // EventBridge Rule は UTC。毎日 03:00 JST に相当する。
+      scheduleExpression: 'cron(0 18 * * ? *)',
     },
     ssm: {
       proxy: {

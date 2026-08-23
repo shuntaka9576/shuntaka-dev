@@ -238,7 +238,7 @@ exports[`TidbProxyLogAnalyticsStack > snapshot 1`] = `
         "IcebergDestinationConfiguration": {
           "AppendOnly": true,
           "BufferingHints": {
-            "IntervalInSeconds": 60,
+            "IntervalInSeconds": 900,
             "SizeInMBs": 64,
           },
           "CatalogConfiguration": {
@@ -965,6 +965,376 @@ LIMIT 100",
         "WorkGroup": "tidb-proxy-logs",
       },
       "Type": "AWS::Athena::NamedQuery",
+    },
+    "LogAnalyticsVacuumExecutionLogGroup6F771A73": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/vendedlogs/states/tidb-proxy-logs-vacuum",
+        "RetentionInDays": 14,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LogAnalyticsVacuumSchedule551BE73F": {
+      "Properties": {
+        "Description": "Run Athena VACUUM for the tidb-proxy Iceberg logs table",
+        "Name": "tidb-proxy-logs-vacuum",
+        "ScheduleExpression": "cron(0 18 * * ? *)",
+        "State": "DISABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Ref": "LogAnalyticsVacuumStateMachine1495758E",
+            },
+            "Id": "Target0",
+            "RetryPolicy": {
+              "MaximumRetryAttempts": 0,
+            },
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "LogAnalyticsVacuumStateMachine1495758E": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "LogAnalyticsLogsTable3388531E",
+        "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0",
+        "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
+        "LogAnalyticsWorkGroupFB93F96A",
+      ],
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{"StartAt":"VacuumQuery","States":{"VacuumQuery":{"End":true,"Type":"Task","TimeoutSeconds":18000,"Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::athena:startQueryExecution.sync","Parameters":{"QueryString":"VACUUM tidb_proxy_logs.logs","QueryExecutionContext":{"Database":"tidb_proxy_logs"},"ResultConfiguration":{"OutputLocation":"s3://",
+              {
+                "Ref": "LogAnalyticsLogsBucket18E6FEA3",
+              },
+              "/athena-results/vacuum/"},"WorkGroup":"tidb-proxy-logs"}}},"TimeoutSeconds":18000}",
+            ],
+          ],
+        },
+        "LoggingConfiguration": {
+          "Destinations": [
+            {
+              "CloudWatchLogsLogGroup": {
+                "LogGroupArn": {
+                  "Fn::GetAtt": [
+                    "LogAnalyticsVacuumExecutionLogGroup6F771A73",
+                    "Arn",
+                  ],
+                },
+              },
+            },
+          ],
+          "IncludeExecutionData": true,
+          "Level": "ALL",
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
+            "Arn",
+          ],
+        },
+        "StateMachineName": "tidb-proxy-logs-vacuum",
+        "StateMachineType": "STANDARD",
+        "TracingConfiguration": {
+          "Enabled": true,
+        },
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A": {
+      "DependsOn": [
+        "LogAnalyticsLogsTable3388531E",
+        "LogAnalyticsWorkGroupFB93F96A",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LogAnalyticsVacuumStateMachineEventsRoleDefaultPolicyAB0F9026": {
+      "DependsOn": [
+        "LogAnalyticsLogsTable3388531E",
+        "LogAnalyticsWorkGroupFB93F96A",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "LogAnalyticsVacuumStateMachine1495758E",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "LogAnalyticsVacuumStateMachineEventsRoleDefaultPolicyAB0F9026",
+        "Roles": [
+          {
+            "Ref": "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "LogAnalyticsVacuumStateMachineRoleB3DF2E3C": {
+      "DependsOn": [
+        "LogAnalyticsLogsTable3388531E",
+        "LogAnalyticsWorkGroupFB93F96A",
+      ],
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0": {
+      "DependsOn": [
+        "LogAnalyticsLogsTable3388531E",
+        "LogAnalyticsWorkGroupFB93F96A",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "athena:getDataCatalog",
+                "athena:startQueryExecution",
+                "athena:getQueryExecution",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":athena:ap-northeast-1:123456789012:datacatalog/AwsDataCatalog",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":athena:ap-northeast-1:123456789012:workgroup/tidb-proxy-logs",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:CreateBucket",
+                "s3:ListBucket",
+                "s3:GetBucketLocation",
+                "s3:GetObject",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "s3:AbortMultipartUpload",
+                "s3:ListBucketMultipartUploads",
+                "s3:ListMultipartUploadParts",
+                "s3:PutObject",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":s3:::",
+                    {
+                      "Ref": "LogAnalyticsLogsBucket18E6FEA3",
+                    },
+                    "/athena-results/vacuum/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": "lakeformation:GetDataAccess",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "glue:BatchCreatePartition",
+                "glue:BatchDeletePartition",
+                "glue:BatchDeleteTable",
+                "glue:BatchGetPartition",
+                "glue:CreateDatabase",
+                "glue:CreatePartition",
+                "glue:CreateTable",
+                "glue:DeleteDatabase",
+                "glue:DeletePartition",
+                "glue:DeleteTable",
+                "glue:GetDatabase",
+                "glue:GetDatabases",
+                "glue:GetPartition",
+                "glue:GetPartitions",
+                "glue:GetTable",
+                "glue:GetTables",
+                "glue:UpdateDatabase",
+                "glue:UpdatePartition",
+                "glue:UpdateTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":glue:ap-northeast-1:123456789012:catalog",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":glue:ap-northeast-1:123456789012:database/tidb_proxy_logs",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":glue:ap-northeast-1:123456789012:table/tidb_proxy_logs/*",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":glue:ap-northeast-1:123456789012:userDefinedFunction/tidb_proxy_logs/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": "s3:DeleteObject*",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "LogAnalyticsLogsBucket18E6FEA3",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0",
+        "Roles": [
+          {
+            "Ref": "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "LogAnalyticsWorkGroupFB93F96A": {
       "Properties": {
