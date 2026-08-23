@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AwsSolutionsChecks } from 'cdk-nag';
 import { TidbProxyLogAnalyticsStack } from '../lib/analytics/tidb-proxy-log-analytics-stack.js';
 import { getLogAnalyticsConfig } from '../lib/config.js';
@@ -23,6 +23,26 @@ describe('TidbProxyLogAnalyticsStack', () => {
     expect(report.violations).toEqual([]);
 
     const template = Template.fromStack(stack);
+    template.hasResourceProperties('AWS::KinesisFirehose::DeliveryStream', {
+      IcebergDestinationConfiguration: Match.objectLike({
+        BufferingHints: {
+          IntervalInSeconds: 900,
+          SizeInMBs: 64,
+        },
+      }),
+    });
+    template.hasResourceProperties('AWS::Events::Rule', {
+      Name: 'tidb-proxy-logs-vacuum',
+      ScheduleExpression: 'cron(0 18 * * ? *)',
+      State: 'DISABLED',
+    });
+    template.hasResourceProperties('AWS::StepFunctions::StateMachine', {
+      StateMachineName: 'tidb-proxy-logs-vacuum',
+      StateMachineType: 'STANDARD',
+    });
+    expect(JSON.stringify(template.findResources('AWS::StepFunctions::StateMachine'))).toContain(
+      'VACUUM tidb_proxy_logs.logs',
+    );
     expect(template.toJSON()).toMatchSnapshot();
   });
 });

@@ -91,6 +91,28 @@ export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void =
       reason:
         '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。バケットへの書き込み主体は Firehose / BucketDeployment / Athena に限定されている。',
     },
+    {
+      id: 'AwsSolutions-IAM5[Resource::*]',
+      reason:
+        'Step Functions の Athena .sync integration が S3 metadata 読み取りと lakeformation:GetDataAccess 用に自動生成する権限。State Machine の query は固定の VACUUM tidb_proxy_logs.logs で、任意 SQL や任意入力を受け取らない。lakeformation:GetDataAccess は resource-level 制限非対応。',
+    },
+    ...['<AWS::Partition>', 'aws'].flatMap((partition) => [
+      {
+        id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::<LogAnalyticsLogsBucket18E6FEA3>/athena-results/vacuum/*]`,
+        reason:
+          'Athena VACUUM の query result を専用 bucket の athena-results/vacuum/ prefix へ出力するため、実行ごとに動的な object key への PutObject を許容する。',
+      },
+      {
+        id: `AwsSolutions-IAM5[Resource::arn:${partition}:glue:${stack.region}:${stack.account}:table/tidb_proxy_logs/*]`,
+        reason:
+          'Step Functions の Athena .sync integration が対象 database 配下の Glue table 権限を自動生成する。State Machine の query は logs table に対する固定 VACUUM のみで、対象 database には本テーブルだけを配置する。',
+      },
+      {
+        id: `AwsSolutions-IAM5[Resource::arn:${partition}:glue:${stack.region}:${stack.account}:userDefinedFunction/tidb_proxy_logs/*]`,
+        reason:
+          'Step Functions の Athena .sync integration が自動生成する Glue UDF 読み取り権限。固定 VACUUM query は UDF を使用せず、State Machine は任意 SQL や任意入力を受け取らない。',
+      },
+    ]),
     ...[
       'Action::s3:Abort*',
       'Action::s3:DeleteObject*',
