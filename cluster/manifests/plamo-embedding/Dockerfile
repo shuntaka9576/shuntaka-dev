@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir \
       torch==2.5.1 \
     && pip install --no-cache-dir \
       transformers==4.46.0 \
-      sentencepiece==0.2.0 \
+      sentencepiece==0.2.1 \
       fastapi==0.115.4 \
       uvicorn==0.32.0 \
       pydantic==2.9.2
