@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026.0824.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0823.0...2026.0824.0) - 2026-08-24
+
+- feat: 定期VACUUMを有効化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/768
+- fix: support sentencepiece on Python 3.13 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/771
+- fix: Grafanaでrolloutとcontainer restartを分離 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/772
+- fix: 定期VACUUMのメタデータ書き込み権限を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/775
+
 ## [2026.0823.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0818.0...2026.0823.0) - 2026-08-23
 
 - feat: 買い物リストに購入済み状態を追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/758
