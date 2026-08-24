@@ -277,8 +277,17 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       },
       tracingEnabled: true,
     });
-    // AthenaStartQueryExecution の自動生成ポリシーには S3 DeleteObject が含まれない。
-    // VACUUM が到達不能な Iceberg files を削除できるよう、専用 bucket のみに付与する。
+    // AthenaStartQueryExecution の自動生成ポリシーには、VACUUM が commit する
+    // Iceberg metadata への PutObject と、到達不能 files への DeleteObject が含まれない。
+    // metadata の書き込み先は対象 table の prefix のみに絞る。
+    vacuumStateMachine.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject'],
+        resources: [this.bucket.arnForObjects('iceberg/logs/metadata/*')],
+      }),
+    );
+    // 削除対象には metadata だけでなく data files も含まれ得るため、ログ専用 bucket
+    // 全体への DeleteObject は維持する。
     this.bucket.grantDelete(vacuumStateMachine);
     vacuumStateMachine.node.addDependency(glueTable);
     vacuumStateMachine.node.addDependency(workGroup);

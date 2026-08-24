@@ -1307,6 +1307,24 @@ LIMIT 100",
               "Resource": "*",
             },
             {
+              "Action": "s3:PutObject",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "LogAnalyticsLogsBucket18E6FEA3",
+                        "Arn",
+                      ],
+                    },
+                    "/iceberg/logs/metadata/*",
+                  ],
+                ],
+              },
+            },
+            {
               "Action": "s3:DeleteObject*",
               "Effect": "Allow",
               "Resource": {
