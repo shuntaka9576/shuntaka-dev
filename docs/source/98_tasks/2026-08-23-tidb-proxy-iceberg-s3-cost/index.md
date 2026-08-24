@@ -1,11 +1,11 @@
-<!-- cspell:ignore UnblendedCost TBLPROPERTIES -->
+<!-- cspell:ignore UnblendedCost TBLPROPERTIES trino -->
 
 # tidb-proxy Iceberg メタデータによる S3 高額化の調査と対応
 
 - 起票日: 2026-08-23
 - 対象環境: dev / prd 共用ログ基盤
 - 対象: `tidb-proxy-logs-<account>` / Glue `tidb_proxy_logs.logs`
-- ステータス: snapshot 保持期間は 14 日で適用済み、30 分上限での VACUUM は 2 回とも Query timeout
+- ステータス: snapshot 保持期間は14日で適用済み、手動VACUUMは9回目で完了。初回定期実行のIAM不足をCDKで修正済み（デプロイ・再実行確認待ち）
 - 関連タスク: [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](../2026-07-10-tidb-proxy-log-iceberg/index.md)
 - 関連実装: `iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`
 
@@ -225,7 +225,7 @@ EventBridge Rule（毎日 03:00 JST、ENABLED）
 - Lambda の最大実行時間 15 分を避けるため、Step Functions の Athena `.sync` integration で query の成功・失敗まで待機
 - State Machine と Athena task の timeout は 5 時間。Athena 側の DML timeout quota は 240 分へ引き上げ済み
 - State Machine の実行ログは CloudWatch Logs に 14 日保持し、X-Ray tracing を有効化
-- VACUUM 用ロールには専用 S3 bucket に対する `s3:DeleteObject` を付与
+- VACUUM 用ロールには専用 S3 bucket に対する `s3:DeleteObject` と、`iceberg/logs/metadata/*` に限定した `s3:PutObject` を付与
 - EventBridge からの再試行は 0 回。失敗を隠して重複実行しない
 
 日次実行は毎日 03:00 JST に開始する。Athena queryの完了までStep Functions Standardの `.sync` integrationで待機するが、Standard Workflowは実行時間ではなくstate transition数で課金されるため、40分前後の待機時間による実行時間課金は発生しない。
@@ -242,6 +242,33 @@ bunx dotenv -- cdk deploy st-tidb-proxy-logs -c stageName=dev
 ```
 
 デプロイ後、定期実行が有効であることを確認する。
+
+#### 初回定期実行の失敗とIAM修正（2026-08-25）
+
+初回の定期実行は EventBridge から予定どおり起動したが、Athena が約2.5秒で失敗した。タイムアウトではない。
+
+| 項目             | 結果                                   |
+| ---------------- | -------------------------------------- |
+| Step Functions   | `FAILED`                               |
+| 開始             | 2026-08-25 03:00:05 JST                |
+| 終了             | 2026-08-25 03:01:02 JST                |
+| QueryExecutionId | `60fa4a8a-330e-45a5-ba8b-cae44299d690` |
+| Athena実行時間   | 2,553 ms                               |
+| Data scanned     | 0 bytes                                |
+| Athena error     | `GENERIC_INTERNAL_ERROR`               |
+
+<details>
+<summary>Athenaエラー</summary>
+
+```text
+GENERIC_INTERNAL_ERROR: Failed to write json to file: io.trino.filesystem.s3.S3OutputFile@345029b0
+```
+
+</details>
+
+手動VACUUMは成功していた一方、定期実行のStep Functionsロールでは、Athena結果保存先の `athena-results/vacuum/*` にしか `s3:PutObject` が付与されていなかった。VACUUMは到達不能ファイルの削除だけでなく、transaction commit時に新しいIceberg metadata JSONを `iceberg/logs/metadata/` へ書き込むため、ここへの権限不足が原因だった。
+
+対応として、Step Functionsロールへ `iceberg/logs/metadata/*` に限定した `s3:PutObject` をCDKで追加した。削除対象はmetadataとdataの両方になり得るため、既存のログ専用bucket全体への `s3:DeleteObject` は維持する。CDKテストではmetadata prefixへのPutObjectを明示的に検証し、権限の欠落を再発防止する。
 
 ```bash
 aws events describe-rule \
@@ -2752,4 +2779,7 @@ metadata は新規書き込みを含めても純減19,906 objects、約1.24 GB�
 - [x] Firehose buffer interval 900 秒を本番までデプロイ
 - [x] 定期 VACUUM を CDK へ実装
 - [x] 手動 VACUUM の正常完了後、日次スケジュールを有効化
+- [x] 初回定期実行の失敗原因をIceberg metadataへの `s3:PutObject` 不足と特定
+- [x] 定期VACUUM用ロールへmetadata prefix限定の `s3:PutObject` を追加
+- [ ] IAM修正をデプロイし、VACUUMの正常完了を確認
 - [ ] 必要に応じて通常 S3 + partitioned Parquet への移行を判断

@@ -96,6 +96,11 @@ export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void =
       reason:
         'Step Functions の Athena .sync integration が S3 metadata 読み取りと lakeformation:GetDataAccess 用に自動生成する権限。State Machine の query は固定の VACUUM tidb_proxy_logs.logs で、任意 SQL や任意入力を受け取らない。lakeformation:GetDataAccess は resource-level 制限非対応。',
     },
+    {
+      id: 'AwsSolutions-IAM5[Resource::<LogAnalyticsLogsBucket18E6FEA3.Arn>/iceberg/logs/metadata/*]',
+      reason:
+        'Athena VACUUM が transaction commit 時に生成する Iceberg metadata JSON の object key は動的なため、対象 table の metadata prefix 内に限定して PutObject を許容する。',
+    },
     ...['<AWS::Partition>', 'aws'].flatMap((partition) => [
       {
         id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::<LogAnalyticsLogsBucket18E6FEA3>/athena-results/vacuum/*]`,

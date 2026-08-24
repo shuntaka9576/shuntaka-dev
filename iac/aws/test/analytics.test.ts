@@ -43,6 +43,27 @@ describe('TidbProxyLogAnalyticsStack', () => {
     expect(JSON.stringify(template.findResources('AWS::StepFunctions::StateMachine'))).toContain(
       'VACUUM tidb_proxy_logs.logs',
     );
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 's3:PutObject',
+            Effect: 'Allow',
+            Resource: {
+              'Fn::Join': [
+                '',
+                Match.arrayWith([
+                  {
+                    'Fn::GetAtt': ['LogAnalyticsLogsBucket18E6FEA3', 'Arn'],
+                  },
+                  '/iceberg/logs/metadata/*',
+                ]),
+              ],
+            },
+          }),
+        ]),
+      },
+    });
     expect(template.toJSON()).toMatchSnapshot();
   });
 });
