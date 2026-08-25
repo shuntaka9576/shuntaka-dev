@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0825.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0825.0...2026.0825.1) - 2026-08-25
+
+- fix: VACUUMのAthena結果出力権限を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/776
+
 ## [2026.0824.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0823.0...2026.0824.0) - 2026-08-24
 
 - feat: 定期VACUUMを有効化 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/768
