@@ -103,9 +103,9 @@ export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void =
     },
     ...['<AWS::Partition>', 'aws'].flatMap((partition) => [
       {
-        id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::<LogAnalyticsLogsBucket18E6FEA3>/athena-results/vacuum/*]`,
+        id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::<LogAnalyticsLogsBucket18E6FEA3>/athena-results/*]`,
         reason:
-          'Athena VACUUM の query result を専用 bucket の athena-results/vacuum/ prefix へ出力するため、実行ごとに動的な object key への PutObject を許容する。',
+          'WorkGroup が Athena VACUUM の query result を専用 bucket の athena-results/ prefix へ強制出力するため、実行ごとに動的な object key への PutObject を許容する。State Machine の query は固定の VACUUM のみ。',
       },
       {
         id: `AwsSolutions-IAM5[Resource::arn:${partition}:glue:${stack.region}:${stack.account}:table/tidb_proxy_logs/*]`,

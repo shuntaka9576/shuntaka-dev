@@ -260,7 +260,9 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       resultConfiguration: {
         outputLocation: {
           bucketName: this.bucket.bucketName,
-          objectKey: 'athena-results/vacuum',
+          // WorkGroup は enforceWorkGroupConfiguration=true のため、実際の query result
+          // を athena-results/ 直下へ出力する。IAM の自動生成対象も同じ prefix に揃える。
+          objectKey: 'athena-results',
         },
       },
       taskTimeout: sfn.Timeout.duration(cdk.Duration.hours(5)),
