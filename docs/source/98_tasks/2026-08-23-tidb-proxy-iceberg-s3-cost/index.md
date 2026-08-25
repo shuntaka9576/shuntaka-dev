@@ -5,7 +5,7 @@
 - 起票日: 2026-08-23
 - 対象環境: dev / prd 共用ログ基盤
 - 対象: `tidb-proxy-logs-<account>` / Glue `tidb_proxy_logs.logs`
-- ステータス: snapshot 保持期間は14日で適用済み、手動VACUUMは9回目で完了。初回定期実行のIAM不足をCDKで修正済み（デプロイ・再実行確認待ち）
+- ステータス: snapshot 保持期間は14日で適用済み。2回目の定期VACUUMでsnapshot expirationは完了したが、Athena結果出力先のIAM不整合で失敗扱いとなったためCDKを修正（デプロイ・再実行確認待ち）
 - 関連タスク: [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](../2026-07-10-tidb-proxy-log-iceberg/index.md)
 - 関連実装: `iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`
 
@@ -269,6 +269,42 @@ GENERIC_INTERNAL_ERROR: Failed to write json to file: io.trino.filesystem.s3.S3O
 手動VACUUMは成功していた一方、定期実行のStep Functionsロールでは、Athena結果保存先の `athena-results/vacuum/*` にしか `s3:PutObject` が付与されていなかった。VACUUMは到達不能ファイルの削除だけでなく、transaction commit時に新しいIceberg metadata JSONを `iceberg/logs/metadata/` へ書き込むため、ここへの権限不足が原因だった。
 
 対応として、Step Functionsロールへ `iceberg/logs/metadata/*` に限定した `s3:PutObject` をCDKで追加した。削除対象はmetadataとdataの両方になり得るため、既存のログ専用bucket全体への `s3:DeleteObject` は維持する。CDKテストではmetadata prefixへのPutObjectを明示的に検証し、権限の欠落を再発防止する。
+
+#### 2回目の定期実行とAthena結果出力権限の修正（2026-08-26）
+
+metadata書き込み権限のデプロイ後、2回目の定期実行はVACUUM本体を約38分54秒実行した。snapshot expirationのcommitには成功したが、最後にAthenaの結果CSVをS3へ書き込む際にアクセス拒否となり、AthenaとStep Functionsは `FAILED` になった。
+
+| 項目             | 結果                                   |
+| ---------------- | -------------------------------------- |
+| Step Functions   | `FAILED`                               |
+| 開始             | 2026-08-26 03:00:05 JST                |
+| 終了             | 2026-08-26 03:43:28 JST                |
+| QueryExecutionId | `19a4ba95-6b28-4482-a8df-349a0a2754a5` |
+| Athena完了       | 2026-08-26 03:38:59 JST                |
+| Engine execution | 2,333,820 ms（約38分54秒）             |
+| Total execution  | 2,334,408 ms（約38分54秒）             |
+| Data scanned     | 0 bytes                                |
+
+<details>
+<summary>2回目の定期実行のAthenaエラー</summary>
+
+```text
+Access denied when writing output to url: s3://tidb-proxy-logs-<account>/athena-results/19a4ba95-6b28-4482-a8df-349a0a2754a5.csv
+```
+
+</details>
+
+失敗扱いになる前後でIceberg metadataを比較すると、VACUUMによる14日より古いsnapshotのexpirationはcommit済みだった。
+
+| 項目             | 実行直前                | VACUUM commit直後       | 差分      |
+| ---------------- | ----------------------- | ----------------------- | --------- |
+| metadata更新時刻 | 2026-08-26 02:56:27 JST | 2026-08-26 03:00:07 JST | -         |
+| snapshot数       | 18,555                  | 15,892                  | -2,663    |
+| 最古snapshot     | 2026-08-10 04:08:20 JST | 2026-08-12 03:00:21 JST | 約2日進行 |
+
+原因は、Athena WorkGroupが `enforceWorkGroupConfiguration: true` により結果出力先を `athena-results/` 直下へ強制する一方、Step Functionsタスクの `resultConfiguration` は `athena-results/vacuum/` を指定していたことにある。CDKの自動生成IAMは後者だけにPutObjectとmultipart関連権限を付与するため、実際の `athena-results/<QueryExecutionId>.csv` へ書き込めなかった。
+
+Step Functionsタスクの `objectKey` を `athena-results` へ変更し、WorkGroupの実出力先と自動生成IAMを `athena-results/*` に揃える。ログ専用bucket内のAthena結果prefixだけに限定し、他のprefixへの権限は広げない。
 
 ```bash
 aws events describe-rule \
@@ -2781,5 +2817,9 @@ metadata は新規書き込みを含めても純減19,906 objects、約1.24 GB�
 - [x] 手動 VACUUM の正常完了後、日次スケジュールを有効化
 - [x] 初回定期実行の失敗原因をIceberg metadataへの `s3:PutObject` 不足と特定
 - [x] 定期VACUUM用ロールへmetadata prefix限定の `s3:PutObject` を追加
-- [ ] IAM修正をデプロイし、VACUUMの正常完了を確認
+- [x] metadata書き込みIAM修正をデプロイ
+- [x] 2回目の定期実行でsnapshotが18,555件から15,892件へ削減されたことを確認
+- [x] 2回目の失敗原因をWorkGroupの結果出力先と自動生成IAMのprefix不整合に特定
+- [x] Step Functionsタスクの結果出力先を `athena-results/*` のIAMと一致させる
+- [ ] 結果出力IAM修正をデプロイし、VACUUMの正常完了を確認
 - [ ] 必要に応じて通常 S3 + partitioned Parquet への移行を判断

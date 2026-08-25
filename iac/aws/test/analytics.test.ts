@@ -64,6 +64,28 @@ describe('TidbProxyLogAnalyticsStack', () => {
         ]),
       },
     });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['s3:PutObject']),
+            Effect: 'Allow',
+            Resource: {
+              'Fn::Join': [
+                '',
+                [
+                  'arn:',
+                  { Ref: 'AWS::Partition' },
+                  ':s3:::',
+                  { Ref: 'LogAnalyticsLogsBucket18E6FEA3' },
+                  '/athena-results/*',
+                ],
+              ],
+            },
+          }),
+        ]),
+      },
+    });
     expect(template.toJSON()).toMatchSnapshot();
   });
 });
