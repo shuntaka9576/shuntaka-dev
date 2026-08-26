@@ -491,6 +491,43 @@ input[type='search']::-webkit-search-decoration {
   font-style: italic;
 }
 
+/* Details container (zenn-content-css の構造に合わせ、開閉時も一続きの枠として見せる) */
+.prose details {
+  margin: var(--space-4) 0;
+  font-size: 0.95em;
+  line-height: var(--lh-list);
+}
+
+.prose details > summary {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.prose details > summary::marker,
+.prose details > summary::-webkit-details-marker {
+  color: var(--color-text-muted);
+}
+
+.prose details[open] > summary {
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-surface-raised);
+}
+
+.prose .details-content {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--color-surface);
+}
+
+.prose .details-content > * {
+  margin: var(--space-2) 0;
+}
+
 /* Footnotes (comrak footnotes 拡張 + Zenn 風タイトル) */
 .prose sup.footnote-ref a {
   padding: 0 0.1em;

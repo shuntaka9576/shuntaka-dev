@@ -1019,40 +1019,174 @@ fn process_widgets(markdown: &str) -> String {
         .to_string()
 }
 
-/// Process custom container syntax (:::details, :::message)
+#[derive(Debug)]
+struct ContainerOpening<'a> {
+    fence_len: usize,
+    container_type: &'a str,
+    argument: &'a str,
+}
+
+fn line_without_ending(line: &str) -> &str {
+    line.trim_end_matches(&['\r', '\n'][..])
+}
+
+fn parse_container_opening(line: &str) -> Option<ContainerOpening<'_>> {
+    let line = line_without_ending(line);
+    let fence_len = line.bytes().take_while(|byte| *byte == b':').count();
+    if fence_len < 3 {
+        return None;
+    }
+
+    let rest = line[fence_len..].trim_start_matches([' ', '\t']);
+    for container_type in ["details", "message"] {
+        let Some(argument) = rest.strip_prefix(container_type) else {
+            continue;
+        };
+        if argument.is_empty() || argument.starts_with([' ', '\t']) {
+            return Some(ContainerOpening {
+                fence_len,
+                container_type,
+                argument: argument.trim(),
+            });
+        }
+    }
+
+    None
+}
+
+fn parse_container_closing(line: &str) -> Option<usize> {
+    let line = line_without_ending(line).trim_end_matches([' ', '\t']);
+    let fence_len = line.bytes().take_while(|byte| *byte == b':').count();
+    (fence_len >= 3 && fence_len == line.len()).then_some(fence_len)
+}
+
+fn parse_markdown_fence(line: &str) -> Option<(u8, usize, bool)> {
+    let line = line_without_ending(line);
+    let indent = line.bytes().take_while(|byte| *byte == b' ').count();
+    if indent > 3 {
+        return None;
+    }
+
+    let content = &line[indent..];
+    let marker = *content.as_bytes().first()?;
+    if marker != b'`' && marker != b'~' {
+        return None;
+    }
+
+    let marker_len = content.bytes().take_while(|byte| *byte == marker).count();
+    if marker_len < 3 {
+        return None;
+    }
+
+    let only_marker = content[marker_len..].trim().is_empty();
+    Some((marker, marker_len, only_marker))
+}
+
+fn update_markdown_fence(line: &str, active_fence: &mut Option<(u8, usize)>) -> bool {
+    let Some((marker, marker_len, only_marker)) = parse_markdown_fence(line) else {
+        return active_fence.is_some();
+    };
+
+    match *active_fence {
+        Some((active_marker, active_len))
+            if marker == active_marker && marker_len >= active_len && only_marker =>
+        {
+            *active_fence = None;
+        }
+        None => *active_fence = Some((marker, marker_len)),
+        _ => {}
+    }
+
+    true
+}
+
+fn find_container_closing(lines: &[&str], start_index: usize, fence_len: usize) -> Option<usize> {
+    let mut active_fence = None;
+    let mut same_fence_depth = 0;
+
+    for (index, line) in lines.iter().enumerate().skip(start_index) {
+        if update_markdown_fence(line, &mut active_fence) || active_fence.is_some() {
+            continue;
+        }
+
+        if parse_container_opening(line).is_some_and(|opening| opening.fence_len == fence_len) {
+            same_fence_depth += 1;
+            continue;
+        }
+
+        if parse_container_closing(line) == Some(fence_len) {
+            if same_fence_depth == 0 {
+                return Some(index);
+            }
+            same_fence_depth -= 1;
+        }
+    }
+
+    None
+}
+
+fn process_containers_inner<F>(markdown: &str, convert_inner: &F) -> String
+where
+    F: Fn(&str) -> String,
+{
+    let lines: Vec<_> = markdown.split_inclusive('\n').collect();
+    let mut output = String::with_capacity(markdown.len());
+    let mut active_fence = None;
+    let mut index = 0;
+
+    while index < lines.len() {
+        let line = lines[index];
+        if update_markdown_fence(line, &mut active_fence) || active_fence.is_some() {
+            output.push_str(line);
+            index += 1;
+            continue;
+        }
+
+        let Some(opening) = parse_container_opening(line) else {
+            output.push_str(line);
+            index += 1;
+            continue;
+        };
+        let Some(closing_index) = find_container_closing(&lines, index + 1, opening.fence_len)
+        else {
+            output.push_str(line);
+            index += 1;
+            continue;
+        };
+
+        let inner_markdown = lines[index + 1..closing_index].concat();
+        let with_nested_containers = process_containers_inner(&inner_markdown, convert_inner);
+        let inner_html = convert_inner(&with_nested_containers);
+
+        match opening.container_type {
+            "details" => output.push_str(&format!(
+                "<details><summary>{}</summary><div class=\"details-content\">{}</div></details>\n",
+                html_escape(opening.argument),
+                inner_html
+            )),
+            "message" => output.push_str(&format!(
+                "<div class=\"message {}\">{}</div>\n",
+                html_escape(opening.argument),
+                inner_html
+            )),
+            _ => unreachable!(),
+        }
+
+        index = closing_index + 1;
+    }
+
+    output
+}
+
+/// Process custom container syntax (`:::details`, `:::message`).
+///
+/// A container can wrap another container by using a longer outer fence, for example
+/// `::::details` around `:::message`.
 fn process_containers<F>(markdown: &str, convert_inner: F) -> String
 where
     F: Fn(&str) -> String,
 {
-    static CONTAINER_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?s):::[ \t]*(details|message)[ \t]*([^\n]*)\n(.*?):::").unwrap()
-    });
-
-    CONTAINER_RE
-        .replace_all(markdown, |caps: &regex::Captures| {
-            let container_type = &caps[1];
-            let argument = caps[2].trim();
-            let inner_content = &caps[3];
-
-            // Convert inner markdown content
-            let inner_html = convert_inner(inner_content);
-
-            // Generate container HTML (preserve trailing newline for legacy compatibility)
-            match container_type {
-                "details" => format!(
-                    "<details><summary>{}</summary><div class=\"details-content\">{}</div></details>\n",
-                    html_escape(argument),
-                    inner_html
-                ),
-                "message" => format!(
-                    "<div class=\"message {}\">{}</div>\n",
-                    html_escape(argument),
-                    inner_html
-                ),
-                _ => caps[0].to_string(),
-            }
-        })
-        .to_string()
+    process_containers_inner(markdown, &convert_inner)
 }
 
 /// 見出しの先頭にアンカーリンク（# 記号）を挿入する。
@@ -1366,6 +1500,29 @@ mod tests {
             html,
             "<details><summary>sourceCode</summary><div class=\"details-content\"><p>here be dragons</p>\n</div></details>\n"
         );
+    }
+
+    #[test]
+    fn test_message_container_nested_inside_details() {
+        let markdown = "::::details 詳細\n\n外側の本文です。\n\n:::message info\n\n内側の補足です。\n:::\n\n続きです。\n::::";
+        let html = convert_markdown_to_html(markdown);
+
+        assert!(html.starts_with("<details><summary>詳細</summary>"));
+        assert!(html.contains("<p>外側の本文です。</p>"));
+        assert!(html.contains("<div class=\"message info\"><p>内側の補足です。</p>"));
+        assert!(html.contains("<p>続きです。</p>"));
+        assert!(html.ends_with("</div></details>\n"));
+        assert!(!html.contains("::::"));
+        assert!(!html.contains(":::message"));
+    }
+
+    #[test]
+    fn test_container_syntax_inside_code_block_is_not_processed() {
+        let markdown = "```md\n:::message info\nコード例\n:::\n```";
+        let html = convert_markdown_to_html(markdown);
+
+        assert!(html.contains(":::message info"));
+        assert!(!html.contains("<div class=\"message info\">"));
     }
 
     #[test]
