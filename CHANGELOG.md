@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.0826.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0826.0...2026.0826.1) - 2026-08-26
+
+- feat: Markdownコンテナのネスト表示に対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/778
+
 ## [2026.0825.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0825.0...2026.0825.1) - 2026-08-25
 
 - fix: VACUUMのAthena結果出力権限を修正 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/776
