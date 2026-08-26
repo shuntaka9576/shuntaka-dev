@@ -4,6 +4,8 @@
    本実装時に共有方法（コピー継続 or packages 化）を再検討する。 */
 
 :root {
+  --color-surface: #fff;
+  --color-surface-raised: #f7fafc;
   --color-text: #525457;
   --color-text-muted: #57595b8a;
   --color-border: #c4c4c4;
@@ -41,6 +43,7 @@
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
+  --space-4: 1rem;
   --space-8: 3rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.625rem;
@@ -249,6 +252,43 @@
 
 .prose em {
   font-style: italic;
+}
+
+/* Details container (zenn-content-css の構造に合わせ、開閉時も一続きの枠として見せる) */
+.prose details {
+  margin: var(--space-4) 0;
+  font-size: 0.95em;
+  line-height: var(--lh-list);
+}
+
+.prose details > summary {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.prose details > summary::marker,
+.prose details > summary::-webkit-details-marker {
+  color: var(--color-text-muted);
+}
+
+.prose details[open] > summary {
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-surface-raised);
+}
+
+.prose .details-content {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--color-surface);
+}
+
+.prose .details-content > * {
+  margin: var(--space-2) 0;
 }
 
 .prose [data-math-style='display'] {

@@ -96,6 +96,17 @@ for (const { name, wasm } of targets) {
       expect(html).toContain('class="message info"');
     });
 
+    test('details 内へ message をネストできる', () => {
+      const html = wasm.convertMarkdownWithResources(
+        '::::details 解答\n\n本文\n\n:::message\n\n補足\n:::\n::::',
+        {},
+      );
+      expect(html).toContain('<details><summary>解答</summary>');
+      expect(html).toContain('<div class="message "><p>補足</p>');
+      expect(html).toContain('</div></details>');
+      expect(html).not.toContain('::::');
+    });
+
     test('ウィジェット記法 (:::widget) が data-payload に base64 encode される', () => {
       const html = wasm.convertMarkdownWithResources(
         ':::widget engine-steps\nnum: 1\ntitle: "テスト"\n:::',
