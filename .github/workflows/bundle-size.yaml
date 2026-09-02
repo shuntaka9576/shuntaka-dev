@@ -38,10 +38,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup node
-        uses: ./.github/actions/setup-node
+        uses: $/.github/actions/setup-node
 
       - name: Bundle size report
-        uses: ./.github/actions/bundle-size
+        uses: $/.github/actions/bundle-size
         with:
           github-token: ${{ github.token }}
           pr-number: ${{ github.event.pull_request.number }}

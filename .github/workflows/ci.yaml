@@ -24,10 +24,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup node
-        uses: ./.github/actions/setup-node
+        uses: $/.github/actions/setup-node
 
       - name: Setup Rust
-        uses: ./.github/actions/setup-rust
+        uses: $/.github/actions/setup-rust
 
       - name: Run CI
-        uses: ./.github/actions/ci
+        uses: $/.github/actions/ci

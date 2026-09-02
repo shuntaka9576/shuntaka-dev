@@ -45,7 +45,7 @@ jobs:
     concurrency:
       group: deploy-prd # deploy.yaml の手動 dispatch (prd) と排他
       cancel-in-progress: false
-    uses: ./.github/workflows/reusable-deploy.yaml
+    uses: $/.github/workflows/reusable-deploy.yaml
     with:
       stageName: prd
       stack: all
@@ -73,7 +73,7 @@ jobs:
           ref: ${{ needs.tagpr.outputs.tag }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node
+      - uses: $/.github/actions/setup-node
 
       - name: Vercel pull
         run: bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"

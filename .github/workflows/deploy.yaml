@@ -37,7 +37,7 @@ jobs:
     permissions:
       id-token: write # AWS IAM Role に OIDC AssumeRole するため reusable workflow に継承
       contents: read
-    uses: ./.github/workflows/reusable-deploy.yaml
+    uses: $/.github/workflows/reusable-deploy.yaml
     with:
       # main push は dev 固定。prd はタグリリース (tagpr.yaml) か手動 dispatch で行う
       stageName: ${{ inputs.stageName || 'dev' }}

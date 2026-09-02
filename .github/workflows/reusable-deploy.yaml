@@ -38,10 +38,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node
+      - uses: $/.github/actions/setup-node
 
       - name: Setup Rust
-        uses: ./.github/actions/setup-rust
+        uses: $/.github/actions/setup-rust
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
