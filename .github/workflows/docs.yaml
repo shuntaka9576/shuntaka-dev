@@ -50,7 +50,7 @@ jobs:
         run: uv sync
 
       - name: Setup node
-        uses: ./.github/actions/setup-node
+        uses: $/.github/actions/setup-node
 
       - name: Build documentation and search index
         run: bun run --cwd docs build-docs

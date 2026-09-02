@@ -5,7 +5,7 @@
 - 起票日: 2026-08-23
 - 対象環境: dev / prd 共用ログ基盤
 - 対象: `tidb-proxy-logs-<account>` / Glue `tidb_proxy_logs.logs`
-- ステータス: snapshot 保持期間は14日で適用済み。2回目の定期VACUUMでsnapshot expirationは完了したが、Athena結果出力先のIAM不整合で失敗扱いとなったためCDKを修正（デプロイ・再実行確認待ち）
+- ステータス: snapshot 保持期間14日・Firehose buffer 900秒・日次VACUUMを適用済み。Athena結果出力先のIAM修正後、2026-08-27〜2026-09-02の定期VACUUMが連続で成功。2026-09-10に定常状態と9月料金予測を再確認する
 - 関連タスク: [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](../2026-07-10-tidb-proxy-log-iceberg/index.md)
 - 関連実装: `iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`
 
@@ -2794,6 +2794,50 @@ metadata は新規書き込みを含めても純減19,906 objects、約1.24 GB�
 
 最終的にmetadataは約813.76 GB（約47.9%）削減できた。dataの微増は処理中もFirehoseの配信が正常に継続したためである。残存55,457 objectsには、14日以内のtime travelに必要なsnapshot・manifest・metadata logと、継続配信で生成される現行ファイルが含まれる。Firehoseの900秒化は本番まで適用済みのため、適用前の約60秒周期で生成されたsnapshotが14日の保持期間外へ抜けた後に再度 `VACUUM` を実行し、定常状態まで減少したことを確認する。
 
+## 2026-09-02 再確認
+
+Athena結果出力先のIAM修正後、日次VACUUMは2026-08-27から2026-09-02まで7回連続で `SUCCEEDED` となった。9月2日の実行は03:00:05 JSTに開始し、03:19:07 JSTに完了した。
+
+### 8月料金
+
+2026-09-02時点では8月分は `Estimated=true`。
+
+| 項目                        |              使用量 | UnblendedCost |
+| --------------------------- | ------------------: | ------------: |
+| S3 合計                     |                   - |    $22.424590 |
+| `APN1-TimedStorage-ByteHrs` | 849.516600 GB-Month |    $21.237915 |
+| `APN1-Requests-Tier1`       |    156,067 requests |     $0.733515 |
+| `APN1-Requests-Tier2`       |  1,220,696 requests |     $0.451658 |
+
+AWSアカウント全体はTax $3.84を含めて `$42.227671` だった。
+
+### 現在のバケットとmetadata
+
+| 項目                     | object数 |           bytes |
+| ------------------------ | -------: | --------------: |
+| バケット全体             |   81,001 | 332,982,269,718 |
+| `iceberg/logs/data/`     |   59,840 |     313,738,736 |
+| `iceberg/logs/metadata/` |   21,152 | 332,668,525,960 |
+
+current metadataのsnapshot数は7,013、metadata logは100。バケット容量は8月23日の約1.70 TBから、8月31日に約470.8 GB、9月1日に約402.8 GB、9月2日のlive listingで約333.0 GBまで低下した。
+
+現在のmetadata容量の大半は、900秒化前の2026-08-18〜2026-08-22に作成されたファイルである。これらが14日のsnapshot保持期間外へ抜け、日次VACUUMで削除されれば9月前半にさらに減少する。
+
+### 9月S3料金予測と次回確認日
+
+Cost Explorerの9月forecastは `$2.978098`。運用上は **約$3、想定レンジを$2〜4** とする。8月の料金を日数だけで換算した場合は `$22.424590 × 30 / 31 = $21.70` だが、VACUUMと900秒バッファ化による8月後半の容量減少を反映しないため採用しない。
+
+旧60秒周期の大容量metadataは、最終生成日（8月22日 UTC）から14日経過後の **2026-09-06〜2026-09-07の日次VACUUMで削除される見込み**。次回確認日は削除日ではなく、S3日次メトリクスとCost Explorerの反映を1〜2日待った **2026-09-10** とする。
+
+確認項目:
+
+1. 9月3日〜9月9日の日次VACUUMが全て `SUCCEEDED` であること
+2. metadata容量・object数・snapshot数が定常値まで低下していること
+3. `BucketSizeBytes` とS3の日次料金が低下していること
+4. 9月forecastが$2〜4の範囲に収まること
+
+9月の確定に近いS3料金は **2026-10-03以降** に再確認する。
+
 ## 対応チェックリスト
 
 - [x] Cost Explorer で S3 の Cost / Usage Type / Operation を確認
@@ -2821,5 +2865,7 @@ metadata は新規書き込みを含めても純減19,906 objects、約1.24 GB�
 - [x] 2回目の定期実行でsnapshotが18,555件から15,892件へ削減されたことを確認
 - [x] 2回目の失敗原因をWorkGroupの結果出力先と自動生成IAMのprefix不整合に特定
 - [x] Step Functionsタスクの結果出力先を `athena-results/*` のIAMと一致させる
-- [ ] 結果出力IAM修正をデプロイし、VACUUMの正常完了を確認
+- [x] 結果出力IAM修正をデプロイし、2026-08-27〜2026-09-02の定期VACUUM連続成功を確認
+- [ ] 2026-09-10にmetadata容量と9月S3料金予測を再確認
+- [ ] 2026-10-03以降に9月の確定に近いS3料金を確認
 - [ ] 必要に応じて通常 S3 + partitioned Parquet への移行を判断
