@@ -1,3 +1,5 @@
+<!-- cspell:ignore Unblended -->
+
 # tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする
 
 - 起票日: 2026-07-10
@@ -71,6 +73,37 @@ Task: tidb-proxy
 | **合計**                               |                                   | **月十数円** |
 
 条件付きの増分として、タスクメモリを 512MB → 1024MB に上げる場合のみ +約$1.6/月 (ARM $0.0044/GB-h × 0.5GB × 730h)。
+
+### 2026-09-02: 8月実績と9月予測
+
+初期試算後、Firehose が約60秒ごとに作成する Iceberg metadata JSON と snapshot が累積し、S3料金が想定を大きく上回った。原因と VACUUM 対応の詳細は [tidb-proxy Iceberg メタデータによる S3 高額化の調査と対応](../2026-08-23-tidb-proxy-iceberg-s3-cost/index.md) を参照。
+
+2026-09-02 時点の Cost Explorer では8月分はまだ `Estimated=true` である。
+
+| 項目                        | 8月実績 (USD) |
+| --------------------------- | ------------: |
+| AWS 全体（Tax $3.84を含む） |    $42.227671 |
+| S3 全体                     |    $22.424590 |
+| S3 Standard Storage         |    $21.237915 |
+| S3 Tier 1 requests          |     $0.733515 |
+| S3 Tier 2 requests          |     $0.451658 |
+
+S3 Standard Storage の8月使用量は `849.516600 GB-Month`。対象バケットの live objects は約333.0 GBで、そのうち実ログデータは約0.314 GB、Iceberg metadataは約332.67 GBだった。
+
+バケット容量は2026-08-23の約1.70 TBから、8月31日に約470.8 GB、9月1日に約402.8 GB、9月2日のlive listingで約333.0 GBまで減少した。結果出力IAM修正後の日次 VACUUM は8月27日から9月2日まで連続で成功している。
+
+9月の S3 UnblendedCost は **約$3（想定レンジ $2〜4）** と予測する。Cost Explorer の forecast は `$2.978098`。8月と同じ平均使用量を単純に30日換算した `$21.70` は、8月後半の VACUUM と900秒バッファ化による構造変化を反映しないため採用しない。
+
+予測の前提は、日次 VACUUM が継続して成功し、旧60秒周期で作られた大容量metadataが14日の保持期間外へ抜けることである。VACUUMが停止して現在の約333 GBが1か月維持されるだけでも、ストレージとリクエストを合わせて約$9以上になるため、実行状態を継続監視する。
+
+旧60秒周期の大容量metadataは、最終生成日（8月22日 UTC）から14日経過後の **2026-09-06〜2026-09-07の日次VACUUMで削除される見込み**。次回確認日は削除日ではなく、S3日次メトリクスとCost Explorerの反映を1〜2日待った **2026-09-10** とする。確認項目は次のとおり。
+
+1. 9月3日〜9月9日の日次 VACUUM が全て `SUCCEEDED` であること
+2. `iceberg/logs/metadata/` の容量・object数・current snapshot数
+3. `AWS/S3 BucketSizeBytes` が定常値まで低下していること
+4. 9月の S3 forecast を再取得し、$2〜4の範囲に収まること
+
+9月の確定に近い請求額は、Cost Explorerの反映を待って **2026-10-03以降** に再確認する。
 
 ### メモリの判断基準
 
