@@ -17,7 +17,7 @@
     "@microsoft/clarity": "^1.0.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "next": "^16.3.2",
+    "next": "^16.3.4",
     "nprogress": "^0.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -25,18 +25,18 @@
     "rss": "^1.2.2"
   },
   "devDependencies": {
-    "@next/env": "16.3.2",
-    "@storybook/addon-themes": "^10.5.10",
-    "@storybook/nextjs-vite": "^10.5.10",
+    "@next/env": "16.3.4",
+    "@storybook/addon-themes": "^10.6.0",
+    "@storybook/nextjs-vite": "^10.6.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/nprogress": "^0.2.3",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.7",
     "@types/rss": "^0.0.32",
-    "storybook": "^10.5.10",
+    "storybook": "^10.6.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vercel": "59.5.0",
+    "vercel": "59.11.7",
     "vite": "^8.2.2"
   }
 }
