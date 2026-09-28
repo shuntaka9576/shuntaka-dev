@@ -9,7 +9,7 @@
     "dev:api": "bun run preview/server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "type-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "type-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo"
   },
   "dependencies": {
     "katex": "^0.18.1"
@@ -19,12 +19,13 @@
     "@sveltejs/kit": "^2.46.5",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.1.16",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "hono": "^4.10.6",
     "markdown-wasm": "workspace:*",
     "svelte": "^5.42.2",
     "svelte-check": "^4.3.3",
     "tailwindcss": "^4.1.16",
-    "typescript": "^5.9.3",
+    "typescript": "~6.0.3",
     "vite": "^8.2.2",
     "yaml": "^2.8.1"
   }
