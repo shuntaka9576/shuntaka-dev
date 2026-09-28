@@ -28,7 +28,8 @@ export class TidbProxyConstruct extends Construct {
       projectName: string;
       vpc: ec2.IVpc;
       tailscale: {
-        proxyAuthKey: string;
+        oauthClientID: string;
+        oauthClientSecret: string;
       };
       ssm: {
         proxy: {
@@ -48,9 +49,8 @@ export class TidbProxyConstruct extends Construct {
     super(scope, id);
 
     // ---- ECR Repository ----
-    // lifecycle で常に最新 1 image のみ保持。古い image を残しても rollback には
-    // ecspresso rollback で task def の image tag を戻す方が安全なので、ECR には
-    // 1 個だけあればよい。コストもほぼゼロに。
+    // ECS circuit breaker が旧 task definition へ rollback する際に対応イメージが
+    // 残っている必要がある。直近 5 リビジョンを保持し、古いものだけ削除する。
     this.ecrRepository = new ecr.Repository(this, 'EcrRepository', {
       repositoryName: props.projectName,
       imageScanOnPush: true,
@@ -58,8 +58,8 @@ export class TidbProxyConstruct extends Construct {
       emptyOnDelete: true,
       lifecycleRules: [
         {
-          description: 'Keep only the latest 1 image',
-          maxImageCount: 1,
+          description: 'Keep the latest 5 images for ECS rollback',
+          maxImageCount: 5,
           rulePriority: 1,
         },
       ],
@@ -104,15 +104,16 @@ export class TidbProxyConstruct extends Construct {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
       ],
     });
-    // ecspresso task def の `secrets[].valueFrom` で Tailscale auth key を SSM
-    // から runtime fetch するため、ExecutionRole に GetParameters 権限を与える。
+    // ecspresso task def の `secrets[].valueFrom` で Tailscale OAuth client を
+    // SSM から runtime fetch するため、ExecutionRole に GetParameters 権限を与える。
     // SecureString のため kms:Decrypt も必要 (default alias/aws/ssm)。
     this.executionRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ['ssm:GetParameters'],
         resources: [
-          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.tailscale.proxyAuthKey}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.tailscale.oauthClientID}`,
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${props.tailscale.oauthClientSecret}`,
         ],
       }),
     );

@@ -112,7 +112,7 @@ exports[`TidbProxyStack > snapshot 1`] = `
           "ScanOnPush": true,
         },
         "LifecyclePolicy": {
-          "LifecyclePolicyText": "{"rules":[{"rulePriority":1,"description":"Keep only the latest 1 image","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":1},"action":{"type":"expire"}}]}",
+          "LifecyclePolicyText": "{"rules":[{"rulePriority":1,"description":"Keep the latest 5 images for ECS rollback","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}",
         },
         "RepositoryName": "tidb-proxy",
       },
@@ -213,22 +213,40 @@ exports[`TidbProxyStack > snapshot 1`] = `
             {
               "Action": "ssm:GetParameters",
               "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:aws:ssm:",
-                    {
-                      "Ref": "AWS::Region",
-                    },
-                    ":",
-                    {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":parameter/shared/shuntaka/tailscale/proxy-auth-key",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:ssm:",
+                      {
+                        "Ref": "AWS::Region",
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":parameter/shared/shuntaka/tailscale/oauth-client-id",
+                    ],
                   ],
-                ],
-              },
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:ssm:",
+                      {
+                        "Ref": "AWS::Region",
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":parameter/shared/shuntaka/tailscale/oauth-client-secret",
+                    ],
+                  ],
+                },
+              ],
             },
             {
               "Action": "kms:Decrypt",
