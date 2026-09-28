@@ -503,11 +503,11 @@ cilium status --wait
 
 Trust credentials に残す OAuth client は用途・tag ごとに分ける。旧 `blog-api-lambda` client は現行構成では使わないため revoke し、再作成しない。
 
-| OAuth client | 状態 | Scopes | Tags | credential の格納先 / 構築手順 |
-| --- | --- | --- | --- | --- |
-| `tidb-proxy` | 現行 | `Keys > Auth Keys > Write` | `tag:proxy` | SSM `/shared/shuntaka/tailscale/oauth-client-{id,secret}`。[開発環境構築](01_development.md) |
-| Tailscale Operator | 現行 | `Devices > Core > Read/Write`, `Keys > Auth Keys > Write` | `tag:k8s` | 下記「Tailscale Operator 導入」で Helm values に設定 |
-| `blog-api-lambda` | **廃止・revoke** | `Keys > Auth Keys > Write` | `tag:aws-app` | Lambda 内 tailscaled 方式の旧 client。[移行記録](../98_tasks/2026-06-26-dsql-to-tidb-migration/index.md) のみ |
+| OAuth client       | 状態             | Scopes                                                    | Tags          | credential の格納先 / 構築手順                                                                                |
+| ------------------ | ---------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `tidb-proxy`       | 現行             | `Keys > Auth Keys > Write`                                | `tag:proxy`   | SSM `/shared/shuntaka/tailscale/oauth-client-{id,secret}`。[開発環境構築](01_development.md)                  |
+| Tailscale Operator | 現行             | `Devices > Core > Read/Write`, `Keys > Auth Keys > Write` | `tag:k8s`     | 下記「Tailscale Operator 導入」で Helm values に設定                                                          |
+| `blog-api-lambda`  | **廃止・revoke** | `Keys > Auth Keys > Write`                                | `tag:aws-app` | Lambda 内 tailscaled 方式の旧 client。[移行記録](../98_tasks/2026-06-26-dsql-to-tidb-migration/index.md) のみ |
 
 ### MagicDNS の有効化
 
