@@ -50,6 +50,7 @@ interface AppParameter {
     api: string;
     admin: string;
     images: string;
+    apexIpv4Addresses?: string[];
   };
   labs: {
     // 章コンテンツを管理する GitHub private リポジトリ (stage ごとに別リポジトリ)
@@ -168,11 +169,12 @@ const stageConfig: {
       long: stageName.dev.longName,
       short: stageName.dev.shortName,
     },
-    fqdn: 'shuntaka.tech',
+    fqdn: 'shuntaka.me',
     domain: {
-      api: 'api.shuntaka.tech',
-      admin: 'admin.shuntaka.tech',
-      images: 'images.shuntaka.tech',
+      api: 'api.shuntaka.me',
+      admin: 'admin.shuntaka.me',
+      images: 'images.shuntaka.me',
+      apexIpv4Addresses: ['216.198.79.1', '64.29.17.1'],
     },
     labs: {
       contentsRepoFullName: 'shuntaka9576/lab-contents-dev',

@@ -37,6 +37,7 @@ const globalDnsStack = new GlobalDnsStack(
   `${config.stageName.short}-${config.projectName.short}-global-dns`,
   {
     domainName: config.fqdn,
+    apexIpv4Addresses: config.domain.apexIpv4Addresses,
     hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
     env: {
       account: config.cdkEnv.account,

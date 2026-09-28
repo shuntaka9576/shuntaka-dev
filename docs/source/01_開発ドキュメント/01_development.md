@@ -70,12 +70,12 @@ Tailnet に参加しているのは forwarder の `tsnet.Server` 1 つだけで�
 
 main への push では本番デプロイされない（`apps/web/vercel.json` の `git.deploymentEnabled` で無効化）。本番反映は CalVer タグ経由で行う（[リリース](#リリース)を参照）。
 
-| 変数名                              | 用途              | Production                 | Preview                     |
-| ----------------------------------- | ----------------- | -------------------------- | --------------------------- |
-| `NEXT_PUBLIC_API_URL`               | バックエンドAPI   | `https://api.shuntaka.dev` | `https://api.shuntaka.tech` |
-| `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.tech`     |
-| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                      |
-| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                      |
+| 変数名                              | 用途              | Production                 | Preview                   |
+| ----------------------------------- | ----------------- | -------------------------- | ------------------------- |
+| `NEXT_PUBLIC_API_URL`               | バックエンドAPI   | `https://api.shuntaka.dev` | `https://api.shuntaka.me` |
+| `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.me`     |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                    |
+| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                    |
 
 ### リリース
 
@@ -233,7 +233,7 @@ bunx dotenv -- cdk deploy \
   ${STAGE_NAME:0:1}-st-tokyo-cert \
   --require-approval never
 
-# デプロイ中にAWSコンソール ap-northeast-1 リージョンのACMで、*.shuntaka.techドメインのDNS検証レコードをRoute53に追加
+# デプロイ中にAWSコンソール ap-northeast-1 リージョンのACMで、*.shuntaka.meドメインのDNS検証レコードをRoute53に追加
 ```
 
 GitHub ActionsにEnvironmentを登録
@@ -552,7 +552,7 @@ export GH_WEBHOOK_SECRET_KEY_NAME=/dev/shuntaka/github-webhook/secret
 export CLOUDINARY_CLOUD_NAME=your-cloud-name
 export CLOUDINARY_API_KEY=123456789012345
 export CLOUDINARY_API_SECRET_KEY_NAME=/dev/shuntaka/cloudinary/api-secret
-export IMAGES_BASE_URL=https://images.shuntaka.tech
+export IMAGES_BASE_URL=https://images.shuntaka.me
 
 # blog-api + admin-api の TiDB 接続文字列。Tailnet 経由で自作クラスタ上の blog_dev を組み立てる
 if [ -z "${DATABASE_URL:-}" ]; then
@@ -579,7 +579,7 @@ export ORIGIN_ALLOWLIST=http://localhost:43002
 export VITE_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 export VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID
 export VITE_IMAGES_BASE_URL=$IMAGES_BASE_URL
-export VITE_PREVIEW_BASE_URL=https://shuntaka.tech
+export VITE_PREVIEW_BASE_URL=https://shuntaka.me
 EOF
 
 direnv allow .

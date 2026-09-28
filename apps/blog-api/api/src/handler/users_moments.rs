@@ -277,26 +277,26 @@ mod tests {
     #[test]
     fn build_image_urls_inserts_thumb_suffix() {
         let (image_url, thumb_url) = build_image_urls(
-            "https://images.shuntaka.tech",
+            "https://images.shuntaka.me",
             &format!("images/moments/{VALID_ID}.webp"),
         );
         assert_eq!(
             image_url,
-            format!("https://images.shuntaka.tech/images/moments/{VALID_ID}.webp")
+            format!("https://images.shuntaka.me/images/moments/{VALID_ID}.webp")
         );
         assert_eq!(
             thumb_url,
-            format!("https://images.shuntaka.tech/images/moments/{VALID_ID}_thumb.webp")
+            format!("https://images.shuntaka.me/images/moments/{VALID_ID}_thumb.webp")
         );
     }
 
     #[test]
     fn build_image_urls_trims_trailing_slash() {
         let (image_url, _) =
-            build_image_urls("https://images.shuntaka.tech/", "images/moments/a.webp");
+            build_image_urls("https://images.shuntaka.me/", "images/moments/a.webp");
         assert_eq!(
             image_url,
-            "https://images.shuntaka.tech/images/moments/a.webp"
+            "https://images.shuntaka.me/images/moments/a.webp"
         );
     }
 

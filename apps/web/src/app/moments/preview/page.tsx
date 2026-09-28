@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export const instant = false;
 
 /** 写真 URL は moments の配信ドメイン（prd / dev）のみ許可する */
-const ALLOWED_IMAGE_HOSTS = new Set(['images.shuntaka.dev', 'images.shuntaka.tech']);
+const ALLOWED_IMAGE_HOSTS = new Set(['images.shuntaka.dev', 'images.shuntaka.me']);
 
 function parseImageUrl(raw: string | undefined): string | null {
   if (!raw) return null;

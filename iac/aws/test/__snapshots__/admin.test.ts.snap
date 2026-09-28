@@ -2118,7 +2118,7 @@ function handler(event) {
         "VirginiaCertArnLookupCustomResourcePolicy0D3EDDE9",
       ],
       "Properties": {
-        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn"}}",
+        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn:admin.example.com"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2126,7 +2126,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn"}}",
+        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn:admin.example.com"}}",
       },
       "Type": "Custom::AWS",
       "UpdateReplacePolicy": "Delete",
@@ -2262,7 +2262,7 @@ exports[`VirginiaCertificateStack > snapshot 1`] = `
         "HostedZoneIdLookupCustomResourcePolicy2D354806",
       ],
       "Properties": {
-        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/hosted-zone-id"},"region":"ap-northeast-1","physicalResourceId":{"id":"ap-northeast-1:/test/hosted-zone-id"}}",
+        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/hosted-zone-id"},"region":"ap-northeast-1","physicalResourceId":{"id":"ap-northeast-1:/test/hosted-zone-id:example.com"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2270,7 +2270,7 @@ exports[`VirginiaCertificateStack > snapshot 1`] = `
             "Arn",
           ],
         },
-        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/hosted-zone-id"},"region":"ap-northeast-1","physicalResourceId":{"id":"ap-northeast-1:/test/hosted-zone-id"}}",
+        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/hosted-zone-id"},"region":"ap-northeast-1","physicalResourceId":{"id":"ap-northeast-1:/test/hosted-zone-id:example.com"}}",
       },
       "Type": "Custom::AWS",
       "UpdateReplacePolicy": "Delete",
@@ -2352,6 +2352,7 @@ exports[`VirginiaCertificateStack > snapshot 1`] = `
         "ValidationMethod": "DNS",
       },
       "Type": "AWS::CertificateManager::Certificate",
+      "UpdateReplacePolicy": "Retain",
     },
   },
   "Rules": {

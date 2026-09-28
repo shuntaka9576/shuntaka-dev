@@ -14,6 +14,7 @@ describe('GlobalDnsStack', () => {
     const app = new cdk.App();
     const stack = new GlobalDnsStack(app, 'TestGlobalDnsStack', {
       domainName: 'example.com',
+      apexIpv4Addresses: ['192.0.2.1', '192.0.2.2'],
       hostedZoneIdParameterName: '/test/hosted-zone-id',
       env: {
         account: '123456789012',

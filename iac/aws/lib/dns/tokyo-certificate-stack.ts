@@ -31,6 +31,10 @@ export class TokyoCertificateStack extends cdk.Stack {
       subjectAlternativeNames: [`*.${props.domainName}`],
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
+    // API Gateway が旧証明書を参照したままでもドメイン移行を進められるよう、
+    // 置換時だけ旧証明書を保持する。切り替え確認後に手動で整理する。
+    const cfnCertificate = certificate.node.defaultChild as acm.CfnCertificate;
+    cfnCertificate.cfnOptions.updateReplacePolicy = cdk.CfnDeletionPolicy.RETAIN;
 
     new ssm.StringParameter(this, 'TokyoCertificateArnParameter', {
       parameterName: props.certificateArnParameterName,

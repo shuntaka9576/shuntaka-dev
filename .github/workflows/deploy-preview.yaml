@@ -1,8 +1,8 @@
 name: Deploy preview web
 
-# main の内容を shuntaka.tech (Vercel Preview 環境) へ反映する。
+# main の内容を shuntaka.me (Vercel Preview 環境) へ反映する。
 # tagpr の deploy-vercel (production) と同じ CLI デプロイの preview 版で、
-# デプロイ URL に shuntaka.tech を直接エイリアスする。
+# デプロイ URL に shuntaka.me を直接エイリアスする。
 # 本番 (shuntaka.dev) は tagpr のタグリリース (deploy-vercel --prod) でのみ更新する。
 on:
   push:
@@ -47,8 +47,8 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Alias shuntaka.tech to the deployment
-        run: bunx vercel alias set "$DEPLOY_URL" shuntaka.tech --token="$VERCEL_TOKEN"
+      - name: Alias shuntaka.me to the deployment
+        run: bunx vercel alias set "$DEPLOY_URL" shuntaka.me --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
