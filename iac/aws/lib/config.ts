@@ -227,8 +227,9 @@ export interface ProxyParameter {
     };
     tailscale: {
       // ecspresso task def の secrets[].valueFrom から runtime fetch される。
-      // 値の格納 (put-parameter) は手動運用 (90 日 rotation)。
-      proxyAuthKey: string;
+      // OAuth client 自体は失効せず、タスク起動時に短命 auth key を発行する。
+      oauthClientID: string;
+      oauthClientSecret: string;
     };
   };
 }
@@ -258,7 +259,8 @@ export const getProxyConfig = (): ProxyParameter => {
         serviceName: `/${projectName}/proxy/service-name`,
       },
       tailscale: {
-        proxyAuthKey: '/shared/shuntaka/tailscale/proxy-auth-key',
+        oauthClientID: '/shared/shuntaka/tailscale/oauth-client-id',
+        oauthClientSecret: '/shared/shuntaka/tailscale/oauth-client-secret',
       },
     },
   };

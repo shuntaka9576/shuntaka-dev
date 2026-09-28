@@ -459,7 +459,7 @@ cilium status --wait
 <https://login.tailscale.com/admin/acls> の ACL エディタで以下を投入する。
 
 - `tag:k8s` — Tailscale Operator 本体と、Operator が立てる Proxy Pod (ts-\*) の両方が名乗るタグ
-- `tag:proxy` — AWS 側の tidb-proxy (ECS Fargate) が名乗るタグ。blog-api → TiDB (`:4000`) と PLaMo Embedding Service (`:80`) の経路（auth key は SSM `/shared/shuntaka/tailscale/proxy-auth-key`、90 日ローテーション。経緯は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)、PLaMo 経路は [TiDB Vector 検索実装](../98_tasks/2026-07-15-tidb-vector-search-implementation/index.md) Phase 6-5）
+- `tag:proxy` — AWS 側の tidb-proxy (ECS Fargate) が名乗るタグ。blog-api → TiDB (`:4000`) と PLaMo Embedding Service (`:80`) の経路。OAuth client credentials は SSM `/shared/shuntaka/tailscale/oauth-client-id` と `/shared/shuntaka/tailscale/oauth-client-secret` に置き、task 起動ごとに短命の ephemeral auth key を発行する（経緯は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md)、PLaMo 経路は [TiDB Vector 検索実装](../98_tasks/2026-07-15-tidb-vector-search-implementation/index.md) Phase 6-5）
 - `autogroup:self:22` — メンバーが自分の所有端末へ SSH (tcp/22) するための許可。ACL はデフォルト deny のため、このルールが無いとユーザー端末間の SSH over Tailscale が通らない（経緯は [SSH over Tailscale 不通の調査と ACL 修正](../98_tasks/2026-07-28-tailscale-ssh-acl/index.md)）
 
 ```json
@@ -498,6 +498,16 @@ cilium status --wait
 > - ACL を先に入れないと、後述の OAuth Client 作成画面で `tag:k8s` が選べない（`tagOwners` 登録済みのタグしか発行できない）
 > - 上記 JSON はポリシー全体の置き換え。Tailscale SSH（`tailscale up --ssh` で有効化した SSH 経路）を使いたい場合はポリシーに `ssh` セクションのルールが別途必要（現行 ACL には無く、ノードへの SSH は管理 VLAN / Subnet Router 経由が主経路）
 > - 旧構成の `tag:aws-app`（Lambda 内 tailscaled 方式）は 2026-06-29 に tidb-proxy 方式へ移行して廃止済み。廃止理由は [Lambda ephemeral ノード増殖の調査](../97_survey/2026-06-29-tailscale-lambda-ephemeral-pileup/index.md) を参照
+
+### OAuth client インベントリ
+
+Trust credentials に残す OAuth client は用途・tag ごとに分ける。旧 `blog-api-lambda` client は現行構成では使わないため revoke し、再作成しない。
+
+| OAuth client       | 状態             | Scopes                                                    | Tags          | credential の格納先 / 構築手順                                                                                |
+| ------------------ | ---------------- | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `tidb-proxy`       | 現行             | `Keys > Auth Keys > Write`                                | `tag:proxy`   | SSM `/shared/shuntaka/tailscale/oauth-client-{id,secret}`。[開発環境構築](01_development.md)                  |
+| Tailscale Operator | 現行             | `Devices > Core > Read/Write`, `Keys > Auth Keys > Write` | `tag:k8s`     | 下記「Tailscale Operator 導入」で Helm values に設定                                                          |
+| `blog-api-lambda`  | **廃止・revoke** | `Keys > Auth Keys > Write`                                | `tag:aws-app` | Lambda 内 tailscaled 方式の旧 client。[移行記録](../98_tasks/2026-06-26-dsql-to-tidb-migration/index.md) のみ |
 
 ### MagicDNS の有効化
 

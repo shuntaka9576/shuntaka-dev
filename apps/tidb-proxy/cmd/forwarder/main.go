@@ -1,19 +1,19 @@
 // tidb-proxy forwarder は Fargate task のメインプロセスとして起動し、
 //
-//  1. 環境変数 TS_AUTHKEY (reusable / non-ephemeral / tag:proxy で発行済み)
-//     を使って tsnet.Server で Tailnet に join
-//  2. 各 forward ルールを TCP forward する。TiDB (必須) は
+//  1. 環境変数 TS_OAUTH_CLIENT_ID / TS_OAUTH_CLIENT_SECRET を使って
+//     Tailscale OAuth API から短命の ephemeral auth key (tag:proxy) を発行
+//  2. 発行した auth key で tsnet.Server を Tailnet に join
+//  3. 各 forward ルールを TCP forward する。TiDB (必須) は
 //     0.0.0.0:13306 -> tidb.<suffix>:4000、PLaMo (PLAMO_HOSTNAME 設定時) は
 //     0.0.0.0:18080 -> plamo-embedding.<suffix>:80 を公開し、Lambda から
 //     Tailnet 上のサービスへ VPC 内エンドポイント経由で到達させる
 //
 // alpine ベース image で動かす前提で CGO_ENABLED=0 で static build する。
 //
-// blog-api/tsnet-launcher との差分:
-//   - SSM Parameter Store / OAuth client_credentials による auth key 発行を削除
-//     (常駐 proxy なので reusable / non-ephemeral / tagged な auth key を
-//     ecspresso 経由で SSM から runtime fetch する想定)
-//   - Rust HTTP server を子プロセス起動するロジックを削除 (forwarder のみ)
+// 旧 blog-api/tsnet-launcher との差分:
+//   - OAuth client credentials は ECS secrets で注入済みのため、プロセス内で
+//     SSM Parameter Store は読まない
+//   - Rust HTTP server を子プロセス起動するロジックは持たない (forwarder のみ)
 //   - listen を 127.0.0.1 ではなく 0.0.0.0 にして同 VPC 内 Lambda から到達可能に
 //   - state dir を /var/lib/tsnet-state (コンテナ内の通常パス) に変更
 package main
@@ -40,7 +40,8 @@ import (
 )
 
 const (
-	envTSAuthKey         = "TS_AUTHKEY"
+	envOAuthClientID     = "TS_OAUTH_CLIENT_ID"
+	envOAuthClientSecret = "TS_OAUTH_CLIENT_SECRET"
 	envTailnetSuffix     = "TAILNET_SUFFIX"
 	envTsnetHostname     = "TSNET_HOSTNAME"
 	envForwardListenAddr = "FORWARD_LISTEN_ADDR"
@@ -71,9 +72,10 @@ type forwardRule struct {
 }
 
 type forwarderConfig struct {
-	AuthKey  string
-	Hostname string
-	StateDir string
+	OAuthClientID     string
+	OAuthClientSecret string
+	Hostname          string
+	StateDir          string
 	// Forwards は起動する forward ルール群。TiDB は必須、PLaMo は
 	// PLAMO_HOSTNAME 設定時のみ追加する。
 	Forwards []forwardRule
@@ -89,15 +91,21 @@ func main() {
 	slog.Info("config loaded",
 		"hostname", cfg.Hostname, "forwards", len(cfg.Forwards), "state_dir", cfg.StateDir)
 
+	authKey, err := issueAuthKey(context.Background(), cfg.OAuthClientID, cfg.OAuthClientSecret)
+	if err != nil {
+		fatal("issueAuthKey", "error", err)
+	}
+	slog.Info("ephemeral auth key issued", "length", len(authKey))
+
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		fatal("mkdir state dir", "dir", cfg.StateDir, "error", err)
 	}
 
 	ts := &tsnet.Server{
 		Hostname:  cfg.Hostname,
-		AuthKey:   cfg.AuthKey,
+		AuthKey:   authKey,
 		Dir:       cfg.StateDir,
-		Ephemeral: false,
+		Ephemeral: true,
 	}
 	defer ts.Close()
 
@@ -185,9 +193,13 @@ func fatal(msg string, args ...any) {
 }
 
 func loadConfig() (*forwarderConfig, error) {
-	authKey := os.Getenv(envTSAuthKey)
-	if authKey == "" {
-		return nil, fmt.Errorf("required env missing: %s", envTSAuthKey)
+	oauthClientID := os.Getenv(envOAuthClientID)
+	if oauthClientID == "" {
+		return nil, fmt.Errorf("required env missing: %s", envOAuthClientID)
+	}
+	oauthClientSecret := os.Getenv(envOAuthClientSecret)
+	if oauthClientSecret == "" {
+		return nil, fmt.Errorf("required env missing: %s", envOAuthClientSecret)
 	}
 	suffix := os.Getenv(envTailnetSuffix)
 	if suffix == "" {
@@ -218,10 +230,11 @@ func loadConfig() (*forwarderConfig, error) {
 	}
 
 	return &forwarderConfig{
-		AuthKey:  authKey,
-		Hostname: hostname,
-		StateDir: stateDir,
-		Forwards: forwards,
+		OAuthClientID:     oauthClientID,
+		OAuthClientSecret: oauthClientSecret,
+		Hostname:          hostname,
+		StateDir:          stateDir,
+		Forwards:          forwards,
 	}, nil
 }
 

@@ -33,8 +33,12 @@ local ssmParams = import 'ssm-params.jsonnet';
       ],
       secrets: [
         {
-          name: 'TS_AUTHKEY',
-          valueFrom: ssmParams.ssm.tailscale.proxyAuthKeyParamName,
+          name: 'TS_OAUTH_CLIENT_ID',
+          valueFrom: ssmParams.ssm.tailscale.oauthClientIDParamName,
+        },
+        {
+          name: 'TS_OAUTH_CLIENT_SECRET',
+          valueFrom: ssmParams.ssm.tailscale.oauthClientSecretParamName,
         },
       ],
       portMappings: [

@@ -167,17 +167,20 @@ aws ssm put-parameter \
   --value "your-api-secret"
 ```
 
-Tailscale proxy auth key と tailnet suffix を登録（tidb-proxy Fargate task が Tailnet に join + TiDB の Tailnet hostname を解決するため）。proxy auth key は reusable / non-ephemeral / `tag:proxy` 付きで発行する。dev / prd 共用なので `/shared/shuntaka/...` に 1 つだけ格納する。発行手順は [blog-api tidb-proxy 化](../98_tasks/2026-06-29-blog-api-tidb-proxy/index.md) の「事前準備」を参照。
+Tailscale OAuth client credentials と tailnet suffix を登録する（tidb-proxy Fargate task が起動時に短命の auth key を発行し、Tailnet に join + TiDB の Tailnet hostname を解決するため）。Tailscale admin console の **Trust credentials** で `tidb-proxy` 用 OAuth client を作り、`Keys > Auth Keys > Write` と `tag:proxy` だけを許可する。dev / prd 共用なので `/shared/shuntaka/...` に 1 組だけ格納する。
 
 ```bash
-export TS_PROXY_AUTHKEY=""  # tskey-auth-... を貼り付け
+export TS_OAUTH_CLIENT_ID=""      # Tailscale OAuth client ID
+export TS_OAUTH_CLIENT_SECRET=""  # Tailscale OAuth client secret
 export TS_TAILNET_SUFFIX=$(tailscale status --json | jq -r '.MagicDNSSuffix')
 
-aws ssm put-parameter \
-  --name "/shared/shuntaka/tailscale/proxy-auth-key" \
-  --type "SecureString" \
-  --value "$TS_PROXY_AUTHKEY" \
-  --overwrite
+printf %s "$TS_OAUTH_CLIENT_ID" | aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/oauth-client-id" \
+  --type "SecureString" --value file:///dev/stdin --overwrite
+
+printf %s "$TS_OAUTH_CLIENT_SECRET" | aws ssm put-parameter \
+  --name "/shared/shuntaka/tailscale/oauth-client-secret" \
+  --type "SecureString" --value file:///dev/stdin --overwrite
 
 aws ssm put-parameter \
   --name "/shared/shuntaka/tailscale/tailnet-suffix" \
@@ -185,8 +188,10 @@ aws ssm put-parameter \
   --value "$TS_TAILNET_SUFFIX" \
   --overwrite
 
-unset TS_PROXY_AUTHKEY TS_TAILNET_SUFFIX
+unset TS_OAUTH_CLIENT_ID TS_OAUTH_CLIENT_SECRET TS_TAILNET_SUFFIX
 ```
+
+OAuth client credentials 自体には 90 日の auth key 期限はない。forwarder は task 起動ごとに one-off / ephemeral / pre-authorized / `tag:proxy` の auth key（有効期間 10 分）を API 発行し、その key を tsnet の join にだけ使う。
 
 OIDCプロバイダーの作成。アカウントに1つのみ作成（初回のみ）。
 

@@ -18,7 +18,8 @@ local projectName = 'tidb-proxy';
       cloudMapServiceArn: '{{ ssm `/' + projectName + '/proxy/cloud-map-service-arn` }}',
     },
     tailscale: {
-      proxyAuthKeyParamName: '/shared/shuntaka/tailscale/proxy-auth-key',
+      oauthClientIDParamName: '/shared/shuntaka/tailscale/oauth-client-id',
+      oauthClientSecretParamName: '/shared/shuntaka/tailscale/oauth-client-secret',
       tailnetSuffix: '{{ ssm `/shared/shuntaka/tailscale/tailnet-suffix` }}',
     },
     // st-tidb-proxy-logs スタック (lib/analytics/) の出力。FireLens のログ振り分け先。

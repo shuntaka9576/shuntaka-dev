@@ -74,20 +74,21 @@ Shared VPC (dev + prd 共用)
 
 infra 本体は 1 つにまとめ、**Lambda 側の DATABASE_URL と SG だけ env で分ける**。proxy は両 stage が共有する。
 
-| 項目                      | 共通 / env 別 | 内容                                         |
-| ------------------------- | ------------- | -------------------------------------------- |
-| VPC                       | 共通          | 1 VPC                                        |
-| ECS cluster / service     | 共通          | 1 個                                         |
-| Fargate task spec         | 共通          | 0.25 vCPU / 0.5 GB ARM Spot                  |
-| Cloud Map namespace       | 共通          | `internal`                                   |
-| proxy DNS 名              | 共通          | `tidb-proxy.internal`                        |
-| Tailscale tag             | 共通          | `tag:proxy`                                  |
-| Tailscale auth key SSM 名 | 共通          | `/shared/shuntaka/tailscale/proxy-auth-key`  |
-| TiDB 接続先 (Tailnet)     | 共通          | `tidb.<tailnet>:4000`                        |
-| Lambda VPC subnet         | 共通          | private subnet                               |
-| Lambda SG                 | **env 別**    | `lambda-sg-dev` / `lambda-sg-prd`            |
-| 接続先 database           | **env 別**    | `blog_dev` / `blog_prd`                      |
-| MySQL user / password     | **env 別**    | `blog_dev` / `blog_prd` ユーザー（権限分離） |
+| 項目                      | 共通 / env 別 | 内容                                             |
+| ------------------------- | ------------- | ------------------------------------------------ |
+| VPC                       | 共通          | 1 VPC                                            |
+| ECS cluster / service     | 共通          | 1 個                                             |
+| Fargate task spec         | 共通          | 0.25 vCPU / 0.5 GB ARM Spot                      |
+| Cloud Map namespace       | 共通          | `internal`                                       |
+| proxy DNS 名              | 共通          | `tidb-proxy.internal`                            |
+| Tailscale tag             | 共通          | `tag:proxy`                                      |
+| Tailscale OAuth client ID | 共通          | `/shared/shuntaka/tailscale/oauth-client-id`     |
+| Tailscale OAuth secret    | 共通          | `/shared/shuntaka/tailscale/oauth-client-secret` |
+| TiDB 接続先 (Tailnet)     | 共通          | `tidb.<tailnet>:4000`                            |
+| Lambda VPC subnet         | 共通          | private subnet                                   |
+| Lambda SG                 | **env 別**    | `lambda-sg-dev` / `lambda-sg-prd`                |
+| 接続先 database           | **env 別**    | `blog_dev` / `blog_prd`                          |
+| MySQL user / password     | **env 別**    | `blog_dev` / `blog_prd` ユーザー（権限分離）     |
 
 ACL: `tag:proxy` → `tag:k8s`（TiDB）への ingress を 1 ルールで許可。env 分離は **TiDB のユーザー権限** と **Lambda SG** の 2 段で担保。
 
@@ -174,8 +175,8 @@ new ecr.Repository(this, 'EcrRepository', {
   repositoryName: 'tidb-proxy',
   lifecycleRules: [
     {
-      description: 'Keep only the latest 1 image',
-      maxImageCount: 1,
+      description: 'Keep the latest 5 images for ECS rollback',
+      maxImageCount: 5,
       rulePriority: 1,
     },
   ],
@@ -245,8 +246,9 @@ local ssmParams = import 'ssm-params.jsonnet';
       image: ssmParams.ssm.proxy.ecrRepositoryUri + ':' + imageTag.tag,
       essential: true,
       secrets: [
-        // Tailscale auth key は SSM から runtime fetch
-        { name: 'TS_AUTHKEY', valueFrom: '/shared/shuntaka/tailscale/proxy-auth-key' },
+        // OAuth client credentials は SSM から runtime fetch
+        { name: 'TS_OAUTH_CLIENT_ID', valueFrom: '/shared/shuntaka/tailscale/oauth-client-id' },
+        { name: 'TS_OAUTH_CLIENT_SECRET', valueFrom: '/shared/shuntaka/tailscale/oauth-client-secret' },
       ],
       environment: [
         { name: 'TIDB_HOSTNAME', value: 'tidb' },
@@ -364,27 +366,33 @@ destination FQDN の whitelist は持たず、VPC 内 (localnet) からの CONNE
 
 将来 SSRF を厳しく管理したい場合は、whitelist 復活ではなく **記事 HTML を webhook 受信時に DB へ pre-render** して runtime の外部 fetch を消す方向 (task 文書の改善メモ参照)。
 
-### Tailscale Auth Key
+### Tailscale OAuth Client と起動用 Auth Key
 
-proxy は常駐 1 個（dev/prd 共用）なので **non-ephemeral / reusable / tagged** で発行:
+Tailscale admin console の **Trust credentials** で `tidb-proxy` 用 OAuth client を作り、`Keys > Auth Keys > Write` と `tag:proxy` だけを許可する。client ID / secret は SSM Parameter Store の `/shared/shuntaka/tailscale/oauth-client-id` と `/shared/shuntaka/tailscale/oauth-client-secret` に格納する。
+
+forwarder は task 起動時に OAuth client credentials grant で access token を得て、次の one-off auth key を API 発行する:
 
 ```json
 {
   "capabilities": {
     "devices": {
       "create": {
-        "reusable": true,
-        "ephemeral": false,
+        "reusable": false,
+        "ephemeral": true,
         "preauthorized": true,
         "tags": ["tag:proxy"]
       }
     }
   },
-  "expirySeconds": 7776000
+  "expirySeconds": 600
 }
 ```
 
-90 日で expire するので、Tailscale admin console から再発行 → SSM Parameter Store `/shared/shuntaka/tailscale/proxy-auth-key` を更新 → Fargate task 再起動 (ecspresso deploy)、で運用ローテーション。
+OAuth client credentials 自体には auth key のような 90 日の期限がない。task ごとに短命の key を作るため、期限切れ済みの固定 key が task 再配置を妨げることもない。OAuth client を revoke / rotate した場合だけ SSM の 2 parameter を更新して Fargate task を再起動する。
+
+#### 2026-09-28 障害と変更
+
+固定 auth key の 90 日期限切れ後に ECS task が再配置され、Tailnet join に失敗して login API が停止した。また ECR が最新 1 image だけを保持していたため、ECS circuit breaker の旧 task definition への rollback も image pull で失敗した。このため、認証を上記 OAuth client 方式へ変更し、ECR の保持数を 5 images に増やした。
 
 ### Tailscale ACL の更新
 
@@ -482,7 +490,7 @@ admin console → Access controls で `tagOwners` に `"tag:proxy": ["autogroup:
 
 ##### 4. 環境変数として渡す
 
-PoC では SSM Parameter Store に格納せず、`docker run -e` で直接渡す。本番 (タスク 2 以降) では `/shared/shuntaka/tailscale/proxy-auth-key` に置き換わるので、PoC 中に SSM put-parameter する必要は無い。
+PoC では SSM Parameter Store に格納せず、`docker run -e` で直接渡した。2026-09-28 以降の本番は OAuth client credentials から起動ごとに短命 key を発行する方式へ移行しているため、この節の固定 `TS_AUTHKEY` 手順は PoC 当時の記録として残す。
 
 ```bash
 cd apps/tidb-proxy
@@ -607,7 +615,7 @@ CDK は **インフラの土台のみ** を作る。Task definition / Service �
 
 - VPC（既存があれば再利用、無ければ最小 1AZ: public subnet 1 + private subnet 1）
 - ECS Cluster `tidb-proxy`
-- ECR Repository `tidb-proxy`（lifecycle: 最新 1 image のみ保持）
+- ECR Repository `tidb-proxy`（lifecycle: rollback 用に最新 5 images を保持）
 - IAM TaskRole（SSM secrets 読み取り、ECS UpdateTaskProtection 等）
 - IAM ExecutionRole（ECR pull / Logs write、SSM secrets fetch）
 - CloudWatch Log Group `/ecs/tidb-proxy` (3 ヶ月保持)
@@ -621,10 +629,10 @@ CDK は **インフラの土台のみ** を作る。Task definition / Service �
 
 - [x] `iac/aws/lib/proxy/proxy-vpc-construct.ts` 作成 (VPC + subnets + IGW)
 - [x] `iac/aws/lib/proxy/tidb-proxy-construct.ts` 作成 (Cluster + ECR + IAM + LogGroup + SG + CloudMap + SSM Params)
-- [x] ECR lifecycle policy `maxImageCount: 1` を設定
+- [x] ECR lifecycle policy `maxImageCount: 5` を設定
 - [x] CDK stack に組み込み、`vitest run` で snapshot 確認 (`iac/aws/test/proxy.test.ts.snap`)
-- [ ] CDK deploy 実行、SSM Parameter Store に必要な値が出力されていることを確認
-- [ ] Tailscale auth key を SSM `/shared/shuntaka/tailscale/proxy-auth-key` に手動で格納（90 日 rotation 運用、手順は `docs/source/01_開発ドキュメント/01_development.md` を参照）
+- [x] CDK deploy 実行、SSM Parameter Store に必要な値が出力されていることを確認
+- [x] Tailscale OAuth client ID / secret を SSM `/shared/shuntaka/tailscale/oauth-client-id` と `/shared/shuntaka/tailscale/oauth-client-secret` に格納（手順は `docs/source/01_開発ドキュメント/01_development.md` を参照）
 
 ### タスク 2: ecspresso 設定ファイル作成 + 初回 deploy
 
