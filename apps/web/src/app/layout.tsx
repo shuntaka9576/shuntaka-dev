@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [OG_IMAGE_URL],
-    creator: '@shuntaka_jp',
+    creator: '@shuntaka_dev',
   },
 };
 

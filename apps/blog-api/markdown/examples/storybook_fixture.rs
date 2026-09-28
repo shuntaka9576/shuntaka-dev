@@ -137,23 +137,23 @@ https://github.com/zenn-dev/zenn-editor/pull/528
 
 通常
 
-https://x.com/shuntaka_jp/status/2005455430907216136
+https://x.com/shuntaka_dev/status/2005455430907216136
 
 画像
 
-https://x.com/shuntaka_jp/status/2006628407640244432
+https://x.com/shuntaka_dev/status/2006628407640244432
 
 動画
 
-https://x.com/shuntaka_jp/status/2005967665513554314
+https://x.com/shuntaka_dev/status/2005967665513554314
 
 画像 + 引用
 
-https://x.com/shuntaka_jp/status/2007325737725084022
+https://x.com/shuntaka_dev/status/2007325737725084022
 
 引用 + 画像
 
-https://x.com/shuntaka_jp/status/2007605987881169264
+https://x.com/shuntaka_dev/status/2007605987881169264
 
 ## SpeakerDeck 埋め込み
 

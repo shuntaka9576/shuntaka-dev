@@ -12,7 +12,7 @@ const links = [
   {
     icon: '/assets/x.svg',
     name: 'shuntaka_dev',
-    href: 'https://x.com/shuntaka_jp',
+    href: 'https://x.com/shuntaka_dev',
   },
   {
     icon: '/assets/zenn.svg',
