@@ -4,6 +4,14 @@
 
 - docs: S3料金実績と9月予測を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/784
 - feat: 開発ドメインをshuntaka.meへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/791
+- chore: integrate pending dependency updates by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/792
+- fix: Xアカウント名をshuntaka_devに変更 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/796
+- fix: Tailscale認証をOAuth client方式へ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/797
+
+## [2026.0928.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0826.1...2026.0928.0) - 2026-09-28
+
+- docs: S3料金実績と9月予測を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/784
+- feat: 開発ドメインをshuntaka.meへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/791
 
 ## [2026.0826.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0826.0...2026.0826.1) - 2026-08-26
 
