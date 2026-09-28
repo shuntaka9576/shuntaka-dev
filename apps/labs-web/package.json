@@ -24,7 +24,7 @@
     "svelte": "^5.42.2",
     "svelte-check": "^4.3.3",
     "tailwindcss": "^4.1.16",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "yaml": "^2.8.1"
   }
