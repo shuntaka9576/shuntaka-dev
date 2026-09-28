@@ -136,7 +136,7 @@ jobs:
         env:
           STAGE_NAME: ${{ inputs.stageName }}
           # 公開サイトの apex ドメイン。GitHub Environments (dev / prd) の
-          # Environment variable。dev: shuntaka.tech / prd: shuntaka.dev
+          # Environment variable。dev: shuntaka.me / prd: shuntaka.dev
           SITE_FQDN: ${{ vars.SITE_FQDN }}
           # admin stack が main stack (blog-api Lambda ロール ARN) に依存するため、
           # synth 時に main stack の env 未設定エラー注釈が出ないよう他ステップと同じ env を渡す

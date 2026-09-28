@@ -327,6 +327,7 @@ export class AdminStack extends cdk.Stack {
     const certificateArn = readCrossRegionParameter(this, 'VirginiaCertArnLookup', {
       parameterName: props.ssmParameters.virginia.certificateArn,
       region: VIRGINIA_REGION,
+      refreshToken: props.adminDomain,
     });
     const certificate = acm.Certificate.fromCertificateArn(
       this,

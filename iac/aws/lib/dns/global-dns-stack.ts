@@ -9,6 +9,7 @@ export class GlobalDnsStack extends cdk.Stack {
     id: string,
     props: {
       domainName: string;
+      apexIpv4Addresses?: string[];
       hostedZoneIdParameterName: string;
     } & cdk.StackProps,
   ) {
@@ -17,6 +18,13 @@ export class GlobalDnsStack extends cdk.Stack {
     const hostedZone = new route53.PublicHostedZone(this, 'Route53', {
       zoneName: props.domainName,
     });
+
+    if (props.apexIpv4Addresses !== undefined) {
+      new route53.ARecord(this, 'ApexRecord', {
+        zone: hostedZone,
+        target: route53.RecordTarget.fromIpAddresses(...props.apexIpv4Addresses),
+      });
+    }
 
     new ssm.StringParameter(this, 'HostedZoneIdParameter', {
       parameterName: props.hostedZoneIdParameterName,

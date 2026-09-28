@@ -25,6 +25,7 @@ export class VirginiaCertificateStack extends cdk.Stack {
     const hostedZoneId = readCrossRegionParameter(this, 'HostedZoneIdLookup', {
       parameterName: props.hostedZoneIdParameterName,
       region: props.hostedZoneParameterRegion,
+      refreshToken: props.fqdn,
     });
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImportedHostedZone', {
       hostedZoneId,
@@ -36,6 +37,10 @@ export class VirginiaCertificateStack extends cdk.Stack {
       subjectAlternativeNames: [props.imagesDomain],
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
+    // CloudFront が旧証明書を参照したままでもドメイン移行を進められるよう、
+    // 置換時だけ旧証明書を保持する。切り替え確認後に手動で整理する。
+    const cfnCertificate = certificate.node.defaultChild as acm.CfnCertificate;
+    cfnCertificate.cfnOptions.updateReplacePolicy = cdk.CfnDeletionPolicy.RETAIN;
 
     new ssm.StringParameter(this, 'VirginiaCertificateArnParameter', {
       parameterName: props.certificateArnParameterName,

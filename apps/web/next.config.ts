@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'images.shuntaka.tech',
+        hostname: 'images.shuntaka.me',
         pathname: '/images/moments/**',
       },
     ],

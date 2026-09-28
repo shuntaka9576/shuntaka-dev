@@ -20,6 +20,21 @@ exports[`GlobalDnsStack > snapshot 1`] = `
     },
   },
   "Resources": {
+    "ApexRecord31DF5995": {
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "Route5344186EA2",
+        },
+        "Name": "example.com.",
+        "ResourceRecords": [
+          "192.0.2.1",
+          "192.0.2.2",
+        ],
+        "TTL": "1800",
+        "Type": "A",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
     "HostedZoneIdParameter0161E959": {
       "Properties": {
         "Name": "/test/hosted-zone-id",
@@ -114,6 +129,7 @@ exports[`TokyoCertificateStack > snapshot 1`] = `
         "ValidationMethod": "DNS",
       },
       "Type": "AWS::CertificateManager::Certificate",
+      "UpdateReplacePolicy": "Retain",
     },
   },
   "Rules": {
