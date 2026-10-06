@@ -2,9 +2,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cdk from 'aws-cdk-lib';
 import {
-  type CfnMethod,
   EndpointType,
   LambdaIntegration,
+  ResponseTransferMode,
   RestApi,
 } from 'aws-cdk-lib/aws-apigateway';
 import type * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -260,22 +260,14 @@ export class BlogAPIConstruct extends Construct {
       },
     });
 
-    const lambdaIntegration = new LambdaIntegration(webApiLambda);
-    const rootMethod = restApi.root.addMethod('ANY', lambdaIntegration);
-    const proxyMethod = restApi.root.addResource('{proxy+}').addMethod('ANY', lambdaIntegration);
-
-    [rootMethod, proxyMethod].forEach((method) => {
-      const cfnMethod = method.node.defaultChild as CfnMethod;
-      cfnMethod.addOverride('Properties.Integration.ResponseTransferMode', 'STREAM');
-      cfnMethod.addOverride('Properties.Integration.TimeoutInMillis', 900000);
-      cfnMethod.addOverride(
-        'Properties.Integration.Uri',
-        cdk.Fn.sub(
-          'arn:aws:apigateway:${AWS::Region}:lambda:path/2021-11-15/functions/${LambdaArn}/response-streaming-invocations',
-          { LambdaArn: webApiLambda.functionArn },
-        ),
-      );
+    // STREAM 指定で L2 が response-streaming-invocations の Uri を組み立てる。
+    // timeout は Lambda の最大実行時間 (15 分) に合わせる
+    const lambdaIntegration = new LambdaIntegration(webApiLambda, {
+      responseTransferMode: ResponseTransferMode.STREAM,
+      timeout: cdk.Duration.minutes(15),
     });
+    restApi.root.addMethod('ANY', lambdaIntegration);
+    restApi.root.addResource('{proxy+}').addMethod('ANY', lambdaIntegration);
 
     new route53.ARecord(this, 'ApiAliasRecord', {
       zone: props.hostedZone,
