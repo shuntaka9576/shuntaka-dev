@@ -8,6 +8,7 @@
 - ステータス: snapshot 保持期間14日・Firehose buffer 900秒・日次VACUUMを適用済み。Athena結果出力先のIAM修正後、2026-08-27〜2026-09-02の定期VACUUMが連続で成功。2026-09-10に定常状態と9月料金予測を再確認する
 - 関連タスク: [tidb-proxy: ログを FireLens で振り分けて S3/Iceberg + Athena で検索可能にする](../2026-07-10-tidb-proxy-log-iceberg/index.md)
 - 関連実装: `iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`
+- 後続タスク: [tidb-proxy ログの Iceberg テーブルを S3 Tables へ移行する](../2026-10-06-tidb-proxy-logs-s3-tables/index.md)（本書の VACUUM 運用は S3 Tables のマネージドメンテナンスに置き換え。`scripts/maintain-tidb-proxy-iceberg.sh` / `iac/aws/sql/tidb-proxy-logs/` は撤去済み）
 
 ## 結論
 

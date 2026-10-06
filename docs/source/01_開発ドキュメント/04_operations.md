@@ -249,7 +249,7 @@ ssh "$NODE" 'cat /var/run/reboot-required 2>/dev/null'
 
 ### Athena（proxy アクセスログ / Iceberg）
 
-tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アクセスログ・forwarder イベント）が S3 上の Iceberg テーブル `tidb_proxy_logs.logs` に、WARN / ERROR・非 JSON 行が CloudWatch Logs `/ecs/tidb-proxy` に入る。設計は [tidb-proxy ログの S3/Iceberg 検索基盤](../98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md) を参照。
+tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アクセスログ・forwarder イベント）が S3 Tables の Iceberg テーブル `"s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs"` に、WARN / ERROR・非 JSON 行が CloudWatch Logs `/ecs/tidb-proxy` に入る。設計は [tidb-proxy ログの S3/Iceberg 検索基盤](../98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md) と [S3 Tables への移行](../98_tasks/2026-10-06-tidb-proxy-logs-s3-tables/index.md) を参照。
 
 よく使うクエリは Saved queries（WorkGroup `tidb-proxy-logs`）に CDK（`iac/aws/lib/analytics/tidb-proxy-log-analytics-construct.ts`）で登録済み。Athena コンソールで WorkGroup を `tidb-proxy-logs` に切り替えて Saved queries から実行する。
 
@@ -264,6 +264,7 @@ tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アク
 自分でクエリを書くときの注意:
 
 - ECS ヘルスチェック（127.0.0.1 から 30 秒ごとの `nc -z`）が `squid_access` のノイズ行になる。`client_ip <> '127.0.0.1'` で除外し、forwarder 行（`client_ip` が NULL）も残す場合は `client_ip IS DISTINCT FROM '127.0.0.1'` を使う
+- テーブルは federated catalog 配下にあるため、FROM 句は `"s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs"` と完全修飾する（Athena コンソールなら Data source に `s3tablescatalog/tidb-proxy-logs-tables` を選べば `logs` だけで書ける）
 - `ts` は string（ISO8601 UTC）で保存されている。時刻演算は `from_iso8601_timestamp(ts)`、期間絞り込みは `from_iso8601_timestamp(ts) > current_timestamp - interval '7' day` の形
 - JST 表示は `format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')`
 - WARN / ERROR は Iceberg 側に入らない。障害調査は CloudWatch Logs の `fluentbit-warnerr-*` / `fluentbit-fallback-*` ストリームを見る

@@ -266,26 +266,27 @@ export const getProxyConfig = (): ProxyParameter => {
   };
 };
 
-// tidb-proxy のログ分析基盤 (FireLens → Firehose → S3/Iceberg → Athena) も
+// tidb-proxy のログ分析基盤 (FireLens → Firehose → S3 Tables → Athena) も
 // dev / prd 共用のため stage 非依存。SSM は tidb-proxy 本体と同じ
 // `/tidb-proxy/...` 名前空間の `logs` 配下に出力する。設計は
 // docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md を参照。
 export interface LogAnalyticsParameter {
   projectName: string;
-  glue: {
-    databaseName: string;
+  s3Tables: {
+    tableBucketName: string;
+    // Glue の database に相当する。Firehose の Iceberg 宛先制約でハイフン不可・小文字のみ
+    namespace: string;
     tableName: string;
+    // time travel 用の snapshot 保持期間 (時間)
+    maxSnapshotAgeHours: number;
   };
   athena: {
     workGroupName: string;
   };
   firehose: {
+    // S3 Tables 宛て。SSM 経由で FireLens (ecspresso) が参照する
     deliveryStreamName: string;
     bufferIntervalSeconds: number;
-  };
-  vacuum: {
-    scheduleEnabled: boolean;
-    scheduleExpression: string;
   };
   ssm: {
     // st-tidb-proxy スタックの出力を import する (読み取りのみ)
@@ -305,23 +306,20 @@ export const getLogAnalyticsConfig = (): LogAnalyticsParameter => {
   const proxyProjectName = 'tidb-proxy';
   return {
     projectName: 'tidb-proxy-logs',
-    glue: {
-      databaseName: 'tidb_proxy_logs',
+    s3Tables: {
+      tableBucketName: 'tidb-proxy-logs-tables',
+      namespace: 'tidb_proxy_logs',
       tableName: 'logs',
+      // 14 日。旧構成の vacuum_max_snapshot_age_seconds と同じ
+      maxSnapshotAgeHours: 336,
     },
     athena: {
       workGroupName: 'tidb-proxy-logs',
     },
     firehose: {
-      deliveryStreamName: 'tidb-proxy-logs',
+      deliveryStreamName: 'tidb-proxy-logs-s3tables',
       // Firehose の Iceberg commit 頻度を抑え、metadata JSON の増加を抑制する。
       bufferIntervalSeconds: 900,
-    },
-    vacuum: {
-      // 手動 VACUUM の正常完了を確認済み。14 日保持を継続するため日次実行する。
-      scheduleEnabled: true,
-      // EventBridge Rule は UTC。毎日 03:00 JST に相当する。
-      scheduleExpression: 'cron(0 18 * * ? *)',
     },
     ssm: {
       proxy: {

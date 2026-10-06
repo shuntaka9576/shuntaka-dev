@@ -42,6 +42,7 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::glue:*',
       'Action::firehose:*',
       'Action::athena:*',
+      'Action::s3tables:*',
       'Action::cognito-idp:*',
       'Action::cloudfront:*',
       'Action::secretsmanager:*',
@@ -82,42 +83,25 @@ export const applyTidbProxySuppressions = (stack: cdk.Stack): void => {
 
 export const applyTidbProxyLogAnalyticsSuppressions = (stack: cdk.Stack): void => {
   const bucketWildcardReason =
-    'Firehose 配信ロールは iceberg/ (テーブルデータ) と firehose-errors/ (失敗レコード) の両 prefix へ、BucketDeployment / autoDeleteObjects の custom resource はバケット全体へオブジェクトキー動的にアクセスするため、bucket/* のワイルドカードを許容する。バケット自体がログ基盤専用。';
+    'BucketDeployment / autoDeleteObjects の custom resource はバケット全体へオブジェクトキー動的にアクセスするため、bucket/* のワイルドカードを許容する。バケット自体がログ基盤専用。';
   const customResourceLambdaReason =
     'BucketDeployment (FireLens 設定の S3 同期) と autoDeleteObjects が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
   acknowledgeRules(stack, [
     {
       id: 'AwsSolutions-S1',
       reason:
-        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。バケットへの書き込み主体は Firehose / BucketDeployment / Athena に限定されている。',
+        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。バケットへの書き込み主体は Firehose (失敗レコード) / BucketDeployment / Athena に限定されている。',
     },
     {
-      id: 'AwsSolutions-IAM5[Resource::*]',
+      id: 'AwsSolutions-IAM5[Resource::<LogAnalyticsLogsBucket18E6FEA3.Arn>/firehose-errors/*]',
       reason:
-        'Step Functions の Athena .sync integration が S3 metadata 読み取りと lakeformation:GetDataAccess 用に自動生成する権限。State Machine の query は固定の VACUUM tidb_proxy_logs.logs で、任意 SQL や任意入力を受け取らない。lakeformation:GetDataAccess は resource-level 制限非対応。',
+        'Firehose が配信失敗レコードを退避する object key は動的なため、firehose-errors/ prefix 内に限定して読み書きを許容する。',
     },
-    {
-      id: 'AwsSolutions-IAM5[Resource::<LogAnalyticsLogsBucket18E6FEA3.Arn>/iceberg/logs/metadata/*]',
+    ...['database/*', 'table/*/*'].map((resource) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:aws:glue:<AWS::Region>:<AWS::AccountId>:${resource}]`,
       reason:
-        'Athena VACUUM が transaction commit 時に生成する Iceberg metadata JSON の object key は動的なため、対象 table の metadata prefix 内に限定して PutObject を許容する。',
-    },
-    ...['<AWS::Partition>', 'aws'].flatMap((partition) => [
-      {
-        id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::<LogAnalyticsLogsBucket18E6FEA3>/athena-results/*]`,
-        reason:
-          'WorkGroup が Athena VACUUM の query result を専用 bucket の athena-results/ prefix へ強制出力するため、実行ごとに動的な object key への PutObject を許容する。State Machine の query は固定の VACUUM のみ。',
-      },
-      {
-        id: `AwsSolutions-IAM5[Resource::arn:${partition}:glue:${stack.region}:${stack.account}:table/tidb_proxy_logs/*]`,
-        reason:
-          'Step Functions の Athena .sync integration が対象 database 配下の Glue table 権限を自動生成する。State Machine の query は logs table に対する固定 VACUUM のみで、対象 database には本テーブルだけを配置する。',
-      },
-      {
-        id: `AwsSolutions-IAM5[Resource::arn:${partition}:glue:${stack.region}:${stack.account}:userDefinedFunction/tidb_proxy_logs/*]`,
-        reason:
-          'Step Functions の Athena .sync integration が自動生成する Glue UDF 読み取り権限。固定 VACUUM query は UDF を使用せず、State Machine は任意 SQL や任意入力を受け取らない。',
-      },
-    ]),
+        'Firehose 開発者ガイド (Grant Firehose access to Amazon S3 Tables, IAM access control) が s3tablescatalog 配下の database / table に指定する Glue ARN。付与する action は Get 系と UpdateTable のみで、書き込み先 catalog はこのテーブルバケットに限定している。',
+    })),
     ...[
       'Action::s3:Abort*',
       'Action::s3:DeleteObject*',

@@ -376,6 +376,7 @@
     "syntect",
     "sysbench",
     "sysdig",
+    "tablescatalog",
     "tablespaces",
     "tagpr",
     "tailea",
