@@ -1,4 +1,6 @@
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
@@ -8,7 +10,17 @@ const port = Number(process.env.LABS_WEB_PORT ?? 43006);
 const apiPort = Number(process.env.LABS_API_PORT ?? 43007);
 
 export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [
+    tailwindcss(),
+    sveltekit({
+      preprocess: vitePreprocess(),
+      // S3 + CloudFront 配信の SPA。非ファイル URI は CloudFront Function が
+      // /labs/index.html に rewrite する前提（fallback がそのシェルになる）
+      adapter: adapter({ fallback: 'index.html' }),
+      // admin.<fqdn>/labs 配下に合成されるため base を固定
+      paths: { base: '/labs' },
+    }),
+  ],
   server: {
     port,
     strictPort: true,

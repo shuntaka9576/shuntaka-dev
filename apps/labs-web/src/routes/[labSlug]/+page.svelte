@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from '$app/paths';
+  import { resolve } from '$app/paths';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();
@@ -11,7 +11,7 @@
 
 <main class="mx-auto max-w-3xl px-4 py-10">
   <nav class="mb-6 text-sm text-[#8b9299]">
-    <a href="{base}/" class="hover:text-[#5c6eb1]">Labs</a>
+    <a href={resolve('')} class="hover:text-[#5c6eb1]">Labs</a>
     <span class="mx-1">/</span>
     <span>{data.lab.title}</span>
   </nav>
@@ -34,7 +34,7 @@
       {#each data.chapters as chapter (chapter.slug)}
         <li>
           <a
-            href="{base}/{data.lab.slug}/{chapter.slug}"
+            href={resolve('/[labSlug]/[chapterSlug]', { labSlug: data.lab.slug, chapterSlug: chapter.slug })}
             class="group flex items-center gap-4 py-3"
           >
             <span

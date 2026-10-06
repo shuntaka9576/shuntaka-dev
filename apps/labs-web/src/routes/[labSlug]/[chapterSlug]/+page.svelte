@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { renderMath } from '$lib/math';
-  import { hydrateWidgets } from '$lib/widgets/hydrate';
+  import { resolve } from '$app/paths';
+  import { renderMath } from '#lib/math.js';
+  import { hydrateWidgets } from '#lib/widgets/hydrate.js';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();
@@ -33,7 +33,7 @@
   <aside class="hidden w-64 shrink-0 lg:block">
     <div class="sticky top-8 rounded-xl border border-[#dde3ea] bg-white p-5">
       <a
-        href="{base}/{data.lab.slug}"
+        href={resolve('/[labSlug]', { labSlug: data.lab.slug })}
         class="mb-3 block text-sm font-semibold text-[#33383e] hover:text-[#5c6eb1]"
       >
         {data.lab.title}
@@ -42,7 +42,7 @@
         {#each data.chapters as chapter (chapter.slug)}
           <li>
             <a
-              href="{base}/{data.lab.slug}/{chapter.slug}"
+              href={resolve('/[labSlug]/[chapterSlug]', { labSlug: data.lab.slug, chapterSlug: chapter.slug })}
               aria-current={chapter.slug === data.chapter.slug ? 'page' : undefined}
               class="flex gap-2 rounded-md px-2 py-1.5 text-sm leading-snug {chapter.slug ===
               data.chapter.slug
@@ -62,7 +62,7 @@
 
   <article class="min-w-0 flex-1">
     <nav class="mb-4 text-sm text-[#8b9299] lg:hidden">
-      <a href="{base}/{data.lab.slug}" class="hover:text-[#5c6eb1]">← {data.lab.title}</a>
+      <a href={resolve('/[labSlug]', { labSlug: data.lab.slug })} class="hover:text-[#5c6eb1]">← {data.lab.title}</a>
     </nav>
 
     <div class="rounded-xl border border-[#dde3ea] bg-white px-6 py-8 sm:px-10">
@@ -82,7 +82,7 @@
     <nav class="mt-6 flex gap-4">
       {#if prev}
         <a
-          href="{base}/{data.lab.slug}/{prev.slug}"
+          href={resolve('/[labSlug]/[chapterSlug]', { labSlug: data.lab.slug, chapterSlug: prev.slug })}
           class="flex-1 rounded-xl border border-[#dde3ea] bg-white p-4 hover:shadow-md"
         >
           <span class="block text-xs text-[#8b9299]">← 前の章</span>
@@ -93,7 +93,7 @@
       {/if}
       {#if next}
         <a
-          href="{base}/{data.lab.slug}/{next.slug}"
+          href={resolve('/[labSlug]/[chapterSlug]', { labSlug: data.lab.slug, chapterSlug: next.slug })}
           class="flex-1 rounded-xl border border-[#dde3ea] bg-white p-4 text-right hover:shadow-md"
         >
           <span class="block text-xs text-[#8b9299]">次の章 →</span>
