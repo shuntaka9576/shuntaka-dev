@@ -195,6 +195,17 @@ S3 Tables の状態（切り替えから約 16 時間）:
 
 Named Query の `Database` プロパティ（`tidb_proxy_logs`）は default catalog に実体が無くなったが、FROM 句を完全修飾しているため実行に影響しない（`recent-activity` を `Catalog=AwsDataCatalog,Database=tidb_proxy_logs` のコンテキストで実行して `SUCCEEDED` を確認）。
 
+### デプロイロールの反映 (2026-10-07)
+
+CI (`reusable-deploy.yaml`) は CDK bootstrap ロールを assume できず（`current credentials could not be used to assume ... Proceeding anyway`）、`{dev,prd}-shuntaka-assume-role` の権限で直接 CloudFormation を実行している。ローカル確認時点で、AWS 上の deploy role はコードより古かった。
+
+| ロール                   | コードにあって AWS に未反映だった権限                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `d-st-deploy-role` (dev) | `cloudfront:*` / `cognito-idp:*` / `s3tables:*`                                                                                           |
+| `p-st-deploy-role` (prd) | `athena:*` / `cloudfront:*` / `cloudwatch:*` / `cognito-idp:*` / `events:*` / `firehose:*` / `glue:*` / `secretsmanager:*` / `s3tables:*` |
+
+2026-09-28 のリリースで prd が通っていたのは、該当スタックが `no changes` だったため。S3 Tables を含むスタックを CI から更新できるよう、07:40 台に両ロールをローカルからデプロイし、inline policy に上記がすべて入ったことを確認した。deploy role は CI のデプロイ対象に含まれないため、権限を追加したら手動で反映する（`01_development.md` の「GitHub Actions用のデプロイロールの作成」を参照）。
+
 ## 料金の目安
 
 S3 Tables はストレージ単価が S3 Standard より約 15% 高い（us-east-1 で $0.0265/GB-月）ほか、オブジェクト監視（$0.025 / 1,000 objects）と compaction（$0.002 / 1,000 objects + $0.005 / GB）が課金される。実データは数百 MiB 規模のため月数セント程度の見込み。東京リージョンの正確な単価は Pricing Calculator で確認する。

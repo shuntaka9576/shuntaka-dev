@@ -204,7 +204,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-GitHub Actions用のデプロイロールの作成
+GitHub Actions用のデプロイロールの作成。deploy role は CI のデプロイ対象に含まれないため、`deploy-role-stack.ts` に権限を追加したときもこの手順で dev / prd の両方へ手動反映する（CI は CDK bootstrap ロールを assume せず、このロールの権限で直接 CloudFormation を実行する）
 
 ```bash
 export STAGE_NAME=""
