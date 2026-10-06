@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.1006.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0928.0...2026.1006.0) - 2026-10-06
+
+- feat: tidb-proxyログのIcebergテーブルをS3 Tablesへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/803
+- refactor: blog-apiのレスポンスストリーミング設定をL2に移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/805
+
 ## [2026.0928.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0826.1...2026.0928.0) - 2026-09-28
 
 - docs: S3料金実績と9月予測を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/784
