@@ -114,6 +114,7 @@ exports[`DeployRoleStack > snapshot 1`] = `
                     "glue:*",
                     "firehose:*",
                     "athena:*",
+                    "s3tables:*",
                     "cognito-idp:*",
                     "cloudfront:*",
                     "secretsmanager:*",

@@ -31,61 +31,44 @@ describe('TidbProxyLogAnalyticsStack', () => {
         },
       }),
     });
-    template.hasResourceProperties('AWS::Events::Rule', {
-      Name: 'tidb-proxy-logs-vacuum',
-      ScheduleExpression: 'cron(0 18 * * ? *)',
-      State: 'ENABLED',
+    template.hasResourceProperties('AWS::KinesisFirehose::DeliveryStream', {
+      IcebergDestinationConfiguration: Match.objectLike({
+        CatalogConfiguration: {
+          CatalogArn: {
+            'Fn::Join': ['', Match.arrayWith([':catalog/s3tablescatalog/tidb-proxy-logs-tables'])],
+          },
+        },
+        DestinationTableConfigurationList: [
+          {
+            DestinationDatabaseName: 'tidb_proxy_logs',
+            DestinationTableName: 'logs',
+          },
+        ],
+      }),
     });
-    template.hasResourceProperties('AWS::StepFunctions::StateMachine', {
-      StateMachineName: 'tidb-proxy-logs-vacuum',
-      StateMachineType: 'STANDARD',
+    template.hasResourceProperties('AWS::S3Tables::TableBucket', {
+      TableBucketName: 'tidb-proxy-logs-tables',
+      UnreferencedFileRemoval: { Status: 'Enabled' },
     });
-    expect(JSON.stringify(template.findResources('AWS::StepFunctions::StateMachine'))).toContain(
-      'VACUUM tidb_proxy_logs.logs',
-    );
-    template.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({
-            Action: 's3:PutObject',
-            Effect: 'Allow',
-            Resource: {
-              'Fn::Join': [
-                '',
-                Match.arrayWith([
-                  {
-                    'Fn::GetAtt': ['LogAnalyticsLogsBucket18E6FEA3', 'Arn'],
-                  },
-                  '/iceberg/logs/metadata/*',
-                ]),
-              ],
-            },
-          }),
-        ]),
+    template.hasResourceProperties('AWS::S3Tables::Table', {
+      Namespace: 'tidb_proxy_logs',
+      TableName: 'logs',
+      OpenTableFormat: 'ICEBERG',
+      Compaction: { Status: 'enabled' },
+      SnapshotManagement: {
+        Status: 'enabled',
+        MaxSnapshotAgeHours: 336,
+        MinSnapshotsToKeep: 1,
       },
     });
-    template.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({
-            Action: Match.arrayWith(['s3:PutObject']),
-            Effect: 'Allow',
-            Resource: {
-              'Fn::Join': [
-                '',
-                [
-                  'arn:',
-                  { Ref: 'AWS::Partition' },
-                  ':s3:::',
-                  { Ref: 'LogAnalyticsLogsBucket18E6FEA3' },
-                  '/athena-results/*',
-                ],
-              ],
-            },
-          }),
-        ]),
-      },
+    template.hasResourceProperties('AWS::Glue::Catalog', {
+      Name: 's3tablescatalog',
+      FederatedCatalog: Match.objectLike({ ConnectionName: 'aws:s3tables' }),
+      AllowFullTableExternalDataAccess: 'True',
     });
+    // VACUUM の自前運用は S3 Tables のマネージドメンテナンスに置き換えた
+    template.resourceCountIs('AWS::StepFunctions::StateMachine', 0);
+    template.resourceCountIs('AWS::Events::Rule', 0);
     expect(template.toJSON()).toMatchSnapshot();
   });
 });

@@ -23,7 +23,7 @@ tidb-proxy (squid + Go forwarder 同居の Fargate task) のログは現状 awsl
 ### 設計判断の前提
 
 - **カスタム Fluent Bit イメージは作らない**。`aws-for-fluent-bit` の `init` タグイメージは Fargate でも起動時に S3 から設定ファイルを取得できるため、設定は S3 配置 (`BucketDeployment` で git と同期) で済ませ、ECR リポジトリ追加とイメージビルドのパイプラインを持たない
-- **S3 Tables は使わない**。マネージドコンパクションは魅力だが Lake Formation 統合の設定が増える。このデータ量 (月数十〜数百MB) ではコンパクション自体が当面不要なため、通常 S3 + Glue Catalog の Iceberg テーブルで開始する
+- **S3 Tables は使わない**。マネージドコンパクションは魅力だが Lake Formation 統合の設定が増える。このデータ量 (月数十〜数百MB) ではコンパクション自体が当面不要なため、通常 S3 + Glue Catalog の Iceberg テーブルで開始する（2026-10-06 追記: 統合が IAM アクセス制御デフォルトになり Lake Formation が不要になったため、[S3 Tables へ移行](../2026-10-06-tidb-proxy-logs-s3-tables/index.md)）
 - **Kinesis Data Streams は使わない**。Firehose Direct PUT で十分（シャード時間課金なし、完全従量）
 
 ## アーキテクチャ

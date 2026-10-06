@@ -224,87 +224,11 @@ exports[`TidbProxyLogAnalyticsStack > snapshot 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
-    "LogAnalyticsDeliveryStream3CF1E4D2": {
-      "DependsOn": [
-        "LogAnalyticsFirehoseRoleDefaultPolicyC43ECF09",
-        "LogAnalyticsLogsTable3388531E",
-      ],
-      "Properties": {
-        "DeliveryStreamEncryptionConfigurationInput": {
-          "KeyType": "AWS_OWNED_CMK",
-        },
-        "DeliveryStreamName": "tidb-proxy-logs",
-        "DeliveryStreamType": "DirectPut",
-        "IcebergDestinationConfiguration": {
-          "AppendOnly": true,
-          "BufferingHints": {
-            "IntervalInSeconds": 900,
-            "SizeInMBs": 64,
-          },
-          "CatalogConfiguration": {
-            "CatalogArn": {
-              "Fn::Join": [
-                "",
-                [
-                  "arn:aws:glue:",
-                  {
-                    "Ref": "AWS::Region",
-                  },
-                  ":",
-                  {
-                    "Ref": "AWS::AccountId",
-                  },
-                  ":catalog",
-                ],
-              ],
-            },
-          },
-          "CloudWatchLoggingOptions": {
-            "Enabled": true,
-            "LogGroupName": {
-              "Ref": "LogAnalyticsFirehoseLogGroupF129BBE2",
-            },
-            "LogStreamName": {
-              "Ref": "LogAnalyticsFirehoseLogStream196AE168",
-            },
-          },
-          "DestinationTableConfigurationList": [
-            {
-              "DestinationDatabaseName": "tidb_proxy_logs",
-              "DestinationTableName": "logs",
-            },
-          ],
-          "RoleARN": {
-            "Fn::GetAtt": [
-              "LogAnalyticsFirehoseRoleCC3FD088",
-              "Arn",
-            ],
-          },
-          "S3Configuration": {
-            "BucketARN": {
-              "Fn::GetAtt": [
-                "LogAnalyticsLogsBucket18E6FEA3",
-                "Arn",
-              ],
-            },
-            "ErrorOutputPrefix": "firehose-errors/",
-            "RoleARN": {
-              "Fn::GetAtt": [
-                "LogAnalyticsFirehoseRoleCC3FD088",
-                "Arn",
-              ],
-            },
-          },
-          "s3BackupMode": "FailedDataOnly",
-        },
-      },
-      "Type": "AWS::KinesisFirehose::DeliveryStream",
-    },
     "LogAnalyticsDeliveryStreamNameParam42051B55": {
       "Properties": {
         "Name": "/tidb-proxy/logs/delivery-stream-name",
         "Type": "String",
-        "Value": "tidb-proxy-logs",
+        "Value": "tidb-proxy-logs-s3tables",
       },
       "Type": "AWS::SSM::Parameter",
     },
@@ -318,7 +242,7 @@ exports[`TidbProxyLogAnalyticsStack > snapshot 1`] = `
         "Name": "denied-or-error-access",
         "QueryString": "SELECT format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss') AS ts_jst,
        client_ip, method, url, status, squid_status, user_agent
-FROM logs
+FROM "s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs"
 WHERE log_type = 'squid_access'
   AND client_ip <> '127.0.0.1'
   AND (status >= 400 OR squid_status LIKE 'TCP_DENIED%')
@@ -343,7 +267,7 @@ LIMIT 100",
        sum(bytes_out) AS bytes_out,
        round(avg(duration_ms)) AS avg_ms,
        format_datetime(from_iso8601_timestamp(max(ts)) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss') AS last_seen_jst
-FROM logs
+FROM "s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs"
 WHERE log_type = 'squid_access'
   AND client_ip <> '127.0.0.1'
   AND from_iso8601_timestamp(ts) > current_timestamp - interval '7' day
@@ -362,157 +286,6 @@ LIMIT 50",
       },
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Delete",
-    },
-    "LogAnalyticsFirehoseLogStream196AE168": {
-      "DeletionPolicy": "Retain",
-      "Properties": {
-        "LogGroupName": {
-          "Ref": "LogAnalyticsFirehoseLogGroupF129BBE2",
-        },
-        "LogStreamName": "iceberg-delivery",
-      },
-      "Type": "AWS::Logs::LogStream",
-      "UpdateReplacePolicy": "Retain",
-    },
-    "LogAnalyticsFirehoseRoleCC3FD088": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "firehose.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "RoleName": "tidb-proxy-logs-firehose",
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "LogAnalyticsFirehoseRoleDefaultPolicyC43ECF09": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "glue:GetDatabase",
-                "glue:GetTable",
-                "glue:GetTableVersions",
-                "glue:UpdateTable",
-              ],
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:aws:glue:",
-                      {
-                        "Ref": "AWS::Region",
-                      },
-                      ":",
-                      {
-                        "Ref": "AWS::AccountId",
-                      },
-                      ":catalog",
-                    ],
-                  ],
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:aws:glue:",
-                      {
-                        "Ref": "AWS::Region",
-                      },
-                      ":",
-                      {
-                        "Ref": "AWS::AccountId",
-                      },
-                      ":database/tidb_proxy_logs",
-                    ],
-                  ],
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:aws:glue:",
-                      {
-                        "Ref": "AWS::Region",
-                      },
-                      ":",
-                      {
-                        "Ref": "AWS::AccountId",
-                      },
-                      ":table/tidb_proxy_logs/logs",
-                    ],
-                  ],
-                },
-              ],
-            },
-            {
-              "Action": [
-                "s3:GetObject*",
-                "s3:GetBucket*",
-                "s3:List*",
-                "s3:DeleteObject*",
-                "s3:PutObject",
-                "s3:PutObjectLegalHold",
-                "s3:PutObjectRetention",
-                "s3:PutObjectTagging",
-                "s3:PutObjectVersionTagging",
-                "s3:Abort*",
-              ],
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "LogAnalyticsLogsBucket18E6FEA3",
-                    "Arn",
-                  ],
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "LogAnalyticsLogsBucket18E6FEA3",
-                          "Arn",
-                        ],
-                      },
-                      "/*",
-                    ],
-                  ],
-                },
-              ],
-            },
-            {
-              "Action": "logs:PutLogEvents",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "LogAnalyticsFirehoseLogGroupF129BBE2",
-                  "Arn",
-                ],
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "LogAnalyticsFirehoseRoleDefaultPolicyC43ECF09",
-        "Roles": [
-          {
-            "Ref": "LogAnalyticsFirehoseRoleCC3FD088",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
     },
     "LogAnalyticsFirelensConfigDeploymentAwsCliLayerCA89C6AA": {
       "Properties": {
@@ -571,17 +344,6 @@ LIMIT 50",
       },
       "Type": "AWS::SSM::Parameter",
     },
-    "LogAnalyticsGlueDatabaseE7A272FA": {
-      "Properties": {
-        "CatalogId": {
-          "Ref": "AWS::AccountId",
-        },
-        "DatabaseInput": {
-          "Name": "tidb_proxy_logs",
-        },
-      },
-      "Type": "AWS::Glue::Database",
-    },
     "LogAnalyticsImportedTidbProxyTaskRolePolicyF6EDB428": {
       "Properties": {
         "PolicyDocument": {
@@ -591,7 +353,7 @@ LIMIT 50",
               "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "LogAnalyticsDeliveryStream3CF1E4D2",
+                  "LogAnalyticsS3TablesDeliveryStreamFA1B0E08",
                   "Arn",
                 ],
               },
@@ -848,103 +610,111 @@ LIMIT 50",
       },
       "Type": "AWS::S3::BucketPolicy",
     },
-    "LogAnalyticsLogsTable3388531E": {
+    "LogAnalyticsLogsS3TableB7EA0210": {
       "DependsOn": [
-        "LogAnalyticsGlueDatabaseE7A272FA",
+        "LogAnalyticsTableNamespaceF67550B0",
       ],
       "Properties": {
-        "CatalogId": {
-          "Ref": "AWS::AccountId",
+        "Compaction": {
+          "Status": "enabled",
         },
-        "DatabaseName": "tidb_proxy_logs",
-        "OpenTableFormatInput": {
-          "IcebergInput": {
-            "MetadataOperation": "CREATE",
-            "Version": "2",
-          },
-        },
-        "TableInput": {
-          "Name": "logs",
-          "StorageDescriptor": {
-            "Columns": [
+        "IcebergMetadata": {
+          "IcebergSchema": {
+            "SchemaFieldList": [
               {
                 "Name": "ts",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "log_type",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "level",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "message",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "client_ip",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "method",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "url",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "http_version",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "status",
+                "Required": false,
                 "Type": "int",
               },
               {
                 "Name": "bytes_in",
-                "Type": "bigint",
+                "Required": false,
+                "Type": "long",
               },
               {
                 "Name": "bytes_out",
-                "Type": "bigint",
+                "Required": false,
+                "Type": "long",
               },
               {
                 "Name": "duration_ms",
-                "Type": "bigint",
+                "Required": false,
+                "Type": "long",
               },
               {
                 "Name": "user_agent",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "squid_status",
+                "Required": false,
                 "Type": "string",
               },
               {
                 "Name": "hier_status",
+                "Required": false,
                 "Type": "string",
               },
             ],
-            "Location": {
-              "Fn::Join": [
-                "",
-                [
-                  "s3://",
-                  {
-                    "Ref": "LogAnalyticsLogsBucket18E6FEA3",
-                  },
-                  "/iceberg/logs",
-                ],
-              ],
-            },
           },
-          "TableType": "EXTERNAL_TABLE",
         },
+        "Namespace": "tidb_proxy_logs",
+        "OpenTableFormat": "ICEBERG",
+        "SnapshotManagement": {
+          "MaxSnapshotAgeHours": 336,
+          "MinSnapshotsToKeep": 1,
+          "Status": "enabled",
+        },
+        "TableBucketARN": {
+          "Fn::GetAtt": [
+            "LogAnalyticsTableBucket735BC1E2",
+            "TableBucketARN",
+          ],
+        },
+        "TableName": "logs",
       },
-      "Type": "AWS::Glue::Table",
+      "Type": "AWS::S3Tables::Table",
     },
     "LogAnalyticsRecentActivityQuery347E60B8": {
       "DependsOn": [
@@ -958,7 +728,7 @@ LIMIT 50",
        log_type,
        coalesce(message, method || ' ' || url) AS event,
        status, duration_ms, bytes_in, bytes_out
-FROM logs
+FROM "s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs"
 WHERE client_ip IS DISTINCT FROM '127.0.0.1'
 ORDER BY ts DESC
 LIMIT 100",
@@ -966,102 +736,141 @@ LIMIT 100",
       },
       "Type": "AWS::Athena::NamedQuery",
     },
-    "LogAnalyticsVacuumExecutionLogGroup6F771A73": {
-      "DeletionPolicy": "Delete",
+    "LogAnalyticsS3TablesCatalog63EB2163": {
       "Properties": {
-        "LogGroupName": "/aws/vendedlogs/states/tidb-proxy-logs-vacuum",
-        "RetentionInDays": 14,
-      },
-      "Type": "AWS::Logs::LogGroup",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "LogAnalyticsVacuumSchedule551BE73F": {
-      "Properties": {
-        "Description": "Run Athena VACUUM for the tidb-proxy Iceberg logs table",
-        "Name": "tidb-proxy-logs-vacuum",
-        "ScheduleExpression": "cron(0 18 * * ? *)",
-        "State": "ENABLED",
-        "Targets": [
+        "AllowFullTableExternalDataAccess": "True",
+        "CreateDatabaseDefaultPermissions": [
           {
-            "Arn": {
-              "Ref": "LogAnalyticsVacuumStateMachine1495758E",
+            "Permissions": [
+              "ALL",
+            ],
+            "Principal": {
+              "DataLakePrincipalIdentifier": "IAM_ALLOWED_PRINCIPALS",
             },
-            "Id": "Target0",
-            "RetryPolicy": {
-              "MaximumRetryAttempts": 0,
+          },
+        ],
+        "CreateTableDefaultPermissions": [
+          {
+            "Permissions": [
+              "ALL",
+            ],
+            "Principal": {
+              "DataLakePrincipalIdentifier": "IAM_ALLOWED_PRINCIPALS",
             },
-            "RoleArn": {
+          },
+        ],
+        "FederatedCatalog": {
+          "ConnectionName": "aws:s3tables",
+          "Identifier": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:s3tables:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":",
+                {
+                  "Ref": "AWS::AccountId",
+                },
+                ":bucket/*",
+              ],
+            ],
+          },
+        },
+        "Name": "s3tablescatalog",
+      },
+      "Type": "AWS::Glue::Catalog",
+    },
+    "LogAnalyticsS3TablesDeliveryStreamFA1B0E08": {
+      "DependsOn": [
+        "LogAnalyticsLogsS3TableB7EA0210",
+        "LogAnalyticsS3TablesCatalog63EB2163",
+        "LogAnalyticsS3TablesFirehoseRoleDefaultPolicy10FE7C55",
+      ],
+      "Properties": {
+        "DeliveryStreamEncryptionConfigurationInput": {
+          "KeyType": "AWS_OWNED_CMK",
+        },
+        "DeliveryStreamName": "tidb-proxy-logs-s3tables",
+        "DeliveryStreamType": "DirectPut",
+        "IcebergDestinationConfiguration": {
+          "AppendOnly": true,
+          "BufferingHints": {
+            "IntervalInSeconds": 900,
+            "SizeInMBs": 64,
+          },
+          "CatalogConfiguration": {
+            "CatalogArn": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:glue:",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ":",
+                  {
+                    "Ref": "AWS::AccountId",
+                  },
+                  ":catalog/s3tablescatalog/tidb-proxy-logs-tables",
+                ],
+              ],
+            },
+          },
+          "CloudWatchLoggingOptions": {
+            "Enabled": true,
+            "LogGroupName": {
+              "Ref": "LogAnalyticsFirehoseLogGroupF129BBE2",
+            },
+            "LogStreamName": {
+              "Ref": "LogAnalyticsS3TablesFirehoseLogStreamB2FDFE1E",
+            },
+          },
+          "DestinationTableConfigurationList": [
+            {
+              "DestinationDatabaseName": "tidb_proxy_logs",
+              "DestinationTableName": "logs",
+            },
+          ],
+          "RoleARN": {
+            "Fn::GetAtt": [
+              "LogAnalyticsS3TablesFirehoseRole88D18585",
+              "Arn",
+            ],
+          },
+          "S3Configuration": {
+            "BucketARN": {
               "Fn::GetAtt": [
-                "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A",
+                "LogAnalyticsLogsBucket18E6FEA3",
+                "Arn",
+              ],
+            },
+            "ErrorOutputPrefix": "firehose-errors/",
+            "RoleARN": {
+              "Fn::GetAtt": [
+                "LogAnalyticsS3TablesFirehoseRole88D18585",
                 "Arn",
               ],
             },
           },
-        ],
+          "s3BackupMode": "FailedDataOnly",
+        },
       },
-      "Type": "AWS::Events::Rule",
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
     },
-    "LogAnalyticsVacuumStateMachine1495758E": {
-      "DeletionPolicy": "Delete",
-      "DependsOn": [
-        "LogAnalyticsLogsTable3388531E",
-        "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0",
-        "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
-        "LogAnalyticsWorkGroupFB93F96A",
-      ],
+    "LogAnalyticsS3TablesFirehoseLogStreamB2FDFE1E": {
+      "DeletionPolicy": "Retain",
       "Properties": {
-        "DefinitionString": {
-          "Fn::Join": [
-            "",
-            [
-              "{"StartAt":"VacuumQuery","States":{"VacuumQuery":{"End":true,"Type":"Task","TimeoutSeconds":18000,"Resource":"arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":states:::athena:startQueryExecution.sync","Parameters":{"QueryString":"VACUUM tidb_proxy_logs.logs","QueryExecutionContext":{"Database":"tidb_proxy_logs"},"ResultConfiguration":{"OutputLocation":"s3://",
-              {
-                "Ref": "LogAnalyticsLogsBucket18E6FEA3",
-              },
-              "/athena-results/"},"WorkGroup":"tidb-proxy-logs"}}},"TimeoutSeconds":18000}",
-            ],
-          ],
+        "LogGroupName": {
+          "Ref": "LogAnalyticsFirehoseLogGroupF129BBE2",
         },
-        "LoggingConfiguration": {
-          "Destinations": [
-            {
-              "CloudWatchLogsLogGroup": {
-                "LogGroupArn": {
-                  "Fn::GetAtt": [
-                    "LogAnalyticsVacuumExecutionLogGroup6F771A73",
-                    "Arn",
-                  ],
-                },
-              },
-            },
-          ],
-          "IncludeExecutionData": true,
-          "Level": "ALL",
-        },
-        "RoleArn": {
-          "Fn::GetAtt": [
-            "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
-            "Arn",
-          ],
-        },
-        "StateMachineName": "tidb-proxy-logs-vacuum",
-        "StateMachineType": "STANDARD",
-        "TracingConfiguration": {
-          "Enabled": true,
-        },
+        "LogStreamName": "s3tables-delivery",
       },
-      "Type": "AWS::StepFunctions::StateMachine",
-      "UpdateReplacePolicy": "Delete",
+      "Type": "AWS::Logs::LogStream",
+      "UpdateReplacePolicy": "Retain",
     },
-    "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A": {
-      "DependsOn": [
-        "LogAnalyticsLogsTable3388531E",
-        "LogAnalyticsWorkGroupFB93F96A",
-      ],
+    "LogAnalyticsS3TablesFirehoseRole88D18585": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -1069,165 +878,52 @@ LIMIT 100",
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": "events.amazonaws.com",
+                "Service": "firehose.amazonaws.com",
               },
             },
           ],
           "Version": "2012-10-17",
         },
+        "RoleName": "tidb-proxy-logs-firehose-s3tables",
       },
       "Type": "AWS::IAM::Role",
     },
-    "LogAnalyticsVacuumStateMachineEventsRoleDefaultPolicyAB0F9026": {
-      "DependsOn": [
-        "LogAnalyticsLogsTable3388531E",
-        "LogAnalyticsWorkGroupFB93F96A",
-      ],
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "states:StartExecution",
-              "Effect": "Allow",
-              "Resource": {
-                "Ref": "LogAnalyticsVacuumStateMachine1495758E",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "LogAnalyticsVacuumStateMachineEventsRoleDefaultPolicyAB0F9026",
-        "Roles": [
-          {
-            "Ref": "LogAnalyticsVacuumStateMachineEventsRoleA407EB0A",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
-    "LogAnalyticsVacuumStateMachineRoleB3DF2E3C": {
-      "DependsOn": [
-        "LogAnalyticsLogsTable3388531E",
-        "LogAnalyticsWorkGroupFB93F96A",
-      ],
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "states.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0": {
-      "DependsOn": [
-        "LogAnalyticsLogsTable3388531E",
-        "LogAnalyticsWorkGroupFB93F96A",
-      ],
+    "LogAnalyticsS3TablesFirehoseRoleDefaultPolicy10FE7C55": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
             {
               "Action": [
-                "athena:getDataCatalog",
-                "athena:startQueryExecution",
-                "athena:getQueryExecution",
+                "s3tables:GetTableBucket",
+                "s3tables:GetNamespace",
+                "s3tables:GetTable",
+                "s3tables:GetTableData",
+                "s3tables:GetTableMetadataLocation",
+                "s3tables:PutTableData",
+                "s3tables:UpdateTableMetadataLocation",
               ],
               "Effect": "Allow",
               "Resource": [
                 {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition",
-                      },
-                      ":athena:ap-northeast-1:123456789012:datacatalog/AwsDataCatalog",
-                    ],
+                  "Fn::GetAtt": [
+                    "LogAnalyticsTableBucket735BC1E2",
+                    "TableBucketARN",
                   ],
                 },
                 {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition",
-                      },
-                      ":athena:ap-northeast-1:123456789012:workgroup/tidb-proxy-logs",
-                    ],
+                  "Fn::GetAtt": [
+                    "LogAnalyticsLogsS3TableB7EA0210",
+                    "TableARN",
                   ],
                 },
               ],
             },
             {
               "Action": [
-                "s3:CreateBucket",
-                "s3:ListBucket",
-                "s3:GetBucketLocation",
-                "s3:GetObject",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-            {
-              "Action": [
-                "s3:AbortMultipartUpload",
-                "s3:ListBucketMultipartUploads",
-                "s3:ListMultipartUploadParts",
-                "s3:PutObject",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":s3:::",
-                    {
-                      "Ref": "LogAnalyticsLogsBucket18E6FEA3",
-                    },
-                    "/athena-results/*",
-                  ],
-                ],
-              },
-            },
-            {
-              "Action": "lakeformation:GetDataAccess",
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-            {
-              "Action": [
-                "glue:BatchCreatePartition",
-                "glue:BatchDeletePartition",
-                "glue:BatchDeleteTable",
-                "glue:BatchGetPartition",
-                "glue:CreateDatabase",
-                "glue:CreatePartition",
-                "glue:CreateTable",
-                "glue:DeleteDatabase",
-                "glue:DeletePartition",
-                "glue:DeleteTable",
                 "glue:GetDatabase",
                 "glue:GetDatabases",
-                "glue:GetPartition",
-                "glue:GetPartitions",
                 "glue:GetTable",
                 "glue:GetTables",
-                "glue:UpdateDatabase",
-                "glue:UpdatePartition",
                 "glue:UpdateTable",
               ],
               "Effect": "Allow",
@@ -1236,11 +932,15 @@ LIMIT 100",
                   "Fn::Join": [
                     "",
                     [
-                      "arn:",
+                      "arn:aws:glue:",
                       {
-                        "Ref": "AWS::Partition",
+                        "Ref": "AWS::Region",
                       },
-                      ":glue:ap-northeast-1:123456789012:catalog",
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":catalog",
                     ],
                   ],
                 },
@@ -1248,11 +948,15 @@ LIMIT 100",
                   "Fn::Join": [
                     "",
                     [
-                      "arn:",
+                      "arn:aws:glue:",
                       {
-                        "Ref": "AWS::Partition",
+                        "Ref": "AWS::Region",
                       },
-                      ":glue:ap-northeast-1:123456789012:database/tidb_proxy_logs",
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":catalog/s3tablescatalog",
                     ],
                   ],
                 },
@@ -1260,11 +964,15 @@ LIMIT 100",
                   "Fn::Join": [
                     "",
                     [
-                      "arn:",
+                      "arn:aws:glue:",
                       {
-                        "Ref": "AWS::Partition",
+                        "Ref": "AWS::Region",
                       },
-                      ":glue:ap-northeast-1:123456789012:table/tidb_proxy_logs/*",
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":catalog/s3tablescatalog/tidb-proxy-logs-tables",
                     ],
                   ],
                 },
@@ -1272,11 +980,31 @@ LIMIT 100",
                   "Fn::Join": [
                     "",
                     [
-                      "arn:",
+                      "arn:aws:glue:",
                       {
-                        "Ref": "AWS::Partition",
+                        "Ref": "AWS::Region",
                       },
-                      ":glue:ap-northeast-1:123456789012:userDefinedFunction/tidb_proxy_logs/*",
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":database/*",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:glue:",
+                      {
+                        "Ref": "AWS::Region",
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":table/*/*",
                     ],
                   ],
                 },
@@ -1284,75 +1012,83 @@ LIMIT 100",
             },
             {
               "Action": [
-                "logs:CreateLogDelivery",
-                "logs:GetLogDelivery",
-                "logs:UpdateLogDelivery",
-                "logs:DeleteLogDelivery",
-                "logs:ListLogDeliveries",
-                "logs:PutResourcePolicy",
-                "logs:DescribeResourcePolicies",
-                "logs:DescribeLogGroups",
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*",
               ],
               "Effect": "Allow",
-              "Resource": "*",
-            },
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-                "xray:GetSamplingRules",
-                "xray:GetSamplingTargets",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LogAnalyticsLogsBucket18E6FEA3",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LogAnalyticsLogsBucket18E6FEA3",
+                          "Arn",
+                        ],
+                      },
+                      "/firehose-errors/*",
+                    ],
+                  ],
+                },
               ],
-              "Effect": "Allow",
-              "Resource": "*",
             },
             {
-              "Action": "s3:PutObject",
+              "Action": "logs:PutLogEvents",
               "Effect": "Allow",
               "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    {
-                      "Fn::GetAtt": [
-                        "LogAnalyticsLogsBucket18E6FEA3",
-                        "Arn",
-                      ],
-                    },
-                    "/iceberg/logs/metadata/*",
-                  ],
-                ],
-              },
-            },
-            {
-              "Action": "s3:DeleteObject*",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    {
-                      "Fn::GetAtt": [
-                        "LogAnalyticsLogsBucket18E6FEA3",
-                        "Arn",
-                      ],
-                    },
-                    "/*",
-                  ],
+                "Fn::GetAtt": [
+                  "LogAnalyticsFirehoseLogGroupF129BBE2",
+                  "Arn",
                 ],
               },
             },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "LogAnalyticsVacuumStateMachineRoleDefaultPolicyB2EB6BD0",
+        "PolicyName": "LogAnalyticsS3TablesFirehoseRoleDefaultPolicy10FE7C55",
         "Roles": [
           {
-            "Ref": "LogAnalyticsVacuumStateMachineRoleB3DF2E3C",
+            "Ref": "LogAnalyticsS3TablesFirehoseRole88D18585",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "LogAnalyticsTableBucket735BC1E2": {
+      "Properties": {
+        "TableBucketName": "tidb-proxy-logs-tables",
+        "UnreferencedFileRemoval": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3Tables::TableBucket",
+    },
+    "LogAnalyticsTableNamespaceF67550B0": {
+      "Properties": {
+        "Namespace": "tidb_proxy_logs",
+        "TableBucketARN": {
+          "Fn::GetAtt": [
+            "LogAnalyticsTableBucket735BC1E2",
+            "TableBucketARN",
+          ],
+        },
+      },
+      "Type": "AWS::S3Tables::Namespace",
     },
     "LogAnalyticsWorkGroupFB93F96A": {
       "Properties": {

@@ -7,6 +7,7 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-10-06 | [tidb-proxy ログの Iceberg テーブルを S3 Tables へ移行する](2026-10-06-tidb-proxy-logs-s3-tables/index.md)                                                        |
 | 2026-08-24 | [Grafana の container restart と Deployment rollout 表示を分離](2026-08-24-grafana-rollout-visibility/index.md)                                                   |
 | 2026-08-23 | [tidb-proxy Iceberg メタデータによる S3 高額化の調査と対応](2026-08-23-tidb-proxy-iceberg-s3-cost/index.md)                                                       |
 | 2026-08-21 | [全ノード停電後のクラスタ自動復旧確認](2026-08-21-power-outage-recovery/index.md)                                                                                 |

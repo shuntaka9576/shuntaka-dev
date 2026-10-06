@@ -320,9 +320,9 @@ aws ecs describe-services \
 aws logs tail /ecs/tidb-proxy --follow --since 5m
 ```
 
-tidb-proxy ログ分析スタックのデプロイ（dev / prd 共用、初回のみ）。S3 バケット / Glue Database・Iceberg テーブル / Firehose / Athena WorkGroup / SSM パラメータを作成し、FireLens (Fluent Bit) の設定ファイル (`apps/tidb-proxy/firelens/`) を S3 の `firelens-config/` に配置する。設計は `docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md` を参照。ecspresso が本スタックの SSM 出力を参照するため、`scripts/deploy-tidb-proxy.sh` より先にデプロイする。
+tidb-proxy ログ分析スタックのデプロイ（dev / prd 共用、初回のみ）。S3 バケット / S3 Tables (table bucket・namespace・Iceberg テーブル) / `s3tablescatalog` (Glue federated catalog) / Firehose / Athena WorkGroup / SSM パラメータを作成し、FireLens (Fluent Bit) の設定ファイル (`apps/tidb-proxy/firelens/`) を S3 の `firelens-config/` に配置する。設計は `docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md` と `docs/source/98_tasks/2026-10-06-tidb-proxy-logs-s3-tables/index.md` を参照。ecspresso が本スタックの SSM 出力を参照するため、`scripts/deploy-tidb-proxy.sh` より先にデプロイする。
 
-本スタックは Glue / Firehose / Athena を使うため、デプロイロールにこれらの権限が入る前の環境では、先に `${STAGE_NAME:0:1}-st-deploy-role` の再デプロイが必要（初回のみ）。
+本スタックは S3 Tables / Glue / Firehose / Athena を使うため、デプロイロールにこれらの権限が入る前の環境では、先に `${STAGE_NAME:0:1}-st-deploy-role` の再デプロイが必要（初回のみ）。
 
 ```bash
 export STAGE_NAME=""
@@ -336,7 +336,7 @@ bunx dotenv -- cdk deploy \
 gh workflow run deploy.yaml --ref main -f stageName=dev -f stack=st-tidb-proxy-logs
 ```
 
-ログ振り分けの動作確認。INFO 系（squid アクセスログ・forwarder の INFO）は Firehose 経由で Iceberg テーブルに入り、WARN / ERROR と非 JSON 行（tsnet 内部ログ・squid cache_log）は CloudWatch Logs に残る。
+ログ振り分けの動作確認。INFO 系（squid アクセスログ・forwarder の INFO）は Firehose 経由で S3 Tables の Iceberg テーブルに入り、WARN / ERROR と非 JSON 行（tsnet 内部ログ・squid cache_log）は CloudWatch Logs に残る。
 
 ```bash
 # log-router の起動確認 (init プロセスの S3 取得失敗はここに出る)
@@ -348,8 +348,7 @@ aws logs tail /ecs/tidb-proxy --since 10m --format short | grep -E "fluentbit-(w
 # Athena で INFO 系ログを検索 (WorkGroup: tidb-proxy-logs)
 aws athena start-query-execution \
   --work-group tidb-proxy-logs \
-  --query-execution-context Database=tidb_proxy_logs \
-  --query-string "SELECT ts, log_type, level, method, url, status FROM logs ORDER BY ts DESC LIMIT 20"
+  --query-string 'SELECT ts, log_type, level, method, url, status FROM "s3tablescatalog/tidb-proxy-logs-tables"."tidb_proxy_logs"."logs" ORDER BY ts DESC LIMIT 20'
 aws athena get-query-results --query-execution-id <上の実行結果の QueryExecutionId>
 
 # Firehose の配信失敗レコードが無いことを確認 (溜まる場合はスキーマ不一致)

@@ -2,26 +2,46 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cdk from 'aws-cdk-lib';
 import * as athena from 'aws-cdk-lib/aws-athena';
-import * as events from 'aws-cdk-lib/aws-events';
-import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as firehose from 'aws-cdk-lib/aws-kinesisfirehose';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as s3tables from 'aws-cdk-lib/aws-s3tables';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
-import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
-import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
 import { type LogAnalyticsParameter } from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ログテーブルのスキーマ。apps/tidb-proxy/firelens/extra.conf の Allowlist_key と揃える。
+// ts は timestamp 型ではなく string (ISO8601) にする。Firehose の JSON -> timestamp
+// 変換フォーマット要求に依存しないためで、Athena では from_iso8601_timestamp(ts) で
+// 時刻演算する。型は Iceberg の primitive type。
+const LOG_COLUMNS: { name: string; type: string }[] = [
+  { name: 'ts', type: 'string' },
+  { name: 'log_type', type: 'string' },
+  { name: 'level', type: 'string' },
+  { name: 'message', type: 'string' },
+  { name: 'client_ip', type: 'string' },
+  { name: 'method', type: 'string' },
+  { name: 'url', type: 'string' },
+  { name: 'http_version', type: 'string' },
+  { name: 'status', type: 'int' },
+  { name: 'bytes_in', type: 'long' },
+  { name: 'bytes_out', type: 'long' },
+  { name: 'duration_ms', type: 'long' },
+  { name: 'user_agent', type: 'string' },
+  { name: 'squid_status', type: 'string' },
+  { name: 'hier_status', type: 'string' },
+];
+
 // tidb-proxy のログ分析基盤。FireLens (Fluent Bit) が振り分けた INFO 系ログを
-// Firehose 経由で S3 上の Iceberg テーブルに蓄積し、Athena で検索する。
-// 設計は docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md を参照。
+// Firehose 経由で S3 Tables (マネージド Iceberg) に蓄積し、Athena で検索する。
+// 設計は docs/source/98_tasks/2026-07-10-tidb-proxy-log-iceberg/index.md と
+// docs/source/98_tasks/2026-10-06-tidb-proxy-logs-s3-tables/index.md を参照。
 //
 // 稼働中の st-tidb-proxy スタックには手を入れず、SSM 出力経由でタスクロールを
 // インポートして必要な権限を後付けする (blog-api-construct が proxy SG に
@@ -41,12 +61,8 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
 
     const { config } = props;
 
-    // ---- S3 Bucket ----
+    // ---- S3 Bucket (汎用) ----
     // prefix で用途を分離する:
-    //   iceberg/         Iceberg テーブル本体。lifecycle rule は設定しない
-    //                    (Iceberg のマニフェストが参照するファイルを S3 側で
-    //                    blind に消すとメタデータ整合性が壊れるため。削減が
-    //                    必要になったら Athena の OPTIMIZE / VACUUM を先に実行)
     //   firehose-errors/ Firehose 配信失敗レコード (デバッグ用途のみ)
     //   athena-results/  Athena クエリ結果 (一時ファイル)
     //   firelens-config/ Fluent Bit 設定 (BucketDeployment で git と同期)
@@ -85,90 +101,126 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       prune: true,
     });
 
-    // ---- Glue Database + Iceberg Table ----
-    const glueDatabase = new glue.CfnDatabase(this, 'GlueDatabase', {
-      catalogId: cdk.Aws.ACCOUNT_ID,
-      databaseInput: {
-        name: config.glue.databaseName,
-      },
-    });
-
-    // スキーマは apps/tidb-proxy/firelens/extra.conf の Allowlist_key と揃える。
-    // ts は Iceberg の timestamp 型ではなく string (ISO8601) にする。Firehose の
-    // JSON -> timestamp 変換フォーマット要求に依存しないためで、Athena では
-    // from_iso8601_timestamp(ts) で時刻演算する。パーティションは量が増えるまで
-    // 持たない。
+    // ---- S3 Tables ----
+    // compaction / snapshot expiration / 未参照ファイル削除を S3 Tables のマネージド
+    // メンテナンスに任せる。旧構成で自前運用していた Athena VACUUM の代替。
     //
-    // Iceberg テーブルのメタデータは TableInput (Hive 形式) 側に書き、IcebergInput
-    // は MetadataOperation: CREATE のみとする。TableInput は CFN 上必須のため、
-    // icebergTableInput (Iceberg ネイティブスキーマ形式) と併用すると Glue の
-    // リソースハンドラが "Table metadata is expected only via TableInput or via
-    // IcebergTableInputProperties" で CREATE_FAILED になる (2026-07-11 の
-    // st-tidb-proxy-logs 初回デプロイで確認)。
-    const glueTable = new glue.CfnTable(this, 'LogsTable', {
-      catalogId: cdk.Aws.ACCOUNT_ID,
-      databaseName: config.glue.databaseName,
-      tableInput: {
-        name: config.glue.tableName,
-        tableType: 'EXTERNAL_TABLE',
-        storageDescriptor: {
-          location: `s3://${this.bucket.bucketName}/iceberg/${config.glue.tableName}`,
-          columns: [
-            { name: 'ts', type: 'string' },
-            { name: 'log_type', type: 'string' },
-            { name: 'level', type: 'string' },
-            { name: 'message', type: 'string' },
-            { name: 'client_ip', type: 'string' },
-            { name: 'method', type: 'string' },
-            { name: 'url', type: 'string' },
-            { name: 'http_version', type: 'string' },
-            { name: 'status', type: 'int' },
-            { name: 'bytes_in', type: 'bigint' },
-            { name: 'bytes_out', type: 'bigint' },
-            { name: 'duration_ms', type: 'bigint' },
-            { name: 'user_agent', type: 'string' },
-            { name: 'squid_status', type: 'string' },
-            { name: 'hier_status', type: 'string' },
-          ],
-        },
-      },
-      openTableFormatInput: {
-        icebergInput: {
-          metadataOperation: 'CREATE',
-          version: '2',
-        },
+    // 未参照ファイル削除の日数は既定値 (unreferenced 3 日 / noncurrent 10 日)。
+    const tableBucket = new s3tables.CfnTableBucket(this, 'TableBucket', {
+      tableBucketName: config.s3Tables.tableBucketName,
+      unreferencedFileRemoval: {
+        status: 'Enabled',
       },
     });
-    glueTable.addDependency(glueDatabase);
+    const namespace = new s3tables.CfnNamespace(this, 'TableNamespace', {
+      tableBucketArn: tableBucket.attrTableBucketArn,
+      namespace: config.s3Tables.namespace,
+    });
+    // Firehose は S3 Tables 宛てではテーブルを自動作成しないため、スキーマ付きで先に作る。
+    const logsS3Table = new s3tables.CfnTable(this, 'LogsS3Table', {
+      tableBucketArn: tableBucket.attrTableBucketArn,
+      namespace: config.s3Tables.namespace,
+      tableName: config.s3Tables.tableName,
+      openTableFormat: 'ICEBERG',
+      icebergMetadata: {
+        icebergSchema: {
+          schemaFieldList: LOG_COLUMNS.map(({ name, type }) => ({
+            name,
+            type,
+            required: false,
+          })),
+        },
+      },
+      compaction: {
+        status: 'enabled',
+      },
+      // time travel 用の snapshot 保持期間。旧構成の
+      // vacuum_max_snapshot_age_seconds (14 日) を引き継ぐ。
+      snapshotManagement: {
+        status: 'enabled',
+        maxSnapshotAgeHours: config.s3Tables.maxSnapshotAgeHours,
+        minSnapshotsToKeep: 1,
+      },
+    });
+    logsS3Table.addDependency(namespace);
 
-    // ---- Firehose (Direct PUT -> Iceberg) ----
+    // S3 Tables と Glue Data Catalog / Athena / Firehose の統合 (IAM アクセス制御モード)。
+    // `s3tablescatalog` はアカウント・リージョンで 1 つの federated catalog で、
+    // 配下に全テーブルバケットが現れる。Lake Formation は使わない。
+    const s3TablesDefaultPermissions = [
+      {
+        principal: { dataLakePrincipalIdentifier: 'IAM_ALLOWED_PRINCIPALS' },
+        permissions: ['ALL'],
+      },
+    ];
+    const s3TablesCatalog = new glue.CfnCatalog(this, 'S3TablesCatalog', {
+      name: 's3tablescatalog',
+      federatedCatalog: {
+        identifier: `arn:aws:s3tables:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:bucket/*`,
+        connectionName: 'aws:s3tables',
+      },
+      createDatabaseDefaultPermissions: s3TablesDefaultPermissions,
+      createTableDefaultPermissions: s3TablesDefaultPermissions,
+      allowFullTableExternalDataAccess: 'True',
+    });
+
+    // ---- Firehose (Direct PUT -> S3 Tables) ----
+    // 宛先 catalog の変更は replacement を伴うため、旧 Glue Iceberg 宛ての stream
+    // (tidb-proxy-logs) とは別名で作り、FireLens を切り替えた後に旧 stream を撤去した。
     const firehoseLogGroup = new logs.LogGroup(this, 'FirehoseLogGroup', {
-      logGroupName: `/aws/kinesisfirehose/${config.firehose.deliveryStreamName}`,
+      logGroupName: `/aws/kinesisfirehose/${config.projectName}`,
       retention: logs.RetentionDays.TWO_WEEKS,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    const firehoseLogStream = new logs.LogStream(this, 'FirehoseLogStream', {
+    const firehoseLogStream = new logs.LogStream(this, 'S3TablesFirehoseLogStream', {
       logGroup: firehoseLogGroup,
-      logStreamName: 'iceberg-delivery',
+      logStreamName: 's3tables-delivery',
     });
 
-    const firehoseRole = new iam.Role(this, 'FirehoseRole', {
-      roleName: `${config.projectName}-firehose`,
+    const firehoseRole = new iam.Role(this, 'S3TablesFirehoseRole', {
+      roleName: `${config.projectName}-firehose-s3tables`,
       assumedBy: new iam.ServicePrincipal('firehose.amazonaws.com'),
     });
+    // 必要な権限は Firehose 開発者ガイドの「Grant Firehose access to Amazon S3 Tables」
+    // (IAM access control) に従う。s3tables はこのテーブルバケット / テーブルに絞る。
     firehoseRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ['glue:GetDatabase', 'glue:GetTable', 'glue:GetTableVersions', 'glue:UpdateTable'],
+        actions: [
+          's3tables:GetTableBucket',
+          's3tables:GetNamespace',
+          's3tables:GetTable',
+          's3tables:GetTableData',
+          's3tables:GetTableMetadataLocation',
+          's3tables:PutTableData',
+          's3tables:UpdateTableMetadataLocation',
+        ],
+        resources: [tableBucket.attrTableBucketArn, logsS3Table.attrTableArn],
+      }),
+    );
+    // federated catalog 配下の database / table の Glue ARN はガイドの記載どおり
+    // ワイルドカードで指定する。catalog はこのテーブルバケットに絞る。
+    firehoseRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'glue:GetDatabase',
+          'glue:GetDatabases',
+          'glue:GetTable',
+          'glue:GetTables',
+          'glue:UpdateTable',
+        ],
         resources: [
           `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog`,
-          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:database/${config.glue.databaseName}`,
-          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${config.glue.databaseName}/${config.glue.tableName}`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog/s3tablescatalog`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog/s3tablescatalog/${config.s3Tables.tableBucketName}`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:database/*`,
+          `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/*/*`,
         ],
       }),
     );
-    // iceberg/ へのデータ書き込みと firehose-errors/ への失敗レコード退避の両方。
-    this.bucket.grantReadWrite(firehoseRole);
+    // 汎用バケットへは firehose-errors/ への失敗レコード退避のみ。
+    this.bucket.grantReadWrite(firehoseRole, 'firehose-errors/*');
     firehoseRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -177,7 +229,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       }),
     );
 
-    this.deliveryStream = new firehose.CfnDeliveryStream(this, 'DeliveryStream', {
+    this.deliveryStream = new firehose.CfnDeliveryStream(this, 'S3TablesDeliveryStream', {
       deliveryStreamName: config.firehose.deliveryStreamName,
       deliveryStreamType: 'DirectPut',
       deliveryStreamEncryptionConfigurationInput: {
@@ -186,12 +238,13 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       icebergDestinationConfiguration: {
         roleArn: firehoseRole.roleArn,
         catalogConfiguration: {
-          catalogArn: `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog`,
+          catalogArn: `arn:aws:glue:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:catalog/s3tablescatalog/${config.s3Tables.tableBucketName}`,
         },
+        // S3 Tables の namespace が Glue の database に相当する。
         destinationTableConfigurationList: [
           {
-            destinationDatabaseName: config.glue.databaseName,
-            destinationTableName: config.glue.tableName,
+            destinationDatabaseName: config.s3Tables.namespace,
+            destinationTableName: config.s3Tables.tableName,
           },
         ],
         // insert-only のログ用途なので append-only (行更新の CDC 経路を持たない)。
@@ -213,7 +266,8 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         },
       },
     });
-    this.deliveryStream.node.addDependency(glueTable);
+    this.deliveryStream.node.addDependency(logsS3Table);
+    this.deliveryStream.node.addDependency(s3TablesCatalog);
     // CfnDeliveryStream は roleArn の文字列参照だけでは Policy リソースへの依存が
     // 張られず、権限が付く前に Firehose の作成時検証が走って失敗しうる。
     const firehoseRoleDefaultPolicy = firehoseRole.node.tryFindChild('DefaultPolicy');
@@ -240,78 +294,16 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       },
     });
 
-    // ---- Iceberg VACUUM maintenance ----
-    // Athena の VACUUM は初回に 30 分を超える可能性があり、Lambda の最大実行時間
-    // では完了待機できない。Step Functions の Athena .sync integration で query の
-    // 成功 / 失敗まで追跡する。EventBridge Rule の有効 / 無効は config で管理する。
-    const vacuumExecutionLogGroup = new logs.LogGroup(this, 'VacuumExecutionLogGroup', {
-      // cspell:disable-next-line -- Step Functions 用 CloudWatch Logs の AWS 予約 prefix
-      logGroupName: `/aws/vendedlogs/states/${config.projectName}-vacuum`,
-      retention: logs.RetentionDays.TWO_WEEKS,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-    const vacuumQuery = new sfnTasks.AthenaStartQueryExecution(this, 'VacuumQuery', {
-      integrationPattern: sfn.IntegrationPattern.RUN_JOB,
-      queryString: `VACUUM ${config.glue.databaseName}.${config.glue.tableName}`,
-      queryExecutionContext: {
-        databaseName: config.glue.databaseName,
-      },
-      workGroup: config.athena.workGroupName,
-      resultConfiguration: {
-        outputLocation: {
-          bucketName: this.bucket.bucketName,
-          // WorkGroup は enforceWorkGroupConfiguration=true のため、実際の query result
-          // を athena-results/ 直下へ出力する。IAM の自動生成対象も同じ prefix に揃える。
-          objectKey: 'athena-results',
-        },
-      },
-      taskTimeout: sfn.Timeout.duration(cdk.Duration.hours(5)),
-    });
-    const vacuumStateMachine = new sfn.StateMachine(this, 'VacuumStateMachine', {
-      stateMachineName: `${config.projectName}-vacuum`,
-      definitionBody: sfn.DefinitionBody.fromChainable(vacuumQuery),
-      stateMachineType: sfn.StateMachineType.STANDARD,
-      timeout: cdk.Duration.hours(5),
-      logs: {
-        destination: vacuumExecutionLogGroup,
-        level: sfn.LogLevel.ALL,
-        includeExecutionData: true,
-      },
-      tracingEnabled: true,
-    });
-    // AthenaStartQueryExecution の自動生成ポリシーには、VACUUM が commit する
-    // Iceberg metadata への PutObject と、到達不能 files への DeleteObject が含まれない。
-    // metadata の書き込み先は対象 table の prefix のみに絞る。
-    vacuumStateMachine.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['s3:PutObject'],
-        resources: [this.bucket.arnForObjects('iceberg/logs/metadata/*')],
-      }),
-    );
-    // 削除対象には metadata だけでなく data files も含まれ得るため、ログ専用 bucket
-    // 全体への DeleteObject は維持する。
-    this.bucket.grantDelete(vacuumStateMachine);
-    vacuumStateMachine.node.addDependency(glueTable);
-    vacuumStateMachine.node.addDependency(workGroup);
-
-    new events.Rule(this, 'VacuumSchedule', {
-      ruleName: `${config.projectName}-vacuum`,
-      description: 'Run Athena VACUUM for the tidb-proxy Iceberg logs table',
-      enabled: config.vacuum.scheduleEnabled,
-      schedule: events.Schedule.expression(config.vacuum.scheduleExpression),
-      targets: [
-        new eventsTargets.SfnStateMachine(vacuumStateMachine, {
-          retryAttempts: 0,
-        }),
-      ],
-    });
-
     // ---- Athena Named Queries (よく使う検索の登録) ----
     // いずれも実データに対して実行確認済み (2026-07-11)。
     // ECS ヘルスチェック (nc -z, 127.0.0.1 から 30 秒ごと) が squid_access の
     // ノイズ行になるため、client_ip でヘルスチェックを除外するのが基本形。
     // forwarder 行は client_ip が NULL のため IS DISTINCT FROM で残す。
     // ts は UTC (ISO8601) で保存しているため、表示は JST に変換して返す。
+    //
+    // NamedQuery には catalog を指定するプロパティがないため、S3 Tables の
+    // federated catalog は FROM 句で完全修飾する。
+    const logsTableRef = `"s3tablescatalog/${config.s3Tables.tableBucketName}"."${config.s3Tables.namespace}"."${config.s3Tables.tableName}"`;
     const tsJst =
       "format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')";
     const namedQueries: { id: string; name: string; description: string; sql: string }[] = [
@@ -325,7 +317,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
           '       log_type,',
           "       coalesce(message, method || ' ' || url) AS event,",
           '       status, duration_ms, bytes_in, bytes_out',
-          'FROM logs',
+          `FROM ${logsTableRef}`,
           "WHERE client_ip IS DISTINCT FROM '127.0.0.1'",
           'ORDER BY ts DESC',
           'LIMIT 100',
@@ -344,7 +336,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
           '       sum(bytes_out) AS bytes_out,',
           '       round(avg(duration_ms)) AS avg_ms,',
           "       format_datetime(from_iso8601_timestamp(max(ts)) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss') AS last_seen_jst",
-          'FROM logs',
+          `FROM ${logsTableRef}`,
           "WHERE log_type = 'squid_access'",
           "  AND client_ip <> '127.0.0.1'",
           "  AND from_iso8601_timestamp(ts) > current_timestamp - interval '7' day",
@@ -361,7 +353,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
         sql: [
           `SELECT ${tsJst} AS ts_jst,`,
           '       client_ip, method, url, status, squid_status, user_agent',
-          'FROM logs',
+          `FROM ${logsTableRef}`,
           "WHERE log_type = 'squid_access'",
           "  AND client_ip <> '127.0.0.1'",
           "  AND (status >= 400 OR squid_status LIKE 'TCP_DENIED%')",
@@ -374,7 +366,7 @@ export class TidbProxyLogAnalyticsConstruct extends Construct {
       const namedQuery = new athena.CfnNamedQuery(this, q.id, {
         name: q.name,
         description: q.description,
-        database: config.glue.databaseName,
+        database: config.s3Tables.namespace,
         workGroup: config.athena.workGroupName,
         queryString: q.sql,
       });
