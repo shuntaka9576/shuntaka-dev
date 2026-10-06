@@ -1,8 +1,10 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
+  "extends": "$app/tsconfig",
   "compilerOptions": {
     "strict": true,
     "moduleResolution": "bundler",
-    "types": []
-  }
+    "types": ["$app/types"]
+  },
+  "include": ["src", "test", "*"],
+  "exclude": ["src/service-worker"]
 }

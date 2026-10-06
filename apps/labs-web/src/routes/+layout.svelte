@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import 'katex/dist/katex.min.css';
-  import { base } from '$app/paths';
+  import { resolve } from '$app/paths';
 
   let { children } = $props();
 </script>
@@ -9,7 +9,7 @@
 <div class="min-h-screen bg-[#edf2f7]">
   <header class="border-b border-[#dde3ea] bg-white">
     <div class="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
-      <a href="{base}/" class="text-lg font-semibold tracking-tight text-[#33383e]">
+      <a href={resolve('')} class="text-lg font-semibold tracking-tight text-[#33383e]">
         shuntaka.dev <span class="text-[#5c6eb1]">labs</span>
       </a>
       <span

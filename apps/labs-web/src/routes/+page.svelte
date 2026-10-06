@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from '$app/paths';
+  import { resolve } from '$app/paths';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();
@@ -19,7 +19,7 @@
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {#each data.labs as lab (lab.slug)}
       <a
-        href="{base}/{lab.slug}"
+        href={resolve('/[labSlug]', { labSlug: lab.slug })}
         class="group flex flex-col rounded-xl border border-[#dde3ea] bg-white p-5 transition-shadow hover:shadow-md"
       >
         <div class="mb-2 flex items-center gap-2">

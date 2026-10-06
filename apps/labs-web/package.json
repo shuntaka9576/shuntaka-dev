@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "bun run preview/dev.ts",
     "dev:web": "vite dev",
@@ -16,7 +19,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^4.0.0",
-    "@sveltejs/kit": "^2.46.5",
+    "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.1.16",
     "@typescript/native": "npm:typescript@^7.0.2",
