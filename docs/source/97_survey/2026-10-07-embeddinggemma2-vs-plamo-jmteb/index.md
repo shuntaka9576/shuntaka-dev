@@ -117,30 +117,41 @@ EmbeddingGemma 2 は計算量が PLaMo の 1/7 程度で、Mac（Apple Silicon�
 EmbeddingGemma 2（`model_type: embedding_gemma2`）は transformers 5.19.0（2026-10-06 リリース）で追加された。普段使っている PyPI プロキシ（`pypi.flatt.tech`）にはまだ配信されていないため、今回は検証用途に限り、Dockerfile 内の `pip install` で公式 PyPI から取得する。PLaMo は既存の image を使うのでビルド不要。
 
 ```bash
+# Mac で実行する
 ./cluster/manifests/embedding-bench/gemma/build-and-push.sh
 ```
 
 ### 2. namespace と Service を作る（Mac）
 
 ```bash
+# Mac で実行する
 kubectl apply -f cluster/manifests/embedding-bench/services.yaml
-
-# ClusterIP を控える（手順 3 の env.sh に書く）
-kubectl -n embedding-bench get svc -o custom-columns=NAME:.metadata.name,CLUSTER-IP:.spec.clusterIP
 ```
 
 ### 3. node2 に作業ディレクトリを作る
 
-Mac から `bench.py` と `requirements.txt` を送る。
+Mac から作業ディレクトリを作り、`bench.py` と `requirements.txt` を送る。続けて、Service の ClusterIP を kubectl で取って `env.sh` を生成し、node2 に書き込む（IP を手で書き写す必要はない）。
 
 ```bash
+# Mac で実行する（node2 には kubectl の接続設定がない）
 ssh node2 'mkdir -p ~/work/20261007-embedding-bench/{logs,results}'
 scp tools/embedding-bench/{bench.py,requirements.txt} node2:~/work/20261007-embedding-bench/
+
+PLAMO_IP=$(kubectl -n embedding-bench get svc bench-plamo -o jsonpath='{.spec.clusterIP}')
+GEMMA_IP=$(kubectl -n embedding-bench get svc bench-gemma -o jsonpath='{.spec.clusterIP}')
+ssh node2 'cat > ~/work/20261007-embedding-bench/env.sh' <<EOF
+cd ~/work/20261007-embedding-bench
+export BENCH_CACHE_DIR=\$HOME/work/20261007-embedding-bench/data
+export PLAMO_EMBED_ENDPOINT=http://${PLAMO_IP}
+export GEMMA_EMBED_ENDPOINT=http://${GEMMA_IP}
+EOF
+ssh node2 'cat ~/work/20261007-embedding-bench/env.sh'
 ```
 
 node2 に uv を入れて venv を作る。クライアントの依存（httpx / numpy / pyarrow）は `pypi.flatt.tech` から入れる。
 
 ```bash
+# Mac から node2 に入って実行する
 ssh node2
 cd ~/work/20261007-embedding-bench
 
@@ -150,22 +161,14 @@ uv venv --python 3.12 .venv
 uv pip install --python .venv --index-url https://pypi.flatt.tech/simple/ -r requirements.txt
 ```
 
-環境変数をファイルにまとめる。`<bench-plamo の ClusterIP>` などは手順 2 で控えた値に置き換える。
-
-```bash
-cat > env.sh <<'EOF'
-cd ~/work/20261007-embedding-bench
-export BENCH_CACHE_DIR="$PWD/data"
-export PLAMO_EMBED_ENDPOINT=http://<bench-plamo の ClusterIP>
-export GEMMA_EMBED_ENDPOINT=http://<bench-gemma の ClusterIP>
-EOF
-```
-
 ### 4. PLaMo のサーバーを立てて埋め込む（約 12 時間）
+
+`plamo.yaml` / `gemma.yaml` には Deployment しか入っていない。namespace は手順 2 の `services.yaml` で作るので、先に手順 2 を済ませておく（済んでいないと `namespaces "embedding-bench" not found` で失敗する）。namespace と Service を `services.yaml` に分けているのは、`kubectl delete -f plamo.yaml` でサーバーを消したときに namespace や Service まで消えて ClusterIP が変わらないようにするため。
 
 Mac でサーバーを立てる。
 
 ```bash
+# Mac で実行する
 kubectl apply -f cluster/manifests/embedding-bench/plamo.yaml
 kubectl -n embedding-bench rollout status deployment/bench-plamo --timeout=10m
 ```
@@ -173,6 +176,7 @@ kubectl -n embedding-bench rollout status deployment/bench-plamo --timeout=10m
 node2 で疎通を確かめてから流す。
 
 ```bash
+# node2 で実行する
 source ~/work/20261007-embedding-bench/env.sh
 curl -sf "$PLAMO_EMBED_ENDPOINT/healthz"; echo
 
@@ -185,6 +189,7 @@ SSH を切っても tmux の中で動き続ける。進捗は `n/total elapsed e
 終わったら（`tmux ls` から `embed-plamo` が消えたら）、Mac でメモリのピークを控えてからサーバーを消す。
 
 ```bash
+# Mac で実行する
 kubectl -n embedding-bench exec deploy/bench-plamo -- cat /sys/fs/cgroup/memory.peak
 kubectl delete -f cluster/manifests/embedding-bench/plamo.yaml
 ```
@@ -194,6 +199,7 @@ kubectl delete -f cluster/manifests/embedding-bench/plamo.yaml
 手順 4 と同じ流れ。Mac でサーバーを立てる。
 
 ```bash
+# Mac で実行する
 kubectl apply -f cluster/manifests/embedding-bench/gemma.yaml
 kubectl -n embedding-bench rollout status deployment/bench-gemma --timeout=10m
 ```
@@ -201,6 +207,7 @@ kubectl -n embedding-bench rollout status deployment/bench-gemma --timeout=10m
 node2 で流す。
 
 ```bash
+# node2 で実行する
 source ~/work/20261007-embedding-bench/env.sh
 curl -sf "$GEMMA_EMBED_ENDPOINT/healthz"; echo
 
@@ -211,6 +218,7 @@ tail -f logs/embed-gemma.log
 終わったら、Mac でメモリのピークを控えてからサーバーを消す。
 
 ```bash
+# Mac で実行する
 kubectl -n embedding-bench exec deploy/bench-gemma -- cat /sys/fs/cgroup/memory.peak
 kubectl delete -f cluster/manifests/embedding-bench/gemma.yaml
 ```
@@ -220,6 +228,7 @@ kubectl delete -f cluster/manifests/embedding-bench/gemma.yaml
 埋め込みが終わっていないタスクは `skip ...` と表示されて飛ばされる。
 
 ```bash
+# node2 で実行する
 source ~/work/20261007-embedding-bench/env.sh
 .venv/bin/python bench.py stats | tee results/stats.md
 .venv/bin/python bench.py eval | tee results/eval.md
@@ -229,6 +238,7 @@ source ~/work/20261007-embedding-bench/env.sh
 結果を Mac に持ってくる場合は次のとおり。
 
 ```bash
+# Mac で実行する
 scp -r node2:~/work/20261007-embedding-bench/results ./embedding-bench-results
 ```
 
