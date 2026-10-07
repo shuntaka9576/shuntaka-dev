@@ -80,7 +80,12 @@ def load_split(task: str, kind: str) -> list[dict]:
         urllib.request.urlretrieve(f"{HF_BASE}/{config}-{kind}/{split}.parquet", path)
     rows = pq.read_table(path).to_pylist()
     if kind == "corpus":
-        return [{"id": str(r["docid"]), "text": r["text"]} for r in rows]
+        # mintaka のコーパスは同じ答えを持つ質問の数だけ同じ docid / text の行が重複している
+        # (2,313 行で docid は 1,592 種類)。docid 単位で 1 件にまとめる。
+        corpus: dict[str, dict] = {}
+        for r in rows:
+            corpus.setdefault(str(r["docid"]), {"id": str(r["docid"]), "text": r["text"]})
+        return list(corpus.values())
     items = []
     for i, r in enumerate(rows):
         rel = r["relevant_docs"]
