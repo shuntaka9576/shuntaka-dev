@@ -1,0 +1,34 @@
+# embedding モデル比較用の namespace と Service。
+# Service は Deployment より先に作り、ClusterIP を bench クライアント (node2 の作業ディレクトリ) の
+# env.sh に書いておく。Deployment は plamo.yaml → gemma.yaml の順に 1 つずつ立てる。
+# 本番の plamo-embedding (namespace plamo-embedding) には触らない。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embedding-bench
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bench-plamo
+  namespace: embedding-bench
+spec:
+  type: ClusterIP
+  selector:
+    app: bench-plamo
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bench-gemma
+  namespace: embedding-bench
+spec:
+  type: ClusterIP
+  selector:
+    app: bench-gemma
+  ports:
+    - port: 80
+      targetPort: 8080

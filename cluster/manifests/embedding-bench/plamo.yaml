@@ -1,0 +1,47 @@
+# bench 用 PLaMo Embedding。本番 (namespace plamo-embedding) と同じ image を digest 固定で使う
+# (2026-10-07 時点の本番 Pod の imageID)。gemma.yaml とは nodeSelector / resources / probe を揃え、
+# 同じ node1 で 1 つずつ順に立てる。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bench-plamo
+  namespace: embedding-bench
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bench-plamo
+  template:
+    metadata:
+      labels:
+        app: bench-plamo
+    spec:
+      # 本番の plamo-embedding Pod (node2 / node3) と CPU を取り合わない node1 に置く。
+      nodeSelector:
+        kubernetes.io/hostname: node1
+      containers:
+        - name: server
+          image: ghcr.io/shuntaka9576/plamo-embedding@sha256:d2c98eda8bdfcf38147086682cd137e4f33d6510efa069cbd926e38ed8f3fda4
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            # 初回 image pull と model load を最大 10 分待つ。
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 60
+          resources:
+            # CPU limit は付けない (本番と同じく node の全コアを使う)。
+            requests:
+              cpu: '500m'
+              memory: '1Gi'
+            limits:
+              memory: '8Gi'

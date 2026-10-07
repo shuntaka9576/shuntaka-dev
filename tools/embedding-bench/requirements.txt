@@ -1,0 +1,4 @@
+# bench.py の依存 (node2 の作業ディレクトリの venv に入れる)
+httpx==0.28.1
+numpy==2.5.3
+pyarrow==25.0.1
