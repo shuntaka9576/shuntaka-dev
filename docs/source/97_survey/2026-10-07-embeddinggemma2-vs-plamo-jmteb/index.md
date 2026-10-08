@@ -39,14 +39,16 @@
 | mintaka               |   1,592※ |  2,313 |                          9 / 30 | 質問 → 答えのエンティティ名   |
 | jagovfaqs_22k         |   22,794 |  3,420 |                        210 / 60 | 行政 FAQ の質問 → 回答        |
 
-※ mintaka のコーパスは 2,313 行あるが、同じ答えを持つ質問の数だけ同じ `docid` / テキストの行が重複していて、`docid` は 1,592 種類しかない（例: `D197`「マーク・トウェイン」が 6 行）。重複行はテキストも同一なので、`docid` 単位で 1 件にまとめて使う。
+※ mintaka のコーパスは 2,313 行あるが、同じ答えを持つ質問の数だけ同じ `docid` / テキストの行が重複していて、`docid` は 1,592 種類しかない（例: `D197`「マーク・トウェイン」が 6 行）。重複行はテキストも同一なので、`docid` 単位で 1 件にまとめて使う。JMTEB v1 の評価器は重複行を残したまま数えるため、公式の mintaka のスコアは高めに出る（「公式スコアとの照合」を参照）。
 
 PLaMo は JMTEB でスコアを公開しているモデルなので、JMTEB の train split が学習に使われている可能性は残る。
 
 ## 評価方法
 
-- 各タスクのコーパスとクエリをすべて埋め込み、全クエリ × 全コーパスの cosine 類似度を計算して上位 100 件を取る（exact KNN）
-- 指標は JMTEB の主指標である nDCG@10 と、Recall@10 / Recall@100 / MRR@10。関連度は二値（正解文書に含まれるか）
+- 各タスクのコーパスとクエリをすべて埋め込み、全クエリ × 全コーパスの cosine 類似度を計算する（exact KNN）
+- 3 タスクとも正解文書はクエリごとに 1 件なので、正解文書より類似度が高い文書の数から正解の順位を出し、指標を計算する
+- 指標は JMTEB の主指標である nDCG@10 と、Recall@10 / Recall@100 / MRR@10
+- 評価コードの検証のため、JMTEB v1 の評価器と同じ数え方の nDCG@10（`jmteb_ndcg@10`。mintaka の重複行を残す）も出し、公開されている PLaMo のスコアと照合する
 - EmbeddingGemma 2 は MRL（Matryoshka Representation Learning）で学習されているので、768 次元のベクトルを先頭 512 / 256 / 128 次元で切って再正規化した場合の精度も、追加の埋め込みなしで測る（768 → 128 次元でベクトルのサイズは 6 分の 1 になる）
 - 速度は 1 件ずつ直列にリクエストし、1 件ごとのレイテンシ（クライアントから見た往復時間）を記録する。メモリは推論サーバーの Pod の `memory.peak`（cgroup v2）で測る
 
@@ -107,7 +109,7 @@ EmbeddingGemma 2 は計算量が PLaMo の 1/7 程度で、Mac（Apple Silicon�
 | EmbeddingGemma 2 を transformers 5.19.0 / sentence-transformers 6.1.0 / torch 2.14.1 で読み込む | Mac CPU で OK。text のみ 271M パラメータ、float32、最大 RSS 約 1.3GB           |
 | text のみの場合に必要な追加依存                                                                 | `torchvision` と `pillow`（Processor が Gemma 4 の画像処理を import するため） |
 | `gemma/server.py` の `/embed` と `/healthz`                                                     | Mac で起動して確認。768 次元を返し、不正な `mode` は 400                       |
-| `bench.py eval` の指標計算                                                                      | 合成ベクトルで確認（正解との対応が取れていれば 1.0、ノイズを強くすると下がる） |
+| `bench.py eval` の指標計算                                                                      | PLaMo の公式スコアを再現できることを確認（「公式スコアとの照合」を参照）       |
 | node1 / node2 の空きメモリ                                                                      | node1 約 23GB、node2 約 21GB                                                   |
 | node2 から ClusterIP / PyPI プロキシ / Hugging Face への疎通                                    | すべて OK（ClusterIP は別の Service で確認）                                   |
 | node2 のツール                                                                                  | tmux、Python 3.12.3 あり。uv はない（手順 3 で入れる。node1 と同じ 0.11.29）   |
@@ -124,6 +126,8 @@ EmbeddingGemma 2（`model_type: embedding_gemma2`）は transformers 5.19.0（20
 # Mac で実行する
 ./cluster/manifests/embedding-bench/gemma/build-and-push.sh
 ```
+
+ghcr に初めて push したパッケージは private になり、クラスタからは認証なしで pull できない（`401 Unauthorized` で `ImagePullBackOff` になる）。初回だけ、GitHub のパッケージ設定（`https://github.com/users/<user>/packages/container/embeddinggemma-bench/settings`）の「Change visibility」で Public にする。
 
 ### 2. namespace と Service を作る（Mac）
 
@@ -260,26 +264,127 @@ rm -rf ~/work/20261007-embedding-bench
 
 ## 結果
 
-未実施。`results/*.md` の中身と、手順 4 / 5 で控えた `memory.peak` をここに貼る。
+2026-10-07〜08 に実施。値は `bench.py` の出力（`results/*.md`）をそのまま転記した。
 
 ### 検索精度（フル次元）
 
-| task | model | dim | queries | ndcg@10 | recall@10 | recall@100 | mrr@10 |
-| ---- | ----- | --: | ------: | ------: | --------: | ---------: | -----: |
-|      |       |     |         |         |           |            |        |
+| task                  | model |  dim | queries | ndcg@10 | recall@10 | recall@100 | mrr@10 | jmteb_ndcg@10 |
+| --------------------- | ----- | ---: | ------: | ------: | --------: | ---------: | -----: | ------------: |
+| nlp_journal_title_abs | plamo | 2048 |     510 |   98.41 |     99.41 |      99.41 |  98.06 |         98.41 |
+| mintaka               | plamo | 2048 |    2313 |   35.15 |     50.93 |      76.96 |  30.19 |         54.48 |
+| jagovfaqs_22k         | plamo | 2048 |    3420 |   79.64 |     91.73 |      97.13 |  75.74 |         79.64 |
+| nlp_journal_title_abs | gemma |  768 |     510 |   94.09 |     98.63 |      99.41 |  92.56 |         94.09 |
+| mintaka               | gemma |  768 |    2313 |   30.91 |     45.57 |      70.47 |  26.34 |         46.54 |
+| jagovfaqs_22k         | gemma |  768 |    3420 |   66.37 |     80.56 |      92.63 |  61.84 |         66.37 |
+
+### 公式スコアとの照合
+
+評価コードが正しいかを確かめるため、PLaMo Embedding 1B の nDCG@10 を JMTEB の公式リーダーボード（[2025-10-02 版](https://github.com/sbintuitions/JMTEB/blob/9b1e683bc6a2cd2b6b3e170bd94c29041038c4bb/leaderboard.md)）と比べた。今回の 3 タスクは JMTEB-lite でも縮小されておらず、JMTEB と行数まで同じなので、そのまま比較できる。
+
+| task                  |  公式 | jmteb_ndcg@10（JMTEB v1 と同じ数え方） | ndcg@10（重複を除く） |
+| --------------------- | ----: | -------------------------------------: | --------------------: |
+| nlp_journal_title_abs | 98.63 |                                  98.41 |                 98.41 |
+| mintaka               | 54.56 |                                  54.48 |                 35.15 |
+| jagovfaqs_22k         | 79.03 |                                  79.64 |                 79.64 |
+
+- JMTEB v1 と同じ数え方にすると、公式スコアとの差は 0.6 ポイント以内に収まる。推論サーバー、入力の書式、評価コードのどれも公式の評価と大きくは食い違っていない。残る差の原因は確認していない（候補は、公式の評価がバッチでまとめて埋め込むのに対し、この検証では 1 件ずつ埋め込んでいることや、推論環境の違い）
+- mintaka は数え方で約 19 ポイント変わる。JMTEB v1 の評価器（[`ndcg_at_k`](https://github.com/sbintuitions/JMTEB/blob/9b1e683bc6a2cd2b6b3e170bd94c29041038c4bb/src/jmteb/evaluators/retrieval/evaluator.py#L294)）はコーパスの重複行を残したまま上位 10 件を数え、正解文書の重複行が入るたびに加点する。PLaMo では 2,313 クエリ中 382 件でクエリ単体の nDCG が 1 を超えていた。この記事では重複を除いた `ndcg@10` を主な指標にする
 
 ### EmbeddingGemma 2 の MRL 切り詰め
 
-| task | dim | ndcg@10 | recall@10 | recall@100 | mrr@10 |
-| ---- | --: | ------: | --------: | ---------: | -----: |
-|      |     |         |           |            |        |
+768 次元のベクトルを先頭から切り詰め、再正規化して評価した。
 
-### 埋め込みレイテンシ / メモリ
+| task                  | dim | ndcg@10 | recall@10 | recall@100 | mrr@10 |
+| --------------------- | --: | ------: | --------: | ---------: | -----: |
+| nlp_journal_title_abs | 768 |   94.09 |     98.63 |      99.41 |  92.56 |
+| nlp_journal_title_abs | 512 |   93.57 |     98.24 |       99.8 |  92.01 |
+| nlp_journal_title_abs | 256 |   92.61 |     97.65 |       99.8 |  90.93 |
+| nlp_journal_title_abs | 128 |   89.62 |     96.86 |      99.02 |  87.25 |
+| mintaka               | 768 |   30.91 |     45.57 |      70.47 |  26.34 |
+| mintaka               | 512 |   30.74 |     45.27 |      70.08 |  26.21 |
+| mintaka               | 256 |   30.51 |     45.18 |       69.3 |  25.93 |
+| mintaka               | 128 |   26.33 |     38.61 |      63.68 |  22.48 |
+| jagovfaqs_22k         | 768 |   66.37 |     80.56 |      92.63 |  61.84 |
+| jagovfaqs_22k         | 512 |   65.98 |     80.32 |      92.28 |  61.39 |
+| jagovfaqs_22k         | 256 |    64.1 |     78.45 |      91.35 |  59.51 |
+| jagovfaqs_22k         | 128 |   60.15 |     74.44 |      88.42 |  55.63 |
 
-| model | kind | p50_ms | p95_ms | memory.peak |
-| ----- | ---- | -----: | -----: | ----------: |
-|       |      |        |        |             |
+### 埋め込みレイテンシ
+
+`bench.py stats` の出力。1 件ずつ直列に送ったときの、クライアントから見た往復時間。
+
+| task                  | model | kind   |     n | avg_chars | p50_ms | p95_ms | total_min |
+| --------------------- | ----- | ------ | ----: | --------: | -----: | -----: | --------: |
+| nlp_journal_title_abs | plamo | query  |   510 |        28 |    713 |    782 |       6.1 |
+| nlp_journal_title_abs | plamo | corpus |   637 |       462 |   2187 |   3346 |      24.1 |
+| mintaka               | plamo | query  |  2313 |        30 |    715 |    786 |      27.8 |
+| mintaka               | plamo | corpus |  1592 |         9 |    525 |    629 |      13.4 |
+| jagovfaqs_22k         | plamo | query  |  3420 |        60 |    821 |   1273 |      50.0 |
+| jagovfaqs_22k         | plamo | corpus | 22794 |       210 |   1079 |   3024 |     525.7 |
+| nlp_journal_title_abs | gemma | query  |   510 |        28 |     93 |    107 |       0.8 |
+| nlp_journal_title_abs | gemma | corpus |   637 |       462 |    337 |    543 |       3.8 |
+| mintaka               | gemma | query  |  2313 |        30 |     92 |    108 |       3.6 |
+| mintaka               | gemma | corpus |  1592 |         9 |     81 |     92 |       2.2 |
+| jagovfaqs_22k         | gemma | query  |  3420 |        60 |    100 |    171 |       6.3 |
+| jagovfaqs_22k         | gemma | corpus | 22794 |       210 |    161 |    474 |      80.8 |
+
+全タスクの埋め込みにかかった時間（`total_min` の合計）は、PLaMo が 647.1 分（約 10.8 時間）、EmbeddingGemma 2 が 97.5 分（約 1.6 時間）。
+
+### メモリ
+
+全タスクを埋め込み終えた時点の推論サーバーの Pod の `memory.peak`（cgroup v2）。
+
+| model |                       memory.peak |
+| ----- | --------------------------------: |
+| plamo | 5,425,344,512 bytes（約 5.05GiB） |
+| gemma | 2,480,631,808 bytes（約 2.31GiB） |
 
 ## 考察
 
-結果が出たら書く。
+### 精度は全タスクで PLaMo が上。差は日本語の FAQ 検索で大きい
+
+`ndcg@10` で比べると、EmbeddingGemma 2 は PLaMo の 83〜96% に収まった。
+
+| task                  | PLaMo | EmbeddingGemma 2 |     差 | 比率 |
+| --------------------- | ----: | ---------------: | -----: | ---: |
+| nlp_journal_title_abs | 98.41 |            94.09 |  -4.32 |  96% |
+| mintaka               | 35.15 |            30.91 |  -4.24 |  88% |
+| jagovfaqs_22k         | 79.64 |            66.37 | -13.27 |  83% |
+
+- nlp_journal_title_abs は Recall@10 がほぼ同じ（99.41 と 98.63）で、どちらも正解を上位 10 件にはほぼ入れている。差は正解が 1 位に来るかどうか（MRR@10 は 98.06 と 92.56）で出ている
+- 差が一番大きいのは jagovfaqs_22k（行政 FAQ の質問 → 回答）で、13 ポイント離れた。2 万件超の日本語の文書から、言い回しの違う質問に合う回答を探すタスクで、日本語に特化した 1B モデルの強みが出たと考えられる
+- mintaka は両モデルとも低い。コーパスがエンティティ名（平均 9 文字）だけで、文脈がほとんどないためと考えられる
+
+### 速度とメモリは EmbeddingGemma 2 が大きく有利
+
+- 1 件ずつ送ったときの p50 は、クエリで約 7〜8 倍、文書で約 6〜7 倍 EmbeddingGemma 2 が速い。全タスクの埋め込み時間は 647 分と 97.5 分で、約 6.6 倍の差
+- 推論サーバーの `memory.peak` は 5.05GiB と 2.31GiB で、EmbeddingGemma 2 は半分以下
+- ベクトルのサイズは 8KB と 3KB。同じ件数を保存するなら、EmbeddingGemma 2 は約 3 分の 1 で済む
+
+### MRL は 256 次元までならほぼ劣化しない
+
+768 → 256 次元（ベクトルは 1KB、PLaMo の 8 分の 1）で、`ndcg@10` の低下は 0.4〜2.3 ポイントにとどまった。128 次元では 4.5〜6.2 ポイント下がる。ベクトルの保存量を抑えたい場合は 256 次元が折り合いどころになる。
+
+### 参考: 先代の EmbeddingGemma（300M）との比較
+
+JMTEB の公式リーダーボードにある `google/embeddinggemma-300m` の nDCG@10 と、EmbeddingGemma 2 の `jmteb_ndcg@10`（同じ数え方）を並べる。
+
+| task                  | embeddinggemma-300m（公式） | EmbeddingGemma 2（この検証） |
+| --------------------- | --------------------------: | ---------------------------: |
+| nlp_journal_title_abs |                       96.12 |                        94.09 |
+| mintaka               |                       38.63 |                        46.54 |
+| jagovfaqs_22k         |                       69.43 |                        66.37 |
+
+mintaka は 8 ポイント上がったが、ほかの 2 タスクは 2〜3 ポイント下回った。ただし公式の値は JMTEB の評価器で測ったもので、入力に付けるプロンプトなどの条件がこの検証と同じかは確認していない。傾向を見る参考にとどめる。
+
+### どちらを選ぶか
+
+- 日本語の検索精度を最優先するなら PLaMo Embedding 1B。特に FAQ のように、言い回しの違う日本語の質問と文書を結びつける用途では差が大きい
+- CPU だけの環境で速度・メモリ・ベクトルの保存量を抑えたい場合や、多言語・画像・音声も扱いたい場合は EmbeddingGemma 2。精度は PLaMo の 83〜96%（`ndcg@10` の比）になる
+
+### この検証の限界
+
+- EmbeddingGemma 2 のクエリには、全タスクで `task: search result` のプロンプトを使った。mintaka と jagovfaqs_22k は質問応答に近いので、`task: question answering` を使うと結果が変わる可能性がある
+- レイテンシは HTTP を含む往復時間で、推論サーバーの実装もモデルごとに違う。モデル自体の速さではなく、この構成での目安として読む
+- 検索タスクは 3 つだけで、信頼区間も出していない。小さな差（nlp_journal_title_abs と mintaka の約 4 ポイント）が、別のデータでも同じ向きに出るかは分からない
+- PLaMo は JMTEB でスコアを公開しているモデルなので、JMTEB の train split が学習に使われている可能性は残る
