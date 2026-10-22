@@ -17,7 +17,7 @@
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.18",
-    "amazon-cognito-identity-js": "^6.3.20",
+    "amazon-cognito-identity-js": "^6.3.22",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "exifr": "^7.1.3",

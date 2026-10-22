@@ -53,7 +53,7 @@
         "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-query": "^5.101.2",
         "@tanstack/react-router": "^1.170.18",
-        "amazon-cognito-identity-js": "^6.3.20",
+        "amazon-cognito-identity-js": "^6.3.22",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "exifr": "^7.1.3",
@@ -1448,7 +1448,7 @@
 
     "ajv-formats": ["ajv-formats@3.0.1", "", { "dependencies": { "ajv": "^8.0.0" } }, "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ=="],
 
-    "amazon-cognito-identity-js": ["amazon-cognito-identity-js@6.3.20", "", { "dependencies": { "@aws-crypto/sha256-js": "1.2.2", "buffer": "4.9.2", "fast-base64-decode": "^1.0.0", "isomorphic-unfetch": "^3.0.0", "js-cookie": "^3.0.7" } }, "sha512-akaaLpDqz4i0m2XG4+x+XcHAlboRt3rydVrSiEFCKvaGZSmZdvnYW4SXqm2OGeVdZK0R1nIXjp8yEpID3rHC5Q=="],
+    "amazon-cognito-identity-js": ["amazon-cognito-identity-js@6.3.22", "", { "dependencies": { "@aws-crypto/sha256-js": "1.2.2", "buffer": "4.9.2", "fast-base64-decode": "^1.0.0", "isomorphic-unfetch": "^3.0.0", "js-cookie": "^3.0.7" } }, "sha512-FcBgh4QS2OIusMak+YVgOQTvdhBDgz7uOkblRN5W8d8teWvCLdJ9uNVgwQ5ivDdlmUqR259JvKLido1X3J2Qiw=="],
 
     "ansi-colors": ["ansi-colors@4.1.3", "", {}, "sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw=="],
 
