@@ -6,14 +6,12 @@ use api::route::users_moments::build_users_moments_routers;
 use api::route::webhooks::build_webhooks_routers;
 use infrastructure::{
     embedding::client::{
-        CachedEmbeddingClient, EmbeddingClient, EmbeddingClientImpl,
-        QUERY_EMBEDDING_CACHE_CAPACITY,
+        CachedEmbeddingClient, EmbeddingClient, EmbeddingClientImpl, QUERY_EMBEDDING_CACHE_CAPACITY,
     },
-    lambda::{LambdaSelfInvoker, SelfInvoker},
+    lambda::{EventInvoker, LambdaEventInvoker},
     s3::{LabImageStore, S3LabImageStore},
 };
 use registry::{AppRegistry, WebhookConfig};
-use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use adapter::database::connect_database_with;
@@ -23,7 +21,6 @@ use shared::config::AppConfig;
 use shared::telemetry::Telemetry;
 use tokio::net::TcpListener;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::filter::Targets;
@@ -83,11 +80,11 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         lab_images_bucket: app_config.webhook.lab_images_bucket,
     };
 
-    // Lambda 上でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
-    // ローカル開発では None となり、webhook はインラインで処理される。
-    let self_invoker = LambdaSelfInvoker::from_env()
+    // Web Function 上でのみ Some。webhook の実処理を Event Function への Event invoke に逃がすために使う。
+    // ローカル開発と Event Function 自身では None となり、webhook はインラインで処理される。
+    let event_invoker = LambdaEventInvoker::from_env()
         .await
-        .map(|invoker| Arc::new(invoker) as Arc<dyn SelfInvoker>);
+        .map(|invoker| Arc::new(invoker) as Arc<dyn EventInvoker>);
 
     // Lambda 上でのみ Some。lab 教材画像の S3 同期に使う。
     // ローカル開発では None となり、画像同期はスキップされる。
@@ -113,17 +110,14 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
     let registry = AppRegistry::new(
         pool,
         webhook_config,
-        self_invoker,
+        event_invoker,
         embedding_client,
         lab_image_store,
     )
     .await;
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
+    // ブラウザからは CloudFront の同一オリジン (/api/*)、ローカル開発は next dev の rewrites 経由で
+    // 呼ばれるため CORS ヘッダーは付けない
     let app = Router::new()
         .merge(build_health_check_routers())
         .merge(build_users_articles_routers())
@@ -137,15 +131,13 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
-        .layer(cors)
         // syntect がインライン style を吐くため content_html が大きく、gzip の効果が高い
         .layer(CompressionLayer::new())
         .with_state(registry);
 
-    let addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), app_config.server.port);
-    let listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&app_config.server.bind_addr).await?;
 
-    println!("Listening on {addr}");
+    println!("Listening on {}", app_config.server.bind_addr);
 
     let result = axum::serve(listener, app).await.map_err(Error::from);
     shared::telemetry::shutdown();

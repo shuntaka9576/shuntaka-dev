@@ -273,41 +273,64 @@ export const applyAdminStackSuppressions = (stack: cdk.Stack): void => {
 
 export const applyMainStackSuppressions = (stack: cdk.Stack): void => {
   const iam4Reason =
-    'TODO(別PR): Lambda 実行ロールと API Gateway CloudWatchRole が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。';
+    'TODO(別PR): Lambda 実行ロール (Event Function / Web Function) が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。';
+  const customResourceLambdaReason =
+    'BucketDeployment / autoDeleteObjects / AwsCustomResource / Route53 の deleteExisting が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
+  const bucketDeploymentWildcardReason =
+    'BucketDeployment と autoDeleteObjects の custom resource はオブジェクトキーへ動的にアクセスするため bucket/* のワイルドカードを許容する。バケットは Web Function のコード置き場専用。';
   acknowledgeRules(stack, [
     ...[
       'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-      'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs',
       'Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ].map((finding) => ({ id: `AwsSolutions-IAM4[${finding}]`, reason: iam4Reason })),
     {
-      id: 'AwsSolutions-APIG1',
+      id: 'AwsSolutions-L1',
+      reason: customResourceLambdaReason,
+    },
+    ...['network-interface/*', 'subnet/*', 'security-group/*'].map((resource) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:<AWS::Partition>:ec2:*:*:${resource}]`,
       reason:
-        'TODO(別PR): API Gateway ステージのアクセスログを CloudWatch Logs に出力する設定を追加する。',
+        'egress network connector の operator role。Lambda が connector の ENI を作るための権限で、AWS 公式ドキュメント (Configuring networking for Lambda Web Functions > Operator role permissions) の例どおり。ENI の ID は作成時に決まるためリソースを絞れない。',
+    })),
+    {
+      id: 'AwsSolutions-IAM5[Resource::<BlogAPIWebApiLambda34B678B7.Arn>:*]',
+      reason:
+        'Web Function が webhook の実処理を Event Function へ Event invoke するための grantInvoke。:* はバージョン / エイリアス修飾子で、対象の関数は Event Function 1 つに限定されている。',
+    },
+    ...[
+      'Action::s3:Abort*',
+      'Action::s3:DeleteObject*',
+      'Action::s3:GetBucket*',
+      'Action::s3:GetObject*',
+      'Action::s3:List*',
+      'Resource::<WebFunctionCodeBucket1D283E48.Arn>/*',
+    ].map((finding) => ({
+      id: `AwsSolutions-IAM5[${finding}]`,
+      reason: bucketDeploymentWildcardReason,
+    })),
+    ...['<AWS::Partition>', 'aws'].map((partition) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::cdk-hnb659fds-assets-${stack.account}-${stack.region}/*]`,
+      reason:
+        'BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケットから Web Function の zip を取得するための CDK 既定権限。',
+    })),
+    {
+      id: 'AwsSolutions-S1',
+      reason:
+        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy-logs と同じ割り切り)。書き込み主体は BucketDeployment のみ。',
     },
     {
-      id: 'AwsSolutions-APIG2',
-      reason:
-        'TODO(別PR): API Gateway のリクエスト検証 (RequestValidator + Model) を OpenAPI 整備とセットで追加する。',
+      id: 'AwsSolutions-CFR1',
+      reason: '公開ブログのため geo restriction は設けない。',
     },
     {
-      id: 'AwsSolutions-APIG4',
+      id: 'AwsSolutions-CFR2',
       reason:
-        'API Gateway は {proxy+} ANY で全リクエストを Lambda にパススルーする構成のため Method 単位のオーソライザーは設定しない。書き込み系 (POST /webhooks/github) は Lambda 側で X-Hub-Signature-256 の HMAC 検証を実装済み。読み取り系 (GET /users/.../articles 等) は意図的に未認証の public エンドポイント。',
+        'TODO(別PR): CloudFront への WAF 導入を検討する。読み取りは public、書き込み (POST /api/webhooks/github) は blog-api 側で X-Hub-Signature-256 の HMAC を検証している。',
     },
     {
-      id: 'AwsSolutions-APIG3',
-      reason: 'TODO(別PR): API Gateway ステージに WAFv2 WebACL を associate する。',
-    },
-    {
-      id: 'AwsSolutions-APIG6',
+      id: 'AwsSolutions-CFR3',
       reason:
-        'TODO(別PR): API Gateway 全 Method の CloudWatch Logs 出力 (deployOptions.loggingLevel) を追加する。',
-    },
-    {
-      id: 'AwsSolutions-COG4',
-      reason:
-        'Cognito User Pool による認証基盤を持たないプロジェクトのため不適合。認証が必要な書き込み系は GitHub Webhook (HMAC 検証) のみで、それ以外は public read。',
+        '個人ブログ用途でアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。',
     },
   ]);
 };

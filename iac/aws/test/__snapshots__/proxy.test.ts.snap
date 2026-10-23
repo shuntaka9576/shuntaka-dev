@@ -504,12 +504,64 @@ exports[`TidbProxyStack > snapshot 1`] = `
       },
       "Type": "AWS::EC2::Subnet",
     },
+    "VpcPrivateSubnet2RouteTableA678073B": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/PrivateSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcPrivateSubnet2RouteTableAssociationA89CAD56": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateSubnet2RouteTableA678073B",
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateSubnet2Subnet3788AAA1",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcPrivateSubnet2Subnet3788AAA1": {
+      "Properties": {
+        "AvailabilityZone": "ap-northeast-1c",
+        "CidrBlock": "10.50.2.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestTidbProxyStack/Vpc/PrivateSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcC3027511",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
     "VpcPrivateSubnetId1ParamC729E2BE": {
       "Properties": {
         "Name": "/tidb-proxy/vpc/private-subnet-id-1",
         "Type": "String",
         "Value": {
           "Ref": "VpcPrivateSubnet1Subnet67A4DBCB",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "VpcPrivateSubnetId2Param84142317": {
+      "Properties": {
+        "Name": "/tidb-proxy/vpc/private-subnet-id-2",
+        "Type": "String",
+        "Value": {
+          "Ref": "VpcPrivateSubnet2Subnet3788AAA1",
         },
       },
       "Type": "AWS::SSM::Parameter",

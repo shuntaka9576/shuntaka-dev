@@ -27,6 +27,22 @@ vi.mock('aws-cdk-lib/aws-lambda', async (importOriginal) => {
   };
 });
 
+// Web Function の zip 作成 (cargo zigbuild / next build) をスキップし、fixture に差し替える
+const webBuildEnvs = vi.hoisted(() => [] as Record<string, string>[]);
+vi.mock('../lib/web-function-package.js', async () => {
+  const path = await import('node:path');
+  const s3deploy = await import('aws-cdk-lib/aws-s3-deployment');
+  const fixture = () =>
+    s3deploy.Source.asset(path.join(import.meta.dirname, 'fixtures/web-function'));
+  return {
+    blogApiWebFunctionCode: fixture,
+    webWebFunctionCode: (buildEnv: Record<string, string>) => {
+      webBuildEnvs.push(buildEnv);
+      return fixture();
+    },
+  };
+});
+
 describe('MainStack', () => {
   it('snapshot', () => {
     const app = new cdk.App();
@@ -35,22 +51,22 @@ describe('MainStack', () => {
       stageName: { long: 'development', short: 'dev' },
       fqdn: 'example.com',
       domain: {
-        api: 'api.example.com',
         images: 'images.example.com',
       },
       labs: {
         repoFullName: 'shuntaka9576/lab-contents-dev',
         imagesBucketName: 'tp-dev-lab-assets',
       },
+      web: {
+        buildApiUrl: 'https://example.com/api',
+        googleTagManagerId: 'GTM-TEST',
+      },
       ssmParameters: {
         globalDns: {
           hostedZoneId: '/test/hosted-zone-id',
         },
-        tokyo: {
-          certificateArn: '/test/certificate-arn',
-        },
-        apiGateway: {
-          apiUrl: '/test/api-url',
+        virginia: {
+          webCertificateArn: '/test/virginia/web-certificate-arn',
         },
         dsql: {
           clusterEndpoint: '/test/dsql/cluster-endpoint',
@@ -59,6 +75,7 @@ describe('MainStack', () => {
         proxy: {
           vpcId: '/test/tidb-proxy/vpc/id',
           privateSubnetId1: '/test/tidb-proxy/vpc/private-subnet-id-1',
+          privateSubnetId2: '/test/tidb-proxy/vpc/private-subnet-id-2',
           sgId: '/test/tidb-proxy/proxy/sg-id',
         },
       },
@@ -89,6 +106,15 @@ describe('MainStack', () => {
 
     const report = new AwsSolutionsChecks(undefined, { verbose: true }).validateScope(stack);
     expect(report.violations).toEqual([]);
+
+    // NEXT_PUBLIC_* はビルド時に焼き込まれるため、next build に渡る値を確認する。未設定の ID は渡さない
+    expect(webBuildEnvs).toEqual([
+      {
+        NEXT_PUBLIC_SITE_URL: 'https://example.com',
+        API_URL: 'https://example.com/api',
+        NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID: 'GTM-TEST',
+      },
+    ]);
 
     const template = Template.fromStack(stack);
     expect(template.toJSON()).toMatchSnapshot();

@@ -117,7 +117,8 @@ export class ObservabilityConstruct extends Construct {
     id: string,
     props: {
       physicalPrefix: string;
-      apiDomain: string;
+      /** blog-api のベース URL (CloudFront の /api) */
+      apiBaseUrl: string;
       lambdaServiceName: string;
       proxyServiceName: string;
     },
@@ -137,7 +138,7 @@ export class ObservabilityConstruct extends Construct {
 
     const healthcheckDestination = new events.ApiDestination(this, 'HealthcheckDestination', {
       connection: healthcheckConnection,
-      endpoint: `https://${props.apiDomain}/health/db`,
+      endpoint: `${props.apiBaseUrl}/health/db`,
       httpMethod: events.HttpMethod.GET,
       rateLimitPerSecond: 1,
       description: 'Periodic SELECT 1 baseline probe (db.healthcheck.duration)',

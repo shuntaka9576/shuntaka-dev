@@ -233,6 +233,7 @@
     "mgmt",
     "microk",
     "millis",
+    "mimalloc",
     "mmap",
     "mountpoint",
     "msdm",
@@ -419,6 +420,7 @@
     "tskey",
     "tsnet",
     "tsoperator",
+    "turbopack",
     "twimg",
     "twttr",
     "uefi",
@@ -445,6 +447,7 @@
     "wwsg",
     "xlarge",
     "zenn",
+    "zigbuild",
     "zipf",
     "zizmor",
     "zstd"

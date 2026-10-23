@@ -19,6 +19,7 @@ export class TidbProxyStack extends cdk.Stack {
 
     const vpcConstruct = new ProxyVpcConstruct(this, 'Vpc', {
       cidr: props.proxyConfig.vpc.cidr,
+      privateSubnet2: props.proxyConfig.vpc.privateSubnet2,
       ssm: props.proxyConfig.ssm.vpc,
     });
 

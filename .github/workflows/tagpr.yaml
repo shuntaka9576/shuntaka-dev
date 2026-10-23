@@ -34,7 +34,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # GITHUB_TOKEN が打ったタグでは on: push: tags の別ワークフローが起動しないため、
-  # 本番デプロイはタグ作成と同一ワークフローの後続ジョブとして実行する
+  # 本番デプロイはタグ作成と同一ワークフローの後続ジョブとして実行する。
+  # 公開サイト (apps/web) も main stack の CloudFront + Web Function に含まれる
   deploy-prd:
     name: Deploy prd (CDK)
     needs: tagpr
@@ -54,38 +55,3 @@ jobs:
       GH_APP_ID: ${{ secrets.GH_APP_ID }}
       CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
       CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-
-  # API (CDK) → web (Vercel) の順で本番反映する
-  deploy-vercel:
-    name: Deploy Vercel (production)
-    needs: [tagpr, deploy-prd]
-    if: needs.tagpr.outputs.tag != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read # actions/checkout でリポジトリを取得するため
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ needs.tagpr.outputs.tag }}
-          persist-credentials: false
-
-      - uses: $/.github/actions/setup-node
-
-      - name: Vercel pull
-        run: bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Vercel build
-        run: bunx vercel build --prod --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Vercel deploy
-        run: bunx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

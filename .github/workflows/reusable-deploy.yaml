@@ -28,7 +28,8 @@ jobs:
     name: Deploy CDK
     # Apple Silicon ビルド用 self-hosted runner。呼び出し元のトリガ制限で pull_request 由来では起動しない。
     runs-on: [self-hosted, macOS, ARM64] # zizmor: ignore[self-hosted-runner]
-    timeout-minutes: 30
+    # main は cargo zigbuild + Docker build + next build を含み、初回は CloudFront の作成も待つ
+    timeout-minutes: 60
     environment: ${{ inputs.stageName }}
     permissions:
       id-token: write # AWS IAM Role に OIDC AssumeRole するため
@@ -43,19 +44,29 @@ jobs:
       - name: Setup Rust
         uses: $/.github/actions/setup-rust
 
+      # blog-api の Web Function 用に aarch64 musl の静的バイナリを作る (iac/aws/lib/web-function-package.ts)。
+      # self-hosted runner なので一度入れれば次回以降は再利用される
+      - name: Setup cargo-zigbuild
+        run: |
+          command -v zig >/dev/null || brew install zig
+          command -v cargo-zigbuild >/dev/null || cargo install cargo-zigbuild --locked
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ inputs.stageName }}-shuntaka-assume-role
           aws-region: ap-northeast-1
 
+      # main 以外のステップは --exclusively で依存スタックをデプロイせず、bundling も対象スタックに
+      # 限る (付けないと全スタックが bundling され、main の cargo zigbuild / next build まで走る)。
+      #
       # dev / prd 共用の shared stack。Lambda VPC 化 (タスク 4 以降) で main-stack が
       # st-tidb-proxy の SSM 出力に依存するため、main より先にデプロイする。
       - name: CDK Deploy (st-tidb-proxy)
         if: inputs.stack == 'all' || inputs.stack == 'st-tidb-proxy'
         working-directory: iac/aws
         run: |
-          bunx cdk deploy st-tidb-proxy -c "stageName=${STAGE_NAME}" --require-approval never
+          bunx cdk deploy st-tidb-proxy --exclusively -c "stageName=${STAGE_NAME}" --require-approval never
         env:
           STAGE_NAME: ${{ inputs.stageName }}
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
@@ -76,7 +87,7 @@ jobs:
         if: inputs.stack == 'all' || inputs.stack == 'st-tidb-proxy-logs'
         working-directory: iac/aws
         run: |
-          bunx cdk deploy st-tidb-proxy-logs -c "stageName=${STAGE_NAME}" --require-approval never
+          bunx cdk deploy st-tidb-proxy-logs --exclusively -c "stageName=${STAGE_NAME}" --require-approval never
         env:
           STAGE_NAME: ${{ inputs.stageName }}
           GH_APP_ID: ${{ secrets.GH_APP_ID }}
@@ -86,6 +97,8 @@ jobs:
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
 
+      # blog-api (Web Function + Event Function) と公開サイト (CloudFront + apps/web の Web Function)。
+      # synth 時に cargo zigbuild と next build が走る。us-east-1 の証明書スタックは依存として先にデプロイされる
       - name: CDK Deploy (main)
         if: inputs.stack == 'all' || inputs.stack == 'main'
         working-directory: iac/aws
@@ -103,6 +116,11 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET_KEY_NAME: ${{ vars.CLOUDINARY_API_SECRET_KEY_NAME }}
+          # apps/web の next build に焼き込む公開 ID (GitHub Environments の Environment variable)
+          NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID }}
+          NEXT_PUBLIC_CLARITY_PROJECT_ID: ${{ vars.NEXT_PUBLIC_CLARITY_PROJECT_ID }}
+          # next build 時の API の向き先。apex を CloudFront へ切り替える初回だけ旧 API を指す
+          WEB_BUILD_API_URL: ${{ vars.WEB_BUILD_API_URL }}
 
       # moments 管理画面 (Cognito + Lambda + CloudFront)。us-east-1 の証明書スタック →
       # admin-web ビルド (Cognito 出力の SSM を参照。初回デプロイ時は空でビルドされるため、
@@ -115,7 +133,7 @@ jobs:
             prd) PREFIX=p ;;
             *)   PREFIX=d ;;
           esac
-          bunx cdk deploy "${PREFIX}-st-virginia-cert" -c "stageName=${STAGE_NAME}" --require-approval never
+          bunx cdk deploy "${PREFIX}-st-virginia-cert" --exclusively -c "stageName=${STAGE_NAME}" --require-approval never
           POOL_ID=$(aws ssm get-parameter --name "/${STAGE_NAME}/shuntaka/admin/user-pool-id" --query 'Parameter.Value' --output text 2>/dev/null || echo '')
           CLIENT_ID=$(aws ssm get-parameter --name "/${STAGE_NAME}/shuntaka/admin/user-pool-client-id" --query 'Parameter.Value' --output text 2>/dev/null || echo '')
           (
@@ -132,7 +150,7 @@ jobs:
             cd ../../apps/labs-web
             bun run build
           )
-          bunx cdk deploy "${PREFIX}-st-admin" -c "stageName=${STAGE_NAME}" --require-approval never
+          bunx cdk deploy "${PREFIX}-st-admin" --exclusively -c "stageName=${STAGE_NAME}" --require-approval never
         env:
           STAGE_NAME: ${{ inputs.stageName }}
           # 公開サイトの apex ドメイン。GitHub Environments (dev / prd) の

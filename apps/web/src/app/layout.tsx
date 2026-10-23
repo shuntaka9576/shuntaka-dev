@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-600.css';
 import './globals.css';
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Clarity } from '@/components/Clarity';
 import { GoogleTagManager } from '@/components/GoogleTagManager';
 import { GoogleTagManagerNoscript } from '@/components/GoogleTagManagerNoscript';
@@ -73,8 +71,6 @@ export default function RootLayout({
         <ThemeProvider>
           <NavigationProgressProvider>{children}</NavigationProgressProvider>
         </ThemeProvider>
-        <SpeedInsights />
-        <Analytics />
         <Clarity />
       </body>
     </html>

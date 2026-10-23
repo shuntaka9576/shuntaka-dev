@@ -2,13 +2,18 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as dsql from 'aws-cdk-lib/aws-dsql';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
+import { readCrossRegionParameter } from '../cross-region-ssm.js';
 import { BlogAPIConstruct } from './blog-api-construct.js';
 import { ObservabilityConstruct } from './observability-construct.js';
+import { SiteConstruct } from './site-construct.js';
+
+const VIRGINIA_REGION = 'us-east-1';
 
 export class MainStack extends cdk.Stack {
-  /** blog-api Lambda 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
+  /** blog-api Event Function 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
   public readonly blogApiLambdaRoleArn: string;
 
   constructor(
@@ -19,22 +24,23 @@ export class MainStack extends cdk.Stack {
       stageName: { long: string; short: string };
       fqdn: string;
       domain: {
-        api: string;
         images: string;
       };
       labs: {
         repoFullName: string;
         imagesBucketName: string;
       };
+      web: {
+        buildApiUrl: string;
+        googleTagManagerId?: string;
+        clarityProjectId?: string;
+      };
       ssmParameters: {
         globalDns: {
           hostedZoneId: string;
         };
-        tokyo: {
-          certificateArn: string;
-        };
-        apiGateway: {
-          apiUrl: string;
+        virginia: {
+          webCertificateArn: string;
         };
         dsql: {
           clusterEndpoint: string;
@@ -43,6 +49,7 @@ export class MainStack extends cdk.Stack {
         proxy: {
           vpcId: string;
           privateSubnetId1: string;
+          privateSubnetId2: string;
           sgId: string;
         };
       };
@@ -68,10 +75,15 @@ export class MainStack extends cdk.Stack {
       zoneName: props.fqdn,
     });
 
-    const tokyoCertificate = acm.Certificate.fromCertificateArn(
+    // CloudFront 用の証明書は us-east-1 にあるため cross-region で読む (AdminStack と同じ流儀)
+    const webCertificate = acm.Certificate.fromCertificateArn(
       this,
-      'ImportedTokyoCertificate',
-      ssm.StringParameter.valueForStringParameter(this, props.ssmParameters.tokyo.certificateArn),
+      'ImportedWebCertificate',
+      readCrossRegionParameter(this, 'WebCertificateArnLookup', {
+        parameterName: props.ssmParameters.virginia.webCertificateArn,
+        region: VIRGINIA_REGION,
+        refreshToken: props.fqdn,
+      }),
     );
 
     // Aurora DSQL Cluster（シングルリージョン・最小構成）
@@ -116,20 +128,27 @@ export class MainStack extends cdk.Stack {
     // dimension の両方で使うためここで一元的に決める。
     const otelServiceName = `blog-api-${props.stageName.long}`;
 
-    // WebApp: Lambda + API Gateway + Route53
+    // Lambda Web Functions のコード置き場。Web Functions はバージョニング有効な S3 バケットの
+    // zip からしかコードを読めない。blog-api と apps/web の 2 関数で共有する
+    const webFunctionCodeBucket = new s3.Bucket(this, 'WebFunctionCodeBucket', {
+      versioned: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    // blog-api: Web Function (HTTP) + Event Function (webhook の実処理)
     const blogApi = new BlogAPIConstruct(this, 'BlogAPI', {
       physicalPrefix,
       stageName: props.stageName.long,
-      domain: props.domain.api,
       imagesBaseUrl: `https://${props.domain.images}`,
       labRepoFullName: props.labs.repoFullName,
       labImagesBucketName: props.labs.imagesBucketName,
-      hostedZone,
-      certificate: tokyoCertificate,
       // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。
       databaseName: `blog_${props.stageName.long}`,
+      webFunctionCodeBucket,
       ssmParameters: {
-        apiGateway: props.ssmParameters.apiGateway,
         proxy: props.ssmParameters.proxy,
       },
       blogApiEnv: props.lambda.blogApi,
@@ -139,10 +158,31 @@ export class MainStack extends cdk.Stack {
     });
     this.blogApiLambdaRoleArn = blogApi.webApiLambdaRoleArn;
 
+    // 公開サイト: CloudFront + apps/web の Web Function + apex の DNS
+    const siteUrl = `https://${props.fqdn}`;
+    new SiteConstruct(this, 'Site', {
+      physicalPrefix,
+      fqdn: props.fqdn,
+      hostedZone,
+      certificate: webCertificate,
+      webFunctionCodeBucket,
+      blogApi: blogApi.webFunction,
+      buildEnv: {
+        NEXT_PUBLIC_SITE_URL: siteUrl,
+        API_URL: props.web.buildApiUrl,
+        ...(props.web.googleTagManagerId && {
+          NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID: props.web.googleTagManagerId,
+        }),
+        ...(props.web.clarityProjectId && {
+          NEXT_PUBLIC_CLARITY_PROJECT_ID: props.web.clarityProjectId,
+        }),
+      },
+    });
+
     // Observability: CloudWatch dashboard + SELECT 1 定期プローブ
     new ObservabilityConstruct(this, 'Observability', {
       physicalPrefix,
-      apiDomain: props.domain.api,
+      apiBaseUrl: `${siteUrl}/api`,
       lambdaServiceName: otelServiceName,
       // tidb-proxy は dev / prd 共用のため service.name も stage 非依存
       proxyServiceName: 'tidb-proxy',

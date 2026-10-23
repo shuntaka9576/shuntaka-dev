@@ -51,35 +51,26 @@ Tailnet に参加しているのは forwarder の `tsnet.Server` 1 つだけで�
 
 ## 初回構築
 
-### Vercel
+### 公開サイト (CloudFront + Lambda Web Functions)
 
-1. [Vercel](https://vercel.com)でGitHubリポジトリをインポート
-2. Root Directory: `apps/web` を指定
-3. Framework Preset: Next.js（自動検出）
-4. Environment Variables に上記の環境変数を設定
-   - Production: 本番用の値を設定
-   - Preview: プレビュー用の値を設定
-5. Deploy
+apps/web と blog-api は main stack の CloudFront（apex）から配信する。`/api/*` は blog-api、それ以外は apps/web の Lambda Web Function に振り分け、ブラウザからは同一オリジンで API を呼ぶ（CORS なし）。構成は `iac/aws/lib/api/site-construct.ts` と [Lambda Web Functions + CloudFront OAC への移行](../98_tasks/2026-10-15-lambda-web-functions-survey/index.md) を参照。
 
-| 設定項目          | 値                          |
-| ----------------- | --------------------------- |
-| Production Branch | `main`                      |
-| Preview           | feature ブランチ（PR ごと） |
-| Root Directory    | `apps/web`                  |
-| Framework         | Next.js（自動検出）         |
+next build と blog-api の musl ビルド（cargo zigbuild）は main stack の synth 時に走る。CDK CLI は `--exclusively` を付けない `cdk deploy` / `cdk diff` で全スタックを bundling するため、main 以外を単体でデプロイするときは `--exclusively` を付ける（ローカルで cargo-zigbuild と zig が必要になるのは main を扱うときだけになる）。ビルドに焼き込む値は GitHub Environments（dev / prd）の Environment variable で渡し、サイトと API の URL は CDK が fqdn から組み立てる。
 
-main への push では本番デプロイされない（`apps/web/vercel.json` の `git.deploymentEnabled` で無効化）。本番反映は CalVer タグ経由で行う（[リリース](#リリース)を参照）。
+| 変数名                              | 用途                         | prd                           | dev    |
+| ----------------------------------- | ---------------------------- | ----------------------------- | ------ |
+| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM                          | `GTM-XXXXXXX`                 | （空） |
+| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity            | `xxxxxxxxxx`                  | （空） |
+| `WEB_BUILD_API_URL`                 | next build 時の API の向き先 | （空 = `https://<fqdn>/api`） | （空） |
 
-| 変数名                              | 用途              | Production                 | Preview                   |
-| ----------------------------------- | ----------------- | -------------------------- | ------------------------- |
-| `NEXT_PUBLIC_API_URL`               | バックエンドAPI   | `https://api.shuntaka.dev` | `https://api.shuntaka.me` |
-| `NEXT_PUBLIC_SITE_URL`              | サイトURL         | `https://shuntaka.dev`     | `https://shuntaka.me`     |
-| `NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID` | GTM               | `GTM-XXXXXXX`              | （空）                    |
-| `NEXT_PUBLIC_CLARITY_PROJECT_ID`    | Microsoft Clarity | `xxxxxxxxxx`               | （空）                    |
+```bash
+gh variable set NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID --env prd --body 'GTM-XXXXXXX'
+gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
+```
 
 ### リリース
 
-リリースは [tagpr](https://github.com/Songmu/tagpr) のリリース PR マージで行う。main へのマージごとに tagpr（`.github/workflows/tagpr.yaml`）がリリース PR を自動作成・追従し、マージすると CalVer タグ（例: `2026.0711.0`、形式は `.tagpr` で定義）と GitHub Release が作られ、同一ワークフローの後続ジョブが prd CDK → Vercel 本番の順にデプロイする。main push の自動デプロイは dev CDK のみ。
+リリースは [tagpr](https://github.com/Songmu/tagpr) のリリース PR マージで行う。main へのマージごとに tagpr（`.github/workflows/tagpr.yaml`）がリリース PR を自動作成・追従し、マージすると CalVer タグ（例: `2026.0711.0`、形式は `.tagpr` で定義）と GitHub Release が作られ、同一ワークフローの後続ジョブが prd CDK（公開サイトを含む）をデプロイする。main push では dev CDK（shuntaka.me）へ自動デプロイする。
 
 tagpr が `GITHUB_TOKEN` で PR を作成できるよう、GitHub 設定の「Allow GitHub Actions to create and approve pull requests」を有効にしておく（`.github/infra.yaml` の `actions.can_approve_pull_requests: true` に対応。`gh infra apply` は ruleset の required status checks を消すため、この設定だけを gh api で変更する）。
 
@@ -87,18 +78,6 @@ tagpr が `GITHUB_TOKEN` で PR を作成できるよう、GitHub 設定の「Al
 gh api --method PUT repos/shuntaka9576/shuntaka-dev/actions/permissions/workflow \
   -f default_workflow_permissions=read \
   -F can_approve_pull_request_reviews=true
-```
-
-Vercel CLI デプロイ用のシークレットを登録する。トークンは <https://vercel.com/account/tokens> で発行し、orgId / projectId は `vercel link` が生成する `.vercel/project.json` から取得する。
-
-```bash
-cd apps/web
-bunx vercel link
-
-# トークンはシェル履歴に残さないよう対話プロンプトで貼り付ける
-gh secret set VERCEL_TOKEN
-gh secret set VERCEL_ORG_ID --body "$(jq -r .orgId .vercel/project.json)"
-gh secret set VERCEL_PROJECT_ID --body "$(jq -r .projectId .vercel/project.json)"
 ```
 
 導入時はベースラインの CalVer タグを手動で打つ。バージョンタグが1つも無いと tagpr は全履歴からリリース PR 本文を生成し、GitHub の 65536 文字上限を超えて 422 で失敗する。
@@ -115,7 +94,7 @@ git push origin <当日タグ>
 1. GitHub Settings → Developer settings → GitHub Apps → New GitHub App
 2. 設定値:
    - **GitHub App name**: `shuntaka-blog-api`（任意）
-   - **Webhook URL**: `https://api-endpoint/webhooks/github`
+   - **Webhook URL**: `https://<fqdn>/api/webhooks/github`（例: `https://shuntaka.dev/api/webhooks/github`）
    - **Webhook secret**: 任意の文字列を生成して設定（後でSSMに登録）
    - **Permissions**:
      - Repository permissions → Contents: Read-only
@@ -229,23 +208,19 @@ Route53にNSレコードを登録
 
 AWSのRoute53からホストゾーンのNSレコードを確認し、ムームードメインのコンソール画面のNSレコードを変更
 
-証明書の作成
+証明書の作成。CloudFront 用（admin / images と apex）は us-east-1 に置く。DNS 検証レコードは Route53 に自動で作られる。main stack の依存先でもあるため、main のデプロイでも先に適用される。
 
 ```bash
 export STAGE_NAME=""
 bunx dotenv -- cdk deploy \
   -c stageName=${STAGE_NAME} \
-  ${STAGE_NAME:0:1}-st-tokyo-cert \
+  ${STAGE_NAME:0:1}-st-virginia-cert \
   --require-approval never
-
-# デプロイ中にAWSコンソール ap-northeast-1 リージョンのACMで、*.shuntaka.meドメインのDNS検証レコードをRoute53に追加
 ```
 
 GitHub ActionsにEnvironmentを登録
 
-`gh`コマンドで環境変数を設定（実際のシークレットはSSM Parameter Storeに格納）:
-
-> **Note**: Webフロントエンド（Next.js）の環境変数はVercelダッシュボードで設定します。[Vercelセクション](#vercel)を参照してください。
+`gh`コマンドで環境変数を設定（実際のシークレットはSSM Parameter Storeに格納）。apps/web のビルドに焼き込む値は [公開サイト](#公開サイト-cloudfront--lambda-web-functions) を参照。
 
 ```bash
 # 設定値（環境に応じて変更）
@@ -374,7 +349,7 @@ bunx dotenv -- cdk deploy \
   --require-approval never
 ```
 
-完了したら、VercelとRoute53にAレコードの紐付けをしてください。
+apex の A / AAAA レコードは main stack が CloudFront への alias として作る。GitHub App の Webhook URL は `https://<fqdn>/api/webhooks/github` に向ける。
 
 DBセットアップ（TiDB）。blog-api が参照する database（`blog_prd` / `blog_dev`）とスキーマを自作クラスタ上の TiDB に作成する。クラスタ自体の構築は [クラスタ構築](02_cluster.md)、スキーマ DDL の詳細とレガシーデータの取り込みは `tools/dsql-cli/dsl-tidb/README.md` を参照。
 
@@ -567,8 +542,9 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 
 # apps/web (main worktree のフォールバック。worktree では .env.local が上書き)
+# API_URL はサーバー側 fetch と next dev の /api rewrites の向き先 (ブラウザは同一オリジンの /api を呼ぶ)
 export NEXT_PUBLIC_SITE_URL=http://localhost:43000
-export NEXT_PUBLIC_API_URL=http://localhost:43003
+export API_URL=http://localhost:43003
 
 # apps/admin-api (Hono/Lambda: 管理API)
 export COGNITO_USER_POOL_ID=ap-northeast-1_XXXXXXXXX
@@ -602,7 +578,7 @@ cat > .env.local <<'EOF'
 WEB_PORT=43000
 API_PORT=43003
 NEXT_PUBLIC_SITE_URL=http://localhost:43000
-NEXT_PUBLIC_API_URL=http://localhost:43003
+API_URL=http://localhost:43003
 PORT=43003
 DOCS_PORT=43004
 ADMIN_API_PORT=43001
@@ -618,19 +594,19 @@ direnv allow .
 
 ポートマッピングに関して、複数worktreeのdev serverを同時に起動できるよう、worktreeごとにポートが自動割り当てされる。`.config/wt.toml`のpre-startフックにより、`wt switch --create`時に`.env.local`と`.envrc`が自動生成される。main の既定は 4300x 帯に揃えて衝突を避けている。
 
-| 変数                   | 内容                           | main（既定）             |
-| ---------------------- | ------------------------------ | ------------------------ |
-| `WEB_PORT`             | Next.js devサーバーポート      | 43000                    |
-| `ADMIN_API_PORT`       | admin-api devサーバーポート    | 43001                    |
-| `ADMIN_WEB_PORT`       | admin-web Vite devポート       | 43002                    |
-| `API_PORT` / `PORT`    | Rust APIポート                 | 43003                    |
-| `DOCS_PORT`            | Sphinxドキュメントポート       | 43004                    |
-| `STORYBOOK_PORT`       | Storybook devポート            | 43005                    |
-| `LABS_WEB_PORT`        | labs-web (SvelteKit) devポート | 43006                    |
-| `LABS_API_PORT`        | labs プレビュー API ポート     | 43007                    |
-| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL              | `http://localhost:43000` |
-| `NEXT_PUBLIC_API_URL`  | API URL                        | `http://localhost:43003` |
-| `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin     | `http://localhost:43002` |
+| 変数                   | 内容                             | main（既定）             |
+| ---------------------- | -------------------------------- | ------------------------ |
+| `WEB_PORT`             | Next.js devサーバーポート        | 43000                    |
+| `ADMIN_API_PORT`       | admin-api devサーバーポート      | 43001                    |
+| `ADMIN_WEB_PORT`       | admin-web Vite devポート         | 43002                    |
+| `API_PORT` / `PORT`    | Rust APIポート                   | 43003                    |
+| `DOCS_PORT`            | Sphinxドキュメントポート         | 43004                    |
+| `STORYBOOK_PORT`       | Storybook devポート              | 43005                    |
+| `LABS_WEB_PORT`        | labs-web (SvelteKit) devポート   | 43006                    |
+| `LABS_API_PORT`        | labs プレビュー API ポート       | 43007                    |
+| `NEXT_PUBLIC_SITE_URL` | フロントエンドURL                | `http://localhost:43000` |
+| `API_URL`              | API URL（サーバー側 / rewrites） | `http://localhost:43003` |
+| `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin       | `http://localhost:43002` |
 
 新規worktreeではブランチ名から10000-19999の範囲でポートがサービスごとに決定的に生成される。同じブランチ名なら常に同じポートになる（連番ではない）。現worktreeに割り当てられたポートは `bun run port` で確認できる。
 

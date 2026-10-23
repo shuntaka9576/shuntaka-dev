@@ -1,29 +1,29 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cdk from 'aws-cdk-lib';
-import {
-  EndpointType,
-  LambdaIntegration,
-  ResponseTransferMode,
-  RestApi,
-} from 'aws-cdk-lib/aws-apigateway';
-import type * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import * as route53 from 'aws-cdk-lib/aws-route53';
-import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
+import type * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
+import { WebFunction } from '../web-function.js';
+import { blogApiWebFunctionCode } from '../web-function-package.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// blog-api は同じ Rust のコードを 2 つの関数で動かす。
+// - Web Function: HTTP をすべて受ける (CloudFront の /api/* から OAC 経由)。GitHub webhook は
+//   署名を検証したら Event Function へ Event invoke して即座に 200 を返す
+// - Event Function: Event invoke のペイロードを LWA が POST /events へ転送し、webhook の実処理
+//   (全記事スキャン / lab 同期) を行う。Web Functions は HTTP しか受けられないため残す
 export class BlogAPIConstruct extends Construct {
-  /** webApiLambda 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
+  /** Event Function 実行ロールの ARN。AdminStack が lab 画像バケットへの権限付与に使う */
   public readonly webApiLambdaRoleArn: string;
+  public readonly webFunction: WebFunction;
 
   constructor(
     scope: Construct,
@@ -31,23 +31,19 @@ export class BlogAPIConstruct extends Construct {
     props: {
       physicalPrefix: string;
       stageName: string;
-      domain: string;
       /** moments 画像の配信ベース URL（例: https://images.shuntaka.dev） */
       imagesBaseUrl: string;
       /** lab 章コンテンツの GitHub リポジトリ (例: shuntaka9576/lab-contents-dev) */
       labRepoFullName: string;
       /** lab 画像バケットの物理名 (AdminStack 所有。S3 権限は AdminStack 側で付与) */
       labImagesBucketName: string;
-      hostedZone: route53.IHostedZone;
-      certificate: acm.ICertificate;
       databaseName: string;
+      webFunctionCodeBucket: s3.Bucket;
       ssmParameters: {
-        apiGateway: {
-          apiUrl: string;
-        };
         proxy: {
           vpcId: string;
           privateSubnetId1: string;
+          privateSubnetId2: string;
           sgId: string;
         };
       };
@@ -76,6 +72,10 @@ export class BlogAPIConstruct extends Construct {
       this,
       props.ssmParameters.proxy.privateSubnetId1,
     );
+    const proxyPrivateSubnetId2 = ssm.StringParameter.valueForStringParameter(
+      this,
+      props.ssmParameters.proxy.privateSubnetId2,
+    );
     const proxySgId = ssm.StringParameter.valueForStringParameter(
       this,
       props.ssmParameters.proxy.sgId,
@@ -97,6 +97,7 @@ export class BlogAPIConstruct extends Construct {
       proxySgId,
     );
 
+    // Event Function の ENI と Web Function の network connector の ENI で共有する
     const lambdaSg = new ec2.SecurityGroup(this, 'LambdaSg', {
       vpc: proxyVpc,
       securityGroupName: `lambda-sg-${props.stageName}`,
@@ -179,7 +180,33 @@ export class BlogAPIConstruct extends Construct {
       props.blogApiEnv.cloudinaryApiSecretKeyName,
     );
 
-    const webApiLambda = new lambda.DockerImageFunction(this, 'WebApiLambda', {
+    // 2 つの関数で共通のアプリ設定
+    const apiEnvironment: Record<string, string> = {
+      DATABASE_URL: `mysql://root@${proxyDnsName}:13306/${props.databaseName}?ssl-mode=PREFERRED`,
+      HTTPS_PROXY: proxyHttpUrl,
+      HTTP_PROXY: proxyHttpUrl,
+      // OTLP 送信は squid を経由させず collector sidecar へ直接届ける
+      NO_PROXY: `169.254.169.254,localhost,127.0.0.1,${proxyDnsName}`,
+      // PLaMo Embedding Service へは tidb-proxy の tsnet forwarder (18080) 経由。
+      // host が proxyDnsName なので上の NO_PROXY に載り、squid (3128) を経由せず直行する。
+      PLAMO_EMBED_ENDPOINT: `http://${proxyDnsName}:18080`,
+      // tidb-proxy task 上の ADOT Collector sidecar (OTLP/HTTP)。
+      // 未設定ならアプリ側で telemetry は無効化される。
+      OTEL_EXPORTER_OTLP_ENDPOINT: `http://${proxyDnsName}:4318`,
+      OTEL_SERVICE_NAME: props.observability.otelServiceName,
+      GH_APP_ID: props.blogApiEnv.githubAppId,
+      GH_APP_SECRET_PEM: ghAppSecretPem,
+      GH_WEBHOOK_SECRET: ghWebhookSecret,
+      CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
+      CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
+      CLOUDINARY_API_SECRET: cloudinaryApiSecret,
+      IMAGES_BASE_URL: props.imagesBaseUrl,
+      LAB_REPO_FULL_NAME: props.labRepoFullName,
+      LAB_IMAGES_BUCKET_NAME: props.labImagesBucketName,
+    };
+
+    // ---- Event Function (webhook の実処理) ----
+    const eventFunction = new lambda.DockerImageFunction(this, 'WebApiLambda', {
       functionName: `${props.physicalPrefix}-blog-api`,
       code: lambda.DockerImageCode.fromImageAsset(path.resolve(__dirname, '../../../..')),
       memorySize: 1024,
@@ -195,89 +222,85 @@ export class BlogAPIConstruct extends Construct {
       vpcSubnets: { subnets: [proxyPrivateSubnet] },
       securityGroups: [lambdaSg],
       environment: {
-        AWS_LWA_INVOKE_MODE: 'response_stream',
-        // 自己 Event invoke のペイロードを LWA がアプリの POST /events へ転送する
-        // （デフォルト値だが挙動を明示するため宣言）。GitHub webhook の実処理を
-        // 非同期化して GitHub 側の 10 秒配信タイムアウトを回避する
+        ...apiEnvironment,
+        // Web Function からの Event invoke のペイロードを LWA がアプリの POST /events へ転送する
+        // （デフォルト値だが挙動を明示するため宣言）
         AWS_LWA_PASS_THROUGH_PATH: '/events',
-        DATABASE_URL: `mysql://root@${proxyDnsName}:13306/${props.databaseName}?ssl-mode=PREFERRED`,
-        HTTPS_PROXY: proxyHttpUrl,
-        HTTP_PROXY: proxyHttpUrl,
-        // OTLP 送信は squid を経由させず collector sidecar へ直接届ける
-        NO_PROXY: `169.254.169.254,localhost,127.0.0.1,${proxyDnsName}`,
-        // PLaMo Embedding Service へは tidb-proxy の tsnet forwarder (18080) 経由。
-        // host が proxyDnsName なので上の NO_PROXY に載り、squid (3128) を経由せず直行する。
-        PLAMO_EMBED_ENDPOINT: `http://${proxyDnsName}:18080`,
-        // tidb-proxy task 上の ADOT Collector sidecar (OTLP/HTTP)。
-        // 未設定ならアプリ側で telemetry は無効化される。
-        OTEL_EXPORTER_OTLP_ENDPOINT: `http://${proxyDnsName}:4318`,
-        OTEL_SERVICE_NAME: props.observability.otelServiceName,
-        GH_APP_ID: props.blogApiEnv.githubAppId,
-        GH_APP_SECRET_PEM: ghAppSecretPem,
-        GH_WEBHOOK_SECRET: ghWebhookSecret,
-        CLOUDINARY_CLOUD_NAME: props.blogApiEnv.cloudinaryCloudName,
-        CLOUDINARY_API_KEY: props.blogApiEnv.cloudinaryApiKey,
-        CLOUDINARY_API_SECRET: cloudinaryApiSecret,
-        IMAGES_BASE_URL: props.imagesBaseUrl,
-        LAB_REPO_FULL_NAME: props.labRepoFullName,
-        LAB_IMAGES_BUCKET_NAME: props.labImagesBucketName,
       },
     });
 
-    webApiLambda.role?.addManagedPolicy(
+    eventFunction.role?.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
     );
 
     // lab 画像バケットへの S3 権限はここでは付与しない。バケットは AdminStack 所有
     // (CloudFront OAC のポリシー書き戻しで循環依存になるため) のため、
     // AdminStack 側でこのロール ARN を受け取って iam.Policy をアタッチする。
-    this.webApiLambdaRoleArn = webApiLambda.role!.roleArn;
+    this.webApiLambdaRoleArn = eventFunction.role!.roleArn;
 
-    // webhook の実処理を自分自身へ Event invoke で逃がすための権限。
-    // 経路は squid (HTTPS_PROXY) の CONNECT トンネル経由で Lambda API に到達する。
-    // grantInvoke(自身) だと Function ⇔ DefaultPolicy の循環依存になるため、
-    // 固定の物理関数名から ARN を組み立てて参照を切る
-    webApiLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['lambda:InvokeFunction'],
-        resources: [
-          cdk.Stack.of(this).formatArn({
-            service: 'lambda',
-            resource: 'function',
-            resourceName: `${props.physicalPrefix}-blog-api`,
-            arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
-          }),
-        ],
-      }),
-    );
-
-    const restApi = new RestApi(this, 'RestApi', {
-      restApiName: `${props.physicalPrefix}-blog-api`,
-      endpointTypes: [EndpointType.REGIONAL],
-      domainName: {
-        domainName: props.domain,
-        certificate: props.certificate,
+    // ---- Web Function の VPC 出口 (egress network connector) ----
+    // Web Function は VPC の外 (Lambda 管理のインフラ) で動くため、tidb-proxy の
+    // プライベート IP へは connector の ENI を経由する。connector はインターネットへの
+    // 出口を持たないので、外向き HTTPS は Event Function と同じく squid (HTTPS_PROXY) を通す
+    const connectorOperatorRole = new iam.Role(this, 'NetworkConnectorOperatorRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: {
+        ManageEni: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ['ec2:CreateNetworkInterface'],
+              resources: [
+                `arn:${cdk.Aws.PARTITION}:ec2:*:*:network-interface/*`,
+                `arn:${cdk.Aws.PARTITION}:ec2:*:*:subnet/*`,
+                `arn:${cdk.Aws.PARTITION}:ec2:*:*:security-group/*`,
+              ],
+            }),
+            new iam.PolicyStatement({
+              actions: ['ec2:CreateTags'],
+              resources: [`arn:${cdk.Aws.PARTITION}:ec2:*:*:network-interface/*`],
+              conditions: {
+                StringEquals: {
+                  'ec2:ManagedResourceOperator': 'network-connectors.lambda.amazonaws.com',
+                },
+              },
+            }),
+          ],
+        }),
       },
     });
 
-    // STREAM 指定で L2 が response-streaming-invocations の Uri を組み立てる。
-    // timeout は Lambda の最大実行時間 (15 分) に合わせる
-    const lambdaIntegration = new LambdaIntegration(webApiLambda, {
-      responseTransferMode: ResponseTransferMode.STREAM,
-      timeout: cdk.Duration.minutes(15),
+    const networkConnector = new lambda.CfnNetworkConnector(this, 'NetworkConnector', {
+      name: `${props.physicalPrefix}-blog-api`,
+      operatorRole: connectorOperatorRole.roleArn,
+      configuration: {
+        vpcEgressConfiguration: {
+          // 別 AZ のサブネットが 2 つ以上必要。tidb-proxy は 1a にあるため、1c の ENI を通る分は AZ 間通信になる
+          subnetIds: [proxyPrivateSubnetId, proxyPrivateSubnetId2],
+          securityGroupIds: [lambdaSg.securityGroupId],
+          networkProtocol: 'IPv4',
+          associatedComputeResourceTypes: ['WebFunction'],
+        },
+      },
     });
-    restApi.root.addMethod('ANY', lambdaIntegration);
-    restApi.root.addResource('{proxy+}').addMethod('ANY', lambdaIntegration);
+    // CDK 同梱の CloudFormation 検証用 schema が古く、許容値に WebFunction が無い (MicroVm のみ)
+    cdk.Validations.of(networkConnector).acknowledge({
+      id: 'CloudFormation-Validate::W3030',
+      reason: 'AssociatedComputeResourceTypes の WebFunction は検証用 schema に未収録',
+    });
 
-    new route53.ARecord(this, 'ApiAliasRecord', {
-      zone: props.hostedZone,
-      recordName: props.domain,
-      target: route53.RecordTarget.fromAlias(new route53Targets.ApiGateway(restApi)),
+    // ---- Web Function (HTTP 全般) ----
+    this.webFunction = new WebFunction(this, 'WebFunction', {
+      functionName: `${props.physicalPrefix}-blog-api-web`,
+      codeBucket: props.webFunctionCodeBucket,
+      code: blogApiWebFunctionCode(),
+      timeoutSeconds: 30,
+      egressNetworkConnectorArn: networkConnector.attrLatestVersionArn,
+      environment: {
+        ...apiEnvironment,
+        // webhook の実処理を逃がす先。経路は squid (HTTPS_PROXY) の CONNECT トンネル経由で Lambda API に到達する
+        EVENT_FUNCTION_NAME: eventFunction.functionName,
+      },
     });
-
-    new ssm.StringParameter(this, 'ApiUrlParam', {
-      parameterName: props.ssmParameters.apiGateway.apiUrl,
-      stringValue: `https://${props.domain}`,
-    });
+    eventFunction.grantInvoke(this.webFunction.role);
   }
 }

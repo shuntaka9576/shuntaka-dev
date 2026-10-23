@@ -13,12 +13,17 @@ impl AppConfig {
             url: std::env::var("DATABASE_URL")?,
         };
 
-        let port = std::env::var("PORT")
-            .ok()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(8080);
+        // Lambda Web Functions は待ち受け先を AWS_LAMBDA_HTTP_ENDPOINT (host:port) で渡し、
+        // その host と port ちょうどに bind することを求める。Event Function (LWA) とローカル開発は PORT
+        let bind_addr = std::env::var("AWS_LAMBDA_HTTP_ENDPOINT").unwrap_or_else(|_| {
+            let port = std::env::var("PORT")
+                .ok()
+                .and_then(|p| p.parse::<u16>().ok())
+                .unwrap_or(8080);
+            format!("0.0.0.0:{port}")
+        });
 
-        let server = ServerConfig { port };
+        let server = ServerConfig { bind_addr };
 
         let webhook = WebhookConfig {
             github_app_id: std::env::var("GH_APP_ID").unwrap_or_default(),
@@ -60,7 +65,8 @@ pub struct DatabaseConfig {
 }
 
 pub struct ServerConfig {
-    pub port: u16,
+    /// 待ち受けアドレス (host:port)
+    pub bind_addr: String,
 }
 
 pub struct EmbeddingConfig {

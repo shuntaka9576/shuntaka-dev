@@ -2,7 +2,7 @@
 
 - 起票日: 2026-10-15
 - 対象: blog-api（Rust / Axum）、apps/web（Next.js 16 / Vercel）、admin-api（Hono）、proxy VPC
-- ステータス: 検討のみ（保留）。blog-api が Rust のため、Web Functions への移行方式が決まっていない。実装・デプロイは未着手
+- ステータス: 実装済み・未デプロイ（2026-10-23）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。デプロイと切り替えは[切り替え手順](#切り替え手順)のとおり
 - 関連タスク:
   - [blog-api: Lambda + tsnet を VPC + Fargate Proxy 構成に移行](../2026-06-29-blog-api-tidb-proxy/index.md)
   - [記事詳細 API の content_html 事前生成（オンザフライ Markdown 変換の廃止）](../2026-07-02-articles-content-html-pregeneration/index.md)
@@ -86,6 +86,8 @@ Rust は Web Functions で動かないため、方式を決める必要がある
 
 webhook は HMAC で検証しているため、OAC で守る必要はない。どの案でも webhook の非同期処理（自己 Event invoke）は Event Function に残す。
 
+案 C を採用した。Go のバイナリを Node.js から起動する方式は Lambda 上で動くことを確認済み（[Lambda Web Functions で Node.js の CPU バウンド処理は他のリクエストを待たせるか](https://dev.classmethod.jp/articles/shuntaka-lambda-web-functions-nodejs-cpu-bound/)）。blog-api も同じ作りにする。
+
 ## VPC 接続
 
 Web Functions から tidb-proxy に繋ぐには egress network connector が必要で、別 AZ のサブネットが 2 つ以上いる。proxy VPC は 1 AZ なので、別 AZ に Private Isolated サブネットを 1 つ足す。
@@ -112,15 +114,83 @@ admin-api は Node.js 24 の Hono なので、ランタイムの面ではその�
 4. blog-api の方式（上の A〜D）を決めて移行する
 5. 必要なら admin-api も移す
 
-## 未決事項
+## 決定事項
 
-- blog-api の方式（A〜D）
-- API を `shuntaka.dev/api/*` にまとめるか、`api.shuntaka.dev` のまま残すか（まとめると同一オリジンになり CORS が不要）
-- `next/image` の最適化をどこで行うか
+| 項目             | 決定                                                                                                                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| blog-api の方式  | 案 C。`apps/blog-api/web-function/index.mjs` が `server`（aarch64 musl の静的バイナリ）を起動し、Rust が `AWS_LAMBDA_HTTP_ENDPOINT` に bind する。webhook の実処理は従来の Event Function（Docker + LWA）へ Event invoke する |
+| API の置き場所   | `https://<fqdn>/api/*` に統合し、CloudFront Function で `/api` を外して blog-api に渡す。`api.<fqdn>`（API Gateway REST + カスタムドメイン）は撤去                                                                            |
+| CORS             | 撤去。ブラウザは同一オリジンの `/api` を呼ぶ。ローカル開発は next dev の rewrites で `/api/*` を blog-api へ中継する                                                                                                          |
+| `next/image`     | `unoptimized: true`。サムネイルは Cloudinary の署名付き URL（変換パラメータを足すと署名が壊れる）、moments は事前生成済みの WebP のため                                                                                       |
+| 静的アセット     | S3 には置かず、Next.js の Web Function から返して `/_next/static/*` を CloudFront で長くキャッシュする（PoC と同じ）                                                                                                          |
+| キャッシュの破棄 | 静的ページは `s-maxage=31536000` で返るため、apps/web の revision が変わったら CloudFront を `/*` で invalidation する（AwsCustomResource）                                                                                   |
+| VPC 接続         | proxy VPC に `ap-northeast-1c` の Private Isolated サブネット（`10.50.2.0/24`）を足し、blog-api の Web Function だけに egress network connector を付ける。SG は Event Function と共有                                         |
+| CDK              | aws-cdk-lib 2.274.0。`ServiceConfig.egressNetworkConnectorArn` が型に入ったため override は不要                                                                                                                               |
+| admin-api        | 対象外（API Gateway HTTP API のまま）                                                                                                                                                                                         |
+
+## 実装
+
+| 対象         | 変更                                                                                                                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CDK          | `iac/aws/lib/web-function.ts`（Web Function 一式の L1 ラッパー）、`iac/aws/lib/web-function-package.ts`（zip の作成）、`iac/aws/lib/api/site-construct.ts`（CloudFront / apex の alias / invalidation）、`blog-api-construct.ts`（API Gateway 撤去、connector 追加） |
+| blog-api     | `EVENT_FUNCTION_NAME` で invoke 先を受け取る（`LambdaEventInvoker`）。`AWS_LAMBDA_HTTP_ENDPOINT` があればそこに bind する。`CorsLayer` を削除                                                                                                                        |
+| apps/web     | `output: 'standalone'`、`@vercel/analytics` / `@vercel/speed-insights` / `vercel.json` を削除。サーバー側の fetch は `API_URL`、ブラウザは `/api`                                                                                                                    |
+| ワークフロー | `deploy-preview.yaml` と tagpr の `deploy-vercel` ジョブを削除。deploy ランナーに cargo-zigbuild / zig を導入し、ビルド用の Environment variable を渡す                                                                                                              |
+
+ローカルで次を確認した。
+
+- `cargo zigbuild --release --target aarch64-unknown-linux-musl --bin server` が通る（aws-lc-sys / ring / onig の C 依存を含めて静的リンク、33 MB）
+- Lambda の `public.ecr.aws/lambda/nodejs:24`（Amazon Linux 2023、glibc 2.34）上で `index.mjs` から起動し、`/health` と `/health/db`（MySQL への SELECT 1）が 204 を返す
+- `cdk synth`（実際の bundling 込み）で作った apps/web の zip（5.2 MB、展開後 21 MB）を Lambda の Node.js 24 イメージで `node index.mjs` 起動し、ページ・`/_next/static/*`・`public/` が返る
+- bun の node_modules はシンボリックリンクで組まれているため、zip にはリンクのまま入れる（`zip -y`）。実体化すると Node.js の realpath による解決が崩れ、`@swc/helpers` が見つからずに起動できなかった
+- standalone には macOS 用の sharp（`@img/sharp-darwin-arm64` など）が入るため、zip を作るときに外す。`outputFileTracingExcludes` では bun の `.bun/` 配下を外せなかった
+
+## 切り替え手順
+
+apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無いため、`WEB_BUILD_API_URL` で旧 API を指す。dev → prd の順で行う。
+
+dev（main へのマージで自動デプロイ）の前に、GitHub Environments の dev に変数を入れる。
+
+```bash
+gh variable set WEB_BUILD_API_URL --env dev --body 'https://api.shuntaka.me'
+```
+
+デプロイの順は `st-tidb-proxy`（別 AZ のサブネット）→ `st-tidb-proxy-logs` → main（GlobalDns と virginia-cert を含む）→ admin。dev の apex は GlobalDnsStack が先に Vercel 向けの A レコードを消すため、main の完了まで shuntaka.me は落ちる。
+
+デプロイ後に GitHub App（dev）の Webhook URL を `https://shuntaka.me/api/webhooks/github` に変え、変数を消す。
+
+```bash
+gh variable delete WEB_BUILD_API_URL --env dev
+```
+
+prd はリリース PR のマージ前に変数を入れる。GTM / Clarity の ID は Vercel の Production 環境変数から移す。
+
+```bash
+gh variable set WEB_BUILD_API_URL --env prd --body 'https://api.shuntaka.dev'
+gh variable set NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID --env prd --body 'GTM-XXXXXXX'
+gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
+```
+
+prd の apex は CFN 管理外の A レコード（Vercel 向け）を手で作っていたため、`route53.ARecord` の `deleteExisting` で消してから alias を作る。デプロイ後に GitHub App（prd）の Webhook URL を `https://shuntaka.dev/api/webhooks/github` に変え、変数を消す。
+
+```bash
+gh variable delete WEB_BUILD_API_URL --env prd
+```
+
+後片付け。
+
+- Vercel プロジェクトからドメインを外して削除し、`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の secret を消す
+- `d-st-tokyo-cert` / `p-st-tokyo-cert`（API Gateway 用の証明書。どこからも参照しなくなった）を `cdk destroy` する
+- 切り替えが済んだら `SiteConstruct` の `deleteExisting` を外す（CDK で非推奨。失敗時にレコードが消えたままになり得る）
 
 ## 未検証事項
 
-- `addPropertyOverride` で `EgressNetworkConnectorArn` を設定できるか
+- egress network connector の ENI から `tidb-proxy.internal`（Cloud Map の private DNS）を引けるか
+- Web Function 上で Rust の AWS SDK が認証情報を取れるか（`AWS_ACCESS_KEY_ID` などは予約済みの環境変数として Lambda が設定する想定）。Event invoke はここに依存する
+- connector の ENI が別 AZ（1c）にある場合の tidb-proxy（1a）までの経路と、AZ 間転送の量
+- invalidation の custom resource が endpoint の切り替え後に走ること（endpoint の更新完了が、新しい revision へのルーティング完了を意味するか）
+- musl の malloc の性能。遅い場合は mimalloc などのアロケータを入れる
+- Web Functions が zip 内のシンボリックリンクを残して展開するか（apps/web の zip はリンクを含む。残らない場合は standalone を hoisted な node_modules で作り直す）
+- swagger UI（`/api/swagger`）は `openapi.json` を絶対パス `/swagger/openapi.json` で読むため、CloudFront 経由では JSON の取得が 404 になる
 - アクセスがなくなってから実行環境が消えるまでの時間（2 GB 固定のメモリ課金に効く。ドキュメントで見つけられなかった）
-- `AWS::Lambda::ResourcePolicy` のプロパティ名（CloudFormation のドキュメントが `FunctionResourceArn` と `ResourceArn` で食い違っている。CDK L1 は `ResourceArn`）
 - IamAuth の endpoint で viewer の `Authorization` が残るか（HTTP ページは削除と書き、アクセス制御ページは `AWS4-` で始まる値のみ削除と書いている）
