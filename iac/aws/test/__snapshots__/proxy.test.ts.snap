@@ -532,7 +532,7 @@ exports[`TidbProxyStack > snapshot 1`] = `
     "VpcPrivateSubnet2Subnet3788AAA1": {
       "Properties": {
         "AvailabilityZone": "ap-northeast-1c",
-        "CidrBlock": "10.50.2.0/24",
+        "CidrBlock": "10.50.3.0/24",
         "MapPublicIpOnLaunch": false,
         "Tags": [
           {

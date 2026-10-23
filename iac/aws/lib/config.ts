@@ -252,10 +252,12 @@ export const getProxyConfig = (): ProxyParameter => {
     projectName,
     vpc: {
       cidr: '10.50.0.0/16',
-      // ec2.Vpc が切る Public (10.50.0.0/24) / Private (10.50.1.0/24) の次の /24
+      // ec2.Vpc が切る Public (10.50.0.0/24) / Private (10.50.1.0/24) と重ならない /24。
+      // 10.50.2.0/24 は 2026-10-23 に旧構成のデプロイでスタックの管理から外れ (connector の ENI が
+      // 使っていて削除できずに残った)、同じ CIDR では作り直せないため使わない
       privateSubnet2: {
         availabilityZone: 'ap-northeast-1c',
-        cidrBlock: '10.50.2.0/24',
+        cidrBlock: '10.50.3.0/24',
       },
     },
     ssm: {

@@ -124,7 +124,7 @@ admin-api は Node.js 24 の Hono なので、ランタイムの面ではその�
 | `next/image`     | `unoptimized: true`。サムネイルは Cloudinary の署名付き URL（変換パラメータを足すと署名が壊れる）、moments は事前生成済みの WebP のため                                                                                       |
 | 静的アセット     | S3 には置かず、Next.js の Web Function から返して `/_next/static/*` を CloudFront で長くキャッシュする（PoC と同じ）                                                                                                          |
 | キャッシュの破棄 | 静的ページは `s-maxage=31536000` で返るため、apps/web の revision が変わったら CloudFront を `/*` で invalidation する（AwsCustomResource）                                                                                   |
-| VPC 接続         | proxy VPC に `ap-northeast-1c` の Private Isolated サブネット（`10.50.2.0/24`）を足し、blog-api の Web Function だけに egress network connector を付ける。SG は Event Function と共有                                         |
+| VPC 接続         | proxy VPC に `ap-northeast-1c` の Private Isolated サブネット（`10.50.3.0/24`。経緯は「dev の巻き戻り」を参照）を足し、blog-api の Web Function だけに egress network connector を付ける。SG は Event Function と共有         |
 | CDK              | aws-cdk-lib 2.274.0。`ServiceConfig.egressNetworkConnectorArn` が型に入ったため override は不要                                                                                                                               |
 | admin-api        | 対象外（API Gateway HTTP API のまま）                                                                                                                                                                                         |
 
@@ -182,6 +182,29 @@ gh variable delete WEB_BUILD_API_URL --env prd
 - Vercel プロジェクトからドメインを外して削除し、`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の secret を消す
 - `d-st-tokyo-cert` / `p-st-tokyo-cert`（API Gateway 用の証明書。どこからも参照しなくなった）を `cdk destroy` する
 - 切り替えが済んだら `SiteConstruct` の `deleteExisting` を外す（CDK で非推奨。失敗時にレコードが消えたままになり得る）
+
+## dev の巻き戻り（2026-10-23）
+
+このブランチを dev にデプロイした後、main への別の push（#816）で旧構成の `deploy.yaml` が動き、旧コードで `st-tidb-proxy` を更新した。旧コードには 2 つ目のサブネットが無いため、CloudFormation が削除しようとした。
+
+| リソース                                     | 結果                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| SSM `/tidb-proxy/vpc/private-subnet-id-2`    | 削除された                                                                                                               |
+| 2 つ目のサブネットのルートテーブルと関連付け | 削除された（サブネットは VPC のメインのルートテーブル（ローカルルートのみ）に戻り、tidb-proxy への通信はそのまま通った） |
+| サブネット `10.50.2.0/24`                    | connector の ENI が使っていて削除に失敗し（`DELETE_FAILED (skipped)`）、スタックの管理から外れて残った                   |
+| main（dev）                                  | 旧ワークフローの `timeout-minutes: 30` で job が打ち切られ、反映されなかった                                             |
+
+このままでは、main は SSM のパラメータが無いため、st-tidb-proxy は同じ CIDR のサブネットが残っているため、どちらもデプロイできない。2 つ目のサブネットを `10.50.3.0/24` に変えて作り直し、`st-tidb-proxy` → main の順にデプロイして connector を移した。
+
+connector が新しいサブネットへ移り ENI が外れたら、管理外のサブネットを消す。
+
+```bash
+SUBNET_ID=$(aws ec2 describe-subnets --filters Name=cidr-block,Values=10.50.2.0/24 --query 'Subnets[0].SubnetId' --output text)
+aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=${SUBNET_ID} --query 'NetworkInterfaces[].NetworkInterfaceId'
+aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
+```
+
+この PR を main にマージするまでは、main への push のたびに旧構成で dev がデプロイされる。ワークフローとコードは push されたコミットのものが使われるため、ブランチ側では防げない。マージまで main へのマージ（Renovate を含む）を止める。
 
 ## 未検証事項
 
