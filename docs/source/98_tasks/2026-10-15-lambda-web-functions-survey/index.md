@@ -165,7 +165,7 @@ dev → prd の順に切り替え、最後に Vercel と旧構成の残りを片
 | 3   | PR #817 をマージする                                                         | 未                                                                      |
 | 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 未                                                                      |
 | 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | 未                                                                      |
-| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 未。prd の切り替え後に行う                                              |
+| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 管理外のサブネットは済（2026-10-23）。ほかは prd の切り替え後に行う     |
 
 apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無い。そのため `WEB_BUILD_API_URL` で旧 API（`https://api.<fqdn>`）を指し、切り替え後に消す。
 
@@ -260,7 +260,7 @@ bunx dotenv -- cdk destroy -c stageName=prd p-st-tokyo-cert
 
 `SiteConstruct` の `deleteExisting` を別の PR で外す（CDK で非推奨。失敗時にレコードが消えたままになり得る。prd の手作りのレコードを消すためだけに入れた）。
 
-dev の管理外になったサブネット（`10.50.2.0/24`）を消す（手順は [dev の巻き戻り](#dev-の巻き戻り2026-10-23)）。
+dev の管理外になったサブネット（`10.50.2.0/24`）は消した（済。手順と結果は [dev の巻き戻り](#dev-の巻き戻り2026-10-23)）。
 
 ## dev の巻き戻り（2026-10-23）
 
@@ -275,13 +275,42 @@ dev の管理外になったサブネット（`10.50.2.0/24`）を消す（手�
 
 このままでは、main は SSM のパラメータが無いため、st-tidb-proxy は同じ CIDR のサブネットが残っているため、どちらもデプロイできない。2 つ目のサブネットを `10.50.3.0/24` に変えて作り直し、`st-tidb-proxy` → main の順にデプロイして connector を移した。
 
-connector が新しいサブネットへ移り ENI が外れたら、管理外のサブネットを消す。
+管理外のサブネットは 2026-10-23 に消した（下の実行結果）。消すまでに分かったことは次の 2 つ。
+
+- connector の ENI は Lambda が管理するリソース（Operator が `network-connectors.lambda.amazonaws.com`、`HiddenByDefault: true`）で、`describe-network-interfaces` には `--include-managed-resources` を付けないと出てこない。付けずに見ると空に見えるが、`delete-subnet` は `DependencyViolation` で失敗する
+- connector の構成を変えると新しいバージョンができ、古いバージョンは残る。古いバージョンが古いサブネットの ENI を持ち続けるため、バージョン付きの ARN（`…:network-connector:<id>:<version>`）で古いバージョンだけを消すと ENI が外れる。バージョンなしの ARN を渡すと connector 全体が消えて、使っている Web Function の外向き通信が止まる
+
+手順は次のとおり。
 
 ```bash
-SUBNET_ID=$(aws ec2 describe-subnets --filters Name=cidr-block,Values=10.50.2.0/24 --query 'Subnets[0].SubnetId' --output text)
-aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=${SUBNET_ID} --query 'NetworkInterfaces[].NetworkInterfaceId'
+VPC_ID=$(aws ssm get-parameter --name /tidb-proxy/vpc/id --query Parameter.Value --output text)
+SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=${VPC_ID} Name=cidr-block,Values=10.50.2.0/24 --query 'Subnets[0].SubnetId' --output text)
+
+# 管理対象を含めて ENI を見る。connector のタグ (aws:lambda:networkConnectorId) で持ち主が分かる
+aws ec2 describe-network-interfaces --include-managed-resources --filters Name=subnet-id,Values=${SUBNET_ID} \
+  --query 'NetworkInterfaces[].[NetworkInterfaceId,Status,InterfaceType]' --output text
+
+# 各バージョンのサブネットを見て、古いサブネットを含むバージョンを特定する
+CONNECTOR_ARN=$(aws lambda-core get-network-connector --identifier d-st-blog-api --query Arn --output text)
+aws lambda-core get-network-connector --identifier ${CONNECTOR_ARN}:1 --query Configuration.VpcEgressConfiguration.SubnetIds
+
+# 古いバージョンだけを消す (必ずバージョン付きの ARN)。ENI が外れたらサブネットを消す
+aws lambda-core delete-network-connector --identifier ${CONNECTOR_ARN}:1
 aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 ```
+
+実行結果（2026-10-23、dev。アカウント ID は伏せ、リソース ID は先頭だけ）。
+
+| 時刻（JST） | 操作                                                                | 結果                                                                                                                |
+| ----------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 14:15       | `describe-network-interfaces`（`--include-managed-resources` なし） | 空                                                                                                                  |
+| 14:15       | `delete-subnet subnet-039e…`                                        | `DependencyViolation`（has dependencies and cannot be deleted）                                                     |
+| 14:29       | `describe-network-interfaces --include-managed-resources`           | `eni-0f1c…` が 1 つ（`in-use`、`lambda`、タグ `aws:lambda:networkConnectorName=d-st-blog-api`）                     |
+| 14:30       | `get-network-connector`（バージョン 1 / 2）                         | バージョン 1 は `10.50.2.0/24` + `10.50.1.0/24`、バージョン 2 は `10.50.3.0/24` + `10.50.1.0/24`（どちらも ACTIVE） |
+| 14:31       | `delete-network-connector …:nc-…:1`                                 | バージョン 1 が `DELETING`。connector 本体（バージョン 2）は `ACTIVE` のまま                                        |
+| 14:31       | 古いサブネットの ENI を再確認                                       | 0                                                                                                                   |
+| 14:31       | `delete-subnet subnet-039e…`                                        | 削除できた                                                                                                          |
+| 14:32       | `https://shuntaka.me/api/health/db` と検索 API                      | 204 / 200（connector 経由の通信は影響なし）                                                                         |
 
 この PR を main にマージするまでは、main への push のたびに旧構成で dev がデプロイされる。ワークフローとコードは push されたコミットのものが使われるため、ブランチ側では防げない。マージまで main へのマージ（Renovate を含む）を止める。
 
