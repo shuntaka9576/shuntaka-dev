@@ -2,26 +2,22 @@
 
 exports[`MainStack > snapshot 1`] = `
 {
+  "Mappings": {
+    "AWSCloudFrontPartitionHostedZoneIdMap": {
+      "aws": {
+        "zoneId": "Z2FDTNDATAQYW2",
+      },
+      "aws-cn": {
+        "zoneId": "Z3RFFRIM2A3IF5",
+      },
+    },
+  },
   "Outputs": {
-    "BlogAPIRestApiEndpoint9DCAF3F6": {
+    "SiteDistributionDomainNameA8EA627B": {
       "Value": {
-        "Fn::Join": [
-          "",
-          [
-            "https://",
-            {
-              "Ref": "BlogAPIRestApiBBA9C8B8",
-            },
-            ".execute-api.ap-northeast-1.",
-            {
-              "Ref": "AWS::URLSuffix",
-            },
-            "/",
-            {
-              "Ref": "BlogAPIRestApiDeploymentStageprodF21BB7CE",
-            },
-            "/",
-          ],
+        "Fn::GetAtt": [
+          "SiteDistribution390DED28",
+          "DomainName",
         ],
       },
     },
@@ -30,10 +26,6 @@ exports[`MainStack > snapshot 1`] = `
     "BootstrapVersion": {
       "Default": "/cdk-bootstrap/hnb659fds/version",
       "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
-      "Type": "AWS::SSM::Parameter::Value<String>",
-    },
-    "SsmParameterValuetestcertificatearnC96584B6F00A464EAD1953AFF4B05118Parameter": {
-      "Default": "/test/certificate-arn",
       "Type": "AWS::SSM::Parameter::Value<String>",
     },
     "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter": {
@@ -50,6 +42,10 @@ exports[`MainStack > snapshot 1`] = `
     },
     "SsmParameterValuetesttidbproxyvpcprivatesubnetid1C96584B6F00A464EAD1953AFF4B05118Parameter": {
       "Default": "/test/tidb-proxy/vpc/private-subnet-id-1",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+    "SsmParameterValuetesttidbproxyvpcprivatesubnetid2C96584B6F00A464EAD1953AFF4B05118Parameter": {
+      "Default": "/test/tidb-proxy/vpc/private-subnet-id-2",
       "Type": "AWS::SSM::Parameter::Value<String>",
     },
   },
@@ -105,38 +101,6 @@ exports[`MainStack > snapshot 1`] = `
         ],
       },
       "Type": "AWS::IAM::Role",
-    },
-    "BlogAPIApiAliasRecord59DE2225": {
-      "Properties": {
-        "AliasTarget": {
-          "DNSName": {
-            "Fn::GetAtt": [
-              "BlogAPIRestApiCustomDomain5D494573",
-              "RegionalDomainName",
-            ],
-          },
-          "HostedZoneId": {
-            "Fn::GetAtt": [
-              "BlogAPIRestApiCustomDomain5D494573",
-              "RegionalHostedZoneId",
-            ],
-          },
-        },
-        "HostedZoneId": {
-          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
-        },
-        "Name": "api.example.com.",
-        "Type": "A",
-      },
-      "Type": "AWS::Route53::RecordSet",
-    },
-    "BlogAPIApiUrlParam4D262008": {
-      "Properties": {
-        "Name": "/test/api-url",
-        "Type": "String",
-        "Value": "https://api.example.com",
-      },
-      "Type": "AWS::SSM::Parameter",
     },
     "BlogAPIBlogApiLogGroup81AB5A34": {
       "DeletionPolicy": "Delete",
@@ -526,138 +490,43 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::EC2::SecurityGroupEgress",
     },
-    "BlogAPIRestApiANYApiPermissionTestMainStackBlogAPIRestApiED5623FFANY70599CF8": {
+    "BlogAPINetworkConnector70D9F9F3": {
       "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "BlogAPIWebApiLambda34B678B7",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:ap-northeast-1:123456789012:",
-              {
-                "Ref": "BlogAPIRestApiBBA9C8B8",
-              },
-              "/",
-              {
-                "Ref": "BlogAPIRestApiDeploymentStageprodF21BB7CE",
-              },
-              "/*/",
+        "Configuration": {
+          "VpcEgressConfiguration": {
+            "AssociatedComputeResourceTypes": [
+              "WebFunction",
             ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "BlogAPIRestApiANYApiPermissionTestTestMainStackBlogAPIRestApiED5623FFANY955A7D50": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "BlogAPIWebApiLambda34B678B7",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
+            "NetworkProtocol": "IPv4",
+            "SecurityGroupIds": [
               {
-                "Ref": "AWS::Partition",
+                "Fn::GetAtt": [
+                  "BlogAPILambdaSgDB7152F1",
+                  "GroupId",
+                ],
               },
-              ":execute-api:ap-northeast-1:123456789012:",
-              {
-                "Ref": "BlogAPIRestApiBBA9C8B8",
-              },
-              "/test-invoke-stage/*/",
             ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "BlogAPIRestApiANYDC50B550": {
-      "Properties": {
-        "AuthorizationType": "NONE",
-        "HttpMethod": "ANY",
-        "Integration": {
-          "IntegrationHttpMethod": "POST",
-          "ResponseTransferMode": "STREAM",
-          "TimeoutInMillis": 900000,
-          "Type": "AWS_PROXY",
-          "Uri": {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":apigateway:ap-northeast-1:lambda:path/2021-11-15/functions/",
-                {
-                  "Fn::GetAtt": [
-                    "BlogAPIWebApiLambda34B678B7",
-                    "Arn",
-                  ],
-                },
-                "/response-streaming-invocations",
-              ],
+            "SubnetIds": [
+              {
+                "Ref": "SsmParameterValuetesttidbproxyvpcprivatesubnetid1C96584B6F00A464EAD1953AFF4B05118Parameter",
+              },
+              {
+                "Ref": "SsmParameterValuetesttidbproxyvpcprivatesubnetid2C96584B6F00A464EAD1953AFF4B05118Parameter",
+              },
             ],
           },
         },
-        "ResourceId": {
+        "Name": "dev-tp-blog-api",
+        "OperatorRole": {
           "Fn::GetAtt": [
-            "BlogAPIRestApiBBA9C8B8",
-            "RootResourceId",
-          ],
-        },
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-      },
-      "Type": "AWS::ApiGateway::Method",
-    },
-    "BlogAPIRestApiAccountFC218CE8": {
-      "DeletionPolicy": "Retain",
-      "DependsOn": [
-        "BlogAPIRestApiBBA9C8B8",
-      ],
-      "Properties": {
-        "CloudWatchRoleArn": {
-          "Fn::GetAtt": [
-            "BlogAPIRestApiCloudWatchRoleD9B7539E",
+            "BlogAPINetworkConnectorOperatorRoleF9631F96",
             "Arn",
           ],
         },
       },
-      "Type": "AWS::ApiGateway::Account",
-      "UpdateReplacePolicy": "Retain",
+      "Type": "AWS::Lambda::NetworkConnector",
     },
-    "BlogAPIRestApiBBA9C8B8": {
-      "Properties": {
-        "EndpointConfiguration": {
-          "Types": [
-            "REGIONAL",
-          ],
-        },
-        "Name": "dev-tp-blog-api",
-      },
-      "Type": "AWS::ApiGateway::RestApi",
-    },
-    "BlogAPIRestApiCloudWatchRoleD9B7539E": {
-      "DeletionPolicy": "Retain",
+    "BlogAPINetworkConnectorOperatorRoleF9631F96": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -665,208 +534,90 @@ exports[`MainStack > snapshot 1`] = `
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": "apigateway.amazonaws.com",
+                "Service": "lambda.amazonaws.com",
               },
             },
           ],
           "Version": "2012-10-17",
         },
-        "ManagedPolicyArns": [
+        "Policies": [
           {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
+            "PolicyDocument": {
+              "Statement": [
                 {
-                  "Ref": "AWS::Partition",
+                  "Action": "ec2:CreateNetworkInterface",
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:*:*:network-interface/*",
+                        ],
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:*:*:subnet/*",
+                        ],
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:*:*:security-group/*",
+                        ],
+                      ],
+                    },
+                  ],
                 },
-                ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
+                {
+                  "Action": "ec2:CreateTags",
+                  "Condition": {
+                    "StringEquals": {
+                      "ec2:ManagedResourceOperator": "network-connectors.lambda.amazonaws.com",
+                    },
+                  },
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ec2:*:*:network-interface/*",
+                      ],
+                    ],
+                  },
+                },
               ],
-            ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "ManageEni",
           },
         ],
       },
       "Type": "AWS::IAM::Role",
-      "UpdateReplacePolicy": "Retain",
-    },
-    "BlogAPIRestApiCustomDomain5D494573": {
-      "Properties": {
-        "DomainName": "api.example.com",
-        "EndpointConfiguration": {
-          "Types": [
-            "REGIONAL",
-          ],
-        },
-        "RegionalCertificateArn": {
-          "Ref": "SsmParameterValuetestcertificatearnC96584B6F00A464EAD1953AFF4B05118Parameter",
-        },
-      },
-      "Type": "AWS::ApiGateway::DomainName",
-    },
-    "BlogAPIRestApiCustomDomainMapTestMainStackBlogAPIRestApiED5623FF6D5A799B": {
-      "Properties": {
-        "DomainName": {
-          "Ref": "BlogAPIRestApiCustomDomain5D494573",
-        },
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-        "Stage": {
-          "Ref": "BlogAPIRestApiDeploymentStageprodF21BB7CE",
-        },
-      },
-      "Type": "AWS::ApiGateway::BasePathMapping",
-    },
-    "BlogAPIRestApiDeployment97EF4B616cd2b58f99ea5a5db991b8d0251de352": {
-      "DependsOn": [
-        "BlogAPIRestApiproxyANY8D7C950D",
-        "BlogAPIRestApiproxy5D46C080",
-        "BlogAPIRestApiANYDC50B550",
-      ],
-      "Metadata": {
-        "aws:cdk:do-not-refactor": true,
-      },
-      "Properties": {
-        "Description": "Automatically created by the RestApi construct",
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-      },
-      "Type": "AWS::ApiGateway::Deployment",
-    },
-    "BlogAPIRestApiDeploymentStageprodF21BB7CE": {
-      "DependsOn": [
-        "BlogAPIRestApiAccountFC218CE8",
-      ],
-      "Properties": {
-        "DeploymentId": {
-          "Ref": "BlogAPIRestApiDeployment97EF4B616cd2b58f99ea5a5db991b8d0251de352",
-        },
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-        "StageName": "prod",
-      },
-      "Type": "AWS::ApiGateway::Stage",
-    },
-    "BlogAPIRestApiproxy5D46C080": {
-      "Properties": {
-        "ParentId": {
-          "Fn::GetAtt": [
-            "BlogAPIRestApiBBA9C8B8",
-            "RootResourceId",
-          ],
-        },
-        "PathPart": "{proxy+}",
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-      },
-      "Type": "AWS::ApiGateway::Resource",
-    },
-    "BlogAPIRestApiproxyANY8D7C950D": {
-      "Properties": {
-        "AuthorizationType": "NONE",
-        "HttpMethod": "ANY",
-        "Integration": {
-          "IntegrationHttpMethod": "POST",
-          "ResponseTransferMode": "STREAM",
-          "TimeoutInMillis": 900000,
-          "Type": "AWS_PROXY",
-          "Uri": {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":apigateway:ap-northeast-1:lambda:path/2021-11-15/functions/",
-                {
-                  "Fn::GetAtt": [
-                    "BlogAPIWebApiLambda34B678B7",
-                    "Arn",
-                  ],
-                },
-                "/response-streaming-invocations",
-              ],
-            ],
-          },
-        },
-        "ResourceId": {
-          "Ref": "BlogAPIRestApiproxy5D46C080",
-        },
-        "RestApiId": {
-          "Ref": "BlogAPIRestApiBBA9C8B8",
-        },
-      },
-      "Type": "AWS::ApiGateway::Method",
-    },
-    "BlogAPIRestApiproxyANYApiPermissionTestMainStackBlogAPIRestApiED5623FFANYproxy0257420C": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "BlogAPIWebApiLambda34B678B7",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:ap-northeast-1:123456789012:",
-              {
-                "Ref": "BlogAPIRestApiBBA9C8B8",
-              },
-              "/",
-              {
-                "Ref": "BlogAPIRestApiDeploymentStageprodF21BB7CE",
-              },
-              "/*/*",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "BlogAPIRestApiproxyANYApiPermissionTestTestMainStackBlogAPIRestApiED5623FFANYproxy85261A50": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "BlogAPIWebApiLambda34B678B7",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:ap-northeast-1:123456789012:",
-              {
-                "Ref": "BlogAPIRestApiBBA9C8B8",
-              },
-              "/test-invoke-stage/*/*",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
     },
     "BlogAPIWebApiLambda34B678B7": {
       "DependsOn": [
-        "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71",
         "BlogAPIWebApiLambdaServiceRole5C77D6FD",
       ],
       "Properties": {
@@ -878,7 +629,6 @@ exports[`MainStack > snapshot 1`] = `
         },
         "Environment": {
           "Variables": {
-            "AWS_LWA_INVOKE_MODE": "response_stream",
             "AWS_LWA_PASS_THROUGH_PATH": "/events",
             "CLOUDINARY_API_KEY": "test-api-key",
             "CLOUDINARY_API_SECRET": {
@@ -991,37 +741,630 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
-    "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71": {
+    "BlogAPIWebFunction615F9187": {
+      "Properties": {
+        "FunctionName": "dev-tp-blog-api-web",
+      },
+      "Type": "AWS::Lambda::WebFunction",
+    },
+    "BlogAPIWebFunctionCodeDeploymentAwsCliLayerFB7586E4": {
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
+        },
+        "Description": "/opt/awscli/aws",
+      },
+      "Type": "AWS::Lambda::LayerVersion",
+    },
+    "BlogAPIWebFunctionCodeDeploymentCustomResource37AEF9E7": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DestinationBucketName": {
+          "Ref": "WebFunctionCodeBucket1D283E48",
+        },
+        "Extract": false,
+        "OutputObjectKeys": true,
+        "OutputObjectVersionIds": true,
+        "Prune": false,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn",
+          ],
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+        ],
+        "SourceObjectKeys": [
+          "06782b0540b665056fd6e728b3d7c23be1287845f5804b08406218f34f041b76.zip",
+        ],
+        "WaitForDistributionInvalidation": true,
+      },
+      "Type": "Custom::CDKBucketDeployment",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "BlogAPIWebFunctionEndpointCF875806": {
+      "Properties": {
+        "AuthType": "IamAuth",
+        "EndpointName": "prod",
+        "EndpointType": "HomeRegion",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "BlogAPIWebFunction615F9187",
+            "FunctionArn",
+          ],
+        },
+        "RevisionWeights": [
+          {
+            "RevisionId": {
+              "Fn::GetAtt": [
+                "BlogAPIWebFunctionRevisionDD7EBC0D",
+                "RevisionId",
+              ],
+            },
+            "Weight": 100,
+          },
+        ],
+        "ScalingConfig": {
+          "MaxEnvironments": 2,
+        },
+      },
+      "Type": "AWS::Lambda::WebFunctionEndpoint",
+    },
+    "BlogAPIWebFunctionExecutionRole014CD9FF": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "BlogAPIWebFunctionExecutionRoleDefaultPolicy4F6B873D": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
             {
               "Action": "lambda:InvokeFunction",
               "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":lambda:ap-northeast-1:123456789012:function:dev-tp-blog-api",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "BlogAPIWebApiLambda34B678B7",
+                    "Arn",
                   ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "BlogAPIWebApiLambda34B678B7",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "BlogAPIWebFunctionExecutionRoleDefaultPolicy4F6B873D",
+        "Roles": [
+          {
+            "Ref": "BlogAPIWebFunctionExecutionRole014CD9FF",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "BlogAPIWebFunctionLogGroupD786C135": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/lambda-web/dev-tp-blog-api-web",
+        "RetentionInDays": 14,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "BlogAPIWebFunctionResourcePolicy24C78080": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeWebFunctionEndpoint",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::123456789012:distribution/",
+                        {
+                          "Ref": "SiteDistribution390DED28",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "BlogAPIWebFunctionEndpointCF875806",
+                  "EndpointArn",
                 ],
               },
             },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "BlogAPIWebApiLambdaServiceRoleDefaultPolicyB2A8DC71",
+        "ResourceArn": {
+          "Fn::GetAtt": [
+            "BlogAPIWebFunction615F9187",
+            "FunctionArn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::ResourcePolicy",
+    },
+    "BlogAPIWebFunctionRevisionDD7EBC0D": {
+      "DependsOn": [
+        "WebFunctionCodeBucketPolicyE8AA0D26",
+      ],
+      "Properties": {
+        "BuildConfig": {
+          "CodeConfig": {
+            "S3Object": {
+              "Bucket": {
+                "Ref": "WebFunctionCodeBucket1D283E48",
+              },
+              "Key": {
+                "Fn::Select": [
+                  0,
+                  {
+                    "Fn::GetAtt": [
+                      "BlogAPIWebFunctionCodeDeploymentCustomResource37AEF9E7",
+                      "SourceObjectKeys",
+                    ],
+                  },
+                ],
+              },
+              "VersionId": {
+                "Fn::Select": [
+                  0,
+                  {
+                    "Fn::GetAtt": [
+                      "BlogAPIWebFunctionCodeDeploymentCustomResource37AEF9E7",
+                      "SourceObjectVersionIds",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "RuntimeConfig": {
+            "Runtime": "nodejs24.x",
+          },
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "BlogAPIWebFunction615F9187",
+            "FunctionArn",
+          ],
+        },
+        "ServiceConfig": {
+          "EgressNetworkConnectorArn": {
+            "Fn::GetAtt": [
+              "BlogAPINetworkConnector70D9F9F3",
+              "LatestVersionArn",
+            ],
+          },
+          "EnvironmentVariables": {
+            "AWS_LAMBDA_NODEJS_ENTRYPOINT": "index.mjs",
+            "CLOUDINARY_API_KEY": "test-api-key",
+            "CLOUDINARY_API_SECRET": {
+              "Fn::GetAtt": [
+                "BlogAPICloudinaryApiSecretLookup97B555BB",
+                "Parameter.Value",
+              ],
+            },
+            "CLOUDINARY_CLOUD_NAME": "test-cloud",
+            "DATABASE_URL": "mysql://root@tidb-proxy.internal:13306/blog_development?ssl-mode=PREFERRED",
+            "EVENT_FUNCTION_NAME": {
+              "Ref": "BlogAPIWebApiLambda34B678B7",
+            },
+            "GH_APP_ID": "12345",
+            "GH_APP_SECRET_PEM": {
+              "Fn::GetAtt": [
+                "BlogAPIGhAppSecretLookup88C8070A",
+                "Parameter.Value",
+              ],
+            },
+            "GH_WEBHOOK_SECRET": {
+              "Fn::GetAtt": [
+                "BlogAPIGhWebhookSecretLookup465A1762",
+                "Parameter.Value",
+              ],
+            },
+            "HTTPS_PROXY": "http://tidb-proxy.internal:3128",
+            "HTTP_PROXY": "http://tidb-proxy.internal:3128",
+            "IMAGES_BASE_URL": "https://images.example.com",
+            "LAB_IMAGES_BUCKET_NAME": "tp-dev-lab-assets",
+            "LAB_REPO_FULL_NAME": "shuntaka9576/lab-contents-dev",
+            "NO_PROXY": "169.254.169.254,localhost,127.0.0.1,tidb-proxy.internal",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "http://tidb-proxy.internal:4318",
+            "OTEL_SERVICE_NAME": "blog-api-development",
+            "PLAMO_EMBED_ENDPOINT": "http://tidb-proxy.internal:18080",
+          },
+          "ExecutionRoleArn": {
+            "Fn::GetAtt": [
+              "BlogAPIWebFunctionExecutionRole014CD9FF",
+              "Arn",
+            ],
+          },
+          "TelemetryConfig": {
+            "LoggingConfig": {
+              "LogGroup": {
+                "Ref": "BlogAPIWebFunctionLogGroupD786C135",
+              },
+            },
+          },
+          "TimeoutSeconds": 30,
+        },
+      },
+      "Type": "AWS::Lambda::WebFunctionRevision",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536": {
+      "DependsOn": [
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+      ],
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "35328da138f26fbd9160297abc9a2522d93dbf75878cd5114a9c050419fc1ce0.zip",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_CA_BUNDLE": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+          },
+        },
+        "Handler": "index.handler",
+        "Layers": [
+          {
+            "Ref": "BlogAPIWebFunctionCodeDeploymentAwsCliLayerFB7586E4",
+          },
+        ],
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.13",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":s3:::cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":s3:::cdk-hnb659fds-assets-123456789012-ap-northeast-1/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebFunctionCodeBucket1D283E48",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebFunctionCodeBucket1D283E48",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
         "Roles": [
           {
-            "Ref": "BlogAPIWebApiLambdaServiceRole5C77D6FD",
+            "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "CustomDeleteExistingRecordSetCustomResourceProviderHandlerAD00231E": {
+      "DependsOn": [
+        "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "95beca947b5964e7fa1145dc0b33239a52456956e72d055dbaa8699f2c36ebcd.zip",
+        },
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": "route53:GetChange",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": "route53:ListResourceRecordSets",
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":route53:::hostedzone/",
+                        {
+                          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+                        },
+                      ],
+                    ],
+                  },
+                },
+                {
+                  "Action": "route53:ChangeResourceRecordSets",
+                  "Condition": {
+                    "ForAllValues:StringEquals": {
+                      "route53:ChangeResourceRecordSetsActions": [
+                        "DELETE",
+                      ],
+                      "route53:ChangeResourceRecordSetsRecordTypes": [
+                        "A",
+                      ],
+                    },
+                  },
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":route53:::hostedzone/",
+                        {
+                          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+      "DependsOn": [
+        "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip",
+        },
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Lambda function for auto-deleting objects in ",
+              {
+                "Ref": "WebFunctionCodeBucket1D283E48",
+              },
+              " S3 bucket.",
+            ],
+          ],
+        },
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
     },
     "DsqlCluster": {
       "Properties": {
@@ -1146,7 +1489,7 @@ exports[`MainStack > snapshot 1`] = `
         },
         "Description": "Periodic SELECT 1 baseline probe (db.healthcheck.duration)",
         "HttpMethod": "GET",
-        "InvocationEndpoint": "https://api.example.com/health/db",
+        "InvocationEndpoint": "https://example.com/api/health/db",
         "InvocationRateLimitPerSecond": 1,
       },
       "Type": "AWS::Events::ApiDestination",
@@ -1197,7 +1540,7 @@ exports[`MainStack > snapshot 1`] = `
     "ObservabilityHealthcheckRule13407249": {
       "Properties": {
         "Name": "dev-tp-db-healthcheck-probe",
-        "ScheduleExpression": "rate(5 minutes)",
+        "ScheduleExpression": "rate(30 minutes)",
         "State": "ENABLED",
         "Targets": [
           {
@@ -1222,6 +1565,857 @@ exports[`MainStack > snapshot 1`] = `
         ],
       },
       "Type": "AWS::Events::Rule",
+    },
+    "SiteApexAliasRecordDeleteExistingRecordSetCustomResource94BE3789": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "RecordName": "example.com.",
+        "RecordType": "A",
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomDeleteExistingRecordSetCustomResourceProviderHandlerAD00231E",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::DeleteExistingRecordSet",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SiteApexAliasRecordEB993F77": {
+      "DependsOn": [
+        "SiteApexAliasRecordDeleteExistingRecordSetCustomResource94BE3789",
+      ],
+      "Properties": {
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "SiteDistribution390DED28",
+              "DomainName",
+            ],
+          },
+          "HostedZoneId": {
+            "Fn::FindInMap": [
+              "AWSCloudFrontPartitionHostedZoneIdMap",
+              {
+                "Ref": "AWS::Partition",
+              },
+              "zoneId",
+            ],
+          },
+        },
+        "HostedZoneId": {
+          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "Name": "example.com.",
+        "Type": "A",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
+    "SiteApexAliasRecordIpv6C3D8F031": {
+      "Properties": {
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "SiteDistribution390DED28",
+              "DomainName",
+            ],
+          },
+          "HostedZoneId": {
+            "Fn::FindInMap": [
+              "AWSCloudFrontPartitionHostedZoneIdMap",
+              {
+                "Ref": "AWS::Partition",
+              },
+              "zoneId",
+            ],
+          },
+        },
+        "HostedZoneId": {
+          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "Name": "example.com.",
+        "Type": "AAAA",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
+    "SiteDistribution390DED28": {
+      "Properties": {
+        "DistributionConfig": {
+          "Aliases": [
+            "example.com",
+          ],
+          "CacheBehaviors": [
+            {
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "Compress": true,
+              "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+              "PathPattern": "/_next/static/*",
+              "TargetOriginId": "TestMainStackSiteDistributionOrigin1E839C3BD",
+              "ViewerProtocolPolicy": "redirect-to-https",
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE",
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteStripApiPrefixFunctionF242BA91",
+                      "FunctionARN",
+                    ],
+                  },
+                },
+              ],
+              "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+              "PathPattern": "/api/*",
+              "TargetOriginId": "TestMainStackSiteDistributionOrigin212500D8C",
+              "ViewerProtocolPolicy": "https-only",
+            },
+          ],
+          "Comment": "dev-tp-web",
+          "DefaultCacheBehavior": {
+            "CachePolicyId": {
+              "Ref": "SitePageCachePolicy030D8D42",
+            },
+            "Compress": true,
+            "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+            "TargetOriginId": "TestMainStackSiteDistributionOrigin1E839C3BD",
+            "ViewerProtocolPolicy": "redirect-to-https",
+          },
+          "Enabled": true,
+          "HttpVersion": "http2and3",
+          "IPV6Enabled": true,
+          "Origins": [
+            {
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2",
+                ],
+              },
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionEndpoint0124CF62",
+                  "DomainName",
+                ],
+              },
+              "Id": "TestMainStackSiteDistributionOrigin1E839C3BD",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "SiteOriginAccessControl4CBD4A9B",
+                  "Id",
+                ],
+              },
+            },
+            {
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2",
+                ],
+              },
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "BlogAPIWebFunctionEndpointCF875806",
+                  "DomainName",
+                ],
+              },
+              "Id": "TestMainStackSiteDistributionOrigin212500D8C",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "SiteOriginAccessControl4CBD4A9B",
+                  "Id",
+                ],
+              },
+            },
+          ],
+          "PriceClass": "PriceClass_200",
+          "ViewerCertificate": {
+            "AcmCertificateArn": {
+              "Fn::GetAtt": [
+                "WebCertificateArnLookup323DAC01",
+                "Parameter.Value",
+              ],
+            },
+            "MinimumProtocolVersion": "TLSv1.2_2021",
+            "SslSupportMethod": "sni-only",
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::Distribution",
+    },
+    "SiteInvalidateOnDeploy709538D4": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "SiteInvalidateOnDeployCustomResourcePolicy098B1B6F",
+        "SiteWebFunctionEndpoint0124CF62",
+      ],
+      "Properties": {
+        "Create": {
+          "Fn::Join": [
+            "",
+            [
+              "{"service":"CloudFront","action":"createInvalidation","parameters":{"DistributionId":"",
+              {
+                "Ref": "SiteDistribution390DED28",
+              },
+              "","InvalidationBatch":{"CallerReference":"",
+              {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionRevision8F4169EB",
+                  "RevisionId",
+                ],
+              },
+              "","Paths":{"Quantity":1,"Items":["/*"]}}},"physicalResourceId":{"id":"",
+              {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionRevision8F4169EB",
+                  "RevisionId",
+                ],
+              },
+              ""}}",
+            ],
+          ],
+        },
+        "InstallLatestAwsSdk": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+            "Arn",
+          ],
+        },
+        "Update": {
+          "Fn::Join": [
+            "",
+            [
+              "{"service":"CloudFront","action":"createInvalidation","parameters":{"DistributionId":"",
+              {
+                "Ref": "SiteDistribution390DED28",
+              },
+              "","InvalidationBatch":{"CallerReference":"",
+              {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionRevision8F4169EB",
+                  "RevisionId",
+                ],
+              },
+              "","Paths":{"Quantity":1,"Items":["/*"]}}},"physicalResourceId":{"id":"",
+              {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionRevision8F4169EB",
+                  "RevisionId",
+                ],
+              },
+              ""}}",
+            ],
+          ],
+        },
+      },
+      "Type": "Custom::AWS",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SiteInvalidateOnDeployCustomResourcePolicy098B1B6F": {
+      "DependsOn": [
+        "SiteWebFunctionEndpoint0124CF62",
+      ],
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "cloudfront:CreateInvalidation",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":cloudfront::123456789012:distribution/",
+                    {
+                      "Ref": "SiteDistribution390DED28",
+                    },
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SiteInvalidateOnDeployCustomResourcePolicy098B1B6F",
+        "Roles": [
+          {
+            "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SiteOriginAccessControl4CBD4A9B": {
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "dev-tp-web-function",
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always-amz-auth",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "SitePageCachePolicy030D8D42": {
+      "Properties": {
+        "CachePolicyConfig": {
+          "DefaultTTL": 0,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": "dev-tp-web-page",
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none",
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "whitelist",
+              "Headers": [
+                "RSC",
+                "Next-Router-State-Tree",
+                "Next-Router-Prefetch",
+                "Next-Router-Segment-Prefetch",
+              ],
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "all",
+            },
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::CachePolicy",
+    },
+    "SiteStripApiPrefixFunctionF242BA91": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "
+function handler(event) {
+  var request = event.request;
+  request.uri = request.uri.replace(/^\\/api/, '') || '/';
+  return request;
+}
+",
+        "FunctionConfig": {
+          "Comment": "dev-tp-strip-api-prefix",
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": "dev-tp-strip-api-prefix",
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "SiteWebFunction9CC68A3F": {
+      "Properties": {
+        "FunctionName": "dev-tp-web",
+      },
+      "Type": "AWS::Lambda::WebFunction",
+    },
+    "SiteWebFunctionCodeDeploymentAwsCliLayer9CC3EDEA": {
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+          "S3Key": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
+        },
+        "Description": "/opt/awscli/aws",
+      },
+      "Type": "AWS::Lambda::LayerVersion",
+    },
+    "SiteWebFunctionCodeDeploymentCustomResource14A30883": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DestinationBucketName": {
+          "Ref": "WebFunctionCodeBucket1D283E48",
+        },
+        "Extract": false,
+        "OutputObjectKeys": true,
+        "OutputObjectVersionIds": true,
+        "Prune": false,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn",
+          ],
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
+        ],
+        "SourceObjectKeys": [
+          "06782b0540b665056fd6e728b3d7c23be1287845f5804b08406218f34f041b76.zip",
+        ],
+        "WaitForDistributionInvalidation": true,
+      },
+      "Type": "Custom::CDKBucketDeployment",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SiteWebFunctionEndpoint0124CF62": {
+      "Properties": {
+        "AuthType": "IamAuth",
+        "EndpointName": "prod",
+        "EndpointType": "HomeRegion",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteWebFunction9CC68A3F",
+            "FunctionArn",
+          ],
+        },
+        "RevisionWeights": [
+          {
+            "RevisionId": {
+              "Fn::GetAtt": [
+                "SiteWebFunctionRevision8F4169EB",
+                "RevisionId",
+              ],
+            },
+            "Weight": 100,
+          },
+        ],
+        "ScalingConfig": {
+          "MaxEnvironments": 2,
+        },
+      },
+      "Type": "AWS::Lambda::WebFunctionEndpoint",
+    },
+    "SiteWebFunctionExecutionRole7342991A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "SiteWebFunctionLogGroupE1C64CDF": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/lambda-web/dev-tp-web",
+        "RetentionInDays": 14,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "SiteWebFunctionResourcePolicy4E074A79": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeWebFunctionEndpoint",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::123456789012:distribution/",
+                        {
+                          "Ref": "SiteDistribution390DED28",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SiteWebFunctionEndpoint0124CF62",
+                  "EndpointArn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ResourceArn": {
+          "Fn::GetAtt": [
+            "SiteWebFunction9CC68A3F",
+            "FunctionArn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::ResourcePolicy",
+    },
+    "SiteWebFunctionRevision8F4169EB": {
+      "DependsOn": [
+        "WebFunctionCodeBucketPolicyE8AA0D26",
+      ],
+      "Properties": {
+        "BuildConfig": {
+          "CodeConfig": {
+            "S3Object": {
+              "Bucket": {
+                "Ref": "WebFunctionCodeBucket1D283E48",
+              },
+              "Key": {
+                "Fn::Select": [
+                  0,
+                  {
+                    "Fn::GetAtt": [
+                      "SiteWebFunctionCodeDeploymentCustomResource14A30883",
+                      "SourceObjectKeys",
+                    ],
+                  },
+                ],
+              },
+              "VersionId": {
+                "Fn::Select": [
+                  0,
+                  {
+                    "Fn::GetAtt": [
+                      "SiteWebFunctionCodeDeploymentCustomResource14A30883",
+                      "SourceObjectVersionIds",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "RuntimeConfig": {
+            "Runtime": "nodejs24.x",
+          },
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteWebFunction9CC68A3F",
+            "FunctionArn",
+          ],
+        },
+        "ServiceConfig": {
+          "EnvironmentVariables": {
+            "API_URL": "https://example.com/api",
+            "AWS_LAMBDA_NODEJS_ENTRYPOINT": "index.mjs",
+          },
+          "ExecutionRoleArn": {
+            "Fn::GetAtt": [
+              "SiteWebFunctionExecutionRole7342991A",
+              "Arn",
+            ],
+          },
+          "TelemetryConfig": {
+            "LoggingConfig": {
+              "LogGroup": {
+                "Ref": "SiteWebFunctionLogGroupE1C64CDF",
+              },
+            },
+          },
+          "TimeoutSeconds": 30,
+        },
+      },
+      "Type": "AWS::Lambda::WebFunctionRevision",
+    },
+    "WebCertificateArnLookup323DAC01": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "WebCertificateArnLookupCustomResourcePolicy86402AE9",
+      ],
+      "Properties": {
+        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/web-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/web-certificate-arn:example.com"}}",
+        "InstallLatestAwsSdk": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+            "Arn",
+          ],
+        },
+        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/web-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/web-certificate-arn:example.com"}}",
+      },
+      "Type": "Custom::AWS",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "WebCertificateArnLookupCustomResourcePolicy86402AE9": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "ssm:GetParameter",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:ssm:us-east-1:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":parameter/test/virginia/web-certificate-arn",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "WebCertificateArnLookupCustomResourcePolicy86402AE9",
+        "Roles": [
+          {
+            "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "WebFunctionCodeBucket1D283E48": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true",
+          },
+          {
+            "Key": "aws-cdk:cr-owned:6337730b",
+            "Value": "true",
+          },
+          {
+            "Key": "aws-cdk:cr-owned:65ee0a31",
+            "Value": "true",
+          },
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "WebFunctionCodeBucketAutoDeleteObjectsCustomResourceE33B070E": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "WebFunctionCodeBucketPolicyE8AA0D26",
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "WebFunctionCodeBucket1D283E48",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "WebFunctionCodeBucketPolicyE8AA0D26": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebFunctionCodeBucket1D283E48",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebFunctionCodeBucket1D283E48",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebFunctionCodeBucket1D283E48",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebFunctionCodeBucket1D283E48",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebFunctionCodeBucket1D283E48",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+              ],
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":lambda:ap-northeast-1:123456789012:web-function/dev-tp-blog-api-web/revision/*",
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebFunctionCodeBucket1D283E48",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+              ],
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":lambda:ap-northeast-1:123456789012:web-function/dev-tp-web/revision/*",
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebFunctionCodeBucket1D283E48",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
     },
   },
   "Rules": {

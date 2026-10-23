@@ -1,5 +1,6 @@
 [toolchain]
 channel = "1.97.1"
 components = ["clippy", "rustfmt", "rust-analyzer"]
-# markdown crate の wasm 化 (tools/content-html-backfill) 用
-targets = ["wasm32-unknown-unknown"]
+# wasm32: markdown crate の wasm 化 (tools/content-html-backfill) 用
+# aarch64 musl: blog-api の Lambda Web Function 用の静的バイナリ (cargo zigbuild でビルド)
+targets = ["wasm32-unknown-unknown", "aarch64-unknown-linux-musl"]

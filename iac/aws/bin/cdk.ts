@@ -37,7 +37,6 @@ const globalDnsStack = new GlobalDnsStack(
   `${config.stageName.short}-${config.projectName.short}-global-dns`,
   {
     domainName: config.fqdn,
-    apexIpv4Addresses: config.domain.apexIpv4Addresses,
     hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
     env: {
       account: config.cdkEnv.account,
@@ -46,48 +45,17 @@ const globalDnsStack = new GlobalDnsStack(
   },
 );
 
-const tokyoCertificateStack = new TokyoCertificateStack(
-  app,
-  `${config.stageName.short}-${config.projectName.short}-tokyo-cert`,
-  {
-    domainName: config.fqdn,
-    hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
-    certificateArnParameterName: config.ssm.tokyo.certificateArn,
-    env: {
-      account: config.cdkEnv.account,
-      region: REGIONS.TOKYO,
-    },
-  },
-);
-
-const mainStack = new MainStack(app, `${config.stageName.short}-${config.projectName.short}-main`, {
-  projectName: config.projectName,
-  stageName: config.stageName,
-  fqdn: config.fqdn,
-  domain: config.domain,
-  labs: {
-    repoFullName: config.labs.contentsRepoFullName,
-    imagesBucketName: config.labs.imagesBucketName,
-  },
-  ssmParameters: config.ssm,
-  lambda: config.lambda,
+// api.<fqdn> (API Gateway) の撤去で MainStack からは参照しなくなった。
+// 証明書スタック自体の撤去 (cdk destroy) は別途行う
+new TokyoCertificateStack(app, `${config.stageName.short}-${config.projectName.short}-tokyo-cert`, {
+  domainName: config.fqdn,
+  hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
+  certificateArnParameterName: config.ssm.tokyo.certificateArn,
   env: {
     account: config.cdkEnv.account,
     region: REGIONS.TOKYO,
   },
 });
-
-mainStack.addDependency(globalDnsStack);
-mainStack.addDependency(tokyoCertificateStack);
-
-// Lambda 用環境変数が未設定の場合、main stack のデプロイだけをブロックする。
-// エラーは stack 単位に付くため、deploy-role 等の他スタックは .env なしの
-// ローカル環境でも synth / deploy できる。
-if (config.missingLambdaEnvVars.length > 0) {
-  cdk.Annotations.of(mainStack).addError(
-    `Lambda 用環境変数が未設定のため main stack はデプロイできません: ${config.missingLambdaEnvVars.join(', ')} (iac/aws/.env か環境変数で設定してください)`,
-  );
-}
 
 const virginiaCertificateStack = new VirginiaCertificateStack(
   app,
@@ -99,6 +67,7 @@ const virginiaCertificateStack = new VirginiaCertificateStack(
     hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
     hostedZoneParameterRegion: REGIONS.TOKYO,
     certificateArnParameterName: config.ssm.virginia.certificateArn,
+    webCertificateArnParameterName: config.ssm.virginia.webCertificateArn,
     env: {
       account: config.cdkEnv.account,
       region: REGIONS.VIRGINIA,
@@ -106,6 +75,39 @@ const virginiaCertificateStack = new VirginiaCertificateStack(
   },
 );
 virginiaCertificateStack.addDependency(globalDnsStack);
+
+const mainStack = new MainStack(app, `${config.stageName.short}-${config.projectName.short}-main`, {
+  projectName: config.projectName,
+  stageName: config.stageName,
+  fqdn: config.fqdn,
+  domain: config.domain,
+  labs: {
+    repoFullName: config.labs.contentsRepoFullName,
+    imagesBucketName: config.labs.imagesBucketName,
+  },
+  webFunction: config.webFunction,
+  observability: config.observability,
+  web: config.web,
+  ssmParameters: config.ssm,
+  lambda: config.lambda,
+  env: {
+    account: config.cdkEnv.account,
+    region: REGIONS.TOKYO,
+  },
+});
+
+mainStack.addDependency(globalDnsStack);
+// 公開サイトの CloudFront が us-east-1 の apex 用証明書を使う
+mainStack.addDependency(virginiaCertificateStack);
+
+// Lambda 用環境変数が未設定の場合、main stack のデプロイだけをブロックする。
+// エラーは stack 単位に付くため、deploy-role 等の他スタックは .env なしの
+// ローカル環境でも synth / deploy できる。
+if (config.missingLambdaEnvVars.length > 0) {
+  cdk.Annotations.of(mainStack).addError(
+    `Lambda 用環境変数が未設定のため main stack はデプロイできません: ${config.missingLambdaEnvVars.join(', ')} (iac/aws/.env か環境変数で設定してください)`,
+  );
+}
 
 const adminStack = new AdminStack(
   app,

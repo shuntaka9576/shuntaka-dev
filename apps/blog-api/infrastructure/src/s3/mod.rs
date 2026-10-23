@@ -7,7 +7,7 @@ use crate::error::S3Error;
 /// lab 教材画像を S3 に同期するためのトレイト。
 ///
 /// 実装 (S3LabImageStore) は Lambda 実行環境でのみ初期化され、ローカル開発では
-/// None として扱われ画像同期はスキップされる (lambda::SelfInvoker と同じパターン)。
+/// None として扱われ画像同期はスキップされる (lambda::EventInvoker と同じパターン)。
 #[async_trait]
 pub trait LabImageStore: Send + Sync {
     /// オブジェクトのメタデータ `github-sha` を返す。オブジェクトが存在しなければ None。

@@ -13,16 +13,22 @@ export class ProxyVpcConstruct extends Construct {
   public readonly vpc: ec2.IVpc;
   public readonly publicSubnet: ec2.ISubnet;
   public readonly privateSubnet: ec2.ISubnet;
+  public readonly privateSubnet2: ec2.ISubnet;
 
   constructor(
     scope: Construct,
     id: string,
     props: {
       cidr: string;
+      privateSubnet2: {
+        availabilityZone: string;
+        cidrBlock: string;
+      };
       ssm: {
         vpcId: string;
         publicSubnetId1: string;
         privateSubnetId1: string;
+        privateSubnetId2: string;
       };
     },
   ) {
@@ -51,6 +57,17 @@ export class ProxyVpcConstruct extends Construct {
     this.publicSubnet = this.vpc.publicSubnets[0]!;
     this.privateSubnet = this.vpc.isolatedSubnets[0]!;
 
+    // Lambda Web Functions の egress network connector は別 AZ のサブネットを 2 つ以上要求する。
+    // ec2.Vpc の availabilityZones を増やすと既存サブネットの作り直しになるため、
+    // 2 つ目の Private Isolated サブネットは VPC 定義の外に足す。ルートテーブルは
+    // PrivateSubnet が作るローカルルートのみで、外向きは 1 つ目と同じく proxy SG 経由
+    this.privateSubnet2 = new ec2.PrivateSubnet(this, 'PrivateSubnet2', {
+      vpcId: this.vpc.vpcId,
+      availabilityZone: props.privateSubnet2.availabilityZone,
+      cidrBlock: props.privateSubnet2.cidrBlock,
+      mapPublicIpOnLaunch: false,
+    });
+
     new ssm.StringParameter(this, 'VpcIdParam', {
       parameterName: props.ssm.vpcId,
       stringValue: this.vpc.vpcId,
@@ -62,6 +79,10 @@ export class ProxyVpcConstruct extends Construct {
     new ssm.StringParameter(this, 'PrivateSubnetId1Param', {
       parameterName: props.ssm.privateSubnetId1,
       stringValue: this.privateSubnet.subnetId,
+    });
+    new ssm.StringParameter(this, 'PrivateSubnetId2Param', {
+      parameterName: props.ssm.privateSubnetId2,
+      stringValue: this.privateSubnet2.subnetId,
     });
   }
 }

@@ -18,6 +18,7 @@ export class VirginiaCertificateStack extends cdk.Stack {
       hostedZoneIdParameterName: string;
       hostedZoneParameterRegion: string;
       certificateArnParameterName: string;
+      webCertificateArnParameterName: string;
     } & cdk.StackProps,
   ) {
     super(scope, id, props);
@@ -45,6 +46,18 @@ export class VirginiaCertificateStack extends cdk.Stack {
     new ssm.StringParameter(this, 'VirginiaCertificateArnParameter', {
       parameterName: props.certificateArnParameterName,
       stringValue: certificate.certificateArn,
+    });
+
+    // 公開サイト (apex) の CloudFront 用。admin / images 用の証明書に SAN を足すと置換になり、
+    // AdminStack の cross-region 読み出しが旧 ARN を掴んだままになるため別の証明書にする
+    const webCertificate = new acm.Certificate(this, 'WebCertificate', {
+      domainName: props.fqdn,
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
+
+    new ssm.StringParameter(this, 'WebCertificateArnParameter', {
+      parameterName: props.webCertificateArnParameterName,
+      stringValue: webCertificate.certificateArn,
     });
   }
 }

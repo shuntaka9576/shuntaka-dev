@@ -8,7 +8,7 @@ use adapter::{
         users_articles::UsersArticlesRepositoryImpl, users_moments::UsersMomentsRepositoryImpl,
     },
 };
-use infrastructure::{embedding::client::EmbeddingClient, lambda::SelfInvoker, s3::LabImageStore};
+use infrastructure::{embedding::client::EmbeddingClient, lambda::EventInvoker, s3::LabImageStore};
 use kernel::repository::{
     articles::ArticlesRepository, health::HealthCheckRepository, labs::LabsRepository,
     users::UsersRepository, users_articles::UsersArticlesRepository,
@@ -44,8 +44,8 @@ pub struct AppRegistry {
     labs_repository: Arc<dyn LabsRepository>,
     users_repository: Arc<dyn UsersRepository>,
     webhook_config: WebhookConfig,
-    /// Lambda 実行環境でのみ Some。webhook の実処理を自己 Event invoke に逃がすために使う。
-    self_invoker: Option<Arc<dyn SelfInvoker>>,
+    /// Web Function でのみ Some。webhook の実処理を Event Function への Event invoke に逃がすために使う。
+    event_invoker: Option<Arc<dyn EventInvoker>>,
     /// PLaMOへの到達経路がある環境でのみSome。未設定でも検索以外のAPIは起動する。
     embedding_client: Option<Arc<dyn EmbeddingClient>>,
     /// Lambda 実行環境でのみ Some。lab 教材画像の S3 同期に使う。
@@ -57,7 +57,7 @@ impl AppRegistry {
     pub async fn new(
         pool: ConnectionPool,
         webhook_config: WebhookConfig,
-        self_invoker: Option<Arc<dyn SelfInvoker>>,
+        event_invoker: Option<Arc<dyn EventInvoker>>,
         embedding_client: Option<Arc<dyn EmbeddingClient>>,
         lab_image_store: Option<Arc<dyn LabImageStore>>,
     ) -> Self {
@@ -76,7 +76,7 @@ impl AppRegistry {
             labs_repository,
             users_repository,
             webhook_config,
-            self_invoker,
+            event_invoker,
             embedding_client,
             lab_image_store,
         }
@@ -110,8 +110,8 @@ impl AppRegistry {
         &self.webhook_config
     }
 
-    pub fn self_invoker(&self) -> Option<Arc<dyn SelfInvoker>> {
-        self.self_invoker.clone()
+    pub fn event_invoker(&self) -> Option<Arc<dyn EventInvoker>> {
+        self.event_invoker.clone()
     }
 
     pub fn embedding_client(&self) -> Option<Arc<dyn EmbeddingClient>> {

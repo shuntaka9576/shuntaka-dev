@@ -59,6 +59,7 @@ describe('VirginiaCertificateStack', () => {
       hostedZoneIdParameterName: '/test/hosted-zone-id',
       hostedZoneParameterRegion: 'ap-northeast-1',
       certificateArnParameterName: '/test/virginia/certificate-arn',
+      webCertificateArnParameterName: '/test/virginia/web-certificate-arn',
       env: {
         account: '123456789012',
         region: 'us-east-1',

@@ -47,10 +47,29 @@ interface AppParameter {
   };
   fqdn: string;
   domain: {
-    api: string;
     admin: string;
     images: string;
-    apexIpv4Addresses?: string[];
+  };
+  // Lambda Web Functions は実行環境ごとにメモリ 2 GB 固定で、実行環境がある間ずっと課金される
+  // (東京で 1 台 1 時間 約 $0.031、常時 1 台で月 約 $22)。料金の見積もりは
+  // docs/source/98_tasks/2026-10-15-lambda-web-functions-survey/index.md の「料金」を参照
+  webFunction: {
+    // endpoint ごとの実行環境の上限 (最小値は 2)。bot などの急増で台数が際限なく増えないようにする
+    maxEnvironments: number;
+  };
+  observability: {
+    // /health/db を叩く監視の間隔 (分)。未設定なら監視しない。実行環境は最後のリクエストから
+    // 5〜7 分ほどで消えるため、それより短いと blog-api の実行環境が常に 1 台残る
+    healthcheckProbeIntervalMinutes?: number;
+  };
+  web: {
+    // next build 時のサーバー側 fetch の向き先。既定は CloudFront 経由の https://<fqdn>/api。
+    // apex を CloudFront へ切り替える初回デプロイだけは /api がまだ無いため、
+    // WEB_BUILD_API_URL で旧 API (https://api.<fqdn>) を指す
+    buildApiUrl: string;
+    // ビルド時に焼き込む公開 ID。GitHub Environments の Environment variable から渡す
+    googleTagManagerId?: string;
+    clarityProjectId?: string;
   };
   labs: {
     // 章コンテンツを管理する GitHub private リポジトリ (stage ごとに別リポジトリ)
@@ -71,13 +90,11 @@ interface AppParameter {
     };
     virginia: {
       certificateArn: string;
+      webCertificateArn: string;
     };
     admin: {
       userPoolId: string;
       userPoolClientId: string;
-    };
-    apiGateway: {
-      apiUrl: string;
     };
     dsql: {
       clusterEndpoint: string;
@@ -86,6 +103,7 @@ interface AppParameter {
     proxy: {
       vpcId: string;
       privateSubnetId1: string;
+      privateSubnetId2: string;
       sgId: string;
     };
   };
@@ -161,7 +179,10 @@ const getLambdaEnvVars = (): {
 };
 
 const stageConfig: {
-  [key in StageName]: Omit<AppParameter, 'cdkEnv' | 'ssm' | 'lambda' | 'missingLambdaEnvVars'>;
+  [key in StageName]: Omit<
+    AppParameter,
+    'cdkEnv' | 'ssm' | 'lambda' | 'web' | 'missingLambdaEnvVars'
+  >;
 } = {
   dev: {
     ...commonParameters,
@@ -171,11 +192,14 @@ const stageConfig: {
     },
     fqdn: 'shuntaka.me',
     domain: {
-      api: 'api.shuntaka.me',
       admin: 'admin.shuntaka.me',
       images: 'images.shuntaka.me',
-      apexIpv4Addresses: ['216.198.79.1', '64.29.17.1'],
     },
+    webFunction: {
+      maxEnvironments: 2,
+    },
+    // dev はアクセスがほぼ無いため、監視で実行環境を起こさない
+    observability: {},
     labs: {
       contentsRepoFullName: 'shuntaka9576/lab-contents-dev',
       imagesBucketName: `${stageName.dev.shortName}-${commonParameters.projectName.short}-lab-assets`,
@@ -189,9 +213,14 @@ const stageConfig: {
     },
     fqdn: 'shuntaka.dev',
     domain: {
-      api: 'api.shuntaka.dev',
       admin: 'admin.shuntaka.dev',
       images: 'images.shuntaka.dev',
+    },
+    webFunction: {
+      maxEnvironments: 3,
+    },
+    observability: {
+      healthcheckProbeIntervalMinutes: 30,
     },
     labs: {
       contentsRepoFullName: 'shuntaka9576/lab-contents',
@@ -207,12 +236,18 @@ export interface ProxyParameter {
   projectName: string;
   vpc: {
     cidr: string;
+    // Lambda Web Functions の egress network connector 用 (別 AZ のサブネットが 2 つ以上必要)
+    privateSubnet2: {
+      availabilityZone: string;
+      cidrBlock: string;
+    };
   };
   ssm: {
     vpc: {
       vpcId: string;
       publicSubnetId1: string;
       privateSubnetId1: string;
+      privateSubnetId2: string;
     };
     proxy: {
       clusterName: string;
@@ -240,12 +275,20 @@ export const getProxyConfig = (): ProxyParameter => {
     projectName,
     vpc: {
       cidr: '10.50.0.0/16',
+      // ec2.Vpc が切る Public (10.50.0.0/24) / Private (10.50.1.0/24) と重ならない /24。
+      // 10.50.2.0/24 は 2026-10-23 に旧構成のデプロイでスタックの管理から外れ (connector の ENI が
+      // 使っていて削除できずに残った)、同じ CIDR では作り直せないため使わない
+      privateSubnet2: {
+        availabilityZone: 'ap-northeast-1c',
+        cidrBlock: '10.50.3.0/24',
+      },
     },
     ssm: {
       vpc: {
         vpcId: `/${projectName}/vpc/id`,
         publicSubnetId1: `/${projectName}/vpc/public-subnet-id-1`,
         privateSubnetId1: `/${projectName}/vpc/private-subnet-id-1`,
+        privateSubnetId2: `/${projectName}/vpc/private-subnet-id-2`,
       },
       proxy: {
         clusterName: `/${projectName}/proxy/cluster-name`,
@@ -361,13 +404,11 @@ export const getConfig = (stageName: string): AppParameter => {
       // us-east-1 (CloudFront 用証明書) の SSM に書き出す。読み取りは cross-region
       virginia: {
         certificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/certificate-arn`,
+        webCertificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/web-certificate-arn`,
       },
       admin: {
         userPoolId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-id`,
         userPoolClientId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-client-id`,
-      },
-      apiGateway: {
-        apiUrl: `/${config.stageName.long}/${config.projectName.long}/api-gateway/api-url`,
       },
       dsql: {
         clusterEndpoint: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-endpoint`,
@@ -376,8 +417,15 @@ export const getConfig = (stageName: string): AppParameter => {
       proxy: {
         vpcId: '/tidb-proxy/vpc/id',
         privateSubnetId1: '/tidb-proxy/vpc/private-subnet-id-1',
+        privateSubnetId2: '/tidb-proxy/vpc/private-subnet-id-2',
         sgId: '/tidb-proxy/proxy/sg-id',
       },
+    },
+    // GitHub Actions の vars.* は未設定だと空文字で渡ってくるため、空文字は未設定として扱う
+    web: {
+      buildApiUrl: process.env.WEB_BUILD_API_URL || `https://${config.fqdn}/api`,
+      googleTagManagerId: process.env.NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID || undefined,
+      clarityProjectId: process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || undefined,
     },
     lambda: {
       blogApi: {

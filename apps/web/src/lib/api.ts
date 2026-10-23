@@ -135,7 +135,10 @@ export interface MomentsQueryOptions {
   signal?: AbortSignal;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:43003';
+// ブラウザからは同一オリジンの /api を呼ぶ (本番は CloudFront、ローカルは next dev の rewrites が
+// blog-api へ中継する)。サーバー側の fetch は相対 URL を解決できないため API_URL を使う
+const API_BASE_URL =
+  typeof window === 'undefined' ? process.env.API_URL || 'http://localhost:43003' : '/api';
 
 /**
  * tags 配列を API 仕様に合わせてクエリ文字列部分に変換する。

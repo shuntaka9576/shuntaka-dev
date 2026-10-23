@@ -44,9 +44,9 @@ pub struct WebhookResponse {
 pub const ARTICLES_PUSH_KIND: &str = "articles";
 pub const LABS_PUSH_KIND: &str = "labs";
 
-/// 自己 Event invoke で受け渡す封筒。Lambda Web Adapter が非 HTTP イベントを
-/// AWS_LWA_PASS_THROUGH_PATH (POST /events) へ転送してくる。
-/// /events は API Gateway の {proxy+} 経由でも外部から到達できるため、
+/// Web Function から Event Function への Event invoke で受け渡す封筒。Event Function の
+/// Lambda Web Adapter が非 HTTP イベントを AWS_LWA_PASS_THROUGH_PATH (POST /events) へ転送してくる。
+/// /events は CloudFront の /api/* 経由でも外部から到達できるため、
 /// 受信時と同じバイト列で署名を再検証できるよう body は base64 で保持する。
 ///
 /// kind は ARTICLES_PUSH_KIND / LABS_PUSH_KIND のいずれか。デプロイ中の
@@ -201,9 +201,9 @@ pub async fn handle_github_webhook(
     let kind = resolve_push_kind(config, &push_event);
 
     // GitHub の webhook 配信タイムアウトは 10 秒固定のため、全記事スキャンを伴う
-    // 実処理は自己 Event invoke に逃がして即座に 200 を返す。
+    // 実処理は Event Function への Event invoke に逃がして即座に 200 を返す。
     // ローカル開発 (Lambda 外) では invoker が無いので従来どおりインラインで処理する。
-    match registry.self_invoker() {
+    match registry.event_invoker() {
         Some(invoker) => {
             let envelope = GithubPushEnvelope {
                 kind: kind.to_string(),
@@ -213,10 +213,9 @@ pub async fn handle_github_webhook(
             let payload = serde_json::to_vec(&envelope)
                 .map_err(|e| AppError::internal("Failed to serialize envelope", e))?;
 
-            invoker
-                .invoke_async(payload)
-                .await
-                .map_err(|e| AppError::internal("Failed to invoke self for async processing", e))?;
+            invoker.invoke_async(payload).await.map_err(|e| {
+                AppError::internal("Failed to invoke event function for async processing", e)
+            })?;
 
             info!(
                 "Queued push event for async processing: ref={}, repo={}, kind={}",
@@ -238,8 +237,8 @@ pub async fn handle_github_webhook(
     }
 }
 
-/// 自己 Event invoke されたイベントの受け口 (Lambda Web Adapter の passthrough)。
-/// API Gateway 経由でも外部から到達できるため、封筒内の署名を必ず再検証する。
+/// Event Function に Event invoke されたイベントの受け口 (Lambda Web Adapter の passthrough)。
+/// CloudFront 経由でも外部から到達できるため、封筒内の署名を必ず再検証する。
 pub async fn handle_lambda_events(
     State(registry): State<AppRegistry>,
     body: Bytes,
@@ -295,7 +294,7 @@ pub async fn handle_lambda_events(
 }
 
 /// push イベントの実処理。articles ディレクトリの全 markdown を取得して upsert する。
-/// GitHub の配信タイムアウトを気にしなくてよい経路 (自己 invoke / ローカル) で呼ばれる。
+/// GitHub の配信タイムアウトを気にしなくてよい経路 (Event Function / ローカル) で呼ばれる。
 async fn process_push_event(
     registry: &AppRegistry,
     push_event: PushEvent,
@@ -433,7 +432,11 @@ async fn process_push_event(
                 let effective_description = frontmatter
                     .description
                     .clone()
-                    .or_else(|| existing.as_ref().map(|a| a.description.as_str().to_string()))
+                    .or_else(|| {
+                        existing
+                            .as_ref()
+                            .map(|a| a.description.as_str().to_string())
+                    })
                     .unwrap_or_else(|| frontmatter.title.clone());
 
                 // title / description / content のいずれかが変わったら chunk を再生成する。
