@@ -2,7 +2,8 @@
 
 - 起票日: 2026-10-15
 - 対象: blog-api（Rust / Axum）、apps/web（Next.js 16 / Vercel）、admin-api（Hono）、proxy VPC
-- ステータス: 実装済み・未デプロイ（2026-10-23）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。デプロイと切り替えは[切り替え手順](#切り替え手順)のとおり
+- ステータス: dev に適用済み・prd は未切り替え（2026-10-23）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。残りの作業は[切り替え手順](#切り替え手順)の表のとおり
+- PR: [#817](https://github.com/shuntaka9576/shuntaka-dev/pull/817)
 - 関連タスク:
   - [blog-api: Lambda + tsnet を VPC + Fargate Proxy 構成に移行](../2026-06-29-blog-api-tidb-proxy/index.md)
   - [記事詳細 API の content_html 事前生成（オンザフライ Markdown 変換の廃止）](../2026-07-02-articles-content-html-pregeneration/index.md)
@@ -145,25 +146,67 @@ admin-api は Node.js 24 の Hono なので、ランタイムの面ではその�
 - bun の node_modules はシンボリックリンクで組まれているため、zip にはリンクのまま入れる（`zip -y`）。実体化すると Node.js の realpath による解決が崩れ、`@swc/helpers` が見つからずに起動できなかった
 - standalone には macOS 用の sharp（`@img/sharp-darwin-arm64` など）が入るため、zip を作るときに外す。`outputFileTracingExcludes` では bun の `.bun/` 配下を外せなかった
 
+dev（shuntaka.me）にデプロイして次を確認した。
+
+- apex の A / AAAA が CloudFront の alias になり、レスポンスに `via: ... (CloudFront)` と `x-cache` が付く。`api.shuntaka.me` は消えた
+- ページは `s-maxage=30, stale-while-revalidate=86370` を返し、Next.js の `x-nextjs-cache` が STALE → HIT と遷移する（ISR）。`/_next/static/*` は `immutable`
+- `/api/health/db`（TiDB に SELECT 1）、記事一覧、検索（PLaMo）が返る。connector の ENI から `tidb-proxy.internal`（Cloud Map の private DNS）を引けている
+- 不正な署名の webhook POST が 401 になる（POST が OAC を越えて Web Function に届き、HMAC で弾かれる）
+- `Origin` 付きの API リクエストに `Access-Control-*` ヘッダーが付かない
+
 ## 切り替え手順
 
-apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無いため、`WEB_BUILD_API_URL` で旧 API を指す。dev → prd の順で行う。
+dev → prd の順に切り替え、最後に Vercel と旧構成の残りを片付ける。
 
-dev（main へのマージで自動デプロイ）の前に、GitHub Environments の dev に変数を入れる。
+| #   | 作業                                                                         | 状態                                                                    |
+| --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336） |
+| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 未                                                                      |
+| 3   | PR #817 をマージする                                                         | 未                                                                      |
+| 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 未                                                                      |
+| 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | 未                                                                      |
+| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 未。prd の切り替え後に行う                                              |
+
+apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無い。そのため `WEB_BUILD_API_URL` で旧 API（`https://api.<fqdn>`）を指し、切り替え後に消す。
+
+### 1. dev に適用する（済）
+
+GitHub Environments の dev に変数を入れ、ブランチから deploy を dispatch した。
 
 ```bash
 gh variable set WEB_BUILD_API_URL --env dev --body 'https://api.shuntaka.me'
+gh workflow run deploy.yaml --ref survey/lambda-web-functions -f stageName=dev -f stack=all
 ```
 
 デプロイの順は `st-tidb-proxy`（別 AZ のサブネット）→ `st-tidb-proxy-logs` → main（GlobalDns と virginia-cert を含む）→ admin。dev の apex は GlobalDnsStack が先に Vercel 向けの A レコードを消すため、main の完了まで shuntaka.me は落ちる。
 
-デプロイ後に GitHub App（dev）の Webhook URL を `https://shuntaka.me/api/webhooks/github` に変え、変数を消す。
+ページ、API、DB、検索が CloudFront 経由で返ることを確かめてから変数を消した。
 
 ```bash
+curl -sI https://shuntaka.me/ | grep -iE '^(via|x-cache)'
+curl -s -o /dev/null -w '%{http_code}\n' https://shuntaka.me/api/health/db
+curl -s 'https://shuntaka.me/api/users/shuntaka/articles?perPage=1' | head -c 200
 gh variable delete WEB_BUILD_API_URL --env dev
 ```
 
-prd はリリース PR のマージ前に変数を入れる。GTM / Clarity の ID は Vercel の Production 環境変数から移す。
+### 2. GitHub App（dev）の Webhook URL を変える
+
+GitHub の Settings → Developer settings → GitHub Apps → dev 用の App → General で、Webhook URL を `https://shuntaka.me/api/webhooks/github` に変える。記事リポジトリ（または lab-contents-dev）に push し、App の Advanced → Recent Deliveries が 200（`accepted`）になることを確かめる。
+
+Web Function が受けて Event Function へ Event invoke し、Event Function が実処理する流れはここで初めて通る。ログで両方を確かめる。
+
+```bash
+aws logs tail /aws/lambda-web/d-st-blog-api-web --since 15m
+aws logs tail /aws/lambda/d-st-blog-api --since 15m
+```
+
+### 3. PR #817 をマージする
+
+マージまでは、main への push のたびに旧構成で dev がデプロイされて巻き戻る（[dev の巻き戻り](#dev-の巻き戻り2026-10-23)）。マージまで main へのマージ（Renovate を含む）を止める。マージ後の main への push は、このブランチと同じコードを dev にデプロイするだけなので差分は出ない。
+
+### 4. prd を切り替える
+
+リリース PR をマージする前に、GitHub Environments の prd に変数を入れる。GTM / Clarity の ID は Vercel の Production 環境変数から移す。
 
 ```bash
 gh variable set WEB_BUILD_API_URL --env prd --body 'https://api.shuntaka.dev'
@@ -171,17 +214,53 @@ gh variable set NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID --env prd --body 'GTM-XXXXXXX'
 gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
 ```
 
-prd の apex は CFN 管理外の A レコード（Vercel 向け）を手で作っていたため、`route53.ARecord` の `deleteExisting` で消してから alias を作る。デプロイ後に GitHub App（prd）の Webhook URL を `https://shuntaka.dev/api/webhooks/github` に変え、変数を消す。
+リリース PR（tagpr）をマージすると、tagpr ワークフローの deploy-prd が prd の CDK をデプロイする。prd の apex は CFN 管理外の A レコード（Vercel 向け）を手で作っていたため、`route53.ARecord` の `deleteExisting` で消してから alias を作る。dev と同じ確認をする。
+
+```bash
+curl -sI https://shuntaka.dev/ | grep -iE '^(via|x-cache)'
+curl -s -o /dev/null -w '%{http_code}\n' https://shuntaka.dev/api/health/db
+curl -s 'https://shuntaka.dev/api/users/shuntaka/articles?perPage=1' | head -c 200
+```
+
+### 5. GitHub App（prd）の Webhook URL を変える
+
+dev と同じ手順で、prd 用の App の Webhook URL を `https://shuntaka.dev/api/webhooks/github` に変えて push で確かめ、変数を消す。
 
 ```bash
 gh variable delete WEB_BUILD_API_URL --env prd
 ```
 
-後片付け。
+### 6. 後片付け（prd の切り替え後）
 
-- Vercel プロジェクトからドメインを外して削除し、`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` の secret を消す
-- `d-st-tokyo-cert` / `p-st-tokyo-cert`（API Gateway 用の証明書。どこからも参照しなくなった）を `cdk destroy` する
-- 切り替えが済んだら `SiteConstruct` の `deleteExisting` を外す（CDK で非推奨。失敗時にレコードが消えたままになり得る）
+Vercel の Git 連携を外す。PR ごとのプレビュービルドと GitHub のチェック（Vercel / Vercel Preview Comments）が止まる。ダッシュボードなら、Vercel の shuntaka-dev プロジェクト → Settings → Git → Connected Git Repository の Disconnect。CLI なら `vercel link` 済みの `apps/web` で実行する（リポジトリから `vercel` パッケージは外したので `bunx` で取ってくる）。
+
+```bash
+cd apps/web
+bunx vercel@latest login
+bunx vercel@latest git disconnect
+```
+
+GitHub 側でも止める場合は、Settings → Applications → Installed GitHub Apps → Vercel の Configure で、Repository access から shuntaka-dev を外す（ほかのリポジトリで使っていなければ Uninstall）。
+
+Vercel プロジェクトの Settings → Domains から shuntaka.dev と shuntaka.me を外し、Settings → General の一番下からプロジェクトを削除する。使わなくなった secret を消す。
+
+```bash
+gh secret delete VERCEL_TOKEN
+gh secret delete VERCEL_ORG_ID
+gh secret delete VERCEL_PROJECT_ID
+```
+
+API Gateway 用だった Tokyo の証明書スタックを消す。どこからも参照しなくなっている。消したあと、`iac/aws/bin/cdk.ts` の `TokyoCertificateStack` と `config.ts` の `ssm.tokyo` を別の PR で外す。
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk destroy -c stageName=dev d-st-tokyo-cert
+bunx dotenv -- cdk destroy -c stageName=prd p-st-tokyo-cert
+```
+
+`SiteConstruct` の `deleteExisting` を別の PR で外す（CDK で非推奨。失敗時にレコードが消えたままになり得る。prd の手作りのレコードを消すためだけに入れた）。
+
+dev の管理外になったサブネット（`10.50.2.0/24`）を消す（手順は [dev の巻き戻り](#dev-の巻き戻り2026-10-23)）。
 
 ## dev の巻き戻り（2026-10-23）
 
@@ -208,8 +287,7 @@ aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 
 ## 未検証事項
 
-- egress network connector の ENI から `tidb-proxy.internal`（Cloud Map の private DNS）を引けるか
-- Web Function 上で Rust の AWS SDK が認証情報を取れるか（`AWS_ACCESS_KEY_ID` などは予約済みの環境変数として Lambda が設定する想定）。Event invoke はここに依存する
+- Web Function 上で Rust の AWS SDK が認証情報を取れるか（`AWS_ACCESS_KEY_ID` などは予約済みの環境変数として Lambda が設定する想定）。Event invoke はここに依存する。切り替え手順の 2 で確かめる
 - connector の ENI が別 AZ（1c）にある場合の tidb-proxy（1a）までの経路と、AZ 間転送の量
 - invalidation の custom resource が endpoint の切り替え後に走ること（endpoint の更新完了が、新しい revision へのルーティング完了を意味するか）
 - musl の malloc の性能。遅い場合は mimalloc などのアロケータを入れる
