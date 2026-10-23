@@ -45,9 +45,11 @@ jobs:
         uses: $/.github/actions/setup-rust
 
       # blog-api の Web Function 用に aarch64 musl の静的バイナリを作る (iac/aws/lib/web-function-package.ts)。
-      # self-hosted runner なので一度入れれば次回以降は再利用される
+      # self-hosted runner なので一度入れれば次回以降は再利用される。rustup show は既に入っている
+      # toolchain に rust-toolchain.toml の targets を足さないため、musl の target は明示的に入れる
       - name: Setup cargo-zigbuild
         run: |
+          rustup target add aarch64-unknown-linux-musl
           command -v zig >/dev/null || brew install zig
           command -v cargo-zigbuild >/dev/null || cargo install cargo-zigbuild --locked
 
