@@ -57,6 +57,12 @@ describe('MainStack', () => {
         repoFullName: 'shuntaka9576/lab-contents-dev',
         imagesBucketName: 'tp-dev-lab-assets',
       },
+      webFunction: {
+        maxEnvironments: 2,
+      },
+      observability: {
+        healthcheckProbeIntervalMinutes: 30,
+      },
       web: {
         buildApiUrl: 'https://example.com/api',
         googleTagManagerId: 'GTM-TEST',

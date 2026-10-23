@@ -39,6 +39,8 @@ export class BlogAPIConstruct extends Construct {
       labImagesBucketName: string;
       databaseName: string;
       webFunctionCodeBucket: s3.Bucket;
+      /** Web Function の endpoint が使える実行環境の上限 */
+      webFunctionMaxEnvironments: number;
       ssmParameters: {
         proxy: {
           vpcId: string;
@@ -294,6 +296,7 @@ export class BlogAPIConstruct extends Construct {
       codeBucket: props.webFunctionCodeBucket,
       code: blogApiWebFunctionCode(),
       timeoutSeconds: 30,
+      maxEnvironments: props.webFunctionMaxEnvironments,
       egressNetworkConnectorArn: networkConnector.attrLatestVersionArn,
       environment: {
         ...apiEnvironment,

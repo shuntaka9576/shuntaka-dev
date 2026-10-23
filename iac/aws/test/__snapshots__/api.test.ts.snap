@@ -806,6 +806,9 @@ exports[`MainStack > snapshot 1`] = `
             "Weight": 100,
           },
         ],
+        "ScalingConfig": {
+          "MaxEnvironments": 2,
+        },
       },
       "Type": "AWS::Lambda::WebFunctionEndpoint",
     },
@@ -1537,7 +1540,7 @@ exports[`MainStack > snapshot 1`] = `
     "ObservabilityHealthcheckRule13407249": {
       "Properties": {
         "Name": "dev-tp-db-healthcheck-probe",
-        "ScheduleExpression": "rate(5 minutes)",
+        "ScheduleExpression": "rate(30 minutes)",
         "State": "ENABLED",
         "Targets": [
           {
@@ -1986,6 +1989,9 @@ function handler(event) {
             "Weight": 100,
           },
         ],
+        "ScalingConfig": {
+          "MaxEnvironments": 2,
+        },
       },
       "Type": "AWS::Lambda::WebFunctionEndpoint",
     },

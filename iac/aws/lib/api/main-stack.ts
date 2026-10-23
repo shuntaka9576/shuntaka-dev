@@ -30,6 +30,12 @@ export class MainStack extends cdk.Stack {
         repoFullName: string;
         imagesBucketName: string;
       };
+      webFunction: {
+        maxEnvironments: number;
+      };
+      observability: {
+        healthcheckProbeIntervalMinutes?: number;
+      };
       web: {
         buildApiUrl: string;
         googleTagManagerId?: string;
@@ -148,6 +154,7 @@ export class MainStack extends cdk.Stack {
       // stage 名そのまま (`dev` / `prd`) を TiDB の database 名サフィックスにする。
       databaseName: `blog_${props.stageName.long}`,
       webFunctionCodeBucket,
+      webFunctionMaxEnvironments: props.webFunction.maxEnvironments,
       ssmParameters: {
         proxy: props.ssmParameters.proxy,
       },
@@ -166,6 +173,7 @@ export class MainStack extends cdk.Stack {
       hostedZone,
       certificate: webCertificate,
       webFunctionCodeBucket,
+      webFunctionMaxEnvironments: props.webFunction.maxEnvironments,
       blogApi: blogApi.webFunction,
       buildEnv: {
         NEXT_PUBLIC_SITE_URL: siteUrl,
@@ -183,6 +191,7 @@ export class MainStack extends cdk.Stack {
     new ObservabilityConstruct(this, 'Observability', {
       physicalPrefix,
       apiBaseUrl: `${siteUrl}/api`,
+      healthcheckProbeIntervalMinutes: props.observability.healthcheckProbeIntervalMinutes,
       lambdaServiceName: otelServiceName,
       // tidb-proxy は dev / prd 共用のため service.name も stage 非依存
       proxyServiceName: 'tidb-proxy',

@@ -108,9 +108,12 @@ const counterIncrease = (id: string, metricName: string, serviceName: string): P
 // - SELECT 1 が速く db.query.duration だけ遅い       -> SQL/TiDB/TiKV 側 or 結果転送
 // - db.query.duration 高 & TiDB statement duration 低 -> ネットワーク/proxy 側
 //
-// SELECT 1 ベースラインは EventBridge API Destination が /health/db を 5 分毎に
-// 叩いて供給する。毎分にすると Lambda が常時 warm に保たれて cold start が
-// 観測できなくなるため、cold start 込みの実態が見える間隔にしている。
+// SELECT 1 ベースラインは EventBridge API Destination が /health/db を定期的に
+// 叩いて供給する。間隔が短いと実行環境が常時 warm に保たれて cold start が
+// 観測できなくなる。Lambda Web Functions の実行環境は最後のリクエストから
+// 5〜7 分ほどで消える (2026-10-23 の dev の実測) ため、5 分毎だと常に 1 台残り、
+// メモリ (2 GB 固定、実行環境がある間ずっと課金) が月 $22 ほどかかる。
+// 間隔はそれより長くし、cold start 込みの実態が見えるようにする。
 export class ObservabilityConstruct extends Construct {
   constructor(
     scope: Construct,
@@ -121,39 +124,43 @@ export class ObservabilityConstruct extends Construct {
       apiBaseUrl: string;
       lambdaServiceName: string;
       proxyServiceName: string;
+      /** /health/db を叩く間隔 (分)。未指定なら定期供給を作らない */
+      healthcheckProbeIntervalMinutes?: number;
     },
   ) {
     super(scope, id);
 
-    // ---- db.healthcheck.duration の定期供給 (5 分毎の SELECT 1) ----
+    // ---- db.healthcheck.duration の定期供給 (SELECT 1) ----
     // /health/db は公開エンドポイントのため認証は不要だが、EventBridge Connection
     // は auth 設定が必須なのでダミーヘッダーを渡す。
-    const healthcheckConnection = new events.Connection(this, 'HealthcheckConnection', {
-      authorization: events.Authorization.apiKey(
-        'x-healthcheck-probe',
-        cdk.SecretValue.unsafePlainText('scheduled-baseline-probe'),
-      ),
-      description: 'Dummy auth header for public /health/db probe',
-    });
+    if (props.healthcheckProbeIntervalMinutes !== undefined) {
+      const healthcheckConnection = new events.Connection(this, 'HealthcheckConnection', {
+        authorization: events.Authorization.apiKey(
+          'x-healthcheck-probe',
+          cdk.SecretValue.unsafePlainText('scheduled-baseline-probe'),
+        ),
+        description: 'Dummy auth header for public /health/db probe',
+      });
 
-    const healthcheckDestination = new events.ApiDestination(this, 'HealthcheckDestination', {
-      connection: healthcheckConnection,
-      endpoint: `${props.apiBaseUrl}/health/db`,
-      httpMethod: events.HttpMethod.GET,
-      rateLimitPerSecond: 1,
-      description: 'Periodic SELECT 1 baseline probe (db.healthcheck.duration)',
-    });
+      const healthcheckDestination = new events.ApiDestination(this, 'HealthcheckDestination', {
+        connection: healthcheckConnection,
+        endpoint: `${props.apiBaseUrl}/health/db`,
+        httpMethod: events.HttpMethod.GET,
+        rateLimitPerSecond: 1,
+        description: 'Periodic SELECT 1 baseline probe (db.healthcheck.duration)',
+      });
 
-    new events.Rule(this, 'HealthcheckRule', {
-      ruleName: `${props.physicalPrefix}-db-healthcheck-probe`,
-      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
-      targets: [
-        new targets.ApiDestination(healthcheckDestination, {
-          retryAttempts: 0,
-          maxEventAge: cdk.Duration.minutes(1),
-        }),
-      ],
-    });
+      new events.Rule(this, 'HealthcheckRule', {
+        ruleName: `${props.physicalPrefix}-db-healthcheck-probe`,
+        schedule: events.Schedule.rate(cdk.Duration.minutes(props.healthcheckProbeIntervalMinutes)),
+        targets: [
+          new targets.ApiDestination(healthcheckDestination, {
+            retryAttempts: 0,
+            maxEventAge: cdk.Duration.minutes(1),
+          }),
+        ],
+      });
+    }
 
     // ---- CloudWatch Dashboard (PromQL / OTel Metrics) ----
     const dashboard = new cloudwatch.Dashboard(this, 'Dashboard', {

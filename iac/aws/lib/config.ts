@@ -50,6 +50,18 @@ interface AppParameter {
     admin: string;
     images: string;
   };
+  // Lambda Web Functions は実行環境ごとにメモリ 2 GB 固定で、実行環境がある間ずっと課金される
+  // (東京で 1 台 1 時間 約 $0.031、常時 1 台で月 約 $22)。料金の見積もりは
+  // docs/source/98_tasks/2026-10-15-lambda-web-functions-survey/index.md の「料金」を参照
+  webFunction: {
+    // endpoint ごとの実行環境の上限 (最小値は 2)。bot などの急増で台数が際限なく増えないようにする
+    maxEnvironments: number;
+  };
+  observability: {
+    // /health/db を叩く監視の間隔 (分)。未設定なら監視しない。実行環境は最後のリクエストから
+    // 5〜7 分ほどで消えるため、それより短いと blog-api の実行環境が常に 1 台残る
+    healthcheckProbeIntervalMinutes?: number;
+  };
   web: {
     // next build 時のサーバー側 fetch の向き先。既定は CloudFront 経由の https://<fqdn>/api。
     // apex を CloudFront へ切り替える初回デプロイだけは /api がまだ無いため、
@@ -183,6 +195,11 @@ const stageConfig: {
       admin: 'admin.shuntaka.me',
       images: 'images.shuntaka.me',
     },
+    webFunction: {
+      maxEnvironments: 2,
+    },
+    // dev はアクセスがほぼ無いため、監視で実行環境を起こさない
+    observability: {},
     labs: {
       contentsRepoFullName: 'shuntaka9576/lab-contents-dev',
       imagesBucketName: `${stageName.dev.shortName}-${commonParameters.projectName.short}-lab-assets`,
@@ -198,6 +215,12 @@ const stageConfig: {
     domain: {
       admin: 'admin.shuntaka.dev',
       images: 'images.shuntaka.dev',
+    },
+    webFunction: {
+      maxEnvironments: 3,
+    },
+    observability: {
+      healthcheckProbeIntervalMinutes: 30,
     },
     labs: {
       contentsRepoFullName: 'shuntaka9576/lab-contents',

@@ -325,6 +325,123 @@ aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 
 この PR を main にマージするまでは、main への push のたびに旧構成で dev がデプロイされる。ワークフローとコードは push されたコミットのものが使われるため、ブランチ側では防げない。マージまで main へのマージ（Renovate を含む）を止める。
 
+## 料金（2026-10-23 の見積もり）
+
+Web Functions の料金はほぼメモリで決まる。メモリは実行環境ごとに 2 GB 固定で、リクエストが無くても実行環境がある間ずっと課金される。費用は「実行環境が何台、何時間生きているか」で決まる。
+
+### 単価（ap-northeast-1、Arm）
+
+AWS の Price List API で確かめた。
+
+```bash
+aws pricing get-products --region us-east-1 --service-code AWSLambda \
+  --filters Type=TERM_MATCH,Field=regionCode,Value=ap-northeast-1 --output json |
+  jq -r '.PriceList[] | fromjson | select((.product.attributes | tostring) | test("web";"i"))
+    | [.product.attributes.usagetype, (.terms.OnDemand[].priceDimensions[] | "\(.pricePerUnit.USD) / \(.unit)")] | @tsv'
+```
+
+| 項目       | 単価                    | 目安                                                                   |
+| ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| メモリ     | $0.0000042688 / GB 秒   | 1 台 1 時間で約 $0.031。24 時間 30 日動き続けると 1 台で約 $22 / 月    |
+| vCPU       | $0.0000322421 / vCPU 秒 | CPU を使った時間だけ。dev の実測は 4 時間で合計約 100 秒（$0.01 未満） |
+| リクエスト | $0.30 / 100 万件        | ブログの規模ならほぼ 0                                                 |
+
+### dev の実測
+
+実行環境は 1 分ごとに `platform.invokeSummary`（`instanceId`、`requests`、`cpuTimeMs` を含む）をログに出す。実行環境ごとに数えると、生きていた分数が分かる。
+
+```bash
+for g in /aws/lambda-web/d-st-web /aws/lambda-web/d-st-blog-api-web; do
+  echo "== $g"
+  aws logs tail "$g" --since 5h --format short | grep 'platform.invokeSummary' |
+    sed -E 's/^([0-9T:-]+) .*"instanceId":"([^"]+)".*"requests":([0-9]+).*"cpuTimeMs":([0-9.]+).*/\2 \1 \3 \4/' |
+    awk '{ n[$1]++; r[$1]+=$3; c[$1]+=$4 } END { t=0; for (k in n) { printf "%s minutes=%d requests=%d cpu_s=%.1f\n", substr(k,1,8), n[k], r[k], c[k]/1000; t+=n[k] } print "total env-minutes=" t }'
+done
+```
+
+2026-10-23 の 11:38〜15:27（JST）は、デプロイと動作確認で一番忙しかった時間帯で、次のとおりだった。
+
+| 関数              | 実行環境の数 | 延べ稼働 | 金額（メモリ） |
+| ----------------- | ------------ | -------- | -------------- |
+| d-st-web          | 35           | 298 分   | 約 $0.15       |
+| d-st-blog-api-web | 14           | 296 分   | 約 $0.15       |
+
+- 実行環境は最後のリクエストから 5〜7 分ほどで消え、リクエストが無ければ 0 台になる
+- デプロイ直後などに 6〜8 台が同時に立ち上がることがあった。1 台あたり数分〜十数分で消える
+
+### 定常時の見込みと対策
+
+対策前は、監視（EventBridge の API Destination が `/health/db` を叩く）が 5 分ごとだった。実行環境が消える前に次の監視が来るため、blog-api の実行環境が常に 1 台残っていた（1 段階あたり約 $22 / 月）。Next.js は CloudFront のキャッシュ切れのときだけ呼ばれ、アクセスが数分おきに来るなら実質ずっと 1 台残る（$0〜22 / 月）。dev と prd を合わせると $30〜90 / 月で、旧構成（Lambda + API Gateway はほぼ $0、Vercel）より増える。
+
+また endpoint に台数の上限が無く、bot などで急に増えるとアカウントの vCPU の上限まで実行環境が増え得た（例えば 100 台が 1 日動くと約 $74）。
+
+| 対策                | dev    | prd       | 効果                                                                                                     |
+| ------------------- | ------ | --------- | -------------------------------------------------------------------------------------------------------- |
+| `maxEnvironments`   | 2      | 3         | 最悪でも、関数ごとに上限台数 × $22 / 月で頭打ちになる。1 台で 64 並列まで捌けるので、ブログには十分      |
+| `/health/db` の監視 | 止める | 30 分ごと | 監視で起こした実行環境は 5〜7 分で消えるので、blog-api の常駐は 30 分のうち 2 割強に下がる（約 $5 / 月） |
+
+設定は `iac/aws/lib/config.ts` の `webFunction.maxEnvironments` と `observability.healthcheckProbeIntervalMinutes`。監視の間隔を実行環境が消える時間より長くすると、db.healthcheck.duration にコールドスタート込みの値が入る。これは元々の監視の意図（`observability-construct.ts` のコメント）にも合う。
+
+対策後の見込みは、dev がほぼ $0（触ったときだけ）、prd が $5〜50 / 月（アクセス次第。上限 3 台）。ほかの料金は次のとおりで小さい。
+
+- CloudFront: 常時無料枠（月 1 TB、1,000 万リクエスト、CloudFront Functions 200 万回）に収まる見込み
+- egress network connector: 時間課金は無い。VPC との間のデータ転送は同一リージョン内の料金で、別 AZ を通る分は $0.01 / GB
+- S3 のコード置き場: デプロイごとに約 18 MB の zip が残る（prune しない）。100 回で約 1.8 GB、月 $0.05 ほど
+
+予算のアラートは CDK では作っていない。AWS Budgets で月の予算を手で作る。既にあるかを確かめてから作る。
+
+```bash
+aws budgets describe-budgets --account-id <account-id> --query 'Budgets[].BudgetName'
+aws budgets create-budget --account-id <account-id> \
+  --budget '{"BudgetName":"monthly-total","BudgetLimit":{"Amount":"30","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST"}' \
+  --notifications-with-subscribers '[{"Notification":{"NotificationType":"FORECASTED","ComparisonOperator":"GREATER_THAN","Threshold":100,"ThresholdType":"PERCENTAGE"},"Subscribers":[{"SubscriptionType":"EMAIL","Address":"<email>"}]}]'
+```
+
+### 次の料金比較の観点
+
+prd を切り替えたあと、実際の請求で旧構成と比べる。見積もりと実績がずれたら、どこがずれたかが分かるように観点を揃えておく。
+
+比べ方は次のとおり。
+
+- 期間: 暦月で比べる。切り替えた月は旧構成と新構成が混ざるので外す（例: 旧構成は 2026-09、新構成は切り替えの翌月）
+- stage: dev と prd を分ける。Cost Explorer では分けられない項目（Web Functions の使用量など）は、関数名（`d-st-*` / `p-st-*`）ごとのログ集計で按分する
+- 正規化: アクセス数で割った値（1 万リクエストあたりの費用）も見る。アクセスが増えて高くなったのか、構成のせいで高くなったのかを分けるため
+
+項目ごとの対応は次のとおり。
+
+| 観点           | 新構成                                                              | 旧構成                                             | 取り方                                         |
+| -------------- | ------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| 計算（メモリ） | `Lambda-Web-Memory-GB-Second-ARM`（実行環境がある間ずっと）         | Lambda の GB 秒（Event Function、実行中だけ）      | Cost Explorer の USAGE_TYPE                    |
+| 計算（CPU）    | `Lambda-Web-vCPU-Second-ARM`                                        | （GB 秒に含まれる）                                | Cost Explorer の USAGE_TYPE                    |
+| リクエスト     | `Lambda-Web-Request-ARM`、CloudFront のリクエスト                   | API Gateway REST のリクエスト、Lambda のリクエスト | Cost Explorer の USAGE_TYPE                    |
+| 配信           | CloudFront のデータ転送（無料枠を超えたか）                         | Vercel のプランと従量分                            | Cost Explorer、Vercel の請求                   |
+| ネットワーク   | AZ 間のデータ転送（connector の 1c の ENI → 1a の tidb-proxy）      | なし（1a のみ）                                    | Cost Explorer の `DataTransfer-Regional-Bytes` |
+| 監視           | EventBridge の API Destination（prd 30 分ごと）                     | 同（dev / prd とも 5 分ごと）                      | Cost Explorer                                  |
+| 保存           | S3 のコード置き場（zip が溜まる）、ECR（Event Function のイメージ） | ECR                                                | S3 のバケットサイズ、Cost Explorer             |
+| 固定費         | なし                                                                | Vercel のプラン                                    | Vercel の請求                                  |
+
+料金の背景として、次の使い方の指標も残す。
+
+- 実行環境の延べ稼働（env-minutes）と、同時に立っていた台数の最大（上の dev の実測と同じ集計）
+- `maxEnvironments` に当たって絞られたか（CloudFront の 5xx / 429 の割合）
+- アクセス数（CloudFront の Requests、ページビュー）
+
+金額以外に、次も一緒に比べる。
+
+- 体感の速さ: TTFB、コールドスタートの頻度と時間（db.healthcheck.duration、CloudFront のオリジンの応答時間）
+- 運用: デプロイにかかる時間、手作業の量（Vercel の操作が無くなった分、CDK の synth が重くなった分）
+
+Cost Explorer からは次で取れる。
+
+```bash
+aws ce get-cost-and-usage --time-period Start=2026-11-01,End=2026-12-01 --granularity MONTHLY \
+  --metrics UnblendedCost UsageQuantity \
+  --filter '{"Dimensions":{"Key":"SERVICE","Values":["AWS Lambda","Amazon CloudFront","Amazon API Gateway","Amazon EC2","Amazon EventBridge"]}}' \
+  --group-by Type=DIMENSION,Key=USAGE_TYPE
+```
+
+stage を Cost Explorer で分けたくなったら、スタックにタグ（例: `stage`）を付けてコスト配分タグとして有効にする（今は付けていない）。
+
 ## 未検証事項
 
 - connector の ENI が別 AZ（1c）にある場合の tidb-proxy（1a）までの経路と、AZ 間転送の量
@@ -332,5 +449,5 @@ aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 - musl の malloc の性能。遅い場合は mimalloc などのアロケータを入れる
 - Web Functions が zip 内のシンボリックリンクを残して展開するか（apps/web の zip はリンクを含む。残らない場合は standalone を hoisted な node_modules で作り直す）
 - swagger UI（`/api/swagger`）は `openapi.json` を絶対パス `/swagger/openapi.json` で読むため、CloudFront 経由では JSON の取得が 404 になる
-- アクセスがなくなってから実行環境が消えるまでの時間（2 GB 固定のメモリ課金に効く。ドキュメントで見つけられなかった）
+- 実行環境が消えるまでの時間（dev の実測では最後のリクエストから 5〜7 分。ドキュメントには書かれておらず、変わり得る）
 - IamAuth の endpoint で viewer の `Authorization` が残るか（HTTP ページは削除と書き、アクセス制御ページは `AWS4-` で始まる値のみ削除と書いている）

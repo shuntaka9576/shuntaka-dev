@@ -26,6 +26,8 @@ export class SiteConstruct extends Construct {
       /** us-east-1 の apex 用証明書 */
       certificate: acm.ICertificate;
       webFunctionCodeBucket: s3.Bucket;
+      /** Web Function の endpoint が使える実行環境の上限 */
+      webFunctionMaxEnvironments: number;
       blogApi: WebFunction;
       /** next build に渡す環境変数 */
       buildEnv: Record<string, string>;
@@ -40,6 +42,7 @@ export class SiteConstruct extends Construct {
       codeBucket: props.webFunctionCodeBucket,
       code: webWebFunctionCode(props.buildEnv),
       timeoutSeconds: 30,
+      maxEnvironments: props.webFunctionMaxEnvironments,
       environment: {
         // サーバー側の fetch は相対 URL を解決できないため、CloudFront 経由の API を絶対 URL で指す
         API_URL: `${siteUrl}/api`,

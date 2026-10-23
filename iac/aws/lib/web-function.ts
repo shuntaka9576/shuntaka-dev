@@ -31,6 +31,10 @@ export class WebFunction extends Construct {
       environment?: Record<string, string>;
       // バージョン付きの connector ARN。指定すると外向き通信が VPC 経由になる
       egressNetworkConnectorArn?: string;
+      // endpoint が使える実行環境の上限 (最小値は 2)。メモリは 2 GB 固定で実行環境がある間
+      // ずっと課金されるため、bot などでアクセスが急に増えても台数 (= 料金) が際限なく増えないようにする。
+      // 上限に達すると、それ以上の並列リクエストは endpoint で絞られる
+      maxEnvironments: number;
     },
   ) {
     super(scope, id);
@@ -133,6 +137,7 @@ export class WebFunction extends Construct {
       // CloudFront OAC から署名付きで呼ばせ、直接アクセスは 403 にする
       authType: 'IamAuth',
       revisionWeights: [{ revisionId: revision.attrRevisionId, weight: 100 }],
+      scalingConfig: { maxEnvironments: props.maxEnvironments },
     });
   }
 

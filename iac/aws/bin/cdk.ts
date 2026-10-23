@@ -85,6 +85,8 @@ const mainStack = new MainStack(app, `${config.stageName.short}-${config.project
     repoFullName: config.labs.contentsRepoFullName,
     imagesBucketName: config.labs.imagesBucketName,
   },
+  webFunction: config.webFunction,
+  observability: config.observability,
   web: config.web,
   ssmParameters: config.ssm,
   lambda: config.lambda,
