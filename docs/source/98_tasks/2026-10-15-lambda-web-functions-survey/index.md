@@ -161,7 +161,7 @@ dev → prd の順に切り替え、最後に Vercel と旧構成の残りを片
 | #   | 作業                                                                         | 状態                                                                    |
 | --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336） |
-| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 未                                                                      |
+| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 済（2026-10-23）                                                        |
 | 3   | PR #817 をマージする                                                         | 未                                                                      |
 | 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 未                                                                      |
 | 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | 未                                                                      |
@@ -189,7 +189,7 @@ curl -s 'https://shuntaka.me/api/users/shuntaka/articles?perPage=1' | head -c 20
 gh variable delete WEB_BUILD_API_URL --env dev
 ```
 
-### 2. GitHub App（dev）の Webhook URL を変える
+### 2. GitHub App（dev）の Webhook URL を変える（済）
 
 GitHub の Settings → Developer settings → GitHub Apps → dev 用の App → General で、Webhook URL を `https://shuntaka.me/api/webhooks/github` に変える。記事リポジトリ（または lab-contents-dev）に push し、App の Advanced → Recent Deliveries が 200（`accepted`）になることを確かめる。
 
@@ -199,6 +199,17 @@ Web Function が受けて Event Function へ Event invoke し、Event Function �
 aws logs tail /aws/lambda-web/d-st-blog-api-web --since 15m
 aws logs tail /aws/lambda/d-st-blog-api --since 15m
 ```
+
+dev 用の App（articles-v2 にインストールしている App）の Webhook URL を変え、articles-v2 のテスト記事 `a2` に目印の行を足して main に push した。最初は別の App の URL を変えていて、配信が shuntaka.me に届かなかった。articles-v2 にインストールしている App を直してからは、次のとおり通った。
+
+| 時刻（JST） | 場所                     | 結果                                                                                                                    |
+| ----------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 15:20:19    | articles-v2              | main に push                                                                                                            |
+| 15:20:20    | blog-api の Web Function | `Received GitHub webhook: event_type=push` → `Queued push event for async processing`（Event Function へ Event invoke） |
+| 15:20 台    | Event Function           | `Processing async push event: ref=refs/heads/main, repo=shuntaka9576/articles-v2, kind=articles`                        |
+| 15:20:27    | dev の API               | `/api/users/shuntaka/articles/a2` に目印が出た（push から約 8 秒）                                                      |
+
+Web Function 上の Rust の AWS SDK が認証情報を取り、squid（`HTTPS_PROXY`）経由で Lambda API を呼べることも、ここで確かめられた。
 
 ### 3. PR #817 をマージする
 
@@ -316,7 +327,6 @@ aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 
 ## 未検証事項
 
-- Web Function 上で Rust の AWS SDK が認証情報を取れるか（`AWS_ACCESS_KEY_ID` などは予約済みの環境変数として Lambda が設定する想定）。Event invoke はここに依存する。切り替え手順の 2 で確かめる
 - connector の ENI が別 AZ（1c）にある場合の tidb-proxy（1a）までの経路と、AZ 間転送の量
 - invalidation の custom resource が endpoint の切り替え後に走ること（endpoint の更新完了が、新しい revision へのルーティング完了を意味するか）
 - musl の malloc の性能。遅い場合は mimalloc などのアロケータを入れる
