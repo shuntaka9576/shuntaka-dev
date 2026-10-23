@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.1023.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1006.0...2026.1023.0) - 2026-10-23
+
+- chore: 滞留中の依存関係更新を統合 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/814
+- feat: blog-api と apps/web を Lambda Web Functions + CloudFront に移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/817
+
 ## [2026.1006.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.0928.0...2026.1006.0) - 2026-10-06
 
 - feat: tidb-proxyログのIcebergテーブルをS3 Tablesへ移行 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/803
