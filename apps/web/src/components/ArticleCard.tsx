@@ -73,15 +73,14 @@ export const ArticleCard = memo(function ArticleCard({
             )}
           </div>
           {article.thumbnail && (
-            <div>
+            <div className="shrink-0">
               {priority ? (
                 <Image
                   src={article.thumbnail}
                   alt={article.title}
                   width={150}
                   height={100}
-                  className="rounded-[10px] object-cover"
-                  style={{ width: 'auto', height: 'auto' }}
+                  className="h-[100px] w-[150px] rounded-[10px] object-cover"
                   priority
                 />
               ) : (
@@ -90,8 +89,7 @@ export const ArticleCard = memo(function ArticleCard({
                   alt={article.title}
                   width={150}
                   height={100}
-                  className="rounded-[10px] object-cover"
-                  style={{ width: 'auto', height: 'auto' }}
+                  className="h-[100px] w-[150px] rounded-[10px] object-cover"
                   loading="lazy"
                 />
               )}
