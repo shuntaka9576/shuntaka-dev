@@ -24,18 +24,18 @@ CloudFront OAC と組み合わせたとき、Function URL + OAC にあった「P
 
 すべて公式ドキュメントで確認した（2026-10-15 時点）。
 
-| 項目                   | 内容                                                                                                                                                                                    | 出典                                                                                                                                                                                                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ランタイム             | `nodejs24.x`（arm64）のみ。Node.js 以外は Event Functions か MicroVMs を使うよう案内されている                                                                                          | [web-functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html)                                                                                                                                                                                              |
-| コード                 | バージョニング有効な S3 バケットの .zip のみ（展開後 512 MB まで）。コンテナイメージは不可。バケットポリシーで `lambda.amazonaws.com` に読み取りを許可する                              | [code-s3](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-code-s3.html)                                                                                                                                                                                            |
-| 実行環境               | メモリ 2 GB 固定。`maxConcurrencyPerEnvironment` は 1〜128（デフォルト 64）                                                                                                             | [runtimes](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-runtimes.html#web-functions-runtimes-memory) / [CFN ServiceConfig](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-webfunctionrevision-serviceconfig.html) |
-| タイムアウト           | 3〜900 秒（デフォルト 30 秒）                                                                                                                                                           | [CFN ServiceConfig](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-webfunctionrevision-serviceconfig.html)                                                                                                                      |
-| 入口                   | Lambda が HTTPS エンドポイントを提供（HTTP/1.1）。カスタムドメインと WAF は CloudFront を前段に置く。WebSocket は不可                                                                   | [networking](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-networking.html)                                                                                                                                                                                      |
-| イベント               | HTTP のみ。イベント駆動の処理は Event Functions を使う                                                                                                                                  | [web-functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html)                                                                                                                                                                                              |
-| VPC                    | egress network connector で VPC へ出る。別 AZ のサブネット 2 つ以上が必要。connector 自体はインターネットへの出口を提供しない（NAT が必要）。`HomeRegion` の endpoint のみ              | [networking](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-networking.html#web-functions-networking-vpc)                                                                                                                                                         |
-| CloudFront OAC         | signing behavior は `always-amz-auth` のみ。PUT / POST / PATCH は `UNSIGNED-PAYLOAD` で署名するため `x-amz-content-sha256` は不要。viewer の `Authorization` は上書きされず関数まで届く | [CloudFront: Lambda Web Function origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda-web.html#oac-signing-behavior-lambda-web)                                                                            |
-| Lambda@Edge            | OAC 付きの Web Function オリジンのビヘイビアでは origin request / origin response トリガーを使えない（CloudFront Functions は使える）                                                   | [CloudFront: Lambda Web Function origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda-web.html#oac-prerequisites-lambda-web)                                                                               |
-| 料金（us-east-1, Arm） | $0.30 / 100 万リクエスト、$0.0000276944 / vCPU 秒（CPU を使った時間のみ）、$0.0000036667 / GB 秒（実行環境が存在する間）                                                                | [pricing](https://aws.amazon.com/lambda/pricing/)                                                                                                                                                                                                                             |
+| 項目                   | 内容                                                                                                                                                                                                                  | 出典                                                                                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ランタイム             | `nodejs24.x`（arm64）のみ。Node.js 以外は Event Functions か MicroVMs を使うよう案内されている                                                                                                                        | [web-functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html)                                                                                                                                                                                              |
+| コード                 | バージョニング有効な S3 バケットの .zip のみ（展開後 512 MB まで）。コンテナイメージは不可。バケットポリシーで `lambda.amazonaws.com` に読み取りを許可する                                                            | [code-s3](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-code-s3.html)                                                                                                                                                                                            |
+| 実行環境               | メモリ 2 GB 固定。`maxConcurrencyPerEnvironment` は 1〜128（デフォルト 64）                                                                                                                                           | [runtimes](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-runtimes.html#web-functions-runtimes-memory) / [CFN ServiceConfig](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-webfunctionrevision-serviceconfig.html) |
+| タイムアウト           | 3〜900 秒（デフォルト 30 秒）                                                                                                                                                                                         | [CFN ServiceConfig](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lambda-webfunctionrevision-serviceconfig.html)                                                                                                                      |
+| 入口                   | Lambda が HTTPS エンドポイントを提供（HTTP/1.1）。カスタムドメインと WAF は CloudFront を前段に置く。WebSocket は不可                                                                                                 | [networking](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-networking.html)                                                                                                                                                                                      |
+| イベント               | HTTP のみ。イベント駆動の処理は Event Functions を使う                                                                                                                                                                | [web-functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html)                                                                                                                                                                                              |
+| VPC                    | egress network connector で VPC へ出る。別 AZ のサブネット 2 つ以上が必要。connector 自体はインターネットへの出口を提供しない（NAT が必要）。`HomeRegion` の endpoint のみ                                            | [networking](https://docs.aws.amazon.com/lambda/latest/dg/web-functions-networking.html#web-functions-networking-vpc)                                                                                                                                                         |
+| CloudFront OAC         | signing behavior は `always-amz-auth` のみ。PUT / POST / PATCH は `UNSIGNED-PAYLOAD` で署名するため `x-amz-content-sha256` は不要。viewer の `Authorization` は上書きされず関数まで届く                               | [CloudFront: Lambda Web Function origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda-web.html#oac-signing-behavior-lambda-web)                                                                            |
+| Lambda@Edge            | OAC 付きの Web Function オリジンのビヘイビアでは origin request / origin response トリガーを使えない（CloudFront Functions は使える）                                                                                 | [CloudFront: Lambda Web Function origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-lambda-web.html#oac-prerequisites-lambda-web)                                                                               |
+| 料金（us-east-1, Arm） | $0.30 / 100 万リクエスト、$0.0000276944 / vCPU 秒（CPU を使った時間のみ）、$0.0000036667 / GB 秒（実行環境が存在する間、使ったメモリの分。[料金の実績](#料金の実績2026-10-27-時点)を参照）。Lambda の無料枠は効かない | [pricing](https://aws.amazon.com/lambda/pricing/)                                                                                                                                                                                                                             |
 
 ### CDK の対応状況（aws-cdk-lib 2.273.0）
 
@@ -327,6 +327,8 @@ aws ec2 delete-subnet --subnet-id ${SUBNET_ID}
 
 ## 料金（2026-10-23 の見積もり）
 
+この見積もりはメモリを 2 GB × 稼働時間で数えているが、実際は実行環境が使ったメモリ（170〜240 MB）の分だけ課金されていた。メモリの金額はこの節の約 1/10 になる。実績は[料金の実績](#料金の実績2026-10-27-時点)を参照。
+
 Web Functions の料金はほぼメモリで決まる。メモリは実行環境ごとに 2 GB 固定で、リクエストが無くても実行環境がある間ずっと課金される。費用は「実行環境が何台、何時間生きているか」で決まる。
 
 ### 単価（ap-northeast-1、Arm）
@@ -442,6 +444,106 @@ aws ce get-cost-and-usage --time-period Start=2026-11-01,End=2026-12-01 --granul
 
 stage を Cost Explorer で分けたくなったら、スタックにタグ（例: `stage`）を付けてコスト配分タグとして有効にする（今は付けていない）。
 
+## 料金の実績（2026-10-27 時点）
+
+prd は 2026-10-23 の 16 時ごろ（JST）に切り替えた。切り替え後の丸 1 日が取れる 10-24〜26（UTC の日。Cost Explorer の日の区切りに合わせた）で集計した。暦月での比較は[次の料金比較の観点](#次の料金比較の観点)のとおり 2026-11 が終わってから行う。ここでは日次の速報を残す。
+
+### メモリは使った分だけ課金される
+
+Web Functions のメモリは、実行環境が使ったメモリの分だけ課金されていた。見積もりは 2 GB × 稼働時間で数えていたため、約 10 倍に見積もっていた。料金ページの計算例も、消費したメモリ（0.49 GB）× 秒で計算している（[pricing](https://aws.amazon.com/lambda/pricing/)）。
+
+`platform.invokeSummary` は実行環境ごとに 1 分おきに `maxMemoryUsageMb` を出す。その合計 × 60 秒が、Cost Explorer の `APN1-Lambda-Web-Memory-GB-Second-ARM` とほぼ一致した（4 関数の合計）。
+
+| 日（UTC） | Cost Explorer の GB 秒 | ログの maxMemoryUsageMb × 60 秒 | 2 GB × 稼働時間（見積もりの数え方） |
+| --------- | ---------------------- | ------------------------------- | ----------------------------------- |
+| 10-23     | 37,122                 | 38,519                          | 382,560                             |
+| 10-24     | 43,318                 | 44,714                          | 440,160                             |
+| 10-25     | 37,566                 | 39,096                          | 396,240                             |
+
+リクエスト数もログの合計と Cost Explorer の `APN1-Lambda-Web-Request-ARM` が一致した（10-24 は両方 3,019 件）。
+
+使っているメモリは blog-api が約 170 MB、Next.js が約 240 MB（最大 386 MB）。1 台が 30 日動き続けたときのメモリ代は、blog-api が約 $1.9、Next.js が約 $2.6 になる（見積もりの約 $22 ではない）。
+
+Web Functions には Lambda の無料枠が効かない。Event Function など（`APN1-Lambda-GB-Second-ARM`）は 0 円のままで、Web Functions の使用量は最初から課金されている。
+
+### Web Functions の費用
+
+Cost Explorer の日次。10-26 はまだ締まっていない（tidb-proxy の Fargate が通常の 6 割しか計上されていない）ので外した。
+
+| 日（UTC） | メモリ | vCPU   | リクエスト | 計     |
+| --------- | ------ | ------ | ---------- | ------ |
+| 10-24     | $0.185 | $0.020 | $0.001     | $0.206 |
+| 10-25     | $0.160 | $0.019 | $0.001     | $0.180 |
+
+1 日あたり約 $0.19、30 日で約 $5.8。関数ごとにはログから按分した（10-24〜26 の平均）。
+
+| 関数              | リクエスト / 日 | 1 台以上いた時間 | 平均メモリ | コールドスタート / 日 | 30 日換算 |
+| ----------------- | --------------- | ---------------- | ---------- | --------------------- | --------- |
+| p-st-web          | 1,370           | 66%              | 237 MB     | 122                   | 約 $2.5   |
+| p-st-blog-api-web | 447             | 68%              | 172 MB     | 144                   | 約 $2.2   |
+| d-st-web          | 1,028           | 23%              | 233 MB     | 49                    | 約 $0.9   |
+| d-st-blog-api-web | 203             | 15%              | 173 MB     | 25                    | 約 $0.3   |
+
+prd が約 $4.7 / 月、dev が約 $1.2 / 月。見積もり（prd $5〜50、dev ほぼ $0）と比べると、prd は下限あたり、dev は少し上だった。
+
+- prd は 1 日の 2/3 の時間で実行環境が 1 台以上いる。1 台は平均 10 分ほどで消え、関数ごとに 1 日 120〜140 回ほど立ち上がる
+- p-st-blog-api-web はリクエストが 1 日 450 件ほどなのに、1 台以上いた時間（3 日で 2,921 分）の約半分（1,395 分）で 2 台が同時にいた。理由は未確認
+- 1 分ごとの台数の最大は p-st-blog-api-web の 5（prd の上限は 3）。1 分の区切りで数えているので、入れ替わる前後の実行環境が重なって数えられたものと見られる（未確認）
+- dev にも Next.js へ 1 日 1,000 件ほどのリクエストが来ている
+- 上限まで常駐したときは、今のメモリ使用量なら prd で 3 台 × 2 関数 ≈ $13 / 月になる。負荷でメモリが増えればその分上がる
+
+### ほかの料金
+
+- CloudFront: 無料枠に収まった。1 日 3,000〜3,900 リクエスト、転送 0.02〜0.03 GB
+- AZ 間のデータ転送（`APN1-DataTransfer-Regional-Bytes`）: 1 日 0.01〜0.03 GB で 0 円
+- API Gateway REST: 10-24 以降は使われていない（`APN1-ApiGatewayRequest` が 0 件）
+
+### 旧構成（2026-09）との比較
+
+| 項目                                  | 旧構成（2026-09 の請求）                  | 新構成（30 日の見込み） |
+| ------------------------------------- | ----------------------------------------- | ----------------------- |
+| Web Functions                         | なし                                      | 約 $5.8                 |
+| Lambda（Event Function など）         | $0（無料枠。約 5,900 GB 秒、約 3.9 万件） | $0（無料枠）            |
+| API Gateway REST                      | $0.09（19,672 件）                        | なし                    |
+| CloudFront                            | なし                                      | $0（無料枠）            |
+| 共通（tidb-proxy、Route 53、S3 など） | $17.14                                    | 同じ                    |
+| Vercel                                | 未確認                                    | なし                    |
+| 計（税抜）                            | $17.23 + Vercel                           | 約 $23                  |
+
+共通分の内訳（2026-09）は、tidb-proxy の Fargate が $8.86、Public IPv4 が $3.60、Route 53 が $2.03、S3 が $1.29、Secrets Manager が $0.80、CloudWatch が $0.33、ECR が $0.15。
+
+日次の合計で見ても、切り替え前（10-02〜10-22）の 1 日約 $0.47 が、切り替え後（10-24〜25）は約 $0.67 になった。差の $0.19 / 日（30 日で約 $5.8）は Web Functions の費用とほぼ同じ。AWS 側は月 $6 ほど増え、Vercel の分が無くなる。
+
+### 集計に使ったコマンド
+
+AWS の認証は `aws-vault exec private`（ブログのアカウント）。Cost Explorer は UTC の日で区切られる。
+
+```bash
+aws ce get-cost-and-usage --region us-east-1 --time-period Start=2026-10-01,End=2026-10-28 --granularity DAILY \
+  --metrics UnblendedCost UsageQuantity --group-by Type=DIMENSION,Key=USAGE_TYPE
+```
+
+関数ごとの使用量は Logs Insights で集計した（`START` / `END` は UNIX 秒）。
+
+```bash
+G="/aws/lambda-web/d-st-web /aws/lambda-web/d-st-blog-api-web /aws/lambda-web/p-st-web /aws/lambda-web/p-st-blog-api-web"
+# 日ごとの延べ稼働（分）、リクエスト、CPU、メモリ（maxMemoryUsageMb の合計 × 60 / 1024 が GB 秒）
+aws logs start-query --log-group-names $G --start-time $START --end-time $END --query-string \
+  'filter type = "platform.invokeSummary"
+   | stats count(*) as envMin, sum(record.metrics.requests) as req, sum(record.metrics.cpuTimeMs) as cpuMs,
+       sum(record.metrics.maxMemoryUsageMb) as memMbMin by @log, bin(1d) as day'
+# コールドスタートの回数
+aws logs start-query --log-group-names $G --start-time $START --end-time $END --query-string \
+  'filter type = "platform.initStart" | stats count(*) as inits by @log, bin(1d) as day'
+# 1 分ごとの台数（--limit 10000 で全行を取り、手元で最大と分布を数える）
+aws logs start-query --log-group-names $G --start-time $START --end-time $END --limit 10000 --query-string \
+  'filter type = "platform.invokeSummary"
+   | stats count_distinct(record.instanceId) as n by @log, datefloor(@timestamp, 1m) as minute'
+aws logs get-query-results --query-id <queryId>
+```
+
+1 分ごとの台数は `bin(1m) as m` で書くと分ごとに分かれず、`@log` ごとの 1 行になった。`datefloor` を使う。
+
 ## 未検証事項
 
 - connector の ENI が別 AZ（1c）にある場合の tidb-proxy（1a）までの経路と、AZ 間転送の量
@@ -451,3 +553,4 @@ stage を Cost Explorer で分けたくなったら、スタックにタグ（�
 - swagger UI（`/api/swagger`）は `openapi.json` を絶対パス `/swagger/openapi.json` で読むため、CloudFront 経由では JSON の取得が 404 になる
 - 実行環境が消えるまでの時間（dev の実測では最後のリクエストから 5〜7 分。ドキュメントには書かれておらず、変わり得る）
 - IamAuth の endpoint で viewer の `Authorization` が残るか（HTTP ページは削除と書き、アクセス制御ページは `AWS4-` で始まる値のみ削除と書いている）
+- p-st-blog-api-web で、リクエストが少ないのに 2 台が同時にいる時間が長い理由（[料金の実績](#料金の実績2026-10-27-時点)）
