@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026.1027.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1023.0...2026.1027.0) - 2026-10-27
+
+- fix: 記事カードのサムネイルを 150x100 に固定する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/823
+- docs: アーキテクチャ図を Lambda Web Functions + CloudFront 構成に更新 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/818
+- feat: リクエストごとに cold start を判定してログに出す by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/826
+- docs: Lambda Web Functions 移行後の料金の実績を追記 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/825
+
 ## [2026.1023.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1006.0...2026.1023.0) - 2026-10-23
 
 - chore: 滞留中の依存関係更新を統合 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/814
