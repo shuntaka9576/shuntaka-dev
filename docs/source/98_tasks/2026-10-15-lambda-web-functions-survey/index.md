@@ -397,6 +397,32 @@ aws budgets create-budget --account-id <account-id> \
   --notifications-with-subscribers '[{"Notification":{"NotificationType":"FORECASTED","ComparisonOperator":"GREATER_THAN","Threshold":100,"ThresholdType":"PERCENTAGE"},"Subscribers":[{"SubscriptionType":"EMAIL","Address":"<email>"}]}]'
 ```
 
+### 次の検証（2026-11〜12）
+
+今回の移行では、apps/web の Vercel からの移行、API Gateway を外して CloudFront 経由にしたこと、blog-api の Web Functions への移行、ヘルスチェックの間隔（5 分 → 30 分）を同時に変えた。料金や cold start の変化がどの変更によるものかを分けるため、blog-api だけを戻して比べる。
+
+| 期間    | 構成                                                                   | 見ること                          |
+| ------- | ---------------------------------------------------------------------- | --------------------------------- |
+| 2026-11 | 今の構成（apps/web と blog-api が Web Functions）                      | 基準                              |
+| 2026-12 | blog-api だけ Event Functions に戻す。apps/web は Web Functions のまま | blog-api の料金と cold start の差 |
+
+条件は次のとおり揃える。
+
+- ヘルスチェックの間隔は 2 か月とも変えない（prd は 30 分ごと）
+- 切り替えた日の前後は外して比べる
+- cold start はアプリのログ（`app.request` の `coldStart`）で数える。判定は [運用](../../01_開発ドキュメント/04_operations.md) の「cold start の調べ方」。11 月の分を取るため、10 月中に prd へリリースする
+- Event Functions に戻した後も同じ判定で数えられる（Event Function の LWA の readiness チェックは TCP にしてある）。戻すときの入口（CloudFront の `/api/*` から Event Function につなぐか、API Gateway に戻すか）は切り替えまでに決める
+- CloudFront のログを有効にする（キャッシュの当たり外れの確認と、`cfId` での `app.request` との突き合わせに使う）。まだ有効にしていない
+
+比べる項目は次のとおり。
+
+- 料金: [次の料金比較の観点](#次の料金比較の観点)のとおり
+- cold start の数と、全リクエストに対する割合（関数ごと、日ごと）
+- 実行環境の起動回数と、リクエストを 1 件も受けずに消えた数（`platform.invokeReport` の `record.metrics.totalRequests` が 0）。Web Functions は需要より先に実行環境を立ち上げる（headroom）ため、こうした環境が出る。2026-10-24〜26 は、本番 blog-api で 437 環境中 60（14%）、本番 Next.js で 372 環境中 21（6%）だった
+- 速さ: cold start したリクエストの処理時間と、起動の時間（`platform.initReport` の `record.metrics.totalDurationMs`）
+
+前回の集計（ブログ記事。2026-10-24〜26 の本番 API）は、起動完了から 1 秒未満に最初のリクエストを受けた環境を数え、約 95 回 / 日（全リクエストの約 21%）だった。次回は同じ 1 秒の基準をリクエストごとに判定するので、起動中に並列で届いた 2 件目以降も数える。前回と比べるときは環境ごとの値も出す（「cold start の調べ方」の実行環境ごとの内訳で、`coldStarts` が 1 以上の行を数える）。
+
 ### 次の料金比較の観点
 
 prd を切り替えたあと、実際の請求で旧構成と比べる。見積もりと実績がずれたら、どこがずれたかが分かるように観点を揃えておく。

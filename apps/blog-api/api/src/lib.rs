@@ -1,6 +1,7 @@
 pub mod error;
 pub mod handler;
 pub mod observability;
+pub mod request_start;
 pub mod route;
 
 use utoipa::OpenApi;

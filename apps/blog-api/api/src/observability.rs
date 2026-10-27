@@ -1,14 +1,13 @@
 //! リクエスト単位の OTel 計装ミドルウェア。
 //!
-//! Lambda Web Adapter 経由では 1 HTTP リクエスト = 1 Lambda invoke なので、
-//! この span (`lambda.handler`) がトレースのルートになり、配下に `db.query` /
-//! `db.connect` 等の子 span がぶら下がる。
+//! この span (`lambda.handler`) がリクエストのトレースのルートになり、配下に `db.query` /
+//! `db.connect` 等の子 span がぶら下がる。`cold_start` は `request_start` の判定
+//! (リクエストが実行環境の初期化を待ったか) をそのまま使う。
 //!
 //! `Router::route_layer` で適用する前提 (ルーティング後に実行されるため
 //! `MatchedPath` が取れる。未マッチの 404 には適用されない)。
 
 use std::sync::LazyLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use axum::extract::{MatchedPath, Request};
@@ -19,7 +18,7 @@ use opentelemetry::global;
 use opentelemetry::metrics::{Counter, Histogram};
 use tracing::Instrument;
 
-static COLD_START: AtomicBool = AtomicBool::new(true);
+use crate::request_start::RequestStart;
 
 static REQUEST_DURATION: LazyLock<Histogram<f64>> = LazyLock::new(|| {
     global::meter("blog-api")
@@ -50,8 +49,11 @@ pub async fn observe_request(req: Request, next: Next) -> Response {
         .unwrap_or_else(|| req.uri().path().to_owned());
     let method = req.method().as_str().to_owned();
 
-    // プロセス起動後の最初のリクエスト = cold start 起因のリクエスト。
-    let cold_start = COLD_START.swap(false, Ordering::Relaxed);
+    // record_request_start (Router::layer の一番外側) が付けた判定。付いていない (テストなど) なら warm
+    let cold_start = req
+        .extensions()
+        .get::<RequestStart>()
+        .is_some_and(|start| start.cold_start);
     if cold_start {
         COLD_START_COUNT.add(1, &[]);
     }
