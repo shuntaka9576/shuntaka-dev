@@ -228,6 +228,9 @@ export class BlogAPIConstruct extends Construct {
         // Web Function からの Event invoke のペイロードを LWA がアプリの POST /events へ転送する
         // （デフォルト値だが挙動を明示するため宣言）
         AWS_LWA_PASS_THROUGH_PATH: '/events',
+        // 既定の HTTP だと readiness チェックの GET / が起動直後に届き、cold start
+        // (apps/blog-api/api/src/request_start.rs) として数えられる。ポートが開いたかだけを見る
+        AWS_LWA_READINESS_CHECK_PROTOCOL: 'tcp',
       },
     });
 

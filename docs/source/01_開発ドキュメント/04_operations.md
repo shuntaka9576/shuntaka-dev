@@ -17,6 +17,7 @@ blog-api (Lambda) 〜 tidb-proxy (forwarder) 〜 TiDB 経路で「遅い・お�
 | MiniPC を再起動したい                    | ノード再起動           |
 | OS パッケージを更新したい                | ノード再起動           |
 | 本番 DB のバックアップ / dev への複製    | バックアップとリストア |
+| リクエストが cold start だったか調べたい | クエリリファレンス     |
 
 ## ボトルネック切り分け
 
@@ -53,7 +54,7 @@ CloudWatch Dashboards の `d-st-observability`（dev）/ `p-st-observability`（
 | Forwarder upstream connect latency | `proxy.upstream.connect.duration`（tidb-proxy）                           | forwarder → TiDB の接続確立                                                                                                                                                                                                                               |
 | Forwarder connections              | `proxy.connection.active` / `proxy.connection.accept.count`（tidb-proxy） | アクティブ接続数と accept 数（15 分増分）。accept の急増は再接続の嵐を疑う                                                                                                                                                                                |
 | Forwarder errors                   | `proxy.error.count` / `proxy.timeout.count`（tidb-proxy）                 | 中継エラーとタイムアウト（15 分増分）。平常時はゼロ。loopback からの ECS ヘルスチェック接続は計測対象外（ハマりどころ参照）                                                                                                                               |
-| Lambda cold starts / DB errors     | `lambda.cold_start.count` / `db.query.error.count`（blog-api）            | cold start 回数とクエリエラー数（15 分増分）                                                                                                                                                                                                              |
+| Lambda cold starts / DB errors     | `lambda.cold_start.count` / `db.query.error.count`（blog-api）            | cold start（リクエストが実行環境の初期化を待った）回数とクエリエラー数（15 分増分）。判定はクエリリファレンスの「cold start の調べ方」                                                                                                                    |
 
 ## テレメトリ一覧
 
@@ -268,6 +269,61 @@ tidb-proxy のログは FireLens で振り分けられ、INFO 系（squid アク
 - `ts` は string（ISO8601 UTC）で保存されている。時刻演算は `from_iso8601_timestamp(ts)`、期間絞り込みは `from_iso8601_timestamp(ts) > current_timestamp - interval '7' day` の形
 - JST 表示は `format_datetime(from_iso8601_timestamp(ts) AT TIME ZONE 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')`
 - WARN / ERROR は Iceberg 側に入らない。障害調査は CloudWatch Logs の `fluentbit-warnerr-*` / `fluentbit-fallback-*` ストリームを見る
+
+### cold start の調べ方（CloudWatch Logs Insights）
+
+リクエストが実行環境の起動を待ったか（cold start）は、アプリがリクエストごとに 1 行出す `app.request` の `coldStart` で分かる。ロググループは Next.js が `/aws/lambda-web/<p|d>-st-web`、blog-api が `/aws/lambda-web/<p|d>-st-blog-api-web`。実装は `apps/blog-api/api/src/request_start.rs` と `apps/web/web-function/index.mjs`。
+
+判定のしくみは次のとおり。
+
+- 起動を待っていたリクエストは、アプリが listen した直後（数 ms）にまとめて渡される。そこでアプリは listen した時刻を持っておき、そこから 1 秒未満に受けたリクエストを cold start（`coldStart: 1`）とする
+- 起動を待っていないリクエストは、ほとんどが起動から数分たってから来る。2026-10 の本番（437 環境）では、listen から最初のリクエストまでの時間がほぼ 20 ms 未満か 1 秒以上に分かれた（20 ms〜1 秒は 2 環境）。幅を 0.1 秒にしても 10 秒にしても数はほぼ変わらない
+- 「実行環境で最初のリクエスト」では数えない。Lambda は需要より先に実行環境を立ち上げる（Web Functions の headroom、Event Functions の事前の初期化）ため、最初のリクエストでも待っていないことがある。また、起動中に並列で届いた 2 件目以降は待っていても数えられない
+- OTel の `cold_start`（X-Ray の annotation、`lambda.cold_start.count`）も同じ判定を使う
+- Event Function（Docker + LWA）でも同じ方法で数える。LWA の readiness チェックは TCP にしている（HTTP の既定だと `GET /` が起動直後に届き、cold start として数えられるため）
+
+| `app.request` のフィールド | 内容                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| `coldStart`                | 1 は起動を待った、0 は待っていない                                                             |
+| `sinceReadyMs`             | listen してからこのリクエストを受けるまで。しきい値を変えて数え直すときに使う                  |
+| `seq` / `inFlight`         | 実行環境で何番目のリクエストか / 受けた時点で処理中だった数（自分を含む）                      |
+| `durationMs`               | 処理時間。blog-api は応答ヘッダーを返すまで、Next.js は body を送り終えるまで                  |
+| `requestId`                | `lambda-web-request-id`。レスポンスヘッダーと `platform.requestComplete`（DEBUG のみ）と同じ値 |
+| `cfId`                     | `x-amz-cf-id`。CloudFront の標準ログの `x-edge-request-id` と同じ値                            |
+
+実行環境ごとに 1 行 `app.ready` も出る。`initMs` はプロセスの起動から listen まで。プラットフォームから見た起動の時間は、同じログストリームの `platform.initReport` の `record.metrics.totalDurationMs`。何 ms 待ったかは測れないので、この起動の時間を上限として読む。ログストリームは実行環境ごとに分かれるので、実行環境の単位では `@logStream` でまとめる（ストリーム名の ID は `instanceId` とは別の値）。
+
+日ごとの cold start の数。
+
+```text
+filter type = "app.request"
+| stats count(*) as requests, sum(coldStart) as coldStarts by @log, bin(1d) as day
+| sort day
+```
+
+cold start したリクエスト。
+
+```text
+filter type = "app.request" and coldStart = 1
+| fields @timestamp, @log, method, path, status, sinceReadyMs, durationMs, seq, inFlight, requestId
+| sort @timestamp desc
+```
+
+実行環境ごとの内訳。`requests` が 0、または `coldStarts` が 0 の実行環境は、リクエストを待たせずに立ち上がったもの（headroom）。
+
+```text
+filter type in ["app.ready", "app.request", "platform.initReport"]
+| stats min(@timestamp) as firstSeen, max(record.metrics.totalDurationMs) as platformInitMs,
+    max(initMs) as appInitMs, count(seq) as requests, sum(coldStart) as coldStarts,
+    max(inFlight) as maxInFlight by @log, @logStream
+| sort firstSeen desc
+```
+
+判定には次の限界がある。
+
+- 先に立ち上がっていた実行環境に、起動完了から 1 秒以内に偶然届いたリクエストも cold start と数える
+- 何 ms 待ったかは分からない（起動の時間を上限として読む）
+- CloudFront のキャッシュから返したリクエストはアプリに届かないので数えない
 
 ### X-Ray（CloudWatch > トレース）
 

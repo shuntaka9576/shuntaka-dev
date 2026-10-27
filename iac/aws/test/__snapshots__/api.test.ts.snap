@@ -630,6 +630,7 @@ exports[`MainStack > snapshot 1`] = `
         "Environment": {
           "Variables": {
             "AWS_LWA_PASS_THROUGH_PATH": "/events",
+            "AWS_LWA_READINESS_CHECK_PROTOCOL": "tcp",
             "CLOUDINARY_API_KEY": "test-api-key",
             "CLOUDINARY_API_SECRET": {
               "Fn::GetAtt": [

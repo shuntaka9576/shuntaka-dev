@@ -1,4 +1,5 @@
 use api::observability::observe_request;
+use api::request_start::{mark_ready, mark_started, record_request_start};
 use api::route::build_swagger_router;
 use api::route::health::build_health_check_routers;
 use api::route::users_articles::build_users_articles_routers;
@@ -27,6 +28,9 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<()> {
+    // cold start の判定に使う。初期化の時間 (app.ready の initMs) をプロセスの起動から測る
+    mark_started();
+
     // OTLP exporter (reqwest blocking client) は async context 内で生成すると
     // panic し得るため、tokio runtime を起動する前に初期化する。
     let telemetry = shared::telemetry::init_telemetry();
@@ -133,9 +137,13 @@ async fn bootstrap(telemetry: Option<Telemetry>) -> Result<()> {
         )
         // syntect がインライン style を吐くため content_html が大きく、gzip の効果が高い
         .layer(CompressionLayer::new())
+        // 未マッチの 404 も含めて全リクエストに cold start の判定を付け、app.request を 1 行出す
+        .layer(axum::middleware::from_fn(record_request_start))
         .with_state(registry);
 
     let listener = TcpListener::bind(&app_config.server.bind_addr).await?;
+    // bind した時点で接続を受け付ける。初期化を待ったリクエストはこの直後に届く
+    mark_ready();
 
     println!("Listening on {}", app_config.server.bind_addr);
 
