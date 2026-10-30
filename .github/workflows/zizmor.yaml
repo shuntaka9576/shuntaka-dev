@@ -22,20 +22,22 @@ jobs:
       contents: read # actions/checkout でリポジトリを取得するため
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Run zizmor
-        run: uvx zizmor --format=sarif . > results.sarif
+        # Latest stable zizmor (1.31.1) flags tag refs. Lockfile support
+        # starts at 1.32.0-rc1, so pin that until a stable release exists.
+        run: uvx --from zizmor==1.32.0rc1 zizmor --format=sarif . > results.sarif
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/upload-sarif@v4.37.8
         with:
           sarif_file: results.sarif
           category: zizmor

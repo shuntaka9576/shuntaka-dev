@@ -35,7 +35,7 @@ jobs:
       id-token: write # AWS IAM Role に OIDC AssumeRole するため
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -54,7 +54,7 @@ jobs:
           command -v cargo-zigbuild >/dev/null || cargo install cargo-zigbuild --locked
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ inputs.stageName }}-shuntaka-assume-role
           aws-region: ap-northeast-1

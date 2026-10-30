@@ -24,7 +24,7 @@ jobs:
       # GitHub App トークンを発行してそれで push する
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@v3.2.0
         with:
           app-id: ${{ vars.SHUNTAKA_DEV_UTILS_APP_ID }}
           private-key: ${{ secrets.SHUNTAKA_DEV_UTILS_PRIVATE_KEY }}
@@ -32,7 +32,7 @@ jobs:
             shuntaka-dev
           permission-contents: write
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.head_ref }}
           persist-credentials: false
@@ -58,7 +58,7 @@ jobs:
           gitleaks version
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Commit Cargo.lock
         env:

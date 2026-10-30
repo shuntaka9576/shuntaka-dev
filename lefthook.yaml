@@ -15,4 +15,4 @@ pre-push:
     lint:
       run: bun run lint
     zizmor:
-      run: uvx zizmor .
+      run: uvx --from zizmor==1.32.0rc1 zizmor .
