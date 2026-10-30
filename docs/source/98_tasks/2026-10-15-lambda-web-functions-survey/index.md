@@ -2,7 +2,7 @@
 
 - 起票日: 2026-10-15
 - 対象: blog-api（Rust / Axum）、apps/web（Next.js 16 / Vercel）、admin-api（Hono）、proxy VPC
-- ステータス: dev・prd に適用済み（prd は 2026.1023.0 のリリース）。後片付けは Vercel と secret を残して済（2026-10-30）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。残りの作業は[切り替え手順](#切り替え手順)の表のとおり
+- ステータス: dev・prd に適用済み（prd は 2026.1023.0 のリリース）。後片付けは Vercel を残して済（2026-10-30）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。残りの作業は[切り替え手順](#切り替え手順)の表のとおり
 - PR: [#817](https://github.com/shuntaka9576/shuntaka-dev/pull/817)
 - 関連タスク:
   - [blog-api: Lambda + tsnet を VPC + Fargate Proxy 構成に移行](../2026-06-29-blog-api-tidb-proxy/index.md)
@@ -158,14 +158,14 @@ dev（shuntaka.me）にデプロイして次を確認した。
 
 dev → prd の順に切り替え、最後に Vercel と旧構成の残りを片付ける。
 
-| #   | 作業                                                                         | 状態                                                                                                      |
-| --- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336）                                   |
-| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 済（2026-10-23）                                                                                          |
-| 3   | PR #817 をマージする                                                         | 済（2026-10-23）                                                                                          |
-| 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 済（2026.1023.0。2026-10-30 に apex と `/api` が CloudFront から返ることを確認）                          |
-| 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | `WEB_BUILD_API_URL` は削除済み（2026-10-30 に確認）。Webhook URL の変更は記録がない                       |
-| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 管理外のサブネット（2026-10-23）、tokyo-cert と `deleteExisting`（2026-10-30）は済。Vercel と secret は未 |
+| #   | 作業                                                                         | 状態                                                                                                  |
+| --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336）                               |
+| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 済（2026-10-23）                                                                                      |
+| 3   | PR #817 をマージする                                                         | 済（2026-10-23）                                                                                      |
+| 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 済（2026.1023.0。2026-10-30 に apex と `/api` が CloudFront から返ることを確認）                      |
+| 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | `WEB_BUILD_API_URL` は削除済み（2026-10-30 に確認）。Webhook URL の変更は記録がない                   |
+| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 管理外のサブネット（2026-10-23）、secret・tokyo-cert・`deleteExisting`（2026-10-30）は済。Vercel は未 |
 
 apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無い。そのため `WEB_BUILD_API_URL` で旧 API（`https://api.<fqdn>`）を指し、切り替え後に消す。
 
@@ -253,7 +253,7 @@ bunx vercel@latest git disconnect
 
 GitHub 側でも止める場合は、Settings → Applications → Installed GitHub Apps → Vercel の Configure で、Repository access から shuntaka-dev を外す（ほかのリポジトリで使っていなければ Uninstall）。
 
-Vercel プロジェクトの Settings → Domains から shuntaka.dev と shuntaka.me を外し、Settings → General の一番下からプロジェクトを削除する。使わなくなった secret を消す。
+Vercel プロジェクトの Settings → Domains から shuntaka.dev と shuntaka.me を外し、Settings → General の一番下からプロジェクトを削除する。使わなくなった secret を消す（secret は済、2026-10-30）。
 
 ```bash
 gh secret delete VERCEL_TOKEN
