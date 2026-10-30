@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1030.6](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.5...2026.1030.6) - 2026-10-30
+
+- fix(deps): patch transitive uv.lock and Cargo.lock advisories by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/855
+
 ## [2026.1030.5](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.4...2026.1030.5) - 2026-10-30
 
 ## [2026.1030.4](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.3...2026.1030.4) - 2026-10-30
