@@ -167,7 +167,7 @@ After login, discover the available tools and test the connection.
 | ツール                       | 「Lambda Web Functions の記事を探して」で `search_articles`、本文の要約で `get_article` が呼ばれる |
 | トークン更新                 | 1 日以上空けて依頼しても 401 にならない（記事の 1 回目・2 回目の失敗が起きない）                   |
 
-DCR で登録を許すリダイレクト先は `apps/mcp-server/src/oauth/redirect-uri.ts` の `DEFAULT_REDIRECT_URI_POLICY`（`agent.meta.ai`・`muse.ai`・`*.muse.ai`・`claude.ai`・`claude.com`・`chatgpt.com` とループバック）。Muse の 3 つは記事の検証で使った許可リストと同じで、Muse の実際のリダイレクト URI は公開されていない。
+DCR で登録を許すリダイレクト先は `apps/mcp-server/src/oauth/redirect-uri.ts` の `DEFAULT_REDIRECT_URI_POLICY`（`agent.meta.ai`・`muse.ai`・`*.muse.ai`・`claude.ai`・`claude.com`・`chatgpt.com` とループバック）。Muse の 3 つは記事の検証で使った許可リストと同じで、Muse の実際のリダイレクト URI は公開されていない。Grok Bot (Cursor) のコールバック `https://www.cursor.com/agents/mcp/oauth/callback` は、`www.cursor.com` が他のページも配信するため、ホストではなく `httpsExactUris` の文字列の完全一致 (パス・クエリまで、URL 正規化後の一致は許さない) で許す。
 
 ## ログの確認
 

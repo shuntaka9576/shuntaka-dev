@@ -21,6 +21,7 @@ describe('isAllowedRedirectUri', () => {
     expect(allowed('https://claude.ai/api/mcp/auth_callback')).toBe(true);
     expect(allowed('https://agent.meta.ai/connectors/callback')).toBe(true);
     expect(allowed('https://www.muse.ai/oauth/callback')).toBe(true);
+    expect(allowed('https://www.cursor.com/agents/mcp/oauth/callback')).toBe(true);
     expect(allowed('http://localhost:53682/callback')).toBe(true);
     expect(allowed('http://127.0.0.1:8080/callback')).toBe(true);
   });
@@ -30,6 +31,30 @@ describe('isAllowedRedirectUri', () => {
     expect(allowed('https://claude.ai.evil.example/callback')).toBe(false);
     expect(allowed('https://evilmuse.ai/callback')).toBe(false);
     expect(allowed('https://claude.ai:8443/callback')).toBe(false);
+    // Grok Bot (Cursor) は www.cursor.com 全体ではなくコールバックの URI だけを許す
+    expect(allowed('https://www.cursor.com.evil.example/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://evil.example/https://www.cursor.com/agents/mcp/oauth/callback')).toBe(
+      false,
+    );
+    expect(allowed('http://www.cursor.com/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://www.cursor.com:8443/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://cursor.com/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://www.cursor.com/')).toBe(false);
+    expect(allowed('https://www.cursor.com/agents/mcp/oauth/callback/other')).toBe(false);
+    expect(
+      allowed('https://www.cursor.com/agents/mcp/oauth/callback?next=https://evil.example'),
+    ).toBe(false);
+    expect(allowed('https://www.cursor.com/agents/mcp/oauth/callback#fragment')).toBe(false);
+    expect(allowed('https://user@www.cursor.com/agents/mcp/oauth/callback')).toBe(false);
+    // URL の正規化で同じ URI になる表記も、文字列として一致しなければ拒否する
+    expect(allowed('https://www.cursor.com/agents/mcp/oauth/callback/')).toBe(false);
+    expect(allowed('https://www.cursor.com:443/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://www.cursor.com/agents/mcp/x/../oauth/callback')).toBe(false);
+    expect(allowed('https://www.cursor.com/agents/mcp/%2e/oauth/callback')).toBe(false);
+    expect(allowed('https://%77ww.cursor.com/agents/mcp/oauth/callback')).toBe(false);
+    expect(allowed('https://www.cursor.com/agents/mcp/oauth/callback?')).toBe(false);
+    expect(allowed(' https://www.cursor.com/agents/mcp/oauth/callback\n')).toBe(false);
+    expect(allowed('https://WWW.CURSOR.COM/agents/mcp/oauth/callback')).toBe(false);
     expect(allowed('http://claude.ai/callback')).toBe(false);
     expect(allowed('javascript:alert(1)')).toBe(false);
     expect(allowed('not a url')).toBe(false);

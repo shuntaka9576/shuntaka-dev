@@ -1,6 +1,11 @@
 export interface RedirectUriPolicy {
   /** DCR で登録を許す HTTPS のホスト。`*.example.com` はサブドメインに一致する */
   httpsHosts: string[];
+  /**
+   * DCR で登録を許す HTTPS のリダイレクト URI (入力文字列との完全一致)。
+   * `www.cursor.com` のようにサイト全体を許したくないホストはホストではなくここで許す
+   */
+  httpsExactUris?: string[];
 }
 
 /**
@@ -9,6 +14,8 @@ export interface RedirectUriPolicy {
  */
 export const DEFAULT_REDIRECT_URI_POLICY: RedirectUriPolicy = {
   httpsHosts: ['agent.meta.ai', 'muse.ai', '*.muse.ai', 'claude.ai', 'claude.com', 'chatgpt.com'],
+  // Grok Bot (Cursor) の MCP OAuth コールバック。www.cursor.com は他のページも配信するため、ホストではなく URI で許す
+  httpsExactUris: ['https://www.cursor.com/agents/mcp/oauth/callback'],
 };
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -34,7 +41,13 @@ export const isAllowedRedirectUri = (value: string, policy: RedirectUriPolicy): 
   if (url.protocol !== 'https:' || url.port !== '') {
     return false;
   }
-  return policy.httpsHosts.some((host) =>
-    host.startsWith('*.') ? url.hostname.endsWith(host.slice(1)) : url.hostname === host,
-  );
+  if (
+    policy.httpsHosts.some((host) =>
+      host.startsWith('*.') ? url.hostname.endsWith(host.slice(1)) : url.hostname === host,
+    )
+  ) {
+    return true;
+  }
+  // 入力文字列そのものとの完全一致のみ。`new URL()` の正規化 (`:443`、`/../`、`%2e`、空白、空のクエリ・フラグメント) を経た一致は許さない
+  return (policy.httpsExactUris ?? []).includes(value);
 };
