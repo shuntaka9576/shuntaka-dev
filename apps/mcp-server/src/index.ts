@@ -4,8 +4,9 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { BlogApiClient } from './blog-api.js';
-import { DynamoDbTokenStorage } from './dynamodb-token-storage.js';
-import { createOAuth, DEFAULT_REDIRECT_URI_POLICY } from './oauth.js';
+import { DynamoDbStore } from './oauth/dynamodb-store.js';
+import { createOAuth } from './oauth/index.js';
+import { DEFAULT_REDIRECT_URI_POLICY } from './oauth/redirect-uri.js';
 import { createRequestObserver } from './observability.js';
 import { deriveKeys, getCognitoClientSecret, getSecretString, requireEnv } from './secrets.js';
 
@@ -24,14 +25,17 @@ const [keySecret, clientSecret] = await Promise.all([
 const oauth = createOAuth({
   baseUrl,
   resourcePath: '/auth/mcp',
-  cognito: { domainUrl: requireEnv('COGNITO_DOMAIN_URL'), clientId, clientSecret },
+  cognito: {
+    domainUrl: requireEnv('COGNITO_DOMAIN_URL'),
+    issuer: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`,
+    clientId,
+    clientSecret,
+  },
   keys: deriveKeys(keySecret),
-  tokenStorage: new DynamoDbTokenStorage(
-    new DynamoDBClient({ region }),
-    requireEnv('TOKEN_TABLE_NAME'),
-  ),
+  store: new DynamoDbStore(new DynamoDBClient({ region }), requireEnv('TOKEN_TABLE_NAME')),
   redirectUriPolicy: DEFAULT_REDIRECT_URI_POLICY,
-  refreshTokenTtlSeconds: Number(requireEnv('REFRESH_TOKEN_TTL_SECONDS')),
+  accessTokenTtlSeconds: Number(requireEnv('ACCESS_TOKEN_TTL_SECONDS')),
+  sessionTtlSeconds: Number(requireEnv('SESSION_TTL_SECONDS')),
 });
 
 const userName = requireEnv('BLOG_USER_NAME');

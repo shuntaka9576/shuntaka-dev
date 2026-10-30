@@ -117,15 +117,12 @@ export class AdminStack extends cdk.Stack {
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID],
-        callbackUrls: [
-          `https://${props.mcpDomain}${MCP_OAUTH.callbackPath}`,
-          // dev は apps/mcp-server の `bun run dev` から認証ありのエンドポイントも試せるようにする
-          ...(isPrd ? [] : [`http://localhost:8787${MCP_OAUTH.callbackPath}`]),
-        ],
+        // ローカル実行 (apps/mcp-server の src/dev.ts) は Cognito の代わりに仮ログインを使うため、localhost は登録しない
+        callbackUrls: [`https://${props.mcpDomain}${MCP_OAUTH.callbackPath}`],
       },
-      accessTokenValidity: MCP_OAUTH.accessTokenValidity,
+      // MCP サーバーが使うのは ID トークン (ユーザーの sub) とリフレッシュトークンだけで、アクセストークンは捨てる
       idTokenValidity: cdk.Duration.hours(1),
-      refreshTokenValidity: MCP_OAUTH.refreshTokenValidity,
+      refreshTokenValidity: MCP_OAUTH.sessionValidity,
       enableTokenRevocation: true,
       preventUserExistenceErrors: true,
     });

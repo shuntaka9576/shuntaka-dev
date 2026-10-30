@@ -954,6 +954,7 @@ exports[`McpStack > snapshot 1`] = `
         },
         "ServiceConfig": {
           "EnvironmentVariables": {
+            "ACCESS_TOKEN_TTL_SECONDS": "86400",
             "APP_AWS_REGION": "ap-northeast-1",
             "AWS_LAMBDA_NODEJS_ENTRYPOINT": "index.mjs",
             "BLOG_API_URL": "https://example.com/api",
@@ -971,7 +972,7 @@ exports[`McpStack > snapshot 1`] = `
               "Ref": "OAuthKeySecretD90BADC0",
             },
             "MCP_BASE_URL": "https://mcp.example.com",
-            "REFRESH_TOKEN_TTL_SECONDS": "2592000",
+            "SESSION_TTL_SECONDS": "2592000",
             "SITE_URL": "https://example.com",
             "TOKEN_TABLE_NAME": {
               "Ref": "OAuthStateTable34ACACCC",

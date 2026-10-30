@@ -745,7 +745,6 @@ exports[`AdminStack > snapshot 1`] = `
     },
     "AdminUserPoolMcpServerClient5CE02E80": {
       "Properties": {
-        "AccessTokenValidity": 1440,
         "AllowedOAuthFlows": [
           "code",
         ],
@@ -755,7 +754,6 @@ exports[`AdminStack > snapshot 1`] = `
         ],
         "CallbackURLs": [
           "https://mcp.example.com/oauth/callback",
-          "http://localhost:8787/oauth/callback",
         ],
         "ClientName": "tp-dev-mcp-server",
         "EnableTokenRevocation": true,
@@ -767,7 +765,6 @@ exports[`AdminStack > snapshot 1`] = `
           "COGNITO",
         ],
         "TokenValidityUnits": {
-          "AccessToken": "minutes",
           "IdToken": "minutes",
           "RefreshToken": "minutes",
         },

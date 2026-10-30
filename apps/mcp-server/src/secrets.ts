@@ -4,16 +4,16 @@ import {
   DescribeUserPoolClientCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
-import type { OAuthKeys } from './oauth.js';
+import type { OAuthKeys } from './oauth/index.js';
 
 // 1 つのシークレットから用途ごとの鍵を作る。用途ごとに別の鍵にしておけば、
-// たとえば同意画面の署名鍵からトークンの署名鍵を推測されることはない
+// たとえば暗号鍵からアクセストークンの署名鍵を推測されることはない
 export const deriveKeys = (secret: string): OAuthKeys => {
-  const derive = (label: string) => createHmac('sha256', secret).update(label).digest('base64url');
+  const derive = (label: string) => createHmac('sha256', secret).update(label).digest();
   return {
-    jwtSigningKey: derive('mcp-oauth/jwt'),
-    encryptionKey: derive('mcp-oauth/storage'),
-    consentSigningKey: derive('mcp-oauth/consent'),
+    accessTokenKey: derive('mcp-oauth/access-token'),
+    refreshTokenKey: derive('mcp-oauth/refresh-token'),
+    encryptionKey: derive('mcp-oauth/upstream-refresh-token'),
   };
 };
 

@@ -84,10 +84,10 @@ gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
 | `get_article`     | slug を指定して Markdown の本文を取得（`/articles/{slug}`） |
 | `list_tags`       | タグごとの記事数（`/articles/tag-facets`）                  |
 
-認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（fastmcp の `OAuthProxy`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名した JWT を渡し、Cognito のトークンはサーバーの外に出さない。OAuth の状態は DynamoDB に暗号化して置き、鍵は Secrets Manager から起動時に読む。設計の背景と dev での作業記録は [ブログの MCP サーバーの追加](../98_tasks/2026-10-30-blog-mcp-server/index.md) を参照。
+認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（`apps/mcp-server/src/oauth/`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名したアクセストークン（JWT）と不透明なリフレッシュトークンを渡し、Cognito のトークンはサーバーの外に出さない。認可の状態（クライアント・トランザクション・認可コード・grant）は DynamoDB に置き、Cognito のリフレッシュトークンだけを暗号化して持つ。鍵は Secrets Manager から起動時に読む。保証している性質は `src/oauth/index.ts` の冒頭に並べ、1 つずつテスト（`src/oauth/oauth.test.ts`）で確かめている。設計の背景と dev での作業記録は [ブログの MCP サーバーの追加](../98_tasks/2026-10-30-blog-mcp-server/index.md) を参照。
 
-- アクセストークンは 1 日、リフレッシュトークンは 30 日（`iac/aws/lib/mcp/mcp-oauth.ts`）。発行済みのトークンは DynamoDB の項目を消せば期限前でも失効する
-- DCR で登録できるリダイレクト先は `apps/mcp-server/src/oauth.ts` の `DEFAULT_REDIRECT_URI_POLICY`（Muse・Claude・ChatGPT とループバック）。ほかのクライアントをつなぐときはここに足す
+- アクセストークンは 1 日、ログインの有効期間は 30 日（`iac/aws/lib/mcp/mcp-oauth.ts`）。リフレッシュトークンは使うたびに替わり、ログインから 30 日で再認証になる。DynamoDB の grant（`grant#<ID>`）を消せば、発行済みのトークンも期限前に失効する
+- DCR で登録できるリダイレクト先は `apps/mcp-server/src/oauth/redirect-uri.ts` の `DEFAULT_REDIRECT_URI_POLICY`（Muse・Claude・ChatGPT とループバック）。ほかのクライアントをつなぐときはここに足す
 - Web Function の endpoint は OAC を使わない `ApplicationManaged`。OAC で viewer の `Authorization` が残るかがはっきりしないため、Bearer トークンはアプリが検証する
 
 デプロイは admin stack の後（Cognito のクライアントとドメインを SSM から読むため）。CI の `all` は main → admin → mcp の順に流す。
@@ -113,7 +113,12 @@ Discover the OAuth metadata, register the client, and guide me through the login
 After login, discover the available tools and test the connection.
 ```
 
-ローカルでは `apps/mcp-server` で `bun run dev` すると、dev のブログ API に対して `http://localhost:8787/mcp` が起動する。認証ありも試すときは AWS 認証済みのシェルで `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` / `COGNITO_DOMAIN_URL`（dev の SSM `/dev/shuntaka/admin/*`）を渡す。dev の Cognito クライアントには `http://localhost:8787/oauth/callback` を登録してある。
+ローカルでは `bun dev`（または `apps/mcp-server` で `bun run dev`）で、dev のブログ API を読む `http://localhost:<MCP_SERVER_PORT>/mcp` と `/auth/mcp` が起動する（main の既定は 43008）。認証ありのログインは Cognito の代わりに仮ログイン（`src/dev-login.ts`。`local-user` としてログインする）を使うため、AWS の認証は要らない。本物の Cognito とのつなぎ込みは dev 環境で確かめる。Claude Code からは次のようにつなぐ。
+
+```bash
+claude mcp add --transport http blog-local http://localhost:43008/auth/mcp
+# Claude Code の /mcp で blog-local を選び、Authenticate → 同意画面 → 仮ログイン
+```
 
 ### リリース
 
@@ -634,6 +639,7 @@ ORIGIN_ALLOWLIST=http://localhost:43002
 STORYBOOK_PORT=43005
 LABS_WEB_PORT=43006
 LABS_API_PORT=43007
+MCP_SERVER_PORT=43008
 EOF
 
 direnv allow .
@@ -651,6 +657,7 @@ direnv allow .
 | `STORYBOOK_PORT`       | Storybook devポート              | 43005                    |
 | `LABS_WEB_PORT`        | labs-web (SvelteKit) devポート   | 43006                    |
 | `LABS_API_PORT`        | labs プレビュー API ポート       | 43007                    |
+| `MCP_SERVER_PORT`      | mcp-server devサーバーポート     | 43008                    |
 | `NEXT_PUBLIC_SITE_URL` | フロントエンドURL                | `http://localhost:43000` |
 | `API_URL`              | API URL（サーバー側 / rewrites） | `http://localhost:43003` |
 | `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin       | `http://localhost:43002` |

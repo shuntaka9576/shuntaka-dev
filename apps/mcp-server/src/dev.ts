@@ -1,61 +1,68 @@
-// ローカル実行。既定では認証なしの /mcp だけを http://localhost:8787 で起動する。
+// ローカル実行 (`bun dev`、または apps/mcp-server で `bun run dev`)。認証なしの /mcp と認証ありの /auth/mcp を起動する。
 //
-// 認証ありの /auth/mcp も試すときは、AWS 認証済みのシェルで COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID /
-// COGNITO_DOMAIN_URL を渡す (値は dev の SSM `/dev/shuntaka/admin/mcp-*`)。dev の Cognito クライアントには
-// http://localhost:8787/oauth/callback を登録してある。OAuth の状態はメモリに置くため、再起動すると消える
+// 認証ありのログインは Cognito の代わりに src/dev-login.ts の仮ログインを使うため、AWS の認証は要らない。
+// 本物の Cognito とのつなぎ込みは dev 環境で確かめる。認可の状態と鍵はメモリに置くため、再起動するとログインし直しになる
 import { randomBytes } from 'node:crypto';
 import { serve } from '@hono/node-server';
-import { MemoryTokenStorage } from 'fastmcp/auth';
-import { createApp } from './app.js';
+import { Hono } from 'hono';
+import { AUTH_MCP_PATH, createApp, PUBLIC_MCP_PATH } from './app.js';
 import { BlogApiClient } from './blog-api.js';
-import { createOAuth, DEFAULT_REDIRECT_URI_POLICY } from './oauth.js';
-import { deriveKeys, getCognitoClientSecret } from './secrets.js';
+import { createDevLogin } from './dev-login.js';
+import { createOAuth } from './oauth/index.js';
+import { DEFAULT_REDIRECT_URI_POLICY } from './oauth/redirect-uri.js';
+import { MemoryStore } from './oauth/store.js';
+import { deriveKeys } from './secrets.js';
 
-const port = 8787;
+// ポートは worktree ごとに wt.toml が .env.local に採番する (admin-api の src/dev.ts と同じ読み方)
+for (const envFile of ['../../.env.local', '.env.local']) {
+  try {
+    process.loadEnvFile(envFile);
+  } catch {
+    // ファイルが無ければ次へ進み、最終的に direnv / シェルの環境変数を使う
+  }
+}
+
+const port = Number(process.env.MCP_SERVER_PORT ?? 43008);
 const baseUrl = `http://localhost:${port}`;
 const userName = process.env.BLOG_USER_NAME ?? 'shuntaka';
-const siteUrl = process.env.SITE_URL ?? 'https://shuntaka.me';
+// 記事は dev 環境の公開 API から読む
+const siteUrl = process.env.MCP_SITE_URL ?? 'https://shuntaka.me';
 
-const createDevOAuth = async () => {
-  const { COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, COGNITO_DOMAIN_URL } = process.env;
-  if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID || !COGNITO_DOMAIN_URL) {
-    return undefined;
-  }
-  const region = process.env.AWS_REGION ?? 'ap-northeast-1';
-  return createOAuth({
-    baseUrl,
-    resourcePath: '/auth/mcp',
-    cognito: {
-      domainUrl: COGNITO_DOMAIN_URL,
-      clientId: COGNITO_CLIENT_ID,
-      clientSecret: await getCognitoClientSecret({
-        region,
-        userPoolId: COGNITO_USER_POOL_ID,
-        clientId: COGNITO_CLIENT_ID,
-      }),
-    },
-    keys: deriveKeys(randomBytes(32).toString('hex')),
-    tokenStorage: new MemoryTokenStorage(),
-    redirectUriPolicy: DEFAULT_REDIRECT_URI_POLICY,
-    refreshTokenTtlSeconds: 30 * 24 * 60 * 60,
-  });
+const DEV_LOGIN_PATH = '/dev-login';
+const devLoginUrl = `${baseUrl}${DEV_LOGIN_PATH}`;
+const devLoginClient = {
+  clientId: 'local-mcp-server',
+  clientSecret: randomBytes(32).toString('hex'),
 };
 
-const oauth = await createDevOAuth();
-const app = createApp({
-  baseUrl,
-  blogApi: new BlogApiClient({
-    baseUrl: process.env.BLOG_API_URL ?? `${siteUrl}/api`,
+const server = new Hono();
+server.route(
+  '/',
+  createDevLogin({ basePath: DEV_LOGIN_PATH, issuer: devLoginUrl, ...devLoginClient }),
+);
+server.route(
+  '/',
+  createApp({
+    baseUrl,
+    blogApi: new BlogApiClient({ baseUrl: `${siteUrl}/api`, userName }),
+    siteUrl,
     userName,
+    oauth: createOAuth({
+      baseUrl,
+      resourcePath: AUTH_MCP_PATH,
+      cognito: { domainUrl: devLoginUrl, issuer: devLoginUrl, ...devLoginClient },
+      keys: deriveKeys(randomBytes(32).toString('hex')),
+      store: new MemoryStore(),
+      redirectUriPolicy: DEFAULT_REDIRECT_URI_POLICY,
+      accessTokenTtlSeconds: 60 * 60,
+      sessionTtlSeconds: 30 * 24 * 60 * 60,
+    }),
   }),
-  siteUrl,
-  userName,
-  oauth,
-});
+);
 
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`public: ${baseUrl}/mcp`);
-  if (oauth) {
-    console.log(`authenticated: ${baseUrl}/auth/mcp`);
-  }
+serve({ fetch: server.fetch, port }, () => {
+  console.log(`mcp-server public:        ${baseUrl}${PUBLIC_MCP_PATH}`);
+  console.log(
+    `mcp-server authenticated: ${baseUrl}${AUTH_MCP_PATH} (sign-in: local stand-in for Cognito)`,
+  );
 });

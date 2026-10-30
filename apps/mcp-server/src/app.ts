@@ -2,7 +2,7 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import type { BlogApiClient } from './blog-api.js';
-import type { OAuth } from './oauth.js';
+import type { OAuth } from './oauth/index.js';
 import { type Log, stdoutLog } from './observability.js';
 import { createBlogMcpServer } from './tools.js';
 

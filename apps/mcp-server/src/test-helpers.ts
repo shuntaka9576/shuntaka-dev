@@ -1,19 +1,33 @@
 import {
   type AttributeValue,
+  ConditionalCheckFailedException,
   DeleteItemCommand,
   GetItemCommand,
   PutItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { BlogApiClient } from './blog-api.js';
 
-/** PutItem / GetItem / DeleteItem だけを Map で再現する DynamoDB クライアント */
+/**
+ * PutItem / GetItem / DeleteItem だけを Map で再現する DynamoDB クライアント。
+ * 条件付き PutItem は DynamoDbStore.replace が使う `#value = :expected` だけを扱う
+ */
 export class FakeDynamoDb {
   readonly items = new Map<string, Record<string, AttributeValue>>();
 
   async send(command: unknown): Promise<object> {
     if (command instanceof PutItemCommand) {
       const item = command.input.Item ?? {};
-      this.items.set(item.pk?.S ?? '', item);
+      const key = item.pk?.S ?? '';
+      if (
+        command.input.ConditionExpression === '#value = :expected' &&
+        this.items.get(key)?.value?.S !== command.input.ExpressionAttributeValues?.[':expected']?.S
+      ) {
+        throw new ConditionalCheckFailedException({
+          message: 'The conditional request failed',
+          $metadata: {},
+        });
+      }
+      this.items.set(key, item);
       return {};
     }
     if (command instanceof GetItemCommand) {

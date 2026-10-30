@@ -119,7 +119,8 @@ export class McpStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: userPoolId,
         COGNITO_CLIENT_ID: cognitoClientId,
         COGNITO_DOMAIN_URL: cognitoDomainUrl,
-        REFRESH_TOKEN_TTL_SECONDS: String(MCP_OAUTH.refreshTokenValidity.toSeconds()),
+        ACCESS_TOKEN_TTL_SECONDS: String(MCP_OAUTH.accessTokenValidity.toSeconds()),
+        SESSION_TTL_SECONDS: String(MCP_OAUTH.sessionValidity.toSeconds()),
       },
     });
     tokenTable.grantReadWriteData(server.role);

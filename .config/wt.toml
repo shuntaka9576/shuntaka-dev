@@ -15,6 +15,7 @@ ORIGIN_ALLOWLIST=http://localhost:{{ ('admin-web-' ~ branch) | hash_port }}
 STORYBOOK_PORT={{ ('storybook-' ~ branch) | hash_port }}
 LABS_WEB_PORT={{ ('labs-web-' ~ branch) | hash_port }}
 LABS_API_PORT={{ ('labs-api-' ~ branch) | hash_port }}
+MCP_SERVER_PORT={{ ('mcp-server-' ~ branch) | hash_port }}
 ENVEOF
 """
 envrc = "direnv allow ."
@@ -29,6 +30,7 @@ kill-admin-web = "lsof -ti :{{ ('admin-web-' ~ branch) | hash_port }} -sTCP:LIST
 kill-storybook = "lsof -ti :{{ ('storybook-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
 kill-labs-web = "lsof -ti :{{ ('labs-web-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
 kill-labs-api = "lsof -ti :{{ ('labs-api-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+kill-mcp-server = "lsof -ti :{{ ('mcp-server-' ~ branch) | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
 
 [list]
 url = "http://localhost:{{ ('web-' ~ branch) | hash_port }}"

@@ -9,8 +9,6 @@ await build({
   format: 'esm',
   target: 'node24',
   minify: true,
-  // fastmcp はクラス名 (constructor.name) で暗号化済みストレージかを判定するため、名前を残す
-  keepNames: true,
   // ESM バンドルに含まれる CJS 依存の require を解決するための shim
   banner: {
     js: "import { createRequire } from 'node:module';const require = createRequire(import.meta.url);",
