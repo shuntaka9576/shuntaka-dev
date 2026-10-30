@@ -1204,113 +1204,6 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
-    "CustomDeleteExistingRecordSetCustomResourceProviderHandlerAD00231E": {
-      "DependsOn": [
-        "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08",
-      ],
-      "Properties": {
-        "Code": {
-          "S3Bucket": "cdk-hnb659fds-assets-123456789012-ap-northeast-1",
-          "S3Key": "95beca947b5964e7fa1145dc0b33239a52456956e72d055dbaa8699f2c36ebcd.zip",
-        },
-        "Handler": "__entrypoint__.handler",
-        "MemorySize": 128,
-        "Role": {
-          "Fn::GetAtt": [
-            "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08",
-            "Arn",
-          ],
-        },
-        "Runtime": "nodejs24.x",
-        "Timeout": 900,
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "CustomDeleteExistingRecordSetCustomResourceProviderRole03A7ED08": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-          },
-        ],
-        "Policies": [
-          {
-            "PolicyDocument": {
-              "Statement": [
-                {
-                  "Action": "route53:GetChange",
-                  "Effect": "Allow",
-                  "Resource": "*",
-                },
-                {
-                  "Action": "route53:ListResourceRecordSets",
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":route53:::hostedzone/",
-                        {
-                          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
-                        },
-                      ],
-                    ],
-                  },
-                },
-                {
-                  "Action": "route53:ChangeResourceRecordSets",
-                  "Condition": {
-                    "ForAllValues:StringEquals": {
-                      "route53:ChangeResourceRecordSetsActions": [
-                        "DELETE",
-                      ],
-                      "route53:ChangeResourceRecordSetsRecordTypes": [
-                        "A",
-                      ],
-                    },
-                  },
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":route53:::hostedzone/",
-                        {
-                          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
-                        },
-                      ],
-                    ],
-                  },
-                },
-              ],
-              "Version": "2012-10-17",
-            },
-            "PolicyName": "Inline",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
     "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
       "DependsOn": [
         "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
@@ -1567,28 +1460,7 @@ exports[`MainStack > snapshot 1`] = `
       },
       "Type": "AWS::Events::Rule",
     },
-    "SiteApexAliasRecordDeleteExistingRecordSetCustomResource94BE3789": {
-      "DeletionPolicy": "Delete",
-      "Properties": {
-        "HostedZoneId": {
-          "Ref": "SsmParameterValuetesthostedzoneidC96584B6F00A464EAD1953AFF4B05118Parameter",
-        },
-        "RecordName": "example.com.",
-        "RecordType": "A",
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "CustomDeleteExistingRecordSetCustomResourceProviderHandlerAD00231E",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::DeleteExistingRecordSet",
-      "UpdateReplacePolicy": "Delete",
-    },
     "SiteApexAliasRecordEB993F77": {
-      "DependsOn": [
-        "SiteApexAliasRecordDeleteExistingRecordSetCustomResource94BE3789",
-      ],
       "Properties": {
         "AliasTarget": {
           "DNSName": {

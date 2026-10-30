@@ -118,7 +118,6 @@ exports[`DeployRoleStack > snapshot 1`] = `
                     "cognito-idp:*",
                     "cloudfront:*",
                     "secretsmanager:*",
-                    "dynamodb:*",
                   ],
                   "Effect": "Allow",
                   "Resource": "*",

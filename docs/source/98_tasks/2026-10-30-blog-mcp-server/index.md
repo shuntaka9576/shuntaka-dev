@@ -60,9 +60,13 @@ Muse の Custom Connector を検証した記事では、DCR に対応した認�
 
 ## 作業記録（dev）
 
-### 1. CI のデプロイロールに dynamodb:\* を追加する
+### 1. CI のデプロイロールに dynamodb:\* を追加する（不要だった）
 
 DynamoDB を使うスタックが増えたため、CI のデプロイロールに `dynamodb:*` を足した。デプロイロールは CI のデプロイ対象外なので手動で反映する。
+
+:::{note}
+後から、この権限は要らなかったと分かった。prd のデプロイロールに `dynamodb:*` を入れないままリリース（2026.1030.0）しても、mcp stack の DynamoDB のテーブルは作れた。CI の CDK は bootstrap のロールを引き受けられず（`current credentials could not be used to assume 'cdk-hnb659fds-deploy-role-…', but are for the right account.`）デプロイロールの認証情報で進めるが、リソースは CloudFormation が `cfn-exec-role` で作る（デプロイロールは `IAMFullAccess` でそのロールを渡せる）。そのため `dynamodb:*` はコードから外した（移行と証明書の後片付けの PR）。dev のデプロイロールには、次に手動でデプロイするまで残る。
+:::
 
 ```bash
 aws-vault exec <shuntaka-dev のプロファイル名>
@@ -188,9 +192,9 @@ aws logs tail /aws/lambda-web/d-st-mcp-server --since 30m --format short \
 
 - [x] 置き換えた認可サーバーを dev に再適用する（[実行結果](https://github.com/shuntaka9576/shuntaka-dev/actions/runs/41005357698)。`/mcp` のツール呼び出し、`/auth/mcp` の 401 とメタデータ、DCR → 同意画面 → Cognito のログイン画面まで確認）
 - [ ] Muse から接続し直す（認証あり・なし。ツール呼び出しとトークン更新まで）
-- [ ] dev の OAuth の状態のテーブルから、fastmcp 版の項目（`client:` / `mapping:` / `upstream:` などで始まり、期限なし）を消す。暗号化した Cognito のリフレッシュトークンを含む
-- [ ] PR #828 をマージする
-- [ ] prd のデプロイロールに `dynamodb:*` を手動で反映する（`p-st-deploy-role`）。リリース前に必要
-- [ ] 証明書を us-east-1 のワイルドカード 1 枚にまとめる。旧証明書 2 枚と使っていない東京の証明書を消す。この PR の prd リリース後に、[証明書を us-east-1 のワイルドカード 1 枚にまとめる](../2026-10-30-unify-certificates/index.md)で行う
+- [x] dev の OAuth の状態のテーブルから、fastmcp 版の項目を消す（2026-10-30。`client:` 3 件・`mapping:` 2 件・`upstream:` 1 件）
+- [x] PR #828 をマージし、prd にリリースする（2026.1030.0）
+- [x] ~~prd のデプロイロールに `dynamodb:*` を手動で反映する~~（不要だった。上の作業記録 1 の注記）
+- [x] 証明書を us-east-1 のワイルドカード 1 枚にまとめる（[証明書を us-east-1 のワイルドカード 1 枚にまとめる](../2026-10-30-unify-certificates/index.md)。prd の旧証明書は次のリリースで消える）
 - [ ] （検討）認証の要る・要らないでツールを分ける。今は両方のエンドポイントが同じ公開記事のツールを出している
 - [ ] （任意）dev の CDK bootstrap が古い（バージョン 21 未満）と通知が出ている。今回の変更とは関係ない

@@ -160,11 +160,9 @@ function handler(event) {
     });
     invalidation.node.addDependency(web.endpoint);
 
-    // prd の apex は Vercel 向けの A レコードを手で作っていたため、CFN 管理外の既存レコードを消してから作る
     new route53.ARecord(this, 'ApexAliasRecord', {
       zone: props.hostedZone,
       target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
-      deleteExisting: true,
     });
     new route53.AaaaRecord(this, 'ApexAliasRecordIpv6', {
       zone: props.hostedZone,
