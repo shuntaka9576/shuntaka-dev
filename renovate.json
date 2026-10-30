@@ -13,9 +13,18 @@
   "automergeStrategy": "squash",
   "minimumReleaseAge": "1 day",
   "rangeStrategy": "bump",
+  "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "enabled": true,
-    "schedule": ["at any time"]
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null,
+    "prCreation": "immediate"
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "description": "週1で lock を更新する。manifest の range 内なら直接依存も間接依存も上がる。osvVulnerabilityAlerts は直接依存だけなので、certifi や zip のような間接依存の脆弱性はここが拾う。PR #16 の daily ではなく、生態系グループには混ぜない。",
+    "schedule": ["before 4am on monday"],
+    "groupName": "lock-file-maintenance"
   },
   "customManagers": [
     {
@@ -53,7 +62,7 @@
   ],
   "packageRules": [
     {
-      "description": "patch/minor は月曜午前の週1バッチでPR作成（平日の割り込み削減。脆弱性対応は vulnerabilityAlerts で即時のまま）",
+      "description": "patch/minor は月曜午前の週1バッチでPR作成（平日の割り込み削減）。脆弱性アラートは Renovate が schedule を無視して即時作成する",
       "matchUpdateTypes": ["patch", "minor"],
       "schedule": ["before 9am on monday"]
     },
@@ -140,6 +149,12 @@
       "matchFileNames": ["cluster/manifests/plamo-embedding/**"],
       "matchPackageNames": ["python"],
       "allowedVersions": "<3.14"
+    },
+    {
+      "description": "lockFileMaintenance は file グループより後に適用し、週1の1 PR に固定する。range 内の直接依存と間接依存の両方を更新する。PR #10 のように生態系グループへ混ぜない",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "groupName": "lock-file-maintenance",
+      "schedule": ["before 4am on monday"]
     }
   ]
 }
