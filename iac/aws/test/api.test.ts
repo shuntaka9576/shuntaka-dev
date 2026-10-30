@@ -72,7 +72,7 @@ describe('MainStack', () => {
           hostedZoneId: '/test/hosted-zone-id',
         },
         virginia: {
-          webCertificateArn: '/test/virginia/web-certificate-arn',
+          wildcardCertificateArn: '/test/virginia/wildcard-certificate-arn',
         },
         dsql: {
           clusterEndpoint: '/test/dsql/cluster-endpoint',

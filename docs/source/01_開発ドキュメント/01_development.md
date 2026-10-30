@@ -68,6 +68,53 @@ gh variable set NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID --env prd --body 'GTM-XXXXXXX'
 gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
 ```
 
+### ブログの MCP サーバー (mcp.<fqdn>)
+
+`apps/mcp-server`（Hono + MCP SDK v2）を mcp stack の Lambda Web Function で動かし、専用の CloudFront（`mcp.<fqdn>`）から配信する。ツールは blog-api の公開 API（`https://<fqdn>/api`）を呼ぶだけで、公開済みの記事しか返さない。
+
+| エンドポイント                | 認証                                        | 用途                                                      |
+| ----------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| `https://mcp.<fqdn>/mcp`      | なし                                        | 誰でも使える読み取り専用の MCP                            |
+| `https://mcp.<fqdn>/auth/mcp` | OAuth（DCR・PKCE S256、Cognito でログイン） | Muse などで Custom Connector として登録する（同じツール） |
+
+| ツール            | 処理                                                        |
+| ----------------- | ----------------------------------------------------------- |
+| `search_articles` | セマンティック検索（`/articles/search`）                    |
+| `list_articles`   | 新しい順の一覧。タグで絞り込める（`/articles`）             |
+| `get_article`     | slug を指定して Markdown の本文を取得（`/articles/{slug}`） |
+| `list_tags`       | タグごとの記事数（`/articles/tag-facets`）                  |
+
+認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（fastmcp の `OAuthProxy`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名した JWT を渡し、Cognito のトークンはサーバーの外に出さない。OAuth の状態は DynamoDB に暗号化して置き、鍵は Secrets Manager から起動時に読む。設計の背景は Muse の Custom Connector を検証した記事（FastMCP OAuth Proxy + Cognito）と同じ。
+
+- アクセストークンは 1 日、リフレッシュトークンは 30 日（`iac/aws/lib/mcp/mcp-oauth.ts`）。発行済みのトークンは DynamoDB の項目を消せば期限前でも失効する
+- DCR で登録できるリダイレクト先は `apps/mcp-server/src/oauth.ts` の `DEFAULT_REDIRECT_URI_POLICY`（Muse・Claude・ChatGPT とループバック）。ほかのクライアントをつなぐときはここに足す
+- Web Function の endpoint は OAC を使わない `ApplicationManaged`。OAC で viewer の `Authorization` が残るかがはっきりしないため、Bearer トークンはアプリが検証する
+
+デプロイは admin stack の後（Cognito のクライアントとドメインを SSM から読むため）。CI の `all` は main → admin → mcp の順に流す。
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk deploy d-st-admin --exclusively -c stageName=dev
+bunx dotenv -- cdk deploy d-st-mcp --exclusively -c stageName=dev
+```
+
+Muse からは次のプロンプトで登録する。
+
+```text
+Create a Custom Connector for my remote MCP server.
+
+Name: custom.shuntaka-dev-blog
+Transport: Streamable HTTP
+URL: https://mcp.shuntaka.dev/auth/mcp
+Authentication: OAuth 2.0 Authorization Code with PKCE (S256)
+Client registration: Dynamic Client Registration (DCR)
+
+Discover the OAuth metadata, register the client, and guide me through the login.
+After login, discover the available tools and test the connection.
+```
+
+ローカルでは `apps/mcp-server` で `bun run dev` すると、dev のブログ API に対して `http://localhost:8787/mcp` が起動する。認証ありも試すときは AWS 認証済みのシェルで `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` / `COGNITO_DOMAIN_URL`（dev の SSM `/dev/shuntaka/admin/*`）を渡す。dev の Cognito クライアントには `http://localhost:8787/oauth/callback` を登録してある。
+
 ### リリース
 
 リリースは [tagpr](https://github.com/Songmu/tagpr) のリリース PR マージで行う。main へのマージごとに tagpr（`.github/workflows/tagpr.yaml`）がリリース PR を自動作成・追従し、マージすると CalVer タグ（例: `2026.0711.0`、形式は `.tagpr` で定義）と GitHub Release が作られ、同一ワークフローの後続ジョブが prd CDK（公開サイトを含む）をデプロイする。main push では dev CDK（shuntaka.me）へ自動デプロイする。

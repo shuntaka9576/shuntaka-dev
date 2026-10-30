@@ -49,6 +49,8 @@ interface AppParameter {
   domain: {
     admin: string;
     images: string;
+    // ブログの MCP サーバー (認証なしの /mcp と、Cognito で認証する /auth/mcp)
+    mcp: string;
   };
   // Lambda Web Functions は実行環境ごとにメモリ 2 GB 固定で、実行環境がある間ずっと課金される
   // (東京で 1 台 1 時間 約 $0.031、常時 1 台で月 約 $22)。料金の見積もりは
@@ -91,10 +93,15 @@ interface AppParameter {
     virginia: {
       certificateArn: string;
       webCertificateArn: string;
+      // <fqdn> と *.<fqdn> の 1 枚。apex・admin・images・mcp の CloudFront はこれを使う
+      wildcardCertificateArn: string;
     };
     admin: {
       userPoolId: string;
       userPoolClientId: string;
+      // MCP サーバーがログインに使う Cognito のアプリクライアントと managed login のドメイン
+      mcpClientId: string;
+      cognitoDomainUrl: string;
     };
     dsql: {
       clusterEndpoint: string;
@@ -194,6 +201,7 @@ const stageConfig: {
     domain: {
       admin: 'admin.shuntaka.me',
       images: 'images.shuntaka.me',
+      mcp: 'mcp.shuntaka.me',
     },
     webFunction: {
       maxEnvironments: 2,
@@ -215,6 +223,7 @@ const stageConfig: {
     domain: {
       admin: 'admin.shuntaka.dev',
       images: 'images.shuntaka.dev',
+      mcp: 'mcp.shuntaka.dev',
     },
     webFunction: {
       maxEnvironments: 3,
@@ -405,10 +414,13 @@ export const getConfig = (stageName: string): AppParameter => {
       virginia: {
         certificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/certificate-arn`,
         webCertificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/web-certificate-arn`,
+        wildcardCertificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/wildcard-certificate-arn`,
       },
       admin: {
         userPoolId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-id`,
         userPoolClientId: `/${config.stageName.long}/${config.projectName.long}/admin/user-pool-client-id`,
+        mcpClientId: `/${config.stageName.long}/${config.projectName.long}/admin/mcp-client-id`,
+        cognitoDomainUrl: `/${config.stageName.long}/${config.projectName.long}/admin/cognito-domain-url`,
       },
       dsql: {
         clusterEndpoint: `/${config.stageName.long}/${config.projectName.long}/dsql/cluster-endpoint`,

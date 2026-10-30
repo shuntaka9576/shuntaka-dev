@@ -98,6 +98,8 @@ export class DeployRoleStack extends cdk.Stack {
                 'cognito-idp:*',
                 'cloudfront:*',
                 'secretsmanager:*',
+                // mcp stack (MCP サーバーの OAuth の状態を置く DynamoDB) のため。上と同じ流儀で service wildcard。
+                'dynamodb:*',
               ],
               resources: ['*'],
             }),

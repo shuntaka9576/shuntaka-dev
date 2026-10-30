@@ -148,3 +148,41 @@ export const webWebFunctionCode = (buildEnv: Record<string, string>): s3deploy.I
     },
   });
 };
+
+/**
+ * apps/mcp-server (Hono の MCP サーバー) を Web Function 用に包む。
+ *
+ * esbuild で依存ごと 1 ファイル (dist/index.mjs) にまとめ、それをそのまま zip のルートの index.mjs にする
+ */
+export const mcpServerWebFunctionCode = (): s3deploy.ISource => {
+  const appDir = path.join(repoRoot, 'apps/mcp-server');
+  const assetHash = createHash('sha256')
+    .update(
+      cdk.FileSystem.fingerprint(appDir, {
+        exclude: ['node_modules', 'dist', '.turbo', '*.tsbuildinfo', '*.test.ts'],
+      }),
+    )
+    .update(fs.readFileSync(path.join(repoRoot, 'bun.lock')))
+    .update(packagingHash)
+    .digest('hex');
+
+  return s3deploy.Source.asset(appDir, {
+    assetHashType: cdk.AssetHashType.CUSTOM,
+    assetHash,
+    bundling: {
+      image: unusedBundlingImage,
+      outputType: cdk.BundlingOutput.ARCHIVED,
+      local: {
+        tryBundle(outputDir) {
+          execSync('bun run build', { cwd: appDir, stdio: 'inherit' });
+          const packageDir = path.join(appDir, 'dist/web-function');
+          fs.rmSync(packageDir, { recursive: true, force: true });
+          fs.mkdirSync(packageDir, { recursive: true });
+          fs.copyFileSync(path.join(appDir, 'dist/index.mjs'), path.join(packageDir, 'index.mjs'));
+          zipDirectory(packageDir, outputDir);
+          return true;
+        },
+      },
+    },
+  });
+};

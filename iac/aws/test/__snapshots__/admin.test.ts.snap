@@ -734,6 +734,49 @@ exports[`AdminStack > snapshot 1`] = `
       "Type": "AWS::Cognito::UserPool",
       "UpdateReplacePolicy": "Delete",
     },
+    "AdminUserPoolLoginDomainD4F0E415": {
+      "Properties": {
+        "Domain": "example-com-login",
+        "UserPoolId": {
+          "Ref": "AdminUserPoolD0AF18CF",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolDomain",
+    },
+    "AdminUserPoolMcpServerClient5CE02E80": {
+      "Properties": {
+        "AccessTokenValidity": 1440,
+        "AllowedOAuthFlows": [
+          "code",
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthScopes": [
+          "openid",
+        ],
+        "CallbackURLs": [
+          "https://mcp.example.com/oauth/callback",
+          "http://localhost:8787/oauth/callback",
+        ],
+        "ClientName": "tp-dev-mcp-server",
+        "EnableTokenRevocation": true,
+        "GenerateSecret": true,
+        "IdTokenValidity": 60,
+        "PreventUserExistenceErrors": "ENABLED",
+        "RefreshTokenValidity": 43200,
+        "SupportedIdentityProviders": [
+          "COGNITO",
+        ],
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+          "RefreshToken": "minutes",
+        },
+        "UserPoolId": {
+          "Ref": "AdminUserPoolD0AF18CF",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolClient",
+    },
     "BlogApiLabAssetsPolicy192B188A": {
       "Properties": {
         "PolicyDocument": {
@@ -785,6 +828,25 @@ exports[`AdminStack > snapshot 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "CognitoDomainUrlParam59574D38": {
+      "Properties": {
+        "Name": "/test/admin/cognito-domain-url",
+        "Type": "String",
+        "Value": {
+          "Fn::Join": [
+            "",
+            [
+              "https://",
+              {
+                "Ref": "AdminUserPoolLoginDomainD4F0E415",
+              },
+              ".auth.ap-northeast-1.amazoncognito.com",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
     },
     "CookieSecret28A05618": {
       "DeletionPolicy": "Delete",
@@ -1832,6 +1894,16 @@ function handler(event) {
       "Type": "Custom::CDKBucketDeployment",
       "UpdateReplacePolicy": "Delete",
     },
+    "McpClientIdParamDEB18BB0": {
+      "Properties": {
+        "Name": "/test/admin/mcp-client-id",
+        "Type": "String",
+        "Value": {
+          "Ref": "AdminUserPoolMcpServerClient5CE02E80",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
     "SpaBucket48E1059F": {
       "DeletionPolicy": "Delete",
       "Properties": {
@@ -2122,7 +2194,7 @@ function handler(event) {
         "VirginiaCertArnLookupCustomResourcePolicy0D3EDDE9",
       ],
       "Properties": {
-        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn:admin.example.com"}}",
+        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/wildcard-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/wildcard-certificate-arn:admin.example.com"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2130,7 +2202,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/certificate-arn:admin.example.com"}}",
+        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/wildcard-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/wildcard-certificate-arn:admin.example.com"}}",
       },
       "Type": "Custom::AWS",
       "UpdateReplacePolicy": "Delete",
@@ -2150,7 +2222,7 @@ function handler(event) {
                     {
                       "Ref": "AWS::AccountId",
                     },
-                    ":parameter/test/virginia/certificate-arn",
+                    ":parameter/test/virginia/wildcard-certificate-arn",
                   ],
                 ],
               },
@@ -2388,6 +2460,43 @@ exports[`VirginiaCertificateStack > snapshot 1`] = `
         "Type": "String",
         "Value": {
           "Ref": "WebCertificate760B17F3",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "WildcardCertificate25A2E830": {
+      "Properties": {
+        "DomainName": "example.com",
+        "DomainValidationOptions": [
+          {
+            "DomainName": "example.com",
+            "HostedZoneId": {
+              "Fn::GetAtt": [
+                "HostedZoneIdLookup1CDBE703",
+                "Parameter.Value",
+              ],
+            },
+          },
+        ],
+        "SubjectAlternativeNames": [
+          "*.example.com",
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestVirginiaCertificateStack/WildcardCertificate",
+          },
+        ],
+        "ValidationMethod": "DNS",
+      },
+      "Type": "AWS::CertificateManager::Certificate",
+    },
+    "WildcardCertificateArnParameter1860DA4D": {
+      "Properties": {
+        "Name": "/test/virginia/wildcard-certificate-arn",
+        "Type": "String",
+        "Value": {
+          "Ref": "WildcardCertificate25A2E830",
         },
       },
       "Type": "AWS::SSM::Parameter",

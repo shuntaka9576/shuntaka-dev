@@ -7,6 +7,7 @@ import { getConfig, getLogAnalyticsConfig, getProxyConfig } from '../lib/config.
 import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
+import { McpStack } from '../lib/mcp/mcp-stack.js';
 import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
 import { VirginiaCertificateStack } from '../lib/dns/virginia-certificate-stack.js';
 import { applyNag } from '../lib/nag.js';
@@ -14,6 +15,7 @@ import {
   applyAdminStackSuppressions,
   applyDeployRoleSuppressions,
   applyMainStackSuppressions,
+  applyMcpStackSuppressions,
   applyTidbProxyLogAnalyticsSuppressions,
   applyTidbProxySuppressions,
   applyVirginiaCertificateSuppressions,
@@ -68,6 +70,7 @@ const virginiaCertificateStack = new VirginiaCertificateStack(
     hostedZoneParameterRegion: REGIONS.TOKYO,
     certificateArnParameterName: config.ssm.virginia.certificateArn,
     webCertificateArnParameterName: config.ssm.virginia.webCertificateArn,
+    wildcardCertificateArnParameterName: config.ssm.virginia.wildcardCertificateArn,
     env: {
       account: config.cdkEnv.account,
       region: REGIONS.VIRGINIA,
@@ -118,6 +121,7 @@ const adminStack = new AdminStack(
     fqdn: config.fqdn,
     adminDomain: config.domain.admin,
     imagesDomain: config.domain.images,
+    mcpDomain: config.domain.mcp,
     databaseName: `blog_${config.stageName.long}`,
     labImagesBucketName: config.labs.imagesBucketName,
     blogApiLambdaRoleArn: mainStack.blogApiLambdaRoleArn,
@@ -138,6 +142,28 @@ adminStack.addDependency(virginiaCertificateStack);
 // blogApiLambdaRoleArn の cross-stack 参照により暗黙の依存は発生するが、
 // 依存方向 (AdminStack → MainStack) を明示するため addDependency も付ける
 adminStack.addDependency(mainStack);
+
+// ブログの MCP サーバー。Cognito のクライアントとドメインを AdminStack から SSM で受け取る
+const mcpStack = new McpStack(app, `${config.stageName.short}-${config.projectName.short}-mcp`, {
+  physicalPrefix: `${config.stageName.short}-${config.projectName.short}`,
+  fqdn: config.fqdn,
+  mcpDomain: config.domain.mcp,
+  blogUserName: 'shuntaka',
+  webFunctionMaxEnvironments: config.webFunction.maxEnvironments,
+  ssmParameters: {
+    globalDns: config.ssm.globalDns,
+    virginia: config.ssm.virginia,
+    admin: config.ssm.admin,
+  },
+  env: {
+    account: config.cdkEnv.account,
+    region: REGIONS.TOKYO,
+  },
+});
+mcpStack.addDependency(globalDnsStack);
+mcpStack.addDependency(virginiaCertificateStack);
+// SSM の値は deploy 時に読むため暗黙の依存ができない。Cognito のクライアントを先に作らせる
+mcpStack.addDependency(adminStack);
 
 const oidcProviderStack = new OidcProviderStack(app, `${config.projectName.short}-oidc-provider`, {
   ssmOidcProviderArn: config.ssm.oidc.providerArn,
@@ -202,3 +228,4 @@ applyTidbProxySuppressions(tidbProxyStack);
 applyTidbProxyLogAnalyticsSuppressions(tidbProxyLogAnalyticsStack);
 applyVirginiaCertificateSuppressions(virginiaCertificateStack);
 applyAdminStackSuppressions(adminStack);
+applyMcpStackSuppressions(mcpStack);

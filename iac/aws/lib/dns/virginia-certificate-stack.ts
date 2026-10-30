@@ -19,6 +19,7 @@ export class VirginiaCertificateStack extends cdk.Stack {
       hostedZoneParameterRegion: string;
       certificateArnParameterName: string;
       webCertificateArnParameterName: string;
+      wildcardCertificateArnParameterName: string;
     } & cdk.StackProps,
   ) {
     super(scope, id, props);
@@ -58,6 +59,21 @@ export class VirginiaCertificateStack extends cdk.Stack {
     new ssm.StringParameter(this, 'WebCertificateArnParameter', {
       parameterName: props.webCertificateArnParameterName,
       stringValue: webCertificate.certificateArn,
+    });
+
+    // apex とすべてのサブドメイン (admin / images / mcp ...) を 1 枚で受ける。サブドメインを増やすたびに
+    // 証明書を作らなくて済むようにする (ワイルドカードは apex を含まないため apex を本体の名前にする)。
+    // MainStack / AdminStack / McpStack はこれを使う。上の 2 枚は CloudFront が参照しなくなった後に消す
+    // (CloudFront が使っている間は削除できず、このスタックは参照側より先にデプロイされるため同じデプロイでは消せない)
+    const wildcardCertificate = new acm.Certificate(this, 'WildcardCertificate', {
+      domainName: props.fqdn,
+      subjectAlternativeNames: [`*.${props.fqdn}`],
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
+
+    new ssm.StringParameter(this, 'WildcardCertificateArnParameter', {
+      parameterName: props.wildcardCertificateArnParameterName,
+      stringValue: wildcardCertificate.certificateArn,
     });
   }
 }

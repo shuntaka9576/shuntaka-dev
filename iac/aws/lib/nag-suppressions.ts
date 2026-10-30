@@ -46,6 +46,7 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::cognito-idp:*',
       'Action::cloudfront:*',
       'Action::secretsmanager:*',
+      'Action::dynamodb:*',
       'Resource::*',
     ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
@@ -331,6 +332,62 @@ export const applyMainStackSuppressions = (stack: cdk.Stack): void => {
       id: 'AwsSolutions-CFR3',
       reason:
         '個人ブログ用途でアクセスログ用の追加バケット・コストを持たない方針 (tidb-proxy の VPC Flow Logs と同じ割り切り)。',
+    },
+  ]);
+};
+
+export const applyMcpStackSuppressions = (stack: cdk.Stack): void => {
+  acknowledgeRules(stack, [
+    {
+      id: 'AwsSolutions-IAM4[Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]',
+      reason:
+        'TODO(別PR): MainStack と同じく、Web Function 実行ロールが CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。',
+    },
+    {
+      id: 'AwsSolutions-L1',
+      reason:
+        'BucketDeployment / autoDeleteObjects / AwsCustomResource が生成する CDK 管理の custom resource Lambda。ランタイムはフレームワーク既定に従う。',
+    },
+    ...[
+      'Action::s3:Abort*',
+      'Action::s3:DeleteObject*',
+      'Action::s3:GetBucket*',
+      'Action::s3:GetObject*',
+      'Action::s3:List*',
+      'Resource::<WebFunctionCodeBucket1D283E48.Arn>/*',
+    ].map((finding) => ({
+      id: `AwsSolutions-IAM5[${finding}]`,
+      reason:
+        'BucketDeployment と autoDeleteObjects の custom resource はオブジェクトキーへ動的にアクセスするため bucket/* のワイルドカードを許容する。バケットは Web Function のコード置き場専用。',
+    })),
+    ...['<AWS::Partition>', 'aws'].map((partition) => ({
+      id: `AwsSolutions-IAM5[Resource::arn:${partition}:s3:::cdk-hnb659fds-assets-${stack.account}-${stack.region}/*]`,
+      reason:
+        'BucketDeployment の custom resource Lambda が CDK bootstrap の asset バケットから Web Function の zip を取得するための CDK 既定権限。',
+    })),
+    {
+      id: 'AwsSolutions-S1',
+      reason:
+        '個人ブログ用途でサーバーアクセスログ用の追加バケット・コストを持たない方針 (MainStack と同じ)。書き込み主体は BucketDeployment のみ。',
+    },
+    {
+      id: 'AwsSolutions-SMG4',
+      reason:
+        'MCP サーバーの JWT 署名・保存値の暗号化の鍵。ローテーションすると発行済みのトークンと保存済みの OAuth の状態がすべて無効になり、MCP クライアントの再認証が必要になるため自動ローテーションしない。',
+    },
+    {
+      id: 'AwsSolutions-CFR1',
+      reason: '公開ブログの記事を返す MCP サーバーのため geo restriction は設けない。',
+    },
+    {
+      id: 'AwsSolutions-CFR2',
+      reason:
+        'TODO(別PR): CloudFront への WAF 導入を検討する。ツールは公開記事の読み取りのみで、認証ありのエンドポイントはアプリが Bearer トークンを検証する。実行環境の上限 (maxEnvironments) で料金の増加を抑える。',
+    },
+    {
+      id: 'AwsSolutions-CFR3',
+      reason:
+        '個人ブログ用途でアクセスログ用の追加バケット・コストを持たない方針 (MainStack と同じ)。',
     },
   ]);
 };

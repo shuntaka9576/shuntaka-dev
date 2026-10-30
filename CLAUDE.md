@@ -47,6 +47,7 @@ secretlint と gitleaks は検出範囲が異なる（Slack Webhook / Anthropic 
 apps/
 ├── web/          # Next.js 16 フロントエンド (React 19, Tailwind CSS 4)
 ├── blog-api/     # Rust/Axum バックエンドAPI (SQLx, TiDB [MySQL互換])
+├── mcp-server/   # ブログの MCP サーバー (Hono + MCP SDK v2。/mcp は認証なし、/auth/mcp は Cognito で OAuth・DCR)
 └── tidb-proxy/   # ECS Fargate 常駐プロキシ (Go tsnet で Tailnet 上の TiDB へ TCP 中継 + squid)
 
 tools/

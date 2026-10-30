@@ -35,6 +35,10 @@ export class WebFunction extends Construct {
       // ずっと課金されるため、bot などでアクセスが急に増えても台数 (= 料金) が際限なく増えないようにする。
       // 上限に達すると、それ以上の並列リクエストは endpoint で絞られる
       maxEnvironments: number;
+      // 既定の IamAuth は CloudFront OAC の署名付きリクエストだけを通す。ApplicationManaged は誰でも呼べ、
+      // 認証はアプリが行う。OAC は viewer の Authorization を残すかがドキュメント上はっきりしないため、
+      // Bearer トークンを受けるアプリ (MCP サーバー) は ApplicationManaged にして OAC を使わない
+      authType?: 'IamAuth' | 'ApplicationManaged';
     },
   ) {
     super(scope, id);
@@ -134,15 +138,18 @@ export class WebFunction extends Construct {
       functionName: webFunction.attrFunctionArn,
       endpointName: 'prod',
       endpointType: 'HomeRegion',
-      // CloudFront OAC から署名付きで呼ばせ、直接アクセスは 403 にする
-      authType: 'IamAuth',
+      // IamAuth なら CloudFront OAC から署名付きで呼ばせ、直接アクセスは 403 にする
+      authType: props.authType ?? 'IamAuth',
       revisionWeights: [{ revisionId: revision.attrRevisionId, weight: 100 }],
       scalingConfig: { maxEnvironments: props.maxEnvironments },
     });
   }
 
-  /** CloudFront の origin。Host を転送すると endpoint が 404 を返すため、behavior 側で AllViewerExceptHostHeader を使う */
-  public origin(originAccessControlId: string): origins.HttpOrigin {
+  /**
+   * CloudFront の origin。Host を転送すると endpoint が 404 を返すため、behavior 側で AllViewerExceptHostHeader を使う。
+   * ApplicationManaged の endpoint では OAC を付けない (originAccessControlId を渡さない)
+   */
+  public origin(originAccessControlId?: string): origins.HttpOrigin {
     return new origins.HttpOrigin(this.endpoint.attrDomainName, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
       originAccessControlId,
