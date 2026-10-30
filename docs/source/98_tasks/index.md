@@ -7,6 +7,7 @@
 | 起票日     | タイトル                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0000-00-00 | [タイトル](0000-00-00-topic/index.md)                                                                                                                             |
+| 2026-10-30 | [証明書を us-east-1 のワイルドカード 1 枚にまとめる](2026-10-30-unify-certificates/index.md)                                                                      |
 | 2026-10-30 | [ブログの MCP サーバー（mcp.<fqdn>）の追加と Muse からの接続確認](2026-10-30-blog-mcp-server/index.md)                                                            |
 | 2026-10-15 | [Lambda Web Functions + CloudFront OAC への移行検討（blog-api / apps/web / admin-api）](2026-10-15-lambda-web-functions-survey/index.md)                          |
 | 2026-10-06 | [tidb-proxy ログの Iceberg テーブルを S3 Tables へ移行する](2026-10-06-tidb-proxy-logs-s3-tables/index.md)                                                        |

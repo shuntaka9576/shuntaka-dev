@@ -260,7 +260,7 @@ Route53にNSレコードを登録
 
 AWSのRoute53からホストゾーンのNSレコードを確認し、ムームードメインのコンソール画面のNSレコードを変更
 
-証明書の作成。CloudFront 用（admin / images と apex）は us-east-1 に置く。DNS 検証レコードは Route53 に自動で作られる。main stack の依存先でもあるため、main のデプロイでも先に適用される。
+証明書の作成。証明書を使うのは CloudFront だけで、us-east-1 に `<fqdn>` + `*.<fqdn>` のワイルドカード 1 枚を置く（apex・admin・images・mcp で共用）。DNS 検証レコードは Route53 に自動で作られる。main stack の依存先でもあるため、main のデプロイでも先に適用される。
 
 ```bash
 export STAGE_NAME=""

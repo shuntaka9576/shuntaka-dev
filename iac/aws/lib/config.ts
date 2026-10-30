@@ -87,12 +87,7 @@ interface AppParameter {
     globalDns: {
       hostedZoneId: string;
     };
-    tokyo: {
-      certificateArn: string;
-    };
     virginia: {
-      certificateArn: string;
-      webCertificateArn: string;
       // <fqdn> と *.<fqdn> の 1 枚。apex・admin・images・mcp の CloudFront はこれを使う
       wildcardCertificateArn: string;
     };
@@ -407,13 +402,8 @@ export const getConfig = (stageName: string): AppParameter => {
       globalDns: {
         hostedZoneId: `/${config.stageName.long}/${config.projectName.long}/global-dns/hosted-zone-id`,
       },
-      tokyo: {
-        certificateArn: `/${config.stageName.long}/${config.projectName.long}/tokyo/certificate-arn`,
-      },
       // us-east-1 (CloudFront 用証明書) の SSM に書き出す。読み取りは cross-region
       virginia: {
-        certificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/certificate-arn`,
-        webCertificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/web-certificate-arn`,
         wildcardCertificateArn: `/${config.stageName.long}/${config.projectName.long}/virginia/wildcard-certificate-arn`,
       },
       admin: {

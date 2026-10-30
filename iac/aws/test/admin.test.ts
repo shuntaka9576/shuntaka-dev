@@ -54,12 +54,8 @@ describe('VirginiaCertificateStack', () => {
     const app = new cdk.App();
     const stack = new VirginiaCertificateStack(app, 'TestVirginiaCertificateStack', {
       fqdn: 'example.com',
-      adminDomain: 'admin.example.com',
-      imagesDomain: 'images.example.com',
       hostedZoneIdParameterName: '/test/hosted-zone-id',
       hostedZoneParameterRegion: 'ap-northeast-1',
-      certificateArnParameterName: '/test/virginia/certificate-arn',
-      webCertificateArnParameterName: '/test/virginia/web-certificate-arn',
       wildcardCertificateArnParameterName: '/test/virginia/wildcard-certificate-arn',
       env: {
         account: '123456789012',

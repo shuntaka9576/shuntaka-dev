@@ -8,7 +8,6 @@ import { DeployRoleStack } from '../lib/deployment/deploy-role-stack.js';
 import { OidcProviderStack } from '../lib/deployment/oidc-provider-stack.js';
 import { GlobalDnsStack } from '../lib/dns/global-dns-stack.js';
 import { McpStack } from '../lib/mcp/mcp-stack.js';
-import { TokyoCertificateStack } from '../lib/dns/tokyo-certificate-stack.js';
 import { VirginiaCertificateStack } from '../lib/dns/virginia-certificate-stack.js';
 import { applyNag } from '../lib/nag.js';
 import {
@@ -47,29 +46,13 @@ const globalDnsStack = new GlobalDnsStack(
   },
 );
 
-// api.<fqdn> (API Gateway) の撤去で MainStack からは参照しなくなった。
-// 証明書スタック自体の撤去 (cdk destroy) は別途行う
-new TokyoCertificateStack(app, `${config.stageName.short}-${config.projectName.short}-tokyo-cert`, {
-  domainName: config.fqdn,
-  hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
-  certificateArnParameterName: config.ssm.tokyo.certificateArn,
-  env: {
-    account: config.cdkEnv.account,
-    region: REGIONS.TOKYO,
-  },
-});
-
 const virginiaCertificateStack = new VirginiaCertificateStack(
   app,
   `${config.stageName.short}-${config.projectName.short}-virginia-cert`,
   {
     fqdn: config.fqdn,
-    adminDomain: config.domain.admin,
-    imagesDomain: config.domain.images,
     hostedZoneIdParameterName: config.ssm.globalDns.hostedZoneId,
     hostedZoneParameterRegion: REGIONS.TOKYO,
-    certificateArnParameterName: config.ssm.virginia.certificateArn,
-    webCertificateArnParameterName: config.ssm.virginia.webCertificateArn,
     wildcardCertificateArnParameterName: config.ssm.virginia.wildcardCertificateArn,
     env: {
       account: config.cdkEnv.account,
