@@ -32,7 +32,7 @@
         "https-proxy-agent": "^9.1.0",
         "iron-webcrypto": "^2.0.0",
         "jose": "^6.2.13",
-        "kysely": "^0.29.4",
+        "kysely": "^0.29.7",
         "mysql2": "^3.23.0",
         "ulid": "^3.0.2",
         "zod": "^4.4.3",
@@ -1749,7 +1749,7 @@
 
     "kleur": ["kleur@4.1.5", "https://npm.flatt.tech/kleur/-/kleur-4.1.5.tgz", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
 
-    "kysely": ["kysely@0.29.4", "https://npm.flatt.tech/kysely/-/kysely-0.29.4.tgz", {}, "sha512-y5mVgQNkMbs1eK9Xyc0pmNdabN2wHhRYY/5r4W5HrUT1rYCEPeVNSj1RUJeSDKT3U0p+mXCvLgkrFuIafYI6BA=="],
+    "kysely": ["kysely@0.29.7", "", {}, "sha512-fmIq+7kv4WbFm2tcfznRzikqB4cuNpgZ40PSU2fAJ2/OO5XhojqnTPrmgrCjYSRJVwBln03XcRXJGnw9H099IQ=="],
 
     "labs-web": ["labs-web@workspace:apps/labs-web"],
 
@@ -3184,6 +3184,18 @@
     "shadcn/@babel/core/@babel/types/@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "https://npm.flatt.tech/@babel/helper-string-parser/-/helper-string-parser-7.27.1.tgz", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
 
     "shadcn/@babel/core/@babel/types/@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.28.5", "https://npm.flatt.tech/@babel/helper-validator-identifier/-/helper-validator-identifier-7.28.5.tgz", {}, "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="],
+
+    "@vitest/browser-preview/vitest/@vitest/browser-preview/@vitest/browser": ["@vitest/browser@5.0.1", "https://npm.flatt.tech/@vitest/browser/-/browser-5.0.1.tgz", { "dependencies": { "@blazediff/core": "1.10.0", "@vitest/mocker": "5.0.1", "@vitest/ui": "5.0.1", "@vitest/utils": "5.0.1", "magic-string": "^1.2.3", "pngjs": "^7.0.0", "sirv": "^3.0.2", "tinyrainbow": "^3.1.1", "ws": "^8.21.3" }, "peerDependencies": { "vitest": "5.0.1" } }, "sha512-s2UroEhP2BZPoen1qrXXTtVqnUcs6y2sxMLGCZ8tZDkH2iM/6tTC2GVTPCgF+oVF3X5M6wC/X2O0MvvoHNmH0Q=="],
+
+    "@vitest/browser-preview/vitest/@vitest/ui/flatted": ["flatted@3.4.4", "https://npm.flatt.tech/flatted/-/flatted-3.4.4.tgz", {}, "sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q=="],
+
+    "@vitest/browser/vitest/@vitest/browser-preview/@vitest/browser": ["@vitest/browser@5.0.1", "https://npm.flatt.tech/@vitest/browser/-/browser-5.0.1.tgz", { "dependencies": { "@blazediff/core": "1.10.0", "@vitest/mocker": "5.0.1", "@vitest/ui": "5.0.1", "@vitest/utils": "5.0.1", "magic-string": "^1.2.3", "pngjs": "^7.0.0", "sirv": "^3.0.2", "tinyrainbow": "^3.1.1", "ws": "^8.21.3" }, "peerDependencies": { "vitest": "5.0.1" } }, "sha512-s2UroEhP2BZPoen1qrXXTtVqnUcs6y2sxMLGCZ8tZDkH2iM/6tTC2GVTPCgF+oVF3X5M6wC/X2O0MvvoHNmH0Q=="],
+
+    "@vitest/browser/vitest/@vitest/ui/flatted": ["flatted@3.4.4", "https://npm.flatt.tech/flatted/-/flatted-3.4.4.tgz", {}, "sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q=="],
+
+    "@vitest/ui/vitest/@vitest/browser-preview/@vitest/browser": ["@vitest/browser@5.0.1", "https://npm.flatt.tech/@vitest/browser/-/browser-5.0.1.tgz", { "dependencies": { "@blazediff/core": "1.10.0", "@vitest/mocker": "5.0.1", "@vitest/ui": "5.0.1", "@vitest/utils": "5.0.1", "magic-string": "^1.2.3", "pngjs": "^7.0.0", "sirv": "^3.0.2", "tinyrainbow": "^3.1.1", "ws": "^8.21.3" }, "peerDependencies": { "vitest": "5.0.1" } }, "sha512-s2UroEhP2BZPoen1qrXXTtVqnUcs6y2sxMLGCZ8tZDkH2iM/6tTC2GVTPCgF+oVF3X5M6wC/X2O0MvvoHNmH0Q=="],
+
+    "labs-web/svelte-check/chokidar/readdirp": ["readdirp@4.1.2", "https://npm.flatt.tech/readdirp/-/readdirp-4.1.2.tgz", {}, "sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg=="],
 
     "@vitest/browser-preview/vitest/@vitest/browser-preview/@vitest/browser": ["@vitest/browser@5.0.1", "https://npm.flatt.tech/@vitest/browser/-/browser-5.0.1.tgz", { "dependencies": { "@blazediff/core": "1.10.0", "@vitest/mocker": "5.0.1", "@vitest/ui": "5.0.1", "@vitest/utils": "5.0.1", "magic-string": "^1.2.3", "pngjs": "^7.0.0", "sirv": "^3.0.2", "tinyrainbow": "^3.1.1", "ws": "^8.21.3" }, "peerDependencies": { "vitest": "5.0.1" } }, "sha512-s2UroEhP2BZPoen1qrXXTtVqnUcs6y2sxMLGCZ8tZDkH2iM/6tTC2GVTPCgF+oVF3X5M6wC/X2O0MvvoHNmH0Q=="],
 
