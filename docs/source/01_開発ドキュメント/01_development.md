@@ -84,7 +84,7 @@ gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
 | `get_article`     | slug を指定して Markdown の本文を取得（`/articles/{slug}`） |
 | `list_tags`       | タグごとの記事数（`/articles/tag-facets`）                  |
 
-認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（fastmcp の `OAuthProxy`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名した JWT を渡し、Cognito のトークンはサーバーの外に出さない。OAuth の状態は DynamoDB に暗号化して置き、鍵は Secrets Manager から起動時に読む。設計の背景は Muse の Custom Connector を検証した記事（FastMCP OAuth Proxy + Cognito）と同じ。
+認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（fastmcp の `OAuthProxy`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名した JWT を渡し、Cognito のトークンはサーバーの外に出さない。OAuth の状態は DynamoDB に暗号化して置き、鍵は Secrets Manager から起動時に読む。設計の背景と dev での作業記録は [ブログの MCP サーバーの追加](../98_tasks/2026-10-30-blog-mcp-server/index.md) を参照。
 
 - アクセストークンは 1 日、リフレッシュトークンは 30 日（`iac/aws/lib/mcp/mcp-oauth.ts`）。発行済みのトークンは DynamoDB の項目を消せば期限前でも失効する
 - DCR で登録できるリダイレクト先は `apps/mcp-server/src/oauth.ts` の `DEFAULT_REDIRECT_URI_POLICY`（Muse・Claude・ChatGPT とループバック）。ほかのクライアントをつなぐときはここに足す
