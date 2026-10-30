@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "commander": "^15.0.0",
-    "mysql2": "^3.23.0"
+    "mysql2": "^3.24.6"
   }
 }
