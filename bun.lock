@@ -74,7 +74,7 @@
         "@vitejs/plugin-react": "^6.1.2",
         "steiger": "^0.6.0",
         "tailwindcss": "^4.3.3",
-        "vite": "^8.2.2",
+        "vite": "^8.3.5",
       },
     },
     "apps/blog-api": {
@@ -99,7 +99,7 @@
         "svelte-check": "^4.3.3",
         "tailwindcss": "^4.1.16",
         "typescript": "~6.0.3",
-        "vite": "^8.2.2",
+        "vite": "^8.3.5",
         "yaml": "^2.8.1",
       },
     },
@@ -144,7 +144,7 @@
         "storybook": "^10.6.0",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3",
-        "vite": "^8.3.1",
+        "vite": "^8.3.5",
       },
     },
     "docs": {
