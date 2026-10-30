@@ -22,7 +22,7 @@
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "description": "manifest が変わらない間接依存の lock 更新だけを週1で取り込む。PR #16 は package 更新時に lock が追従するとして daily の lockFileMaintenance を止めた。その追従は直接依存の PR に残し、こちらは生態系グループへ混ぜない。",
+    "description": "週1で lock を更新する。manifest の range 内なら直接依存も間接依存も上がる。osvVulnerabilityAlerts は直接依存だけなので、certifi や zip のような間接依存の脆弱性はここが拾う。PR #16 の daily ではなく、生態系グループには混ぜない。",
     "schedule": ["before 4am on monday"],
     "groupName": "lock-file-maintenance"
   },
@@ -151,7 +151,7 @@
       "allowedVersions": "<3.14"
     },
     {
-      "description": "lockFileMaintenance は file グループより後に適用し、週1の1 PR に固定する。PR #10 のように生態系グループへ混ざると直接依存の更新と間接依存の lock 更新が同じ PR になる",
+      "description": "lockFileMaintenance は file グループより後に適用し、週1の1 PR に固定する。range 内の直接依存と間接依存の両方を更新する。PR #10 のように生態系グループへ混ぜない",
       "matchUpdateTypes": ["lockFileMaintenance"],
       "groupName": "lock-file-maintenance",
       "schedule": ["before 4am on monday"]
