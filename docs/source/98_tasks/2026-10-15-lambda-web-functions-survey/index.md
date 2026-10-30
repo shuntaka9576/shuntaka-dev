@@ -2,7 +2,7 @@
 
 - 起票日: 2026-10-15
 - 対象: blog-api（Rust / Axum）、apps/web（Next.js 16 / Vercel）、admin-api（Hono）、proxy VPC
-- ステータス: dev に適用済み・prd は未切り替え（2026-10-23）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。残りの作業は[切り替え手順](#切り替え手順)の表のとおり
+- ステータス: dev・prd に適用済み（prd は 2026.1023.0 のリリース）。後片付けは Vercel と secret を残して済（2026-10-30）。blog-api は案 C（Node.js から Rust バイナリを子プロセスで起動）、API は `https://<fqdn>/api/*` に統合して `api.<fqdn>` を撤去する。admin-api は対象外。残りの作業は[切り替え手順](#切り替え手順)の表のとおり
 - PR: [#817](https://github.com/shuntaka9576/shuntaka-dev/pull/817)
 - 関連タスク:
   - [blog-api: Lambda + tsnet を VPC + Fargate Proxy 構成に移行](../2026-06-29-blog-api-tidb-proxy/index.md)
@@ -158,14 +158,14 @@ dev（shuntaka.me）にデプロイして次を確認した。
 
 dev → prd の順に切り替え、最後に Vercel と旧構成の残りを片付ける。
 
-| #   | 作業                                                                         | 状態                                                                    |
-| --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336） |
-| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 済（2026-10-23）                                                        |
-| 3   | PR #817 をマージする                                                         | 未                                                                      |
-| 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 未                                                                      |
-| 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | 未                                                                      |
-| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 管理外のサブネットは済（2026-10-23）。ほかは prd の切り替え後に行う     |
+| #   | 作業                                                                         | 状態                                                                                                      |
+| --- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1   | dev に適用する（ブランチから deploy.yaml を dispatch）                       | 済（2026-10-23。run 39888301734、巻き戻りからの復旧は run 39901222336）                                   |
+| 2   | GitHub App（dev）の Webhook URL を変え、記事の push で反映されるか確かめる   | 済（2026-10-23）                                                                                          |
+| 3   | PR #817 をマージする                                                         | 済（2026-10-23）                                                                                          |
+| 4   | prd の Environment variable を入れ、リリース PR をマージする                 | 済（2026.1023.0。2026-10-30 に apex と `/api` が CloudFront から返ることを確認）                          |
+| 5   | GitHub App（prd）の Webhook URL を変え、prd の `WEB_BUILD_API_URL` を消す    | `WEB_BUILD_API_URL` は削除済み（2026-10-30 に確認）。Webhook URL の変更は記録がない                       |
+| 6   | 後片付け（Vercel、secret、tokyo-cert、`deleteExisting`、管理外のサブネット） | 管理外のサブネット（2026-10-23）、tokyo-cert と `deleteExisting`（2026-10-30）は済。Vercel と secret は未 |
 
 apex を CloudFront に向け直す初回だけ、next build の時点ではまだ `https://<fqdn>/api` が無い。そのため `WEB_BUILD_API_URL` で旧 API（`https://api.<fqdn>`）を指し、切り替え後に消す。
 
@@ -261,15 +261,9 @@ gh secret delete VERCEL_ORG_ID
 gh secret delete VERCEL_PROJECT_ID
 ```
 
-API Gateway 用だった Tokyo の証明書スタックを消す。どこからも参照しなくなっている。消したあと、`iac/aws/bin/cdk.ts` の `TokyoCertificateStack` と `config.ts` の `ssm.tokyo` を別の PR で外す。
+API Gateway 用だった Tokyo の証明書スタックは消した（済、2026-10-30）。コードから先に外した（PR #830）ため、`cdk destroy` ではなく `aws cloudformation delete-stack` で消した。手順と結果は [証明書を us-east-1 のワイルドカード 1 枚にまとめる](../2026-10-30-unify-certificates/index.md)。
 
-```bash
-cd iac/aws
-bunx dotenv -- cdk destroy -c stageName=dev d-st-tokyo-cert
-bunx dotenv -- cdk destroy -c stageName=prd p-st-tokyo-cert
-```
-
-`SiteConstruct` の `deleteExisting` を別の PR で外す（CDK で非推奨。失敗時にレコードが消えたままになり得る。prd の手作りのレコードを消すためだけに入れた）。
+`SiteConstruct` の `deleteExisting` は外した（済、2026-10-30）。CDK で非推奨で、失敗時にレコードが消えたままになり得る。prd の手作りのレコードを消すためだけに入れていた。CDK のハンドラーは Create のときだけ既存のレコードを消し、Update・Delete では何もしないため、外しても apex のレコードは残る。
 
 dev の管理外になったサブネット（`10.50.2.0/24`）は消した（済。手順と結果は [dev の巻き戻り](#dev-の巻き戻り2026-10-23)）。
 

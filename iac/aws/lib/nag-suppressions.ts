@@ -46,7 +46,6 @@ export const applyDeployRoleSuppressions = (stack: cdk.Stack): void => {
       'Action::cognito-idp:*',
       'Action::cloudfront:*',
       'Action::secretsmanager:*',
-      'Action::dynamodb:*',
       'Resource::*',
     ].map((finding) => ({ id: `AwsSolutions-IAM5[${finding}]`, reason: iam5Reason })),
   ]);
@@ -276,7 +275,7 @@ export const applyMainStackSuppressions = (stack: cdk.Stack): void => {
   const iam4Reason =
     'TODO(別PR): Lambda 実行ロール (Event Function / Web Function) が CDK 既定で利用する AWS 管理ポリシーをカスタマー管理ポリシーに置き換える。AWSLambdaVPCAccessExecutionRole は VPC 内 Lambda の ENI 管理に必要な最小権限セットで AWS 公式のベストプラクティスのため許容。';
   const customResourceLambdaReason =
-    'BucketDeployment / autoDeleteObjects / AwsCustomResource / Route53 の deleteExisting が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
+    'BucketDeployment / autoDeleteObjects / AwsCustomResource が生成する CDK 管理の custom resource Lambda。実装は aws-cdk-lib 側の管理物のためポリシー / ランタイムはフレームワーク既定に従う。';
   const bucketDeploymentWildcardReason =
     'BucketDeployment と autoDeleteObjects の custom resource はオブジェクトキーへ動的にアクセスするため bucket/* のワイルドカードを許容する。バケットは Web Function のコード置き場専用。';
   acknowledgeRules(stack, [
