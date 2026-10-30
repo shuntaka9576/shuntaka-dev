@@ -95,7 +95,7 @@
         "@typescript/native": "npm:typescript@^7.0.2",
         "hono": "^4.10.6",
         "markdown-wasm": "workspace:*",
-        "svelte": "^5.42.2",
+        "svelte": "^5.57.3",
         "svelte-check": "^4.3.3",
         "tailwindcss": "^4.1.16",
         "typescript": "~6.0.3",
