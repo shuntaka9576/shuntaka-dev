@@ -4,12 +4,7 @@
 
 body {
   font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    'Hiragino Kaku Gothic ProN',
-    'Hiragino Sans',
-    Meiryo,
+    system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo,
     sans-serif;
   color: var(--color-text);
 }

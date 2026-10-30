@@ -44,7 +44,7 @@ metric_storage = "http://kube-prom-stack-kube-prome-prometheus.monitoring:9090"
 
 [log]
 path = ""
-level = "INFO"          # ← 大文字必須。"info" は弾かれて起動失敗する
+level = "INFO" # ← 大文字必須。"info" は弾かれて起動失敗する
 
 [pd]
 endpoints = ["basic-pd:2379"]
@@ -54,7 +54,7 @@ enable = true
 profile_seconds = 10
 interval_seconds = 60
 timeout_seconds = 120
-data_retention_seconds = 259200    # 3日
+data_retention_seconds = 259200 # 3日
 ```
 
 - **`log.level` は大文字** (`DEBUG` / `INFO` / `WARN` / `ERROR`)。小文字を指定すると `Failed to initialize config, err: log level should be DEBUG, INFO, WARN or ERROR` で CrashLoopBackOff になる
