@@ -1,0 +1,24 @@
+{
+  "name": "@shuntaka-dev/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "build": "node build.mjs",
+    "test": "bun test src/",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1092.0",
+    "@aws-sdk/client-dynamodb": "^3.1092.0",
+    "@aws-sdk/client-secrets-manager": "^3.1092.0",
+    "@hono/node-server": "^2.0.12",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "hono": "^4.12.31",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -68,6 +68,58 @@ gh variable set NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID --env prd --body 'GTM-XXXXXXX'
 gh variable set NEXT_PUBLIC_CLARITY_PROJECT_ID --env prd --body 'xxxxxxxxxx'
 ```
 
+### ブログの MCP サーバー (mcp.<fqdn>)
+
+`apps/mcp-server`（Hono + MCP SDK v2）を mcp stack の Lambda Web Function で動かし、専用の CloudFront（`mcp.<fqdn>`）から配信する。ツールは blog-api の公開 API（`https://<fqdn>/api`）を呼ぶだけで、公開済みの記事しか返さない。
+
+| エンドポイント                | 認証                                        | 用途                                                      |
+| ----------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| `https://mcp.<fqdn>/mcp`      | なし                                        | 誰でも使える読み取り専用の MCP                            |
+| `https://mcp.<fqdn>/auth/mcp` | OAuth（DCR・PKCE S256、Cognito でログイン） | Muse などで Custom Connector として登録する（同じツール） |
+
+| ツール            | 処理                                                        |
+| ----------------- | ----------------------------------------------------------- |
+| `search_articles` | セマンティック検索（`/articles/search`）                    |
+| `list_articles`   | 新しい順の一覧。タグで絞り込める（`/articles`）             |
+| `get_article`     | slug を指定して Markdown の本文を取得（`/articles/{slug}`） |
+| `list_tags`       | タグごとの記事数（`/articles/tag-facets`）                  |
+
+認証ありのエンドポイントは、MCP サーバー自身が DCR に対応した認可サーバーとして振る舞い（`apps/mcp-server/src/oauth/`）、ログインだけを admin のユーザープールの managed login に任せる。ログインするのは admin 画面と同じユーザー。MCP クライアントにはサーバーが署名したアクセストークン（JWT）と不透明なリフレッシュトークンを渡し、Cognito のトークンはサーバーの外に出さない。認可の状態（クライアント・トランザクション・認可コード・grant）は DynamoDB に置き、Cognito のリフレッシュトークンだけを暗号化して持つ。鍵は Secrets Manager から起動時に読む。保証している性質は `src/oauth/index.ts` の冒頭に並べ、1 つずつテスト（`src/oauth/oauth.test.ts`）で確かめている。設計の背景と dev での作業記録は [ブログの MCP サーバーの追加](../98_tasks/2026-10-30-blog-mcp-server/index.md) を参照。
+
+- アクセストークンは 1 日、ログインの有効期間は 30 日（`iac/aws/lib/mcp/mcp-oauth.ts`）。リフレッシュトークンは使うたびに替わり、ログインから 30 日で再認証になる。DynamoDB の grant（`grant#<ID>`）を消せば、発行済みのトークンも期限前に失効する
+- DCR で登録できるリダイレクト先は `apps/mcp-server/src/oauth/redirect-uri.ts` の `DEFAULT_REDIRECT_URI_POLICY`（Muse・Claude・ChatGPT とループバック）。ほかのクライアントをつなぐときはここに足す
+- Web Function の endpoint は OAC を使わない `ApplicationManaged`。OAC で viewer の `Authorization` が残るかがはっきりしないため、Bearer トークンはアプリが検証する
+
+デプロイは admin stack の後（Cognito のクライアントとドメインを SSM から読むため）。CI の `all` は main → admin → mcp の順に流す。
+
+```bash
+cd iac/aws
+bunx dotenv -- cdk deploy d-st-admin --exclusively -c stageName=dev
+bunx dotenv -- cdk deploy d-st-mcp --exclusively -c stageName=dev
+```
+
+Muse からは次のプロンプトで登録する。
+
+```text
+Create a Custom Connector for my remote MCP server.
+
+Name: custom.shuntaka-dev-blog
+Transport: Streamable HTTP
+URL: https://mcp.shuntaka.dev/auth/mcp
+Authentication: OAuth 2.0 Authorization Code with PKCE (S256)
+Client registration: Dynamic Client Registration (DCR)
+
+Discover the OAuth metadata, register the client, and guide me through the login.
+After login, discover the available tools and test the connection.
+```
+
+ローカルでは `bun dev`（または `apps/mcp-server` で `bun run dev`）で、dev のブログ API を読む `http://localhost:<MCP_SERVER_PORT>/mcp` と `/auth/mcp` が起動する（main の既定は 43008）。認証ありのログインは Cognito の代わりに仮ログイン（`src/dev-login.ts`。`local-user` としてログインする）を使うため、AWS の認証は要らない。本物の Cognito とのつなぎ込みは dev 環境で確かめる。Claude Code からは次のようにつなぐ。
+
+```bash
+claude mcp add --transport http blog-local http://localhost:43008/auth/mcp
+# Claude Code の /mcp で blog-local を選び、Authenticate → 同意画面 → 仮ログイン
+```
+
 ### リリース
 
 リリースは [tagpr](https://github.com/Songmu/tagpr) のリリース PR マージで行う。main へのマージごとに tagpr（`.github/workflows/tagpr.yaml`）がリリース PR を自動作成・追従し、マージすると CalVer タグ（例: `2026.0711.0`、形式は `.tagpr` で定義）と GitHub Release が作られ、同一ワークフローの後続ジョブが prd CDK（公開サイトを含む）をデプロイする。main push では dev CDK（shuntaka.me）へ自動デプロイする。
@@ -587,6 +639,7 @@ ORIGIN_ALLOWLIST=http://localhost:43002
 STORYBOOK_PORT=43005
 LABS_WEB_PORT=43006
 LABS_API_PORT=43007
+MCP_SERVER_PORT=43008
 EOF
 
 direnv allow .
@@ -604,6 +657,7 @@ direnv allow .
 | `STORYBOOK_PORT`       | Storybook devポート              | 43005                    |
 | `LABS_WEB_PORT`        | labs-web (SvelteKit) devポート   | 43006                    |
 | `LABS_API_PORT`        | labs プレビュー API ポート       | 43007                    |
+| `MCP_SERVER_PORT`      | mcp-server devサーバーポート     | 43008                    |
 | `NEXT_PUBLIC_SITE_URL` | フロントエンドURL                | `http://localhost:43000` |
 | `API_URL`              | API URL（サーバー側 / rewrites） | `http://localhost:43003` |
 | `ORIGIN_ALLOWLIST`     | admin-api CSRF 許可 Origin       | `http://localhost:43002` |

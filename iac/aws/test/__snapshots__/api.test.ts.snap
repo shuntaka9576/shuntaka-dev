@@ -2158,7 +2158,7 @@ function handler(event) {
         "WebCertificateArnLookupCustomResourcePolicy86402AE9",
       ],
       "Properties": {
-        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/web-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/web-certificate-arn:example.com"}}",
+        "Create": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/wildcard-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/wildcard-certificate-arn:example.com"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2166,7 +2166,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/web-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/web-certificate-arn:example.com"}}",
+        "Update": "{"service":"SSM","action":"GetParameter","parameters":{"Name":"/test/virginia/wildcard-certificate-arn"},"region":"us-east-1","physicalResourceId":{"id":"us-east-1:/test/virginia/wildcard-certificate-arn:example.com"}}",
       },
       "Type": "Custom::AWS",
       "UpdateReplacePolicy": "Delete",
@@ -2186,7 +2186,7 @@ function handler(event) {
                     {
                       "Ref": "AWS::AccountId",
                     },
-                    ":parameter/test/virginia/web-certificate-arn",
+                    ":parameter/test/virginia/wildcard-certificate-arn",
                   ],
                 ],
               },

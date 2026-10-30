@@ -60,6 +60,7 @@ describe('VirginiaCertificateStack', () => {
       hostedZoneParameterRegion: 'ap-northeast-1',
       certificateArnParameterName: '/test/virginia/certificate-arn',
       webCertificateArnParameterName: '/test/virginia/web-certificate-arn',
+      wildcardCertificateArnParameterName: '/test/virginia/wildcard-certificate-arn',
       env: {
         account: '123456789012',
         region: 'us-east-1',
@@ -83,6 +84,7 @@ describe('AdminStack', () => {
       fqdn: 'example.com',
       adminDomain: 'admin.example.com',
       imagesDomain: 'images.example.com',
+      mcpDomain: 'mcp.example.com',
       databaseName: 'blog_dev',
       spaDistPath: path.resolve(__dirname, 'fixtures/admin-spa'),
       labsSpaDistPath: path.resolve(__dirname, 'fixtures/labs-spa'),
@@ -90,10 +92,12 @@ describe('AdminStack', () => {
       blogApiLambdaRoleArn: 'arn:aws:iam::123456789012:role/tp-dev-blog-api-role',
       ssmParameters: {
         globalDns: { hostedZoneId: '/test/hosted-zone-id' },
-        virginia: { certificateArn: '/test/virginia/certificate-arn' },
+        virginia: { wildcardCertificateArn: '/test/virginia/wildcard-certificate-arn' },
         admin: {
           userPoolId: '/test/admin/user-pool-id',
           userPoolClientId: '/test/admin/user-pool-client-id',
+          mcpClientId: '/test/admin/mcp-client-id',
+          cognitoDomainUrl: '/test/admin/cognito-domain-url',
         },
         proxy: {
           vpcId: '/test/tidb-proxy/vpc/id',

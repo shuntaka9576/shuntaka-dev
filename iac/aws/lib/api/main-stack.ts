@@ -46,7 +46,7 @@ export class MainStack extends cdk.Stack {
           hostedZoneId: string;
         };
         virginia: {
-          webCertificateArn: string;
+          wildcardCertificateArn: string;
         };
         dsql: {
           clusterEndpoint: string;
@@ -81,12 +81,13 @@ export class MainStack extends cdk.Stack {
       zoneName: props.fqdn,
     });
 
-    // CloudFront 用の証明書は us-east-1 にあるため cross-region で読む (AdminStack と同じ流儀)
+    // CloudFront 用の証明書は us-east-1 にあるため cross-region で読む (AdminStack と同じ流儀)。
+    // apex とサブドメインで共有するワイルドカード証明書 (<fqdn> + *.<fqdn>)
     const webCertificate = acm.Certificate.fromCertificateArn(
       this,
       'ImportedWebCertificate',
       readCrossRegionParameter(this, 'WebCertificateArnLookup', {
-        parameterName: props.ssmParameters.virginia.webCertificateArn,
+        parameterName: props.ssmParameters.virginia.wildcardCertificateArn,
         region: VIRGINIA_REGION,
         refreshToken: props.fqdn,
       }),

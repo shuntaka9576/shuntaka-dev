@@ -23,6 +23,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import { readCrossRegionParameter } from '../cross-region-ssm.js';
+import { MCP_OAUTH } from '../mcp/mcp-oauth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +42,8 @@ export class AdminStack extends cdk.Stack {
       fqdn: string;
       adminDomain: string;
       imagesDomain: string;
+      // MCP サーバー (McpStack) のドメイン。ログイン後に Cognito から戻る先に使う
+      mcpDomain: string;
       databaseName: string;
       // lab 画像バケットの物理名。MainStack の blog-api にも config 経由で同じ
       // 文字列を渡しているため、ここではクロススタック token を受け取らない
@@ -54,8 +57,13 @@ export class AdminStack extends cdk.Stack {
       labsSpaDistPath?: string;
       ssmParameters: {
         globalDns: { hostedZoneId: string };
-        virginia: { certificateArn: string };
-        admin: { userPoolId: string; userPoolClientId: string };
+        virginia: { wildcardCertificateArn: string };
+        admin: {
+          userPoolId: string;
+          userPoolClientId: string;
+          mcpClientId: string;
+          cognitoDomainUrl: string;
+        };
         proxy: { vpcId: string; privateSubnetId1: string; sgId: string };
       };
     } & cdk.StackProps,
@@ -88,6 +96,33 @@ export class AdminStack extends cdk.Stack {
       generateSecret: false,
       authFlows: { userSrp: true },
       refreshTokenValidity: cdk.Duration.days(30),
+      enableTokenRevocation: true,
+      preventUserExistenceErrors: true,
+    });
+
+    // ---- MCP サーバーのログイン用 (Cognito の managed login + 認可コードフロー) ----
+    // MCP サーバー (apps/mcp-server) は DCR に対応した認可サーバーとして振る舞い、ログインだけをこのユーザープールに任せる。
+    // admin 画面と同じユーザーでログインする。クライアントとドメインはユーザープールを持つこのスタックで作り、
+    // McpStack へは SSM で渡す (CloudFormation の export にすると、クライアントの置き換えが export に阻まれる)
+    const loginDomain = userPool.addDomain('LoginDomain', {
+      // 接頭辞はリージョン内で一意。所有しているドメイン名から作る (例: shuntaka-dev-login)
+      cognitoDomain: { domainPrefix: `${props.fqdn.replaceAll('.', '-')}-login` },
+    });
+    const mcpClient = userPool.addClient('McpServerClient', {
+      userPoolClientName: `${props.physicalPrefix}-mcp-server`,
+      // MCP サーバーは Cognito のトークンエンドポイントを client_secret_basic で呼ぶ。シークレットは
+      // MCP サーバーが起動時に DescribeUserPoolClient で読む
+      generateSecret: true,
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [cognito.OAuthScope.OPENID],
+        // ローカル実行 (apps/mcp-server の src/dev.ts) は Cognito の代わりに仮ログインを使うため、localhost は登録しない
+        callbackUrls: [`https://${props.mcpDomain}${MCP_OAUTH.callbackPath}`],
+      },
+      // MCP サーバーが使うのは ID トークン (ユーザーの sub) とリフレッシュトークンだけで、アクセストークンは捨てる
+      idTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: MCP_OAUTH.sessionValidity,
       enableTokenRevocation: true,
       preventUserExistenceErrors: true,
     });
@@ -324,8 +359,9 @@ export class AdminStack extends cdk.Stack {
     });
 
     // ---- CloudFront (admin + images の 2 エイリアス) ----
+    // apex とサブドメインで共有するワイルドカード証明書 (<fqdn> + *.<fqdn>)
     const certificateArn = readCrossRegionParameter(this, 'VirginiaCertArnLookup', {
-      parameterName: props.ssmParameters.virginia.certificateArn,
+      parameterName: props.ssmParameters.virginia.wildcardCertificateArn,
       region: VIRGINIA_REGION,
       refreshToken: props.adminDomain,
     });
@@ -502,6 +538,15 @@ function handler(event) {
     new ssm.StringParameter(this, 'UserPoolClientIdParam', {
       parameterName: props.ssmParameters.admin.userPoolClientId,
       stringValue: userPoolClient.userPoolClientId,
+    });
+    // McpStack が読む
+    new ssm.StringParameter(this, 'McpClientIdParam', {
+      parameterName: props.ssmParameters.admin.mcpClientId,
+      stringValue: mcpClient.userPoolClientId,
+    });
+    new ssm.StringParameter(this, 'CognitoDomainUrlParam', {
+      parameterName: props.ssmParameters.admin.cognitoDomainUrl,
+      stringValue: loginDomain.baseUrl(),
     });
   }
 }

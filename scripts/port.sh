@@ -17,6 +17,7 @@ fi
 : "${STORYBOOK_PORT:=43005}"
 : "${LABS_WEB_PORT:=43006}"
 : "${LABS_API_PORT:=43007}"
+: "${MCP_SERVER_PORT:=43008}"
 
 printf "%-11s http://localhost:%s\n" web       "${WEB_PORT}"
 printf "%-11s http://localhost:%s\n" api       "${API_PORT}"
@@ -26,3 +27,4 @@ printf "%-11s http://localhost:%s\n" admin-web "${ADMIN_WEB_PORT}"
 printf "%-11s http://localhost:%s\n" storybook "${STORYBOOK_PORT}"
 printf "%-11s http://localhost:%s/labs/\n" labs-web  "${LABS_WEB_PORT}"
 printf "%-11s http://localhost:%s\n" labs-api  "${LABS_API_PORT}"
+printf "%-11s http://localhost:%s/mcp\n" mcp-server "${MCP_SERVER_PORT}"
