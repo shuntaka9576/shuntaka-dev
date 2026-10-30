@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1030.2](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.1...2026.1030.2) - 2026-10-30
+
+- feat(mcp-server): DCR のリダイレクト URI 許可リストに Grok Bot (Cursor) のコールバックを追加 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/834
+
 ## [2026.1030.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.0...2026.1030.1) - 2026-10-30
 
 - refactor: 証明書を us-east-1 のワイルドカード 1 枚にまとめる by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/830
