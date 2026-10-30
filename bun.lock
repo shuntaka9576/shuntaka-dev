@@ -33,7 +33,7 @@
         "iron-webcrypto": "^2.0.0",
         "jose": "^6.2.13",
         "kysely": "^0.29.7",
-        "mysql2": "^3.23.0",
+        "mysql2": "^3.24.6",
         "ulid": "^3.0.2",
         "zod": "^4.4.3",
       },
@@ -184,7 +184,7 @@
       "dependencies": {
         "commander": "^15.0.0",
         "markdown-wasm": "workspace:*",
-        "mysql2": "^3.23.0",
+        "mysql2": "^3.24.6",
       },
     },
     "tools/dsql-cli": {
@@ -209,7 +209,7 @@
       "version": "0.1.0",
       "dependencies": {
         "commander": "^15.0.0",
-        "mysql2": "^3.23.0",
+        "mysql2": "^3.24.6",
       },
     },
     "tools/tidb-seeder": {
@@ -220,7 +220,7 @@
       },
       "devDependencies": {
         "@types/node": "^26.6.6",
-        "mysql2": "^3.23.0",
+        "mysql2": "^3.24.6",
       },
     },
   },
