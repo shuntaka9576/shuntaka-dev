@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.1030.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.0...2026.1030.1) - 2026-10-30
+
+- refactor: 証明書を us-east-1 のワイルドカード 1 枚にまとめる by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/830
+- fix: 壊れた bun.lock を作り直す by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/832
+- chore: Lambda Web Functions 移行と証明書の統一の後片付け by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/833
+
 ## [2026.1030.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1027.0...2026.1030.0) - 2026-10-30
 
 - feat: ブログの MCP サーバー (mcp.<fqdn>) を追加する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/828
