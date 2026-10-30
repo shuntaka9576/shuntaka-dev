@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1030.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1027.0...2026.1030.0) - 2026-10-30
+
+- feat: ブログの MCP サーバー (mcp.<fqdn>) を追加する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/828
+
 ## [2026.1027.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1023.0...2026.1027.0) - 2026-10-27
 
 - fix: 記事カードのサムネイルを 150x100 に固定する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/823
