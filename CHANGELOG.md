@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1030.4](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.3...2026.1030.4) - 2026-10-30
+
+- fix(deps): patch certifi and zip, and pick up lockfile security updates by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/838
+
 ## [2026.1030.3](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.2...2026.1030.3) - 2026-10-30
 
 - Add a GitHub Actions workflow lockfile by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/836
