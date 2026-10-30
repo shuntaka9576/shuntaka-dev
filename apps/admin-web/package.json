@@ -30,7 +30,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@feature-sliced/steiger-plugin": "^0.7.0",
+    "@feature-sliced/steiger-plugin": "^0.8.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.23",
     "@types/react": "^19.3.0",
