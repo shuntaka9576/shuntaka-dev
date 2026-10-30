@@ -42,9 +42,24 @@ serde_yaml = "0.9.34"
 uuid = { version = "1.23.5", features = ["serde", "v4"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 aws-config = "1.9.0"
-aws-sdk-ssm = "1.115.0"
-aws-sdk-lambda = "1.134.0"
-aws-sdk-s3 = "1.140.0"
+# AWS SDK の default feature `rustls` は aws-smithy-runtime の `tls-rustls`
+# (`legacy-rustls-ring` / rustls 0.21) を有効にする。0.21 系にパッチリリースはなく
+# (修正は rustls >= 0.23.46)、HTTPS は `default-https-client` (rustls-aws-lc) と
+# infrastructure のカスタムコネクタで足りる。他の default feature は維持する。
+aws-sdk-ssm = { version = "1.115.0", default-features = false, features = [
+  "default-https-client",
+  "rt-tokio",
+] }
+aws-sdk-lambda = { version = "1.134.0", default-features = false, features = [
+  "default-https-client",
+  "rt-tokio",
+] }
+aws-sdk-s3 = { version = "1.140.0", default-features = false, features = [
+  "sigv4a",
+  "http-1x",
+  "default-https-client",
+  "rt-tokio",
+] }
 aws-smithy-http-client = { version = "1.2.0", features = ["rustls-aws-lc"] }
 aws-smithy-runtime-api = "1.13.0"
 tower-http = { version = "0.7.0", features = ["trace", "compression-gzip"] }
