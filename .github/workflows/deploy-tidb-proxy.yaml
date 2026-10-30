@@ -26,20 +26,20 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
           # tidb-proxy は dev/prd 共用スタックのため dev ロール固定
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/dev-shuntaka-assume-role
           aws-region: ap-northeast-1
 
       - name: Install ecspresso
-        uses: kayac/ecspresso@03c3416ba35a35e6e545b54a208b54738ffdb468 # v2.8.5
+        uses: kayac/ecspresso@v2.8.5
         with:
           version: v2.6.0
 
