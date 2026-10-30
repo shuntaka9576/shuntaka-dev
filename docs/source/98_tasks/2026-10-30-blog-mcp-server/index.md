@@ -186,10 +186,11 @@ aws logs tail /aws/lambda-web/d-st-mcp-server --since 30m --format short \
 
 ## 残作業
 
-- [ ] 置き換えた認可サーバーを dev に再適用し、Muse から接続し直す（認証あり・なし。ツール呼び出しとトークン更新まで）
+- [x] 置き換えた認可サーバーを dev に再適用する（[実行結果](https://github.com/shuntaka9576/shuntaka-dev/actions/runs/41005357698)。`/mcp` のツール呼び出し、`/auth/mcp` の 401 とメタデータ、DCR → 同意画面 → Cognito のログイン画面まで確認）
+- [ ] Muse から接続し直す（認証あり・なし。ツール呼び出しとトークン更新まで）
 - [ ] dev の OAuth の状態のテーブルから、fastmcp 版の項目（`client:` / `mapping:` / `upstream:` などで始まり、期限なし）を消す。暗号化した Cognito のリフレッシュトークンを含む
 - [ ] PR #828 をマージする
 - [ ] prd のデプロイロールに `dynamodb:*` を手動で反映する（`p-st-deploy-role`）。リリース前に必要
-- [ ] dev / prd に反映した後、旧証明書 2 枚（`VirginiaCertificate` / `WebCertificate`）と SSM パラメータを別 PR で消す
+- [ ] 証明書を us-east-1 のワイルドカード 1 枚にまとめる。旧証明書 2 枚と使っていない東京の証明書を消す。この PR の prd リリース後に、[証明書を us-east-1 のワイルドカード 1 枚にまとめる](../2026-10-30-unify-certificates/index.md)で行う
 - [ ] （検討）認証の要る・要らないでツールを分ける。今は両方のエンドポイントが同じ公開記事のツールを出している
 - [ ] （任意）dev の CDK bootstrap が古い（バージョン 21 未満）と通知が出ている。今回の変更とは関係ない

@@ -13,12 +13,8 @@ export class VirginiaCertificateStack extends cdk.Stack {
     id: string,
     props: {
       fqdn: string;
-      adminDomain: string;
-      imagesDomain: string;
       hostedZoneIdParameterName: string;
       hostedZoneParameterRegion: string;
-      certificateArnParameterName: string;
-      webCertificateArnParameterName: string;
       wildcardCertificateArnParameterName: string;
     } & cdk.StackProps,
   ) {
@@ -34,37 +30,9 @@ export class VirginiaCertificateStack extends cdk.Stack {
       zoneName: props.fqdn,
     });
 
-    const certificate = new acm.Certificate(this, 'VirginiaCertificate', {
-      domainName: props.adminDomain,
-      subjectAlternativeNames: [props.imagesDomain],
-      validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
-    // CloudFront が旧証明書を参照したままでもドメイン移行を進められるよう、
-    // 置換時だけ旧証明書を保持する。切り替え確認後に手動で整理する。
-    const cfnCertificate = certificate.node.defaultChild as acm.CfnCertificate;
-    cfnCertificate.cfnOptions.updateReplacePolicy = cdk.CfnDeletionPolicy.RETAIN;
-
-    new ssm.StringParameter(this, 'VirginiaCertificateArnParameter', {
-      parameterName: props.certificateArnParameterName,
-      stringValue: certificate.certificateArn,
-    });
-
-    // 公開サイト (apex) の CloudFront 用。admin / images 用の証明書に SAN を足すと置換になり、
-    // AdminStack の cross-region 読み出しが旧 ARN を掴んだままになるため別の証明書にする
-    const webCertificate = new acm.Certificate(this, 'WebCertificate', {
-      domainName: props.fqdn,
-      validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
-
-    new ssm.StringParameter(this, 'WebCertificateArnParameter', {
-      parameterName: props.webCertificateArnParameterName,
-      stringValue: webCertificate.certificateArn,
-    });
-
-    // apex とすべてのサブドメイン (admin / images / mcp ...) を 1 枚で受ける。サブドメインを増やすたびに
-    // 証明書を作らなくて済むようにする (ワイルドカードは apex を含まないため apex を本体の名前にする)。
-    // MainStack / AdminStack / McpStack はこれを使う。上の 2 枚は CloudFront が参照しなくなった後に消す
-    // (CloudFront が使っている間は削除できず、このスタックは参照側より先にデプロイされるため同じデプロイでは消せない)
+    // apex とすべてのサブドメイン (admin / images / mcp ...) を 1 枚で受ける。CloudFront を使うのはすべてこれで、
+    // サブドメインを増やしても証明書は作らない (ワイルドカードは apex を含まないため apex を本体の名前にする)。
+    // 論理 ID を変えると証明書が作り直しになり、参照側の cross-region 読み出しも追従が要るため変えない
     const wildcardCertificate = new acm.Certificate(this, 'WildcardCertificate', {
       domainName: props.fqdn,
       subjectAlternativeNames: [`*.${props.fqdn}`],
