@@ -31,7 +31,7 @@
         "hono": "^4.13.16",
         "https-proxy-agent": "^9.1.0",
         "iron-webcrypto": "^2.0.0",
-        "jose": "^6.2.13",
+        "jose": "^6.2.14",
         "kysely": "^0.29.7",
         "mysql2": "^3.24.6",
         "ulid": "^3.0.2",
