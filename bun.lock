@@ -175,7 +175,7 @@
       "name": "markdown-wasm",
       "version": "0.1.0",
       "devDependencies": {
-        "wasm-pack": "^0.15.0",
+        "wasm-pack": "^0.15.1",
       },
     },
     "tools/content-html-backfill": {
