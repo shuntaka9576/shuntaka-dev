@@ -13,6 +13,6 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "wasm-pack": "^0.15.0"
+    "wasm-pack": "^0.15.1"
   }
 }
