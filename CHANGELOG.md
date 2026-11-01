@@ -1,5 +1,7 @@
 # Changelog
 
+## [2026.1101.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1101.0...2026.1101.1) - 2026-11-01
+
 ## [2026.1101.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1030.6...2026.1101.0) - 2026-11-01
 
 - feat: robots.txt に AI 学習の opt-in を追加する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/857
