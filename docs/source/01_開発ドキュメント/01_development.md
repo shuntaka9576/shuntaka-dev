@@ -868,6 +868,21 @@ bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev
 bun run backfill -- --endpoint mysql://root@tidb.$TAILNET:4000/blog_dev --all --dry-run --out-dir ./out
 ```
 
+### 記事本文の Mermaid
+
+公開ブログでは、言語を `mermaid` としたコードブロックを図として表示する。
+
+````markdown
+```mermaid
+flowchart LR
+  A[記事を書く] --> B[保存する] --> C[公開する]
+```
+````
+
+Markdown 変換が出力する `pre[lang="mermaid"]` を Web 側で検出し、Mermaid を遅延読み込みする。ライト / ダークモードに追従し、図は本文の幅に合わせて縮小表示する。クリック（キーボードでは Enter / Space）で拡大し、閉じるボタンまたは Escape で戻れる。描画に失敗した場合は元のコードを表示する。既存記事もこの HTML 形式なら再保存は不要。図内の HTML やクリック処理は Mermaid の `strict` モードで制限する。
+
+Storybook の `Components/ArticleContent` で表示を確認できる。Neovim のローカルプレビューは別の描画実装のため、現時点では Mermaid をコードとして表示する。
+
 ### shuntaka-preview.nvim
 
 ブログと同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で Markdown をローカルプレビューする Neovim プラグイン。バッファ変更のライブ反映、カーソル行割合ベースのスクロール同期、リンクカード・GitHub 埋め込みの実フェッチ（URL 単位キャッシュ）、frontmatter の除去（本番の webhook と同じ扱い）に対応する。スタイルは `apps/web/src/app/globals.css` をそのまま配信し、本番と同じ `article-body` レイアウト（コンテナ幅 1200px + 右サイドバー目次）で表示する。目次は `TableOfContents.tsx` を移植したもので、スクロール追従と 1024px 以下のモーダル目次も本番と同じ挙動になる。

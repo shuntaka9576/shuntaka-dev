@@ -1460,6 +1460,20 @@ mod tests {
     }
 
     #[test]
+    fn test_mermaid_code_preserves_language_and_source() {
+        // Web は保存済み HTML の lang と code.textContent から Mermaid を描画する。
+        let source = "flowchart LR\n  A[\"<script>alert(1)</script>\"] --> B[\"A & B\"]\n";
+        for fence in ["```", "````"] {
+            let html = convert_markdown_to_html(&format!("{fence}mermaid\n{source}{fence}"));
+            let document = Html::parse_fragment(&html);
+            let selector = Selector::parse("pre[lang=mermaid] > code").unwrap();
+            let code = document.select(&selector).next().unwrap();
+            assert_eq!(code.text().collect::<String>(), source);
+            assert!(!html.contains("<script>"));
+        }
+    }
+
+    #[test]
     fn test_speakerdeck_embed() {
         let markdown = "@[sd](abc123,1,560/315,1.78)";
         let html = convert_markdown_to_html(markdown);
