@@ -50,6 +50,26 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
   const parts = useMemo(() => parseHtmlWithTweets(html), [html]);
 
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container?.querySelector('pre[lang="mermaid"]')) return;
+
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    void import('@/lib/mermaid').then(
+      ({ enhanceMermaid }) => {
+        if (!cancelled) cleanup = enhanceMermaid(container);
+      },
+      () => {
+        // 読み込みに失敗した場合も元のコードブロックを残す。
+      },
+    );
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [html]);
+
   // Complete navigation progress after content is painted
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -83,7 +103,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
       pre.appendChild(button);
     });
-  }, []);
+  }, [html]);
 
   // Handle copy click
   useEffect(() => {
