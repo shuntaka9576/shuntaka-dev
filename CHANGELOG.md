@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1105.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1104.0...2026.1105.0) - 2026-11-05
+
+- feat: 記事本文のMermaid描画と拡大表示に対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/872
+
 ## [2026.1101.4](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1101.3...2026.1101.4) - 2026-11-01
 
 ## [2026.1101.3](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1101.2...2026.1101.3) - 2026-11-01
