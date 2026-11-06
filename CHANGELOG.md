@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1106.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1105.0...2026.1106.0) - 2026-11-06
+
+- fix: NeovimプレビューでMermaidを描画する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/876
+
 ## [2026.1105.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1104.0...2026.1105.0) - 2026-11-05
 
 - feat: 記事本文のMermaid描画と拡大表示に対応 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/872
