@@ -37,6 +37,7 @@ bun run serve
 - `src/articles.ts` — frontmatter の除去/title 抽出（blog-api の ArticleFrontmatter::parse と同じ切り出し方）と記事一覧の列挙。日付は git log 1 回で集めた初回/最終コミット日時（未コミットのみ fs 日時にフォールバック）
 - `src/template.ts` — shell ページ（記事一覧 + pc/mobile 切り替え + iframe）と view ページ（本番と同じ article-body レイアウト）、globals.css の取り込み（Tailwind ディレクティブのみ除去）
 - `static/client.js` — shell 側。WS 受信を iframe に注入し、記事一覧の描画・ソート・pc/mobile 切り替えを行う
+- `static/mermaid.js` — Mermaid の遅延読み込みと本文更新時の再描画。`src/browser-assets.ts` が `apps/web/src/lib/mermaid-renderer.ts` を Bun.Transpiler で JS に変換して配信し、図のスタイル・拡大・後片付けを本番と共有する。Mermaid 本体は固定バージョンの CDN から読み込み、node_modules 不要を維持する
 - `static/toc.js` — view (iframe) 側。apps/web の TableOfContents.tsx を移植した目次（スクロール追従・モバイルモーダル込み）
 - `static/favicon.png` — 本番 favicon (apps/web/public/icons/icon.png) を色相 +240° 回転したプレビュー識別用アイコン
 - ブラウザ側 JS は DOM 型と bun-types が衝突するため素の JS

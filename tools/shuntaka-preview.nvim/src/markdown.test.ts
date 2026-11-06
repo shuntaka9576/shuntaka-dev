@@ -19,6 +19,14 @@ function mockFetch(handler: () => Response | Promise<Response>): { calls: () => 
 }
 
 describe('renderMarkdown', () => {
+  test('コミット済み WASM が Mermaid の言語属性・改行・配色指定を保持する', async () => {
+    const html = await renderMarkdown(
+      '```mermaid\nflowchart TD\n  A["NER<br/>固有表現抽出"] --> B[関係抽出]\n  classDef process fill:#dbeafe\n  class A process\n```',
+    );
+    expect(html).toContain('lang="mermaid"');
+    expect(html).toContain('&lt;br/&gt;');
+    expect(html).toContain('classDef process fill:#dbeafe');
+  });
   test('外部リソース無しの Markdown が本番同等の HTML に変換される', async () => {
     const html = await renderMarkdown('# 見出し\n\n本文');
     expect(html).toContain('見出し');

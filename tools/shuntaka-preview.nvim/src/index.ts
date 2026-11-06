@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { ServerWebSocket } from 'bun';
 import { isPathInDir, listArticles, stripFrontmatter } from './articles.js';
 import { renderMarkdown } from './markdown.js';
+import { readMermaidRenderer } from './browser-assets.js';
 import { readGlobalsCss, renderShellPage, renderViewPage } from './template.js';
 import type { BrowserMessage, InboundMessage, OutboundMessage, StdoutMessage } from './protocol.js';
 
@@ -48,6 +49,14 @@ const server = Bun.serve({
     }
     if (url.pathname === '/toc.js') {
       return new Response(Bun.file(join(import.meta.dir, '../static/toc.js')));
+    }
+    if (url.pathname === '/mermaid.js') {
+      return new Response(Bun.file(join(import.meta.dir, '../static/mermaid.js')));
+    }
+    if (url.pathname === '/mermaid-renderer.js') {
+      return new Response(readMermaidRenderer(), {
+        headers: { 'content-type': 'text/javascript; charset=utf-8' },
+      });
     }
     if (url.pathname === '/favicon.png') {
       return new Response(Bun.file(join(import.meta.dir, '../static/favicon.png')));
