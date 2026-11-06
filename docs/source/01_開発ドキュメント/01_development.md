@@ -881,9 +881,11 @@ flowchart LR
 
 Markdown 変換が出力する `pre[lang="mermaid"]` を Web 側で検出し、Mermaid を遅延読み込みする。ライト / ダークモードに追従し、図は本文の幅に合わせて縮小表示する。クリック（キーボードでは Enter / Space）で拡大し、閉じるボタンまたは Escape で戻れる。描画に失敗した場合は元のコードを表示する。既存記事もこの HTML 形式なら再保存は不要。図内の HTML やクリック処理は Mermaid の `strict` モードで制限する。
 
-Storybook の `Components/ArticleContent` で表示を確認できる。Neovim のローカルプレビューは別の描画実装のため、現時点では Mermaid をコードとして表示する。
+Storybook の `Components/ArticleContent` で表示を確認できる。Neovim のローカルプレビューでも同じ描画処理で図を表示する。
 
 ### shuntaka-preview.nvim
+
+Mermaid のコードブロックも、本番と共通の描画処理で図として表示する。バッファ更新で再描画し、本文幅への縮小・クリック拡大・OS の配色変更に対応する。プレビューでは図を含む記事を開いたときに Mermaid 12.3.0 を jsDelivr から読み込むためネットワーク接続が必要。読み込みに失敗した場合は案内と元のコードを表示する。`bun install` は不要。更新後は `:ShuntakaPreviewStop` → `:ShuntakaPreview` でサーバーを起動し直す。
 
 ブログと同じ変換ロジック（`apps/blog-api/markdown` crate を wasm 化したもの）で Markdown をローカルプレビューする Neovim プラグイン。バッファ変更のライブ反映、カーソル行割合ベースのスクロール同期、リンクカード・GitHub 埋め込みの実フェッチ（URL 単位キャッシュ）、frontmatter の除去（本番の webhook と同じ扱い）に対応する。スタイルは `apps/web/src/app/globals.css` をそのまま配信し、本番と同じ `article-body` レイアウト（コンテナ幅 1200px + 右サイドバー目次）で表示する。目次は `TableOfContents.tsx` を移植したもので、スクロール追従と 1024px 以下のモーダル目次も本番と同じ挙動になる。
 

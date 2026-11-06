@@ -15,6 +15,7 @@
     var el = doc && doc.getElementById('content');
     if (el) {
       el.innerHTML = latestHtml;
+      doc.dispatchEvent(new iframe.contentWindow.Event('preview-content-updated'));
       // 目次 (toc.js) を新しい本文で組み立て直す
       var win = iframe.contentWindow;
       if (win && typeof win.__shuntakaPreviewRefresh === 'function') {

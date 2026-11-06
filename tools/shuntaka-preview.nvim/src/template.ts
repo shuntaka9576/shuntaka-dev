@@ -142,6 +142,7 @@ export function renderViewPage(initialHtml = ''): string {
   </div>
 </div>
 <script src="/toc.js"></script>
+<script type="module" src="/mermaid.js"></script>
 </body>
 </html>`;
 }
