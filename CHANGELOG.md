@@ -1,5 +1,7 @@
 # Changelog
 
+## [2026.1109.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1108.0...2026.1109.0) - 2026-11-09
+
 ## [2026.1108.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1106.0...2026.1108.0) - 2026-11-08
 
 ## [2026.1106.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1105.0...2026.1106.0) - 2026-11-06
