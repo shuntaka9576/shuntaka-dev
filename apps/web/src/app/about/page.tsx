@@ -85,7 +85,7 @@ export default function AboutPage() {
           <div>Site Policy</div>
           <div className="p-2 text-sm text-[var(--color-text-muted)]">
             <p>
-              本サイトはアクセス解析のため Google Analytics / Microsoft Clarity / Vercel Analytics
+              本サイトはアクセス解析のため Google Analytics / Microsoft Clarity
               を使用しています。
             </p>
           </div>
