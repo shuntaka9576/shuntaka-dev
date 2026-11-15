@@ -16,7 +16,7 @@ workflows:
     '.github/workflows/deploy-tidb-proxy.yaml':
         - 'actions/checkout@v7.0.1'
         - 'aws-actions/configure-aws-credentials@v6.2.3'
-        - 'kayac/ecspresso@v2.8.5'
+        - 'kayac/ecspresso@v3.0.0'
     '.github/workflows/deploy.yaml': []
     '.github/workflows/docs.yaml':
         - 'actions/cache@v6.1.0'
@@ -110,11 +110,18 @@ dependencies:
         commit: 'sha1-db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28'
         owner_id: 9919
         repo_id: 259445878
-    'kayac/ecspresso@v2.8.5':
-        ref: 'v2.8.5'
-        commit: 'sha1-03c3416ba35a35e6e545b54a208b54738ffdb468'
+    'kayac/ecspresso-action@v3.0.0':
+        ref: 'v3.0.0'
+        commit: 'sha1-77ba8735dac2fb1189e7648af97978f232a1df7c'
+        owner_id: 114519
+        repo_id: 1447088065
+    'kayac/ecspresso@v3.0.0':
+        ref: 'v3.0.0'
+        commit: 'sha1-ec1c17df8e5dad83deb2870646c091aee57bdb95'
         owner_id: 114519
         repo_id: 109662309
+        uses:
+            - 'kayac/ecspresso-action@v3.0.0'
     'oven-sh/setup-bun@v2.2.0':
         ref: 'v2.2.0'
         commit: 'sha1-0c5077e51419868618aeaa5fe8019c62421857d6'
