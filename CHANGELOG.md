@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1116.1](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1116.0...2026.1116.1) - 2026-11-16
+
+- ci: kayac/ecspresso-action@v3.0.0 に移行する by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/896
+
 ## [2026.1116.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1114.0...2026.1116.0) - 2026-11-16
 
 - docs(about): Site PolicyからVercel Analyticsの記載を削除 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/893
