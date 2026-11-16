@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026.1116.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1114.0...2026.1116.0) - 2026-11-16
+
+- docs(about): Site PolicyからVercel Analyticsの記載を削除 by @shuntaka9576 in https://github.com/shuntaka9576/shuntaka-dev/pull/893
+
 ## [2026.1109.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1108.0...2026.1109.0) - 2026-11-09
 
 ## [2026.1108.0](https://github.com/shuntaka9576/shuntaka-dev/compare/2026.1106.0...2026.1108.0) - 2026-11-08
