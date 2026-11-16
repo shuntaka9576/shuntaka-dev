@@ -78,6 +78,7 @@ spec:
         - astral-sh/setup-uv@*
         - aws-actions/configure-aws-credentials@*
         - kayac/ecspresso@*
+        - kayac/ecspresso-action@*
         - oven-sh/setup-bun@*
         - songmu/tagpr@*
     sha_pinning_required: true
