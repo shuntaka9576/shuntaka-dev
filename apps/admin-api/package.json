@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "^2.1.6",
-    "@scalar/hono-api-reference": "^0.12.20",
+    "@scalar/hono-api-reference": "^0.12.26",
     "esbuild": "^0.28.2"
   }
 }
